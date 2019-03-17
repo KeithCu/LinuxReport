@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+  <head>
+    <title>LinuxHomePage 2</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+   * {
+      box-sizing: border-box;
+    }
+
+    a:link {
+      color: black;
+    }
+
+    a:visited {
+      color: black;
+    }
+
+    a:hover {
+      color: black;
+    }
+
+    .linkclass {margin-bottom: .4em }
+
+    a:active {
+      color: black;
+    } 
+    
+    {% if not request.MOBILE %}
+    /* Create three equal columns that floats next to each other */
+    .column {
+      float: left;
+      width: 33.33%;
+      padding: 10px;
+    }
+    
+    .row:after {
+      content: "";
+      display: table;
+      clear: both;
+    }
+    {% endif %}
+  </style>
+
+  <script>
+    function redirect() {
+        window.location = "/linuxhomepage/config"          
+        }
+    </script>
+
+  </head>
+  <body>
+    <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
+    <center><img src = "http://keithcu.com/images/LinuxReport2.png" height = "100"></center>
+    <div class="row">
+
+        <div class = "column">{{ columns[0] }}</div>
+        <div class = "column">{{ columns[1] }}</div>
+        <div class = "column">{{ columns[2] }}</div>
+    </div>
+  </body>
+</html>

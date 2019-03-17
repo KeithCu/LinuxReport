@@ -1,0 +1,28 @@
+{% macro render_field(field) %}
+  <dt>{{ field.label }}
+  <dd>{{ field(**kwargs)|safe }}
+  {% if field.errors %}
+    <ul class=errors>
+    {% for error in field.errors %}
+      <li>{{ error }}</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
+  </dd>
+{% endmacro %}
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LinuxReport Customize</title>
+</head>
+<body>
+<form method="POST">
+  {{ form.urls }}
+  {{ form.url_custom }}
+    <button type="save" name="save">Save</button>
+</form>
+</body>
+</html>
