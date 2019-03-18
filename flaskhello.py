@@ -139,12 +139,16 @@ def GrabImage(feedinfo):
 
 
 g_c = None
+g_standard_order = list(site_urls.keys())
+g_standard_order_s = str(g_standard_order)
 
 @g_app.route('/')
 def index():
 
     global g_c
     global g_app
+    global g_standard_order
+    global g_standard_order_s
 
     if g_c is None:
         g_c = HelloCache()
@@ -154,14 +158,12 @@ def index():
         page_order = json.loads(page_order)
     
     if page_order is None:
-        page_order = []
-        for key, value in site_urls.items():
-            if value[0] != "http://keithcu.com/images/Custom.png":
-                page_order.append(key)
+        page_order = g_standard_order
+
+        # for key, value in site_urls.items():
+        #     if value[0] != "http://keithcu.com/images/Custom.png":
+        #         page_order.append(key)
     
-    # suffix = ""
-    # if request.MOBILE:
-    #     suffix = ":MOBILE"
     #There's a question as to whether it's worth trying to cache
     #all possible custom page layouts.
     #That could cause us to use at least 40,000 files with just
@@ -173,10 +175,17 @@ def index():
     #or 400 with a page cache. I'll just kill it for now.
     #Or I'll just cache the "standard layout" page.
 
-    # page_order_s = str(page_order) + suffix
-    # full_page = g_c.Get(page_order_s)
-    # if full_page is not None:
-    #     return full_page
+    #Only try to cache standard page order
+    page_order_s = str(page_order)
+
+    suffix = ""
+    if request.MOBILE:
+        suffix = ":MOBILE"
+
+    if page_order_s == g_standard_order_s:
+        full_page = g_c.Get(page_order_s + suffix)
+        if full_page is not None:
+            return full_page
     
     result = [[], [], []]
     cur_col = 0
@@ -258,7 +267,8 @@ def index():
 
     page = render_template('page.html', columns = result)
 
-    # g_c.Put(page_order_s, page, timeout = EXPIRE_MINUTES)
+    if page_order_s == g_standard_order_s:
+        g_c.Put(page_order_s + suffix, page, timeout = EXPIRE_MINUTES)
     return page      
 
 class ROStringField(StringField):
