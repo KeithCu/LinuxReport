@@ -37,50 +37,42 @@ EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
 site_urls = { "http://lxer.com/module/newswire/headlines.rss" : 
-             ["http://lxer.com/module/newswire/headlines.rss",
-              "http://keithcu.com/images/lxer.png",
+             ["http://keithcu.com/images/lxer.png",
               "http://lxer.com/",
               EXPIRE_HOUR],
     
               "http://www.reddit.com/r/linux/.rss" : 
-             ["http://www.reddit.com/r/linux/.rss",
-              "http://keithcu.com/images/redditlogosmall.png",
+             ["http://keithcu.com/images/redditlogosmall.png",
               "https://www.reddit.com/r/linux",
               EXPIRE_HOUR],
 
               "http://rss.slashdot.org/Slashdot/slashdotMain" : 
-             ["http://rss.slashdot.org/Slashdot/slashdotMain",
-              "http://keithcu.com/images/slashdotlogo.png",
+             ["http://keithcu.com/images/slashdotlogo.png",
               "https://slashdot.org/",
               EXPIRE_HOUR],
 
               "http://lwn.net/headlines/newrss" :
-             ["http://lwn.net/headlines/newrss",
-              "http://keithcu.com/images/barepenguin-70.png",
+             ["http://keithcu.com/images/barepenguin-70.png",
               "https://lwn.net/",
               EXPIRE_DAY],
 
                "http://feeds.feedburner.com/linuxtoday/linux" :
-             ["http://feeds.feedburner.com/linuxtoday/linux",
-              "http://keithcu.com/images/linuxtd_logo.png",
+             ["http://keithcu.com/images/linuxtd_logo.png",
               "http://www.linuxtoday.com/",
               EXPIRE_HOUR],
 
                "http://planet.debian.org/rss20.xml" :
-             ["http://planet.debian.org/rss20.xml",
-              "http://keithcu.com/images/Debian-OpenLogo.svg",
+             ["http://keithcu.com/images/Debian-OpenLogo.svg",
               "http://planet.debian.org/",
               EXPIRE_HOUR],
 
               "http://www.osnews.com/feed/" :
-             ["http://www.osnews.com/feed/",
-              "http://keithcu.com/images/osnews-logo.png",
+             ["http://keithcu.com/images/osnews-logo.png",
               "http://www.osnews.com/",
               EXPIRE_HOUR],
 
               "http://www.geekwire.com/feed/" :
-             ["http://www.geekwire.com/feed/",
-              "http://keithcu.com/images/GeekWire.png",
+             ["http://keithcu.com/images/GeekWire.png",
               "http://www.geekwire.com/",
               EXPIRE_HOUR],
 
@@ -157,6 +149,19 @@ def index():
     if g_c is None:
         g_c = HelloCache()
 
+    page_order = request.cookies.get('RssUrls')
+    if page_order is not None:
+        page_order = json.loads(page_order)
+    
+    if page_order is None:
+        page_order = []
+        for key, value in site_urls.items():
+            if value[0] != "http://keithcu.com/images/Custom.png":
+                page_order.append(key)
+    
+    # suffix = ""
+    # if request.MOBILE:
+    #     suffix = ":MOBILE"
     #There's a question as to whether it's worth trying to cache
     #all possible custom page layouts.
     #That could cause us to use at least 40,000 files with just
@@ -164,22 +169,14 @@ def index():
     #for those cases. It takes just a bit more time to stitch together 
     #the individual cached html templates versus the full page.
     #It would be interesting to find out how much longer.
-    #For now it's worth caching variations until we get to >10k+ cached files
-    page_order = request.cookies.get('RssUrls')
-    if page_order is not None:
-        page_order = json.loads(page_order)
-    
-    if page_order is None:
-        page_order = list(site_urls.keys())
-    
-    suffix = ""
-    if request.MOBILE:
-        suffix = ":MOBILE"
+    #On my machine I can do 300 requests per second with no page cache
+    #or 400 with a page cache. I'll just kill it for now.
+    #Or I'll just cache the "standard layout" page.
 
-    page_order_s = str(page_order) + suffix
-    full_page = g_c.Get(page_order_s)
-    if full_page is not None:
-        return full_page
+    # page_order_s = str(page_order) + suffix
+    # full_page = g_c.Get(page_order_s)
+    # if full_page is not None:
+    #     return full_page
     
     result = [[], [], []]
     cur_col = 0
@@ -187,13 +184,13 @@ def index():
     for url in page_order:
         
         #If custom URL, add
-        site_info = site_urls.get(url)
+        site_info = site_urls.get(url, None)
 
         if site_info is None:
-            site_info = [url, "http://keithcu.com/twitter.png", url + "HTML", EXPIRE_HOUR]
+            site_info = ["http://keithcu.com/images/Custom.png", url + "HTML", EXPIRE_HOUR]
             site_urls[url] = site_info
 
-        rss_url, logo_url, site_url, expire_time = site_info
+        logo_url, site_url, expire_time = site_info
 
         #First check for the templatized content stored with site URL
         template = g_c.Get(site_url)
@@ -202,7 +199,7 @@ def index():
             jitter = random.randint(0, 20)
 
             #Check for RSS content to save network fetch
-            feedinfo = g_c.Get(rss_url)
+            feedinfo = g_c.Get(url)
             if feedinfo is None:
                 #Consider adding code to make sure only one process tries to fetch
                 #at a time after expiration (considering multiple processes on a busy server)
@@ -234,10 +231,10 @@ def index():
                 #all the RSS feeds to my server.
                 #Given the 2/3 levels of caching, this app is usually very fast.
 
-                print ("Warning: parsing from remote site %s" %(rss_url))
-                res = feedparser.parse(rss_url)
+                print ("Warning: parsing from remote site %s" %(url))
+                res = feedparser.parse(url)
                 feedinfo = list(itertools.islice(res['entries'], 8))
-                g_c.Put(rss_url, feedinfo, timeout = expire_time + jitter)
+                g_c.Put(url, feedinfo, timeout = expire_time + jitter)
 
             #First try to grab image from cache
             # image_name = g_c.Get(rssurl + ":" + "IMAGE")
@@ -261,7 +258,7 @@ def index():
 
     page = render_template('page.html', columns = result)
 
-    g_c.Put(page_order_s, page, timeout = EXPIRE_MINUTES)
+    # g_c.Put(page_order_s, page, timeout = EXPIRE_MINUTES)
     return page      
 
 class ROStringField(StringField):
@@ -300,7 +297,7 @@ def Config():
         custom_count = 0
         for i, p_url in enumerate(page_order):
             site_info = site_urls.get(p_url, None)
-            if site_info is not None and site_info[2] is not "http://keithcu.com/twitter.png":
+            if site_info is not None and site_info[0] != "http://keithcu.com/images/Custom.png":
                 urlf = UrlForm()
                 urlf.pri = (i + 1) * 10
                 urlf.url = p_url
