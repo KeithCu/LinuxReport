@@ -36,52 +36,52 @@ EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
-site_urls = { "http://lxer.com/" : 
+site_urls = { "http://lxer.com/module/newswire/headlines.rss" : 
              ["http://lxer.com/module/newswire/headlines.rss",
               "http://keithcu.com/images/lxer.png",
               "http://lxer.com/",
               EXPIRE_HOUR],
     
-              "https://www.reddit.com/r/linux" : 
-             ["https://www.reddit.com/r/linux/.rss",
+              "http://www.reddit.com/r/linux/.rss" : 
+             ["http://www.reddit.com/r/linux/.rss",
               "http://keithcu.com/images/redditlogosmall.png",
               "https://www.reddit.com/r/linux",
               EXPIRE_HOUR],
 
-              "https://slashdot.org/" : 
+              "http://rss.slashdot.org/Slashdot/slashdotMain" : 
              ["http://rss.slashdot.org/Slashdot/slashdotMain",
               "http://keithcu.com/images/slashdotlogo.png",
               "https://slashdot.org/",
               EXPIRE_HOUR],
 
-              "https://lwn.net/" :
-             ["https://lwn.net/headlines/newrss",
+              "http://lwn.net/headlines/newrss" :
+             ["http://lwn.net/headlines/newrss",
               "http://keithcu.com/images/barepenguin-70.png",
               "https://lwn.net/",
               EXPIRE_DAY],
 
-               "https://www.linuxtoday.com/" :
-             ["https://feeds.feedburner.com/linuxtoday/linux",
+               "http://feeds.feedburner.com/linuxtoday/linux" :
+             ["http://feeds.feedburner.com/linuxtoday/linux",
               "http://keithcu.com/images/linuxtd_logo.png",
-              "https://www.linuxtoday.com/",
+              "http://www.linuxtoday.com/",
               EXPIRE_HOUR],
 
-               "https://planet.debian.org/" :
-             ["https://planet.debian.org/rss20.xml",
+               "http://planet.debian.org/rss20.xml" :
+             ["http://planet.debian.org/rss20.xml",
               "http://keithcu.com/images/Debian-OpenLogo.svg",
-              "https://planet.debian.org/",
+              "http://planet.debian.org/",
               EXPIRE_HOUR],
 
-              "https://www.osnews.com/" :
-             ["https://www.osnews.com/feed/",
+              "http://www.osnews.com/feed/" :
+             ["http://www.osnews.com/feed/",
               "http://keithcu.com/images/osnews-logo.png",
-              "https://www.osnews.com/",
+              "http://www.osnews.com/",
               EXPIRE_HOUR],
 
-              "https://www.geekwire.com/" :
-             ["https://www.geekwire.com/feed/",
+              "http://www.geekwire.com/feed/" :
+             ["http://www.geekwire.com/feed/",
               "http://keithcu.com/images/GeekWire.png",
-              "https://www.geekwire.com/",
+              "http://www.geekwire.com/",
               EXPIRE_HOUR],
 
             }
@@ -165,7 +165,7 @@ def index():
     #the individual cached html templates versus the full page.
     #It would be interesting to find out how much longer.
     #For now it's worth caching variations until we get to >10k+ cached files
-    page_order = request.cookies.get('URLs')
+    page_order = request.cookies.get('RssUrls')
     if page_order is not None:
         page_order = json.loads(page_order)
     
@@ -186,7 +186,14 @@ def index():
         
     for url in page_order:
         
-        rss_url, logo_url, site_url, expire_time = site_urls[url]
+        #If custom URL, add
+        site_info = site_urls.get(url)
+
+        if site_info is None:
+            site_info = [url, "http://keithcu.com/twitter.png", url + "HTML", EXPIRE_HOUR]
+            site_urls[url] = site_info
+
+        rss_url, logo_url, site_url, expire_time = site_info
 
         #First check for the templatized content stored with site URL
         template = g_c.Get(site_url)
@@ -264,11 +271,11 @@ class ROStringField(StringField):
 
 class UrlForm(Form):
     pri = IntegerField('Priority')
-    url = ROStringField('url')
+    url = ROStringField('RSS URL')
 
 class CustomRSSForm(Form):
     pri = IntegerField('Priority')
-    rss = StringField('RSS URL')
+    url = StringField('RSS URL')
 
 
 class ConfigForm(Form):
@@ -284,22 +291,31 @@ def Config():
     if request.method == 'GET':
         form = ConfigForm()
 
-        page_order = request.cookies.get('URLs')
+        page_order = request.cookies.get('RssUrls')
         if page_order is not None:
             page_order = json.loads(page_order)
         else:
             page_order = list(site_urls.keys())
 
-        for i, p in enumerate(page_order):
-            urlf = UrlForm()
-            urlf.pri = (i + 1) * 10
-            urlf.url = p
-            form.urls.append_entry(urlf)
+        custom_count = 0
+        for i, p_url in enumerate(page_order):
+            site_info = site_urls.get(p_url, None)
+            if site_info is not None and site_info[2] is not "http://keithcu.com/twitter.png":
+                urlf = UrlForm()
+                urlf.pri = (i + 1) * 10
+                urlf.url = p_url
+                form.urls.append_entry(urlf)
+            else:
+                custom_count += 1
+                rssf =  CustomRSSForm()
+                rssf.url = p_url
+                rssf.pri = (i + 1) * 10
+                form.url_custom.append_entry(rssf)
 
-        for i in range (3):
+        for i in range (custom_count, 5):
             rssf =  CustomRSSForm()
-            rssf.rss = "http://"
-            rssf.pri = (10 + i) * 10            
+            rssf.url = "http://"
+            rssf.pri = (i + 10) * 10
             form.url_custom.append_entry(rssf)
 
         page = render_template('config.html', form = form)
@@ -312,20 +328,20 @@ def Config():
 
         url_custom = list(form.url_custom)
         for site in url_custom:
-            if site.url != "http://":
+            if site.url.data != "http://":
                 urls.append(site)
 
         urls.sort(key = lambda x: x.pri.data)
 
         for urlf in urls:
-            if urlf is UrlForm:
+            if isinstance(urlf.form, UrlForm):
                 page_order.append(urlf.url.data)
-            elif urlf is CustomRSSForm:
-                page_order.append(urlf.rss.data)
+            elif isinstance(urlf.form, CustomRSSForm):
+                page_order.append(urlf.url.data)
         
         #Pickle this stuff to a string to send as a cookie
         cookie_str = json.dumps(page_order)
         resp = g_app.make_response("<HTML><BODY>Saved cookie for later.</BODY></HTML>")        
-        resp.set_cookie('URLs', cookie_str, max_age = EXPIRE_YEARS)
+        resp.set_cookie('RssUrls', cookie_str, max_age = EXPIRE_YEARS)
         return resp
 
