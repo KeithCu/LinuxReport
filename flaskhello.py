@@ -29,7 +29,7 @@ EXPIRE_MINUTES = 60 * 10
 if g_app.debug == True:
     EXPIRE_MINUTES = 60
 
-EXPIRE_HOUR = 3600 * 2
+EXPIRE_HOURS = 3600 * 2
 EXPIRE_DAY = 3600 * 6
 EXPIRE_DAYS = 86400 * 10
 EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
@@ -39,42 +39,47 @@ g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 site_urls = { "http://lxer.com/module/newswire/headlines.rss" : 
              ["http://keithcu.com/images/lxer.png",
               "http://lxer.com/",
-              EXPIRE_HOUR],
+              EXPIRE_HOURS],
     
               "http://www.reddit.com/r/linux/.rss" : 
              ["http://keithcu.com/images/redditlogosmall.png",
               "https://www.reddit.com/r/linux",
-              EXPIRE_HOUR],
+              EXPIRE_HOURS],
 
               "http://rss.slashdot.org/Slashdot/slashdotMain" : 
              ["http://keithcu.com/images/slashdotlogo.png",
               "https://slashdot.org/",
-              EXPIRE_HOUR],
+              EXPIRE_HOURS],
 
               "http://lwn.net/headlines/newrss" :
              ["http://keithcu.com/images/barepenguin-70.png",
               "https://lwn.net/",
               EXPIRE_DAY],
 
-               "http://feeds.feedburner.com/linuxtoday/linux" :
-             ["http://keithcu.com/images/linuxtd_logo.png",
-              "http://www.linuxtoday.com/",
-              EXPIRE_HOUR],
+              "http://news.ycombinator.com/rss" :
+             ["http://keithcu.com/images/hackernews.jpg",
+              "http://news.ycombinator.com/",
+              EXPIRE_HOURS],
 
                "http://planet.debian.org/rss20.xml" :
              ["http://keithcu.com/images/Debian-OpenLogo.svg",
               "http://planet.debian.org/",
-              EXPIRE_HOUR],
+              EXPIRE_HOURS],
 
               "http://www.osnews.com/feed/" :
              ["http://keithcu.com/images/osnews-logo.png",
               "http://www.osnews.com/",
-              EXPIRE_HOUR],
+              EXPIRE_HOURS],
 
               "http://www.geekwire.com/feed/" :
              ["http://keithcu.com/images/GeekWire.png",
               "http://www.geekwire.com/",
-              EXPIRE_HOUR],
+              EXPIRE_HOURS],
+
+               "http://feeds.feedburner.com/linuxtoday/linux" :
+             ["http://keithcu.com/images/linuxtd_logo.png",
+              "http://www.linuxtoday.com/",
+              EXPIRE_HOURS],
 
             }
 
@@ -93,7 +98,7 @@ class HelloCache(object):
         return template
 
 
-def GrabImage(feedinfo):
+def GrabImageTest(feedinfo):
 
     #Search for first image in first article of feed:
     feed = feedinfo[0]
@@ -167,15 +172,10 @@ def index():
     #There's a question as to whether it's worth trying to cache
     #all possible custom page layouts.
     #That could cause us to use at least 40,000 files with just
-    #8 URL variants. If that becomes too much, we could just disable the page cache
-    #for those cases. It takes just a bit more time to stitch together 
-    #the individual cached html templates versus the full page.
-    #It would be interesting to find out how much longer.
+    #8 URL variants.
     #On my machine I can do 300 requests per second with no page cache
-    #or 400 with a page cache. I'll just kill it for now.
-    #Or I'll just cache the "standard layout" page.
+    #or 400 with a page cache. I'll just cache the "standard layout" page.
 
-    #Only try to cache standard page order
     page_order_s = str(page_order)
 
     suffix = ""
@@ -192,11 +192,10 @@ def index():
         
     for url in page_order:
         
-        #If custom URL, add
         site_info = site_urls.get(url, None)
 
         if site_info is None:
-            site_info = ["http://keithcu.com/images/Custom.png", url + "HTML", EXPIRE_HOUR]
+            site_info = ["http://keithcu.com/images/Custom.png", url + "HTML", EXPIRE_HOURS]
             site_urls[url] = site_info
 
         logo_url, site_url, expire_time = site_info
@@ -205,7 +204,7 @@ def index():
         template = g_c.Get(site_url)
 
         if template is None:
-            jitter = random.randint(0, 20)
+            jitter = random.randint(0, 60 * 5) #Add up to 5 minutes of jitter to spread out updates
 
             #Check for RSS content to save network fetch
             feedinfo = g_c.Get(url)
@@ -215,30 +214,25 @@ def index():
                 #Implement a two-stage process where first I check for the pid.
                 #if it doesn't exist, create it. Then check again if it's me.
                 #If it is, then fetch.
-                #Otherwise, sleep for 50 ms and try again. Multille processes / threds
-                #could be waiting on the app, but it's faster to wait than to
-                #do the work many times.
+                #Otherwise, sleep for 50 ms and try again.
                 #Some people will have pauses, but it should only be a small number
                 #every hours or so.
 
                 #An alternative way of caching is to never expire the HTML templates.
                 #Just create a thread which sleeps for 10 seconds, and then checks if 
-                #any of the RSS feeds are out of date, and update them.
+                #any of the RSS feeds are out of date, and updates them.
                 #And also update the HTML template.
-                #This version isn't much faster in practice considering that 
+                #That version isn't much faster in practice considering that 
                 #everything here is cached. However, it would help
                 #for cases where the web server is temporarily down or slow, so 
                 #just continuing to serve stale data until something new is found.
+
                 #There needs to be logic to not start serving pages until all caches
                 #are warm.
 
-                #This way, no user will ever wait on the perf of fetching between remote
-                #servers or re-rendering of the sitebox templates.
-
-                #However, given the levels of caches, and the remote fetch only happens every 
-                #hour or so, most users won't notice. It takes just a few seconds to fetch
-                #all the RSS feeds to my server.
-                #Given the 2/3 levels of caching, this app is usually very fast.
+                #It takes just a few seconds to fetch all the feeds to my server
+                #I could make them each fetch be in a threadpool to go faster also. 
+                #Given the levels of caching, this app is usually very fast.
 
                 print ("Warning: parsing from remote site %s" %(url))
                 res = feedparser.parse(url)
@@ -282,10 +276,11 @@ class UrlForm(Form):
 
 class CustomRSSForm(Form):
     pri = IntegerField('Priority')
-    url = StringField('RSS URL')
+    url = StringField('RSS URL', [validators.Length(min=10, max=120)])
 
 
 class ConfigForm(Form):
+    delete_cookie = BooleanField(label = "Delete Cookie")
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
 
@@ -329,6 +324,11 @@ def Config():
         return page
     else: #request == 'POST':
         form = ConfigForm(request.form)
+        if form.delete_cookie.data:
+            resp = g_app.make_response("<HTML><BODY>Deleted cookie.</BODY></HTML>")        
+            resp.set_cookie('RssUrls', '', max_age = 0)
+            return resp
+
         page_order = []
 
         urls = list(form.urls)
