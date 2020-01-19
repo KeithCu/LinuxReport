@@ -26,10 +26,11 @@ application = g_app
 EXPIRE_MINUTES = 60 * 10
 
 #Expire things faster in debug mode
-if g_app.debug == True:
-    EXPIRE_MINUTES = 60
+#if g_app.debug == True:
+#    EXPIRE_MINUTES = 60
+#    print ("In debug mode, so expires faster")
 
-EXPIRE_HOURS = 3600 * 2
+EXPIRE_HOURS = 3600
 EXPIRE_DAY = 3600 * 6
 EXPIRE_DAYS = 86400 * 10
 EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2

@@ -40,11 +40,12 @@
       clear: both;
     }
     {% endif %}
+
   </style>
 
   <script>
     function redirect() {
-        window.location = "/linuxreport/config"
+        window.location = "/config"
         }
     </script>
 
@@ -52,6 +53,7 @@
   <body>
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
     <center><img src = "http://keithcu.com/images/LinuxReport2.png" height = "100"></center>
+    <center><small>(Refreshes hourly) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a></small></center>
     <div class="row">
 
         <div class = "column">{{ columns[0] }}</div>
