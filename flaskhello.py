@@ -1,4 +1,4 @@
-import feedparser
+﻿import feedparser
 import random
 import json
 import itertools
@@ -38,47 +38,47 @@ EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
 site_urls = { "http://lxer.com/module/newswire/headlines.rss" : 
-             ["http://linuxreport.net/images/lxer.webp",
+             ["http://keithcu.com/images/lxer.webp",
               "http://lxer.com/",
               EXPIRE_HOURS],
     
               "http://www.reddit.com/r/linux/.rss" : 
-             ["http://linuxreport.net/images/redditlogosmall.webp",
+             ["http://keithcu.com/images/redditlogosmall.webp",
               "https://www.reddit.com/r/linux",
               EXPIRE_HOURS],
 
               "http://rss.slashdot.org/Slashdot/slashdotMain" : 
-             ["http://linuxreport.net/images/slashdotlogo.webp",
+             ["http://keithcu.com/images/slashdotlogo.webp",
               "https://slashdot.org/",
               EXPIRE_HOURS],
 
               "http://lwn.net/headlines/newrss" :
-             ["http://linuxreport.net/images/barepenguin-70.webp",
+             ["http://keithcu.com/images/barepenguin-70.webp",
               "https://lwn.net/",
               EXPIRE_DAY],
 
               "http://news.ycombinator.com/rss" :
-             ["http://linuxreport.net/images/hackernews.webp",
+             ["http://keithcu.com/images/hackernews.webp",
               "http://news.ycombinator.com/",
               EXPIRE_HOURS],
 
                "http://planet.debian.org/rss20.xml" :
-             ["http://linuxreport.net/images/Debian-OpenLogo.svg",
+             ["http://keithcu.com/images/Debian-OpenLogo.svg",
               "http://planet.debian.org/",
               EXPIRE_HOURS],
 
               "http://www.osnews.com/feed/" :
-             ["http://linuxreport.net/images/osnews-logo.webp",
+             ["http://keithcu.com/images/osnews-logo.webp",
               "http://www.osnews.com/",
               EXPIRE_HOURS],
 
               "http://www.geekwire.com/feed/" :
-             ["http://linuxreport.net/images/GeekWire.png",
+             ["http://keithcu.com/images/GeekWire.png",
               "http://www.geekwire.com/",
               EXPIRE_HOURS],
 
                "http://feeds.feedburner.com/linuxtoday/linux" :
-             ["http://linuxreport.net/images/linuxtd_logo.png",
+             ["http://keithcu.com/images/linuxtd_logo.png",
               "http://www.linuxtoday.com/",
               EXPIRE_HOURS],
 
