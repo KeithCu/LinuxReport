@@ -1,64 +1,55 @@
 <!doctype html>
-<html>
+<html lang="en">
   <head>
-    <title>LinuxReport</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>LinuxReport</title>
     <style>
-   * {
-      box-sizing: border-box;
-    }
+      * {
+        box-sizing: border-box;
+      }
 
-    a:link {
-      color: black;
-    }
+      a:link, a:visited, a:hover, a:active {
+        color: black;
+      }
 
-    a:visited {
-      color: black;
-    }
+      .linkclass {
+        margin-bottom: .4em;
+      }
 
-    a:hover {
-      color: black;
-    }
+      {% if not request.MOBILE %}
+      /* Create three equal columns that floats next to each other */
+      .column {
+        float: left;
+        width: 33.33%;
+        padding: 10px;
+      }
+      
+      .row:after {
+        content: "";
+        display: table;
+        clear: both;
+      }
+      {% endif %}
 
-    .linkclass {margin-bottom: .4em }
+    </style>
 
-    a:active {
-      color: black;
-    } 
-    
-    {% if not request.MOBILE %}
-    /* Create three equal columns that floats next to each other */
-    .column {
-      float: left;
-      width: 33.33%;
-      padding: 10px;
-    }
-    
-    .row:after {
-      content: "";
-      display: table;
-      clear: both;
-    }
-    {% endif %}
-
-  </style>
-
-  <script>
-    function redirect() {
+    <script>
+      function redirect() {
         window.location = "/config"
-        }
+      }
     </script>
 
   </head>
   <body>
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
-    <center><img src = "http://keithcu.com/images/LinuxReport2.webp" height = "100"></center>
-    <center><small>(Refreshes hourly) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a></small></center>
+    <center><img src="http://keithcu.com/images/LinuxReport2.webp" height="100"></center>
+    <center><small>(Refreshes hourly) - Fork me on <a href="https://github.com/KeithCu/LinuxReport">GitHub</a></small></center>
     <div class="row">
-
-        <div class = "column">{{ columns[0] }}</div>
-        <div class = "column">{{ columns[1] }}</div>
-        <div class = "column">{{ columns[2] }}</div>
+      <div class="column">{{ columns[0] }}</div>
+      <div class="column">{{ columns[1] }}</div>
+      <div class="column">{{ columns[2] }}</div>
     </div>
   </body>
 </html>
