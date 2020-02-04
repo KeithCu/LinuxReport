@@ -38,27 +38,27 @@ EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
 site_urls = { "http://lxer.com/module/newswire/headlines.rss" : 
-             ["http://keithcu.com/images/lxer.webp",
+             ["http://keithcu.com/images/lxer.png",
               "http://lxer.com/",
               EXPIRE_HOURS],
     
               "http://www.reddit.com/r/linux/.rss" : 
-             ["http://keithcu.com/images/redditlogosmall.webp",
+             ["http://keithcu.com/images/redditlogosmall.png",
               "https://www.reddit.com/r/linux",
               EXPIRE_HOURS],
 
               "http://rss.slashdot.org/Slashdot/slashdotMain" : 
-             ["http://keithcu.com/images/slashdotlogo.webp",
+             ["http://keithcu.com/images/slashdotlogo.png",
               "https://slashdot.org/",
               EXPIRE_HOURS],
 
               "http://lwn.net/headlines/newrss" :
-             ["http://keithcu.com/images/barepenguin-70.webp",
+             ["http://keithcu.com/images/barepenguin-70.png",
               "https://lwn.net/",
               EXPIRE_DAY],
 
               "http://news.ycombinator.com/rss" :
-             ["http://keithcu.com/images/hackernews.webp",
+             ["http://keithcu.com/images/hackernews.jpg",
               "http://news.ycombinator.com/",
               EXPIRE_HOURS],
 
@@ -68,7 +68,7 @@ site_urls = { "http://lxer.com/module/newswire/headlines.rss" :
               EXPIRE_HOURS],
 
               "http://www.osnews.com/feed/" :
-             ["http://keithcu.com/images/osnews-logo.webp",
+             ["http://keithcu.com/images/osnews-logo.png",
               "http://www.osnews.com/",
               EXPIRE_HOURS],
 
