@@ -18,20 +18,20 @@
         margin-bottom: .4em;
       }
 
-      {% if not request.MOBILE %}
-      /* Create three equal columns that floats next to each other */
-      .column {
-        float: left;
-        width: 33.33%;
-        padding: 10px;
+      @media screen and (min-width: 769px) {
+        /* Create three equal columns that floats next to each other */
+        .column {
+          float: left;
+          width: 33.33%;
+          padding: 10px;
+        }
+        
+        .row:after {
+          content: "";
+          display: table;
+          clear: both;
+        }
       }
-      
-      .row:after {
-        content: "";
-        display: table;
-        clear: both;
-      }
-      {% endif %}
 
     </style>
 

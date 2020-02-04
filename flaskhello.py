@@ -9,7 +9,6 @@ import shutil
 # import html
 # import multiprocessing
 
-from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
 from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators, SelectField
@@ -17,7 +16,6 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
 http = urllib3.PoolManager()
 
 g_app = Flask(__name__)
-Mobility(g_app)
 application = g_app
 
 # from flask_table import Table, Col
@@ -179,12 +177,8 @@ def index():
 
     page_order_s = str(page_order)
 
-    suffix = ""
-    if request.MOBILE:
-        suffix = ":MOBILE"
-
     if page_order_s == g_standard_order_s:
-        full_page = g_c.Get(page_order_s + suffix)
+        full_page = g_c.Get(page_order_s)
         if full_page is not None:
             return full_page
     
@@ -263,7 +257,7 @@ def index():
     page = render_template('page.html', columns = result)
 
     if page_order_s == g_standard_order_s:
-        g_c.Put(page_order_s + suffix, page, timeout = EXPIRE_MINUTES)
+        g_c.Put(page_order_s, page, timeout = EXPIRE_MINUTES)
     return page      
 
 class ROStringField(StringField):
