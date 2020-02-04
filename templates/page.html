@@ -14,11 +14,15 @@
         color: black;
       }
 
+      img {
+        max-width: 100%;
+      }
+
       .linkclass {
         margin-bottom: .4em;
       }
 
-      {% if not request.MOBILE %}
+      {%- if not request.MOBILE %}
       /* Create three equal columns that floats next to each other */
       .column {
         float: left;
@@ -31,20 +35,17 @@
         display: table;
         clear: both;
       }
-      {% endif %}
-
+      {%- endif %}
     </style>
-
     <script>
       function redirect() {
         window.location = "/config"
       }
     </script>
-
   </head>
   <body>
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
-    <center><img src="http://keithcu.com/images/LinuxReport2.png" height="100"></center>
+    <center><img src="http://keithcu.com/images/LinuxReport2.png" style="max-height:100px;"></center>
     <center><small>(Refreshes hourly) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></small></center>
     <div class="row">
       <div class="column">{{ columns[0] }}</div>
