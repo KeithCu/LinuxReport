@@ -22,7 +22,7 @@
         margin-bottom: .4em;
       }
 
-      {% if not request.MOBILE %}
+      {%- if not request.MOBILE %}
       /* Create three equal columns that floats next to each other */
       .column {
         float: left;
@@ -35,16 +35,13 @@
         display: table;
         clear: both;
       }
-      {% endif %}
-
+      {%- endif %}
     </style>
-
     <script>
       function redirect() {
         window.location = "/config"
       }
     </script>
-
   </head>
   <body>
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>

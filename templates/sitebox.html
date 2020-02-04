@@ -2,11 +2,11 @@
     <center><a target="_blank" href="{{ link }}"><img src="{{ logo }}" style="max-height:75px;"/></a></center>
     <br/>
     <div class="box">
-        {% for e in entries %}
+        {%- for e in entries %}
         <div class="linkclass">
             <code><font size="4"><a target="_blank" href="{{ e.link | safe }}">{{ e.title | safe }}</a></font></code>
         </div>
-        {% endfor %}
+        {%- endfor %}
     </div>
     <br/>
 {% endblock %}
