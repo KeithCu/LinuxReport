@@ -39,48 +39,50 @@ EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
+URL_IMAGES = "http://linuxreport.net/static/images/"
+
 site_urls = { "http://lxer.com/module/newswire/headlines.rss" : 
-             ["http://keithcu.com/images/lxer.png",
+             [URL_IMAGES + "lxer.png",
               "http://lxer.com/",
               EXPIRE_HOURS],
     
               "http://www.reddit.com/r/linux/.rss" : 
-             ["http://keithcu.com/images/redditlogosmall.png",
+             [URL_IMAGES + "redditlogosmall.png",
               "https://www.reddit.com/r/linux",
               EXPIRE_HOURS],
 
               "http://rss.slashdot.org/Slashdot/slashdotMain" : 
-             ["http://keithcu.com/images/slashdotlogo.png",
+             [URL_IMAGES + "slashdotlogo.png",
               "https://slashdot.org/",
               EXPIRE_HOURS],
 
               "http://lwn.net/headlines/newrss" :
-             ["http://keithcu.com/images/barepenguin-70.png",
+             [URL_IMAGES + "barepenguin-70.png",
               "https://lwn.net/",
               EXPIRE_DAY],
 
               "http://news.ycombinator.com/rss" :
-             ["http://keithcu.com/images/hackernews.jpg",
+             [URL_IMAGES + "hackernews.jpg",
               "http://news.ycombinator.com/",
               EXPIRE_HOURS],
 
                "http://planet.debian.org/rss20.xml" :
-             ["http://keithcu.com/images/Debian-OpenLogo.svg",
+             [URL_IMAGES + "Debian-OpenLogo.svg",
               "http://planet.debian.org/",
               EXPIRE_HOURS],
 
               "http://www.osnews.com/feed/" :
-             ["http://keithcu.com/images/osnews-logo.png",
+             [URL_IMAGES + "osnews-logo.png",
               "http://www.osnews.com/",
               EXPIRE_HOURS],
 
               "http://www.geekwire.com/feed/" :
-             ["http://keithcu.com/images/GeekWire.png",
+             [URL_IMAGES + "GeekWire.png",
               "http://www.geekwire.com/",
               EXPIRE_HOURS],
 
                "http://feeds.feedburner.com/linuxtoday/linux" :
-             ["http://keithcu.com/images/linuxtd_logo.png",
+             [URL_IMAGES + "linuxtd_logo.png",
               "http://www.linuxtoday.com/",
               EXPIRE_HOURS],
 
@@ -201,7 +203,7 @@ def index():
         site_info = site_urls.get(url, None)
 
         if site_info is None:
-            site_info = ["http://keithcu.com/images/Custom.png", url + "HTML", EXPIRE_HOURS]
+            site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS]
             site_urls[url] = site_info
 
         logo_url, site_url, expire_time = site_info
@@ -302,7 +304,7 @@ def Config():
         custom_count = 0
         for i, p_url in enumerate(page_order):
             site_info = site_urls.get(p_url, None)
-            if site_info is not None and site_info[0] != "http://keithcu.com/images/Custom.png":
+            if site_info is not None and site_info[0] != URL_IMAGES + "Custom.png":
                 urlf = UrlForm()
                 urlf.pri = (i + 1) * 10
                 urlf.url = p_url
