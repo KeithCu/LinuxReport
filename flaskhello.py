@@ -8,6 +8,8 @@ import urllib3
 import shutil
 # import html
 # import multiprocessing
+import os
+import time
 
 from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
@@ -95,8 +97,11 @@ class HelloCache(object):
         
     def Get(self, url):
         template = self._cache.get(url)
-
         return template
+
+    def Del(self, url):
+        self._cache.delete(url)
+
 
 
 def GrabImageTest(feedinfo):
@@ -186,7 +191,7 @@ def index():
     if page_order_s == g_standard_order_s:
         full_page = g_c.Get(page_order_s + suffix)
         if full_page is not None:
-            return full_page
+            return full_page #Typically, the Python is finished here
     
     result = [[], [], []]
     cur_col = 0
@@ -210,43 +215,35 @@ def index():
             #Check for RSS content to save network fetch
             feedinfo = g_c.Get(url)
             if feedinfo is None:
-                #Consider adding code to make sure only one process tries to fetch
-                #at a time after expiration (considering multiple processes on a busy server)
-                #Implement a two-stage process where first I check for the pid.
-                #if it doesn't exist, create it. Then check again if it's me.
-                #If it is, then fetch.
-                #Otherwise, sleep for 50 ms and try again.
-                #Some people will have pauses, but it should only be a small number
-                #every hours or so.
+                feedcheck = g_c.Get(url + "FETCHPID")
+                if feedcheck is None:
+                    g_c.Put(url + "FETCHPID", os.getpid())
 
-                #An alternative way of caching is to never expire the HTML templates.
-                #Just create a thread which sleeps for 10 seconds, and then checks if 
-                #any of the RSS feeds are out of date, and updates them.
-                #And also update the HTML template.
-                #That version isn't much faster in practice considering that 
-                #everything here is cached. However, it would help
-                #for cases where the web server is temporarily down or slow, so 
-                #just continuing to serve stale data until something new is found.
+                feedcheck = g_c.Get(url + "FETCHPID")
+                if feedcheck == os.getpid():
+                    print ("Warning: parsing from remote site %s" %(url))
+                    res = feedparser.parse(url)
+                    feedinfo = list(itertools.islice(res['entries'], 8))
+                    g_c.Put(url, feedinfo, timeout = expire_time + jitter)
+                    g_c.Del(url + "FETCHPID")
+                else:
+                    print ("Waiting for someone else to parse remote site %s" %(url))
 
-                #There needs to be logic to not start serving pages until all caches
-                #are warm.
+                    # Someone else is fetching, so wait
+                    while feedcheck is not None:
+                        time.sleep(0.1)
+                        feedcheck = g_c.Get(url + "FETCHPID")
 
-                #It takes just a few seconds to fetch all the feeds to my server
-                #I could make them each fetch be in a threadpool to go faster also. 
-                #Given the levels of caching, this app is usually very fast.
+                    print ("Done waiting for someone else to parse remote site %s" %(url))
+                    feedinfo = g_c.Get(url)
 
-                print ("Warning: parsing from remote site %s" %(url))
-                res = feedparser.parse(url)
-                feedinfo = list(itertools.islice(res['entries'], 8))
-                g_c.Put(url, feedinfo, timeout = expire_time + jitter)
-
-            #First try to grab image from cache
-            # image_name = g_c.Get(rssurl + ":" + "IMAGE")
-            # if image_name is None:
-            #     image_name = GrabImage(feedinfo)
-            #     if image_name is not None:
-            #         g_c.Put(rssurl + ":" + "IMAGE", image_name, timeout = EXPIRE_DAYS)
-            #         print (image_name)    
+                #First try to grab image from cache
+                # image_name = g_c.Get(rssurl + ":" + "IMAGE")
+                # if image_name is None:
+                #     image_name = GrabImage(feedinfo)
+                #     if image_name is not None:
+                #         g_c.Put(rssurl + ":" + "IMAGE", image_name, timeout = EXPIRE_DAYS)
+                #         print (image_name)
 
             template = render_template('sitebox.html', entries = feedinfo, logo = logo_url, link = site_url)
             g_c.Put(site_url, template, timeout = expire_time + jitter + 10)
