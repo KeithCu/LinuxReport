@@ -215,6 +215,8 @@ def index():
             #Check for RSS content to save network fetch
             feedinfo = g_c.Get(url)
             if feedinfo is None:
+                #This FETCHPID logic is to prevent race conditions of 
+                # multiple Python processes fetching an expired RSS feed
                 feedcheck = g_c.Get(url + "FETCHPID")
                 if feedcheck is None:
                     g_c.Put(url + "FETCHPID", os.getpid())
