@@ -217,12 +217,12 @@ def index():
             if feedinfo is None:
                 #This FETCHPID logic is to prevent race conditions of 
                 # multiple Python processes fetching an expired RSS feed
-                feedcheck = g_c.Get(url + "FETCHPID")
-                if feedcheck is None:
+                feedpid = g_c.Get(url + "FETCHPID")
+                if feedpid is None:
                     g_c.Put(url + "FETCHPID", os.getpid())
+                    feedpid = g_c.Get(url + "FETCHPID") #Check to make sure it's us
 
-                feedcheck = g_c.Get(url + "FETCHPID")
-                if feedcheck == os.getpid():
+                if feedpid == os.getpid():
                     print ("Warning: parsing from remote site %s" %(url))
                     res = feedparser.parse(url)
                     feedinfo = list(itertools.islice(res['entries'], 8))
@@ -232,9 +232,9 @@ def index():
                     print ("Waiting for someone else to parse remote site %s" %(url))
 
                     # Someone else is fetching, so wait
-                    while feedcheck is not None:
+                    while feedpid is not None:
                         time.sleep(0.1)
-                        feedcheck = g_c.Get(url + "FETCHPID")
+                        feedpid = g_c.Get(url + "FETCHPID")
 
                     print ("Done waiting for someone else to parse remote site %s" %(url))
                     feedinfo = g_c.Get(url)
