@@ -340,7 +340,7 @@ def Config():
         for i in range (custom_count, 5):
             rssf =  CustomRSSForm()
             rssf.url = "http://"
-            rssf.pri = (i + 10) * 10
+            rssf.pri = (i + 30) * 10
             form.url_custom.append_entry(rssf)
 
         page = render_template('config.html', form = form)
