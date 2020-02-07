@@ -86,6 +86,11 @@ site_urls = { "http://lxer.com/module/newswire/headlines.rss" :
               "http://www.linuxtoday.com/",
               EXPIRE_HOURS],
 
+               "http://www.independent.co.uk/topic/coronavirus/rss" :
+             [URL_IMAGES + "Independent-Corona.png",
+              "https://www.independent.co.uk/topic/coronavirus",
+              EXPIRE_HOURS],
+
             }
 
  
@@ -218,7 +223,7 @@ def index():
             feedinfo = g_c.Get(url)
             if feedinfo is None:
                 #This FETCHPID logic is to prevent race conditions of 
-                # multiple Python processes fetching an expired RSS feed
+                #multiple Python processes fetching an expired RSS feed.
                 feedpid = g_c.Get(url + "FETCHPID")
                 if feedpid is None:
                     g_c.Put(url + "FETCHPID", os.getpid())
