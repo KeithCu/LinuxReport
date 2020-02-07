@@ -28,9 +28,9 @@ application = g_app
 EXPIRE_MINUTES = 60 * 10
 
 #Expire things faster in debug mode
-#if g_app.debug == True:
-#    EXPIRE_MINUTES = 60
-#    print ("In debug mode, so expires faster")
+if g_app.debug == True:
+    EXPIRE_MINUTES = 1
+    print ("Warning, in debug mode")
 
 EXPIRE_HOURS = 3600
 EXPIRE_DAY = 3600 * 6
@@ -171,10 +171,17 @@ def index():
     if g_c is None:
         g_c = HelloCache()
 
+    dark_mode = request.cookies.get('DarkMode')
+    if dark_mode is None:
+        dark_mode = False
+    else:
+        dark_mode = True
+
     page_order = request.cookies.get('RssUrls')
+
     if page_order is not None:
         page_order = json.loads(page_order)
-    
+
     if page_order is None:
         page_order = g_standard_order
 
@@ -182,19 +189,16 @@ def index():
         #     if value[0] != "http://keithcu.com/images/Custom.png":
         #         page_order.append(key)
     
-    #There's a question as to whether it's worth trying to cache
-    #all possible custom page layouts.
-    #That could cause us to use at least 40,000 files with just
-    #8 URL variants.
-    #On my machine I can do 300 requests per second with no page cache
-    #or 400 with a page cache. I'll just cache the "standard layout" page.
-
     page_order_s = str(page_order)
 
     suffix = ""
     if request.MOBILE:
         suffix = ":MOBILE"
 
+    if dark_mode:
+        suffix = suffix + ":DARK"
+
+    #Only cache standard order
     if page_order_s == g_standard_order_s:
         full_page = g_c.Get(page_order_s + suffix)
         if full_page is not None:
@@ -266,7 +270,14 @@ def index():
     result[1] = Markup(''.join(result[1]))
     result[2] = Markup(''.join(result[2]))
 
-    page = render_template('page.html', columns = result)
+    if dark_mode:
+        back_color = '#1e1e1e'
+        text_color = '#d4d4d4'
+    else:
+        back_color = '#f6f5f4'
+        text_color = 'black'
+
+    page = render_template('page.html', columns = result, text_color = text_color, back_color = back_color)
 
     if page_order_s == g_standard_order_s:
         g_c.Put(page_order_s + suffix, page, timeout = EXPIRE_MINUTES)
@@ -285,20 +296,20 @@ class CustomRSSForm(Form):
     pri = IntegerField('Priority')
     url = StringField('RSS URL', [validators.Length(min=10, max=120)])
 
-
 class ConfigForm(Form):
     delete_cookie = BooleanField(label = "Delete Cookie")
+    dark_mode = BooleanField(label = "Dark Mode")
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
-
-#    color = BooleanField('White background')
-#  {{ render_field(form.color) }}
 
 
 @g_app.route('/config', methods=['GET', 'POST'])
 def Config():
     if request.method == 'GET':
         form = ConfigForm()
+        dark_mode = request.cookies.get('DarkMode')
+        if dark_mode:
+            form.dark_mode.data  = True
 
         page_order = request.cookies.get('RssUrls')
         if page_order is not None:
@@ -333,7 +344,8 @@ def Config():
         form = ConfigForm(request.form)
         if form.delete_cookie.data:
             resp = g_app.make_response("<HTML><BODY>Deleted cookie.</BODY></HTML>")        
-            resp.set_cookie('RssUrls', '', max_age = 0)
+            resp.delete_cookie('RssUrls')
+            resp.delete_cookie('DarkMode')
             return resp
 
         page_order = []
@@ -357,5 +369,9 @@ def Config():
         cookie_str = json.dumps(page_order)
         resp = g_app.make_response("<HTML><BODY>Saved cookie for later.</BODY></HTML>")        
         resp.set_cookie('RssUrls', cookie_str, max_age = EXPIRE_YEARS)
+        if form.dark_mode.data:
+            resp.set_cookie('DarkMode', "1", max_age = EXPIRE_YEARS)
+        else:
+            resp.delete_cookie('DarkMode')
         return resp
 

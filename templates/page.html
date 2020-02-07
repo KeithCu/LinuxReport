@@ -10,8 +10,12 @@
         box-sizing: border-box;
       }
 
+      body {
+        color:{{ text_color }};
+      }
+
       a:link, a:visited, a:hover, a:active {
-        color: black;
+        color:{{ text_color }};
       }
 
       img {
@@ -43,10 +47,10 @@
       }
     </script>
   </head>
-  <body style="background-color:#f6f5f4">
+  <body style="background-color:{{ back_color }}">
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
     <center><img src="http://linuxreport.net/static/images/LinuxReport2.png" style="max-height:100px;"></center>
-    <center><small>(Refreshes hourly) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></small></center>
+    <center><small>(Refreshes hourly - Try Dark Mode!) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></small></center>
     <div class="row">
       <div class="column">{{ columns[0] }}</div>
       <div class="column">{{ columns[1] }}</div>
