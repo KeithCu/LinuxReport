@@ -91,6 +91,11 @@ site_urls = { "http://lxer.com/module/newswire/headlines.rss" :
               "https://www.independent.co.uk/topic/coronavirus",
               EXPIRE_HOURS],
 
+               "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
+             [URL_IMAGES + "Google-News.png",
+              "https://news.google.com/search?q=coronavirus&hl=en-US&gl=US&ceid=US%3Aen",
+              EXPIRE_HOURS],
+
             }
 
  
