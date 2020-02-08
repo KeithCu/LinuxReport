@@ -53,8 +53,10 @@
     <center><small>(Refreshes hourly - Try Dark Mode!) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></small></center>
     <div class="row">
       <div class="column">{{ columns[0] }}</div>
+      {%- if not request.MOBILE %}
       <div class="column">{{ columns[1] }}</div>
       <div class="column">{{ columns[2] }}</div>
+      {%- endif %}
     </div>
   </body>
 </html>

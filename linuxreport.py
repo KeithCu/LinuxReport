@@ -203,19 +203,25 @@ def index():
     page_order_s = str(page_order)
 
     suffix = ""
-    if request.MOBILE:
+    single_column = False
+    if True or request.MOBILE:
         suffix = ":MOBILE"
+        single_column = True
 
     if dark_mode:
         suffix = suffix + ":DARK"
 
     #Only cache standard order
-    if page_order_s == g_standard_order_s:
-        full_page = g_c.Get(page_order_s + suffix)
-        if full_page is not None:
-            return full_page #Typically, the Python is finished here
+    # if page_order_s == g_standard_order_s:
+    #     full_page = g_c.Get(page_order_s + suffix)
+    #     if full_page is not None:
+    #         return full_page #Typically, the Python is finished here
     
-    result = [[], [], []]
+    if single_column:
+        result = [[]]
+    else:
+        result = [[], [], []]
+
     cur_col = 0
         
     for url in page_order:
@@ -274,12 +280,15 @@ def index():
     
         result[cur_col].append(template)
 
-        cur_col += 1
-        cur_col %= 3
+        if single_column == False:
+            cur_col += 1
+            cur_col %= 3
 
     result[0] = Markup(''.join(result[0]))
-    result[1] = Markup(''.join(result[1]))
-    result[2] = Markup(''.join(result[2]))
+
+    if single_column == False:
+        result[1] = Markup(''.join(result[1]))
+        result[2] = Markup(''.join(result[2]))
 
     if dark_mode:
         back_color = '#1e1e1e'
