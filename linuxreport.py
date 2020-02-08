@@ -211,11 +211,11 @@ def index():
     if dark_mode:
         suffix = suffix + ":DARK"
 
-    #Only cache standard order
-    # if page_order_s == g_standard_order_s:
-    #     full_page = g_c.Get(page_order_s + suffix)
-    #     if full_page is not None:
-    #         return full_page #Typically, the Python is finished here
+    # Only cache standard order
+    if page_order_s == g_standard_order_s:
+        full_page = g_c.Get(page_order_s + suffix)
+        if full_page is not None:
+            return full_page # Typically, the Python is finished here
     
     if single_column:
         result = [[]]
