@@ -41,7 +41,13 @@ g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
 URL_IMAGES = "http://linuxreport.net/static/images/"
 
-site_urls = { "http://lxer.com/module/newswire/headlines.rss" : 
+site_urls = {
+              "https://www.reddit.com/r/Coronavirus/rising/.rss" :
+             [URL_IMAGES + "Coronavirus.jpg",
+              "https://www.reddit.com/r/Coronavirus/",
+              EXPIRE_HOURS],
+
+             "http://lxer.com/module/newswire/headlines.rss" :
              [URL_IMAGES + "lxer.png",
               "http://lxer.com/",
               EXPIRE_HOURS],
@@ -66,11 +72,6 @@ site_urls = { "http://lxer.com/module/newswire/headlines.rss" :
               "http://news.ycombinator.com/",
               EXPIRE_HOURS],
 
-               "http://planet.debian.org/rss20.xml" :
-             [URL_IMAGES + "Debian-OpenLogo.svg",
-              "http://planet.debian.org/",
-              EXPIRE_HOURS],
-
               "http://www.osnews.com/feed/" :
              [URL_IMAGES + "osnews-logo.png",
               "http://www.osnews.com/",
@@ -86,6 +87,11 @@ site_urls = { "http://lxer.com/module/newswire/headlines.rss" :
               "http://www.linuxtoday.com/",
               EXPIRE_HOURS],
 
+               "http://planet.debian.org/rss20.xml" :
+             [URL_IMAGES + "Debian-OpenLogo.svg",
+              "http://planet.debian.org/",
+              EXPIRE_HOURS],
+
                "http://www.independent.co.uk/topic/coronavirus/rss" :
              [URL_IMAGES + "Independent-Corona.png",
               "https://www.independent.co.uk/topic/coronavirus",
@@ -95,12 +101,6 @@ site_urls = { "http://lxer.com/module/newswire/headlines.rss" :
              [URL_IMAGES + "Google-News.png",
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
-
-               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
-             [URL_IMAGES + "Coronavirus.jpg",
-              "https://www.reddit.com/r/Coronavirus/",
-              EXPIRE_HOURS],
-
 
             }
 
