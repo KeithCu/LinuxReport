@@ -204,7 +204,7 @@ def index():
 
     suffix = ""
     single_column = False
-    if True or request.MOBILE:
+    if request.MOBILE:
         suffix = ":MOBILE"
         single_column = True
 
