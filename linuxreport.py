@@ -96,6 +96,12 @@ site_urls = { "http://lxer.com/module/newswire/headlines.rss" :
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
 
+               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
+             [URL_IMAGES + "Coronavirus.jpg",
+              "https://www.reddit.com/r/Coronavirus/",
+              EXPIRE_HOURS],
+
+
             }
 
  
