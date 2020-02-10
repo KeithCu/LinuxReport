@@ -7,7 +7,6 @@ from bs4 import BeautifulSoup
 import urllib3
 import shutil
 # import html
-# import multiprocessing
 import os
 import time
 
@@ -22,12 +21,8 @@ g_app = Flask(__name__)
 Mobility(g_app)
 application = g_app
 
-# from flask_table import Table, Col
-#    <a target="_blank" href = "{{ link }}"><img src = "{{ image_url }}" style="max-height: 100px;"/>
+EXPIRE_MINUTES = 60 * 5
 
-EXPIRE_MINUTES = 60 * 10
-
-#Expire things faster in debug mode
 if g_app.debug == True:
     EXPIRE_MINUTES = 1
     print ("Warning, in debug mode")
@@ -120,7 +115,13 @@ class HelloCache(object):
     def Del(self, url):
         self._cache.delete(url)
 
-
+#First try to grab image from cache
+# image_name = g_c.Get(rssurl + ":" + "IMAGE")
+# if image_name is None:
+#     image_name = GrabImage(feedinfo)
+#     if image_name is not None:
+#         g_c.Put(rssurl + ":" + "IMAGE", image_name, timeout = EXPIRE_DAYS)
+#         print (image_name)
 
 def GrabImageTest(feedinfo):
 
@@ -182,28 +183,23 @@ def index():
     if g_c is None:
         g_c = HelloCache()
 
-    dark_mode = request.cookies.get('DarkMode')
-    if dark_mode is None:
+    if request.cookies.get('DarkMode') is None:
         dark_mode = False
     else:
         dark_mode = True
 
     page_order = request.cookies.get('RssUrls')
-
     if page_order is not None:
         page_order = json.loads(page_order)
 
     if page_order is None:
         page_order = g_standard_order
 
-        # for key, value in site_urls.items():
-        #     if value[0] != "http://keithcu.com/images/Custom.png":
-        #         page_order.append(key)
-    
     page_order_s = str(page_order)
 
     suffix = ""
     single_column = False
+
     if request.MOBILE:
         suffix = ":MOBILE"
         single_column = True
@@ -211,11 +207,9 @@ def index():
     if dark_mode:
         suffix = suffix + ":DARK"
 
-    # Only cache standard order
-    if page_order_s == g_standard_order_s:
-        full_page = g_c.Get(page_order_s + suffix)
-        if full_page is not None:
-            return full_page # Typically, the Python is finished here
+    full_page = g_c.Get(page_order_s + suffix)
+    if full_page is not None:
+        return full_page # Typically, the Python is finished here
     
     if single_column:
         result = [[]]
@@ -238,7 +232,7 @@ def index():
         template = g_c.Get(site_url)
 
         if template is None:
-            jitter = random.randint(0, 60 * 5) #Add up to 5 minutes of jitter to spread out updates
+            jitter = random.randint(0, 60 * 15) #Add up to 15 minutes of jitter to spread out updates
 
             #Check for RSS content to save network fetch
             feedinfo = g_c.Get(url)
@@ -267,14 +261,6 @@ def index():
                     print ("Done waiting for someone else to parse remote site %s" %(url))
                     feedinfo = g_c.Get(url)
 
-                #First try to grab image from cache
-                # image_name = g_c.Get(rssurl + ":" + "IMAGE")
-                # if image_name is None:
-                #     image_name = GrabImage(feedinfo)
-                #     if image_name is not None:
-                #         g_c.Put(rssurl + ":" + "IMAGE", image_name, timeout = EXPIRE_DAYS)
-                #         print (image_name)
-
             template = render_template('sitebox.html', entries = feedinfo, logo = logo_url, link = site_url)
             g_c.Put(site_url, template, timeout = expire_time + jitter + 10)
     
@@ -299,6 +285,7 @@ def index():
 
     page = render_template('page.html', columns = result, text_color = text_color, back_color = back_color)
 
+    # Only cache standard order
     if page_order_s == g_standard_order_s:
         g_c.Put(page_order_s + suffix, page, timeout = EXPIRE_MINUTES)
     return page      
