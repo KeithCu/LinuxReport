@@ -9,6 +9,8 @@ import shutil
 # import html
 import os
 import time
+import socket
+
 
 from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
@@ -181,6 +183,7 @@ def index():
     global g_standard_order_s
 
     if g_c is None:
+        socket.setdefaulttimeout(5)
         g_c = HelloCache()
 
     if request.cookies.get('DarkMode') is None:
