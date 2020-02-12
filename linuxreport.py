@@ -194,11 +194,13 @@ def load_url(url):
         feedpid = g_c.Get(url + "FETCHPID") #Check to make sure it's us
 
     if feedpid == os.getpid():
-        print ("Warning: parsing from remote site %s" %(url))
+        start = timer()
         res = feedparser.parse(url)
         feedinfo = list(itertools.islice(res['entries'], 8))
         g_c.Put(url, feedinfo, timeout = expire_time)
         g_c.Del(url + "FETCHPID")
+        end = timer()
+        print ("Parsing from remote site %s in %f." %(url, end - start))
     else:
         print ("Waiting for someone else to parse remote site %s" %(url))
 
