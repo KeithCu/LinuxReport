@@ -105,7 +105,7 @@ site_urls = {
 class HelloCache(object):
     def __init__(self):
         global g_app
-        self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR' : '/tmp/flaskhello/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY })
+        self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY })
 
     def Put(self, url, template, timeout = None):
         self._cache.set(url, template, timeout)
