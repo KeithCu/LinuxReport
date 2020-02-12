@@ -10,6 +10,7 @@ import shutil
 import os
 import time
 import socket
+from timeit import default_timer as timer
 
 
 from flask_mobility import Mobility
@@ -174,6 +175,55 @@ g_c = None
 g_standard_order = list(site_urls.keys())
 g_standard_order_s = str(g_standard_order)
 
+import concurrent.futures
+
+def load_url(url):
+    site_info = site_urls.get(url, None)
+
+    if site_info is None:
+        site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS]
+        site_urls[url] = site_info
+
+    logo_url, site_url, expire_time = site_info
+
+    #This FETCHPID logic is to prevent race conditions of
+    #multiple Python processes fetching an expired RSS feed.
+    feedpid = g_c.Get(url + "FETCHPID")
+    if feedpid is None:
+        g_c.Put(url + "FETCHPID", os.getpid())
+        feedpid = g_c.Get(url + "FETCHPID") #Check to make sure it's us
+
+    if feedpid == os.getpid():
+        print ("Warning: parsing from remote site %s" %(url))
+        res = feedparser.parse(url)
+        feedinfo = list(itertools.islice(res['entries'], 8))
+        g_c.Put(url, feedinfo, timeout = expire_time)
+        g_c.Del(url + "FETCHPID")
+    else:
+        print ("Waiting for someone else to parse remote site %s" %(url))
+
+        # Someone else is fetching, so wait
+        while feedpid is not None:
+            time.sleep(0.1)
+            feedpid = g_c.Get(url + "FETCHPID")
+
+        print ("Done waiting for someone else to parse remote site %s" %(url))
+
+g_threadpool = concurrent.futures.ThreadPoolExecutor(max_workers = 10)
+
+def FetchAndUpdateUrlsParallel(urls):
+    global g_threadpool
+
+    # Start the load operations and mark each future with its URL
+    future_to_url = {g_threadpool.submit(load_url, url): url for url in urls}
+
+    for future in concurrent.futures.as_completed(future_to_url):
+        url = future_to_url[future]
+        try:
+            future.result()
+        except Exception as exc:
+            print('%r generated an exception: %s' % (url, exc))
+
 @g_app.route('/')
 def index():
 
@@ -220,9 +270,15 @@ def index():
         result = [[], [], []]
 
     cur_col = 0
-        
+
+    # Two stage process:
+    # 1. Go through URLs and collect either the templates, or the URLs that we need to fetch
+    # Asynchronously fetch all the needed URLs.
+    # Note: You have to save off the fetched data in case any expire while fetching.
+    result1 = {}
+    needed_urls = []
+
     for url in page_order:
-        
         site_info = site_urls.get(url, None)
 
         if site_info is None:
@@ -234,39 +290,40 @@ def index():
         #First check for the templatized content stored with site URL
         template = g_c.Get(site_url)
 
+        #If we don't have the template, the feed has likely expired
         if template is None:
-            jitter = random.randint(0, 60 * 15) #Add up to 15 minutes of jitter to spread out updates
+            needed_urls.append(url)
+        else:
+            result1[url] = template
 
-            #Check for RSS content to save network fetch
+
+    if len(needed_urls) > 0:
+        start = timer()
+        FetchAndUpdateUrlsParallel(needed_urls)
+        end = timer()
+        print ("Fetched all feeds in %f." % (end - start))
+
+    #2. Now we've got all the data, go through and quickly build the page.
+    for url in page_order:
+        site_info = site_urls.get(url, None)
+
+        if site_info is None:
+            site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS]
+            site_urls[url] = site_info
+
+        logo_url, site_url, expire_time = site_info
+
+        #First check to see if we already found this result
+        template = result1.get(url, None)
+        if template is None:
+
+            #If not, then the feed should be in the cache
             feedinfo = g_c.Get(url)
-            if feedinfo is None:
-                #This FETCHPID logic is to prevent race conditions of 
-                #multiple Python processes fetching an expired RSS feed.
-                feedpid = g_c.Get(url + "FETCHPID")
-                if feedpid is None:
-                    g_c.Put(url + "FETCHPID", os.getpid())
-                    feedpid = g_c.Get(url + "FETCHPID") #Check to make sure it's us
 
-                if feedpid == os.getpid():
-                    print ("Warning: parsing from remote site %s" %(url))
-                    res = feedparser.parse(url)
-                    feedinfo = list(itertools.islice(res['entries'], 8))
-                    g_c.Put(url, feedinfo, timeout = expire_time + jitter)
-                    g_c.Del(url + "FETCHPID")
-                else:
-                    print ("Waiting for someone else to parse remote site %s" %(url))
-
-                    # Someone else is fetching, so wait
-                    while feedpid is not None:
-                        time.sleep(0.1)
-                        feedpid = g_c.Get(url + "FETCHPID")
-
-                    print ("Done waiting for someone else to parse remote site %s" %(url))
-                    feedinfo = g_c.Get(url)
-
+            jitter = random.randint(0, 60 * 15)
             template = render_template('sitebox.html', entries = feedinfo, logo = logo_url, link = site_url)
             g_c.Put(site_url, template, timeout = expire_time + jitter + 10)
-    
+
         result[cur_col].append(template)
 
         if single_column == False:
