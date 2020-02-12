@@ -209,7 +209,7 @@ def load_url(url):
 
         print ("Done waiting for someone else to parse remote site %s" %(url))
 
-g_threadpool = concurrent.futures.ThreadPoolExecutor(max_workers = 10)
+g_threadpool = concurrent.futures.ThreadPoolExecutor(max_workers = 5)
 
 def FetchAndUpdateUrlsParallel(urls):
     global g_threadpool
@@ -296,7 +296,6 @@ def index():
         else:
             result1[url] = template
 
-
     if len(needed_urls) > 0:
         start = timer()
         FetchAndUpdateUrlsParallel(needed_urls)
@@ -305,12 +304,7 @@ def index():
 
     #2. Now we've got all the data, go through and quickly build the page.
     for url in page_order:
-        site_info = site_urls.get(url, None)
-
-        if site_info is None:
-            site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS]
-            site_urls[url] = site_info
-
+        site_info = site_urls[url]
         logo_url, site_url, expire_time = site_info
 
         #First check to see if we already found this result
@@ -441,4 +435,3 @@ def Config():
         else:
             resp.delete_cookie('DarkMode')
         return resp
-
