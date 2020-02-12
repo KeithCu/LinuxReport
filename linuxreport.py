@@ -11,7 +11,7 @@ import os
 import time
 import socket
 from timeit import default_timer as timer
-
+import concurrent.futures
 
 from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
@@ -175,9 +175,7 @@ g_c = None
 g_standard_order = list(site_urls.keys())
 g_standard_order_s = str(g_standard_order)
 
-import concurrent.futures
-
-def load_url(url):
+def load_url_worker(url):
     site_info = site_urls.get(url, None)
 
     if site_info is None:
@@ -211,20 +209,14 @@ def load_url(url):
 
         print ("Done waiting for someone else to parse remote site %s" %(url))
 
-g_threadpool = concurrent.futures.ThreadPoolExecutor(max_workers = 5)
+def FetchUrlsParallel(urls):
 
-def FetchAndUpdateUrlsParallel(urls):
-    global g_threadpool
+    with concurrent.futures.ThreadPoolExecutor(max_workers = 10) as executor:
+        future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
-    # Start the load operations and mark each future with its URL
-    future_to_url = {g_threadpool.submit(load_url, url): url for url in urls}
-
-    for future in concurrent.futures.as_completed(future_to_url):
-        url = future_to_url[future]
-        try:
+        for future in concurrent.futures.as_completed(future_to_url):
+            url = future_to_url[future]
             future.result()
-        except Exception as exc:
-            print('%r generated an exception: %s' % (url, exc))
 
 @g_app.route('/')
 def index():
@@ -273,11 +265,9 @@ def index():
 
     cur_col = 0
 
-    # Two stage process:
-    # 1. Go through URLs and collect either the templates, or the URLs that we need to fetch
-    # Asynchronously fetch all the needed URLs.
-    # Note: You have to save off the fetched data in case any expire while fetching.
-    result1 = {}
+    # 2 phase process:
+    # 1. Go through URLs and collect the template and the needed feeds.
+    result_1 = {}
     needed_urls = []
 
     for url in page_order:
@@ -296,24 +286,25 @@ def index():
         if template is None:
             needed_urls.append(url)
         else:
-            result1[url] = template
+            result_1[url] = template
 
+    # Asynchronously fetch all the needed URLs
     if len(needed_urls) > 0:
         start = timer()
-        FetchAndUpdateUrlsParallel(needed_urls)
+        FetchUrlsParallel(needed_urls)
         end = timer()
-        print ("Fetched all feeds in %f." % (end - start))
+        print ("Fetched all feeds in %f sec." % (end - start))
 
-    #2. Now we've got all the data, go through and quickly build the page.
+    #2. Now we've got all the data, go through again to build the page
     for url in page_order:
         site_info = site_urls[url]
         logo_url, site_url, expire_time = site_info
 
-        #First check to see if we already found this result
-        template = result1.get(url, None)
+        #First check to see if we already have this result
+        template = result_1.get(url, None)
         if template is None:
 
-            #If not, then the feed should be in the cache
+            #If not, feed should be in the RSS cache by now
             feedinfo = g_c.Get(url)
 
             jitter = random.randint(0, 60 * 15)
