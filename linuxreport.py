@@ -78,7 +78,7 @@ site_urls = {
               "http://www.geekwire.com/feed/" :
              [URL_IMAGES + "GeekWire.png",
               "http://www.geekwire.com/",
-              EXPIRE_HOURS],
+              EXPIRE_HOURS * 2], #Slow and slow-changing, so fetch less
 
                "http://feeds.feedburner.com/linuxtoday/linux" :
              [URL_IMAGES + "linuxtd_logo.png",
@@ -88,12 +88,12 @@ site_urls = {
                "http://planet.debian.org/rss20.xml" :
              [URL_IMAGES + "Debian-OpenLogo.svg",
               "http://planet.debian.org/",
-              EXPIRE_HOURS],
+              EXPIRE_HOURS * 2],
 
                "http://www.independent.co.uk/topic/coronavirus/rss" :
              [URL_IMAGES + "Independent-Corona.png",
               "https://www.independent.co.uk/topic/coronavirus",
-              EXPIRE_HOURS],
+              EXPIRE_HOURS * 2],
 
                "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
              [URL_IMAGES + "Google-News.png",
