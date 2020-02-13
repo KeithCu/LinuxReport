@@ -171,10 +171,6 @@ def GrabImageTest(feedinfo):
     return "http://keithcu.com/images/" + names[-1]
 
 
-g_c = None
-g_standard_order = list(site_urls.keys())
-g_standard_order_s = str(g_standard_order)
-
 def load_url_worker(url):
     site_info = site_urls.get(url, None)
 
@@ -218,13 +214,15 @@ def FetchUrlsParallel(urls):
             url = future_to_url[future]
             future.result()
 
+g_c = None
+g_standard_order = list(site_urls.keys())
+g_standard_order_s = str(g_standard_order)
+
+#The main page
 @g_app.route('/')
 def index():
 
     global g_c
-    global g_app
-    global g_standard_order
-    global g_standard_order_s
 
     if g_c is None:
         socket.setdefaulttimeout(5)
@@ -282,7 +280,7 @@ def index():
         #First check for the templatized content stored with site URL
         template = g_c.Get(site_url)
 
-        #If we don't have the template, the feed has likely expired
+        #If we don't have the template, the feed has expired
         if template is None:
             needed_urls.append(url)
         else:
@@ -293,7 +291,7 @@ def index():
         start = timer()
         FetchUrlsParallel(needed_urls)
         end = timer()
-        print ("Fetched all feeds in %f sec." % (end - start))
+        print ("Fetched %d feeds in %f sec." % (len(needed_urls), end - start))
 
     #2. Now we've got all the data, go through again to build the page
     for url in page_order:
@@ -309,7 +307,7 @@ def index():
 
             jitter = random.randint(0, 60 * 15)
             template = render_template('sitebox.html', entries = feedinfo, logo = logo_url, link = site_url)
-            g_c.Put(site_url, template, timeout = expire_time + jitter + 10)
+            g_c.Put(site_url, template, timeout = expire_time + jitter)
 
         result[cur_col].append(template)
 
