@@ -146,7 +146,7 @@ else:
               EXPIRE_DAY],
 
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
-             [URL_IMAGES + "PeakProsperity.jpg",
+             [URL_IMAGES + "PeakProsperity.png",
               "https://www.youtube.com/user/ChrisMartensondotcom/videos",
               EXPIRE_DAY],
 
