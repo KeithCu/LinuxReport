@@ -135,6 +135,11 @@ else:
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
 
+               "https://gnews.org/feed/" :
+             [URL_IMAGES + "gnews.png",
+              "https://gnews.org/",
+              EXPIRE_HOURS * 3],
+
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
              [URL_IMAGES + "JohnCampbell.png",
               "https://www.youtube.com/user/Campbellteaching/videos",
