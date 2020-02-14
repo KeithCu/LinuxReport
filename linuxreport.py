@@ -120,7 +120,7 @@ else:
               "https://www.reddit.com/r/Coronavirus/",
               EXPIRE_HOURS],
 
-              "https://www.reddit.com/r/China_Flu/.rss" :
+              "https://www.reddit.com/r/China_Flu/rising/.rss" :
              [URL_IMAGES + "redditlogosmall.png",
               "https://www.reddit.com/r/China_Flu/",
               EXPIRE_HOURS],
