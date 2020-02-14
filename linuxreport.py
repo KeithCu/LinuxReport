@@ -116,16 +116,6 @@ else:
     WEB_TITLE = "COVID-19 Report"
 
     site_urls = {
-            "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
-             [URL_IMAGES + "JohnCampbell.png",
-              "https://www.youtube.com/user/Campbellteaching/videos",
-              EXPIRE_DAYS],
-
-            "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
-             [URL_IMAGES + "PeakProsperity.jpg",
-              "https://www.youtube.com/user/ChrisMartensondotcom/videos",
-              EXPIRE_DAYS],
-
               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
              [URL_IMAGES + "Coronavirus.jpg",
               "https://www.reddit.com/r/Coronavirus/",
@@ -145,6 +135,16 @@ else:
              [URL_IMAGES + "Google-News.png",
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
+
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
+             [URL_IMAGES + "JohnCampbell.png",
+              "https://www.youtube.com/user/Campbellteaching/videos",
+              EXPIRE_DAYS],
+
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
+             [URL_IMAGES + "PeakProsperity.jpg",
+              "https://www.youtube.com/user/ChrisMartensondotcom/videos",
+              EXPIRE_DAYS],
 
     }
  
