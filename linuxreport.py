@@ -1,4 +1,5 @@
-﻿import feedparser
+﻿LINUX_REPORT = True
+import feedparser
 import random
 import json
 import itertools
@@ -41,7 +42,6 @@ g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
 URL_IMAGES = "http://linuxreport.net/static/images/"
 
-LINUX_REPORT = True
 LOGO_URL = ""
 site_urls = {}
 WEB_TITLE = "LinuxReport"
@@ -148,7 +148,7 @@ else:
 
     }
  
-class HelloCache(object):
+class FlaskCache(object):
     def __init__(self):
         global g_app
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY })
@@ -162,59 +162,6 @@ class HelloCache(object):
 
     def Del(self, url):
         self._cache.delete(url)
-
-#First try to grab image from cache
-# image_name = g_c.Get(rssurl + ":" + "IMAGE")
-# if image_name is None:
-#     image_name = GrabImage(feedinfo)
-#     if image_name is not None:
-#         g_c.Put(rssurl + ":" + "IMAGE", image_name, timeout = EXPIRE_DAYS)
-#         print (image_name)
-
-def GrabImageTest(feedinfo):
-
-    #Search for first image in first article of feed:
-    feed = feedinfo[0]
-    url = feed.link
-
-    #url = "http://keithcu.com/wordpress/?p=3847"
-
-    http_response = g_c.Get(url)
-
-    #Try to grab the mobile page since it is easier to find the correct first image
-    if http_response is None:
-        headers_mobile = { 'User-Agent' : 'Mozilla/5.0 (iPhone; CPU iPhone OS 9_1 like Mac OS X) AppleWebKit/601.1.46 (KHTML, like Gecko) Version/9.0 Mobile/13B137 Safari/601.1'}
-        http_response = http.request("Get", url, headers=headers_mobile).data
-        g_c.Put(url, http_response, timeout = EXPIRE_DAYS)
-
-    soup = BeautifulSoup(http_response, features = "lxml")
-    img = None
-    for img in soup.findAll('img'):
-        if 'gravatar' in img.attrs['src'] or 'themes' in img.attrs['src'] or 'qsstats' in img.attrs['src']:
-            continue
-        else:
-            print (img)
-            break
-
-    #Can't find an image, so give up
-    if img is None:
-        return None
-
-    img_url = img.attrs['src']
-
-    names = img_url.split("/")
-    print (names[-1])
-
-    try:
-        response = http.request("Get", img_url)
-        filename = "/srv/http/images/" + names[-1]
-        f = open(filename, "wb+")
-        shutil.copyfileobj(response, f)
-    except:
-        return None
-
-    return "http://keithcu.com/images/" + names[-1]
-
 
 def load_url_worker(url):
     site_info = site_urls.get(url, None)
@@ -271,7 +218,7 @@ def index():
 
     if g_c is None:
         socket.setdefaulttimeout(5)
-        g_c = HelloCache()
+        g_c = FlaskCache()
 
     if request.cookies.get('DarkMode') is None:
         dark_mode = False
