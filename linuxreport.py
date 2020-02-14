@@ -115,12 +115,12 @@ else:
 
     site_urls = {
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
-             [URL_IMAGES + "Campbell.png",
+             [URL_IMAGES + "JohnCampbell.png",
               "https://www.youtube.com/user/Campbellteaching/videos",
               EXPIRE_DAYS],
 
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
-             [URL_IMAGES + "JohnCampbell.png",
+             [URL_IMAGES + "PeakProsperity.jpg",
               "https://www.youtube.com/user/ChrisMartensondotcom/videos",
               EXPIRE_DAYS],
 
