@@ -44,6 +44,7 @@ URL_IMAGES = "http://linuxreport.net/static/images/"
 LINUX_REPORT = True
 LOGO_URL = ""
 site_urls = {}
+WEB_TITLE = "LinuxReport"
 
 if LINUX_REPORT:
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
@@ -112,6 +113,7 @@ if LINUX_REPORT:
 else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     URL_IMAGES = "http://covidreport.net/static/images/"
+    WEB_TITLE = "COVID-19 Report"
 
     site_urls = {
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
@@ -376,7 +378,7 @@ def index():
         text_color = 'black'
 
     page = render_template('page.html', columns = result, text_color = text_color,
-    logo_url = LOGO_URL, back_color = back_color)
+    logo_url = LOGO_URL, back_color = back_color, title = WEB_TITLE)
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
