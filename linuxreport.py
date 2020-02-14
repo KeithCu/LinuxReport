@@ -26,7 +26,9 @@ application = g_app
 
 EXPIRE_MINUTES = 60 * 5
 
-if g_app.debug == True:
+DEBUG = False
+
+if DEBUG or g_app.debug == True:
     EXPIRE_MINUTES = 1
     print ("Warning, in debug mode")
 
@@ -39,7 +41,13 @@ g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
 URL_IMAGES = "http://linuxreport.net/static/images/"
 
-site_urls = {
+LINUX_REPORT = True
+LOGO_URL = ""
+site_urls = {}
+
+if LINUX_REPORT:
+    LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
+    site_urls = {
               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
              [URL_IMAGES + "Coronavirus.jpg",
               "https://www.reddit.com/r/Coronavirus/",
@@ -100,8 +108,43 @@ site_urls = {
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
 
-            }
+    }
+else:
+    LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
+    URL_IMAGES = "http://covidreport.net/static/images/"
 
+    site_urls = {
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
+             [URL_IMAGES + "Campbell.png",
+              "https://www.youtube.com/user/Campbellteaching/videos",
+              EXPIRE_DAYS],
+
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
+             [URL_IMAGES + "JohnCampbell.png",
+              "https://www.youtube.com/user/ChrisMartensondotcom/videos",
+              EXPIRE_DAYS],
+
+              "https://www.reddit.com/r/Coronavirus/rising/.rss" :
+             [URL_IMAGES + "Coronavirus.jpg",
+              "https://www.reddit.com/r/Coronavirus/",
+              EXPIRE_HOURS],
+
+              "https://www.reddit.com/r/China_Flu/.rss" :
+             [URL_IMAGES + "redditlogosmall.png",
+              "https://www.reddit.com/r/China_Flu/",
+              EXPIRE_HOURS],
+
+               "http://www.independent.co.uk/topic/coronavirus/rss" :
+             [URL_IMAGES + "Independent-Corona.png",
+              "https://www.independent.co.uk/topic/coronavirus",
+              EXPIRE_HOURS * 2],
+
+               "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
+             [URL_IMAGES + "Google-News.png",
+              "https://news.google.com/search?q=coronavirus",
+              EXPIRE_HOURS],
+
+    }
  
 class HelloCache(object):
     def __init__(self):
@@ -306,6 +349,10 @@ def index():
             feedinfo = g_c.Get(url)
 
             jitter = random.randint(0, 60 * 15)
+            if DEBUG:
+                jitter = 0
+                expire_time = 10
+
             template = render_template('sitebox.html', entries = feedinfo, logo = logo_url, link = site_url)
             g_c.Put(site_url, template, timeout = expire_time + jitter)
 
@@ -328,7 +375,8 @@ def index():
         back_color = '#f6f5f4'
         text_color = 'black'
 
-    page = render_template('page.html', columns = result, text_color = text_color, back_color = back_color)
+    page = render_template('page.html', columns = result, text_color = text_color,
+    logo_url = LOGO_URL, back_color = back_color)
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
