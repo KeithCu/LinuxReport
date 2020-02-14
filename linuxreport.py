@@ -1,4 +1,5 @@
 ﻿LINUX_REPORT = True
+DEBUG = False
 import feedparser
 import random
 import json
@@ -26,8 +27,6 @@ Mobility(g_app)
 application = g_app
 
 EXPIRE_MINUTES = 60 * 5
-
-DEBUG = False
 
 if DEBUG or g_app.debug == True:
     EXPIRE_MINUTES = 1
@@ -176,7 +175,7 @@ def load_url_worker(url):
     #multiple Python processes fetching an expired RSS feed.
     feedpid = g_c.Get(url + "FETCHPID")
     if feedpid is None:
-        g_c.Put(url + "FETCHPID", os.getpid())
+        g_c.Put(url + "FETCHPID", os.getpid(), timeout = 10)
         feedpid = g_c.Get(url + "FETCHPID") #Check to make sure it's us
 
     if feedpid == os.getpid():
