@@ -1,4 +1,4 @@
-﻿LINUX_REPORT = True
+﻿LINUX_REPORT = False
 DEBUG = False
 import feedparser
 import random
@@ -61,7 +61,7 @@ if LINUX_REPORT:
               "http://www.reddit.com/r/linux/.rss" : 
              [URL_IMAGES + "redditlogosmall.png",
               "https://www.reddit.com/r/linux",
-              EXPIRE_HOURS],
+              EXPIRE_HOURS * 2],
 
               "http://rss.slashdot.org/Slashdot/slashdotMain" : 
              [URL_IMAGES + "slashdotlogo.png",
@@ -143,12 +143,12 @@ else:
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
              [URL_IMAGES + "JohnCampbell.png",
               "https://www.youtube.com/user/Campbellteaching/videos",
-              EXPIRE_DAYS],
+              EXPIRE_DAY],
 
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
              [URL_IMAGES + "PeakProsperity.jpg",
               "https://www.youtube.com/user/ChrisMartensondotcom/videos",
-              EXPIRE_DAYS],
+              EXPIRE_DAY],
 
     }
  
