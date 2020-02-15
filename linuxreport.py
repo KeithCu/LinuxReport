@@ -1,4 +1,4 @@
-﻿LINUX_REPORT = False
+﻿LINUX_REPORT = True
 DEBUG = False
 import feedparser
 import random
@@ -140,14 +140,14 @@ else:
               "https://gnews.org/",
               EXPIRE_HOURS * 3],
 
-            "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
-             [URL_IMAGES + "JohnCampbell.png",
-              "https://www.youtube.com/user/Campbellteaching/videos",
-              EXPIRE_DAY],
-
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
              [URL_IMAGES + "PeakProsperity.png",
               "https://www.youtube.com/user/ChrisMartensondotcom/videos",
+              EXPIRE_DAY],
+
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
+             [URL_IMAGES + "JohnCampbell.png",
+              "https://www.youtube.com/user/Campbellteaching/videos",
               EXPIRE_DAY],
 
     }
