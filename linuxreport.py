@@ -46,6 +46,7 @@ site_urls = {}
 WEB_TITLE = "LinuxReport"
 
 if LINUX_REPORT:
+    FAVICON = "http://linuxreport.net/static/images/linuxreport.ico"
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     site_urls = {
               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
@@ -110,6 +111,7 @@ if LINUX_REPORT:
 
     }
 else:
+    FAVICON = "http://covidreport.net/static/images/covidreport.ico"
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     URL_IMAGES = "http://covidreport.net/static/images/"
     WEB_TITLE = "COVID-19 Report"
@@ -329,7 +331,7 @@ def index():
         text_color = 'black'
 
     page = render_template('page.html', columns = result, text_color = text_color,
-    logo_url = LOGO_URL, back_color = back_color, title = WEB_TITLE)
+    logo_url = LOGO_URL, back_color = back_color, title = WEB_TITLE, favicon = FAVICON)
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
