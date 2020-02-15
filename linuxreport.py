@@ -44,9 +44,9 @@ URL_IMAGES = "http://linuxreport.net/static/images/"
 LOGO_URL = ""
 site_urls = {}
 WEB_TITLE = "LinuxReport"
+FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
 
 if LINUX_REPORT:
-    FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     site_urls = {
               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
