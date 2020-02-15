@@ -46,7 +46,7 @@ site_urls = {}
 WEB_TITLE = "LinuxReport"
 
 if LINUX_REPORT:
-    FAVICON = "http://linuxreport.net/static/images/linuxreport.ico"
+    FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     site_urls = {
               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
@@ -111,7 +111,7 @@ if LINUX_REPORT:
 
     }
 else:
-    FAVICON = "http://covidreport.net/static/images/covidreport.ico"
+    FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     URL_IMAGES = "http://covidreport.net/static/images/"
     WEB_TITLE = "COVID-19 Report"
