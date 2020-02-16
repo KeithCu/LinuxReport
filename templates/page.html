@@ -48,12 +48,14 @@
       function redirect() {
         window.location = "/config"
       }
+      var timer = setInterval("autoRefresh()", 1800 * 1000);
+        function autoRefresh(){self.location.reload(true);}
     </script>
   </head>
   <body style="background-color:{{ back_color }}">
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
     <center><img src="{{logo_url}}" style="max-height:100px;"></center>
-    <center><small>(Refreshes hourly - Try Dark Mode!) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></small></center>
+    <center><small>(Refreshes automatically -- See also <a target="_blank" href = "http://covidreport.net/">CovidReport</a>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></small></center>
     <div class="row">
       <div class="column">{{ columns[0] }}</div>
       {%- if not request.MOBILE %}
