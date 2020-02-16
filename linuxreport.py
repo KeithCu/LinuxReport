@@ -127,15 +127,15 @@ else:
               "https://www.reddit.com/r/China_Flu/",
               EXPIRE_HOURS],
 
-               "http://www.independent.co.uk/topic/coronavirus/rss" :
-             [URL_IMAGES + "Independent-Corona.png",
-              "https://www.independent.co.uk/topic/coronavirus",
-              EXPIRE_HOURS * 3],
-
                "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
              [URL_IMAGES + "Google-News.png",
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
+
+               "http://www.independent.co.uk/topic/coronavirus/rss" :
+             [URL_IMAGES + "Independent-Corona.png",
+              "https://www.independent.co.uk/topic/coronavirus",
+              EXPIRE_HOURS * 3],
 
                "https://gnews.org/feed/" :
              [URL_IMAGES + "gnews.png",
@@ -204,7 +204,6 @@ def load_url_worker(url):
         print ("Done waiting for someone else to parse remote site %s" %(url))
 
 def FetchUrlsParallel(urls):
-
     with concurrent.futures.ThreadPoolExecutor(max_workers = 10) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
