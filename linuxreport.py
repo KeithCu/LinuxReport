@@ -82,7 +82,7 @@ if LINUX_REPORT:
               "http://www.osnews.com/feed/" :
              [URL_IMAGES + "osnews-logo.png",
               "http://www.osnews.com/",
-              EXPIRE_HOURS],
+              EXPIRE_HOURS * 2],
 
               "http://www.geekwire.com/feed/" :
              [URL_IMAGES + "GeekWire.png",
@@ -92,22 +92,22 @@ if LINUX_REPORT:
                "http://feeds.feedburner.com/linuxtoday/linux" :
              [URL_IMAGES + "linuxtd_logo.png",
               "http://www.linuxtoday.com/",
-              EXPIRE_HOURS],
+              EXPIRE_HOURS * 2],
 
                "http://planet.debian.org/rss20.xml" :
              [URL_IMAGES + "Debian-OpenLogo.svg",
               "http://planet.debian.org/",
               EXPIRE_HOURS * 2],
 
-               "http://www.independent.co.uk/topic/coronavirus/rss" :
-             [URL_IMAGES + "Independent-Corona.png",
-              "https://www.independent.co.uk/topic/coronavirus",
-              EXPIRE_HOURS * 2],
-
                "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
              [URL_IMAGES + "Google-News.png",
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
+
+            "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
+             [URL_IMAGES + "JohnCampbell.png",
+              "https://www.youtube.com/user/Campbellteaching/videos",
+              EXPIRE_DAY],
 
     }
 else:
@@ -130,7 +130,7 @@ else:
                "http://www.independent.co.uk/topic/coronavirus/rss" :
              [URL_IMAGES + "Independent-Corona.png",
               "https://www.independent.co.uk/topic/coronavirus",
-              EXPIRE_HOURS * 2],
+              EXPIRE_HOURS * 3],
 
                "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
              [URL_IMAGES + "Google-News.png",
