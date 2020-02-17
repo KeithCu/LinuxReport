@@ -48,8 +48,8 @@
       function redirect() {
         window.location = "/config"
       }
-      var timer = setInterval("autoRefresh()", 1800 * 1000);
-        function autoRefresh(){self.location.reload(true);}
+      var timer = setInterval("autoRefresh()", 1800 * 1);
+        function autoRefresh(){self.location.reload();}
     </script>
   </head>
   <body style="background-color:{{ back_color }}">
