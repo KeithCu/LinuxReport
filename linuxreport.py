@@ -87,7 +87,7 @@ if LINUX_REPORT:
               "http://www.geekwire.com/feed/" :
              [URL_IMAGES + "GeekWire.png",
               "http://www.geekwire.com/",
-              EXPIRE_HOURS * 2], #Slow and slow-changing, so fetch less
+              EXPIRE_HOURS * 3], #Slow and slow-changing, so fetch less
 
                "http://feeds.feedburner.com/linuxtoday/linux" :
              [URL_IMAGES + "linuxtd_logo.png",
@@ -135,12 +135,12 @@ else:
                "http://www.independent.co.uk/topic/coronavirus/rss" :
              [URL_IMAGES + "Independent-Corona.png",
               "https://www.independent.co.uk/topic/coronavirus",
-              EXPIRE_HOURS * 3],
+              EXPIRE_HOURS * 4],
 
                "https://gnews.org/feed/" :
              [URL_IMAGES + "gnews.png",
               "https://gnews.org/",
-              EXPIRE_HOURS * 3],
+              EXPIRE_HOURS * 4],
 
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
              [URL_IMAGES + "PeakProsperity.png",
