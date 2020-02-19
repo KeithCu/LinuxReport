@@ -1,4 +1,4 @@
-﻿LINUX_REPORT = True
+﻿LINUX_REPORT = False
 DEBUG = False
 import feedparser
 import random
@@ -105,11 +105,6 @@ if LINUX_REPORT:
               "https://news.google.com/search?q=coronavirus",
               EXPIRE_HOURS],
 
-            "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
-             [URL_IMAGES + "JohnCampbell.png",
-              "https://www.youtube.com/user/Campbellteaching/videos",
-              EXPIRE_DAY],
-
     }
 else:
     FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
@@ -119,12 +114,12 @@ else:
 
     site_urls = {
               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
-             [URL_IMAGES + "Coronavirus.jpg",
+             [URL_IMAGES + "redditlogosmall.png",
               "https://www.reddit.com/r/Coronavirus/",
               EXPIRE_HOURS],
 
               "https://www.reddit.com/r/China_Flu/rising/.rss" :
-             [URL_IMAGES + "redditlogosmall.png",
+             [URL_IMAGES + "Coronavirus.jpg",
               "https://www.reddit.com/r/China_Flu/",
               EXPIRE_HOURS],
 
