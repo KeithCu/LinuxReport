@@ -49,9 +49,10 @@ FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
 if LINUX_REPORT:
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     site_urls = {
-              "https://www.reddit.com/r/Coronavirus/rising/.rss" :
+
+              "https://www.reddit.com/r/China_Flu/rising/.rss" :
              [URL_IMAGES + "Coronavirus.jpg",
-              "https://www.reddit.com/r/Coronavirus/",
+              "https://www.reddit.com/r/China_Flu/",
               EXPIRE_HOURS],
 
              "http://lxer.com/module/newswire/headlines.rss" :
