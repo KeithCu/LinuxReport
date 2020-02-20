@@ -1,4 +1,4 @@
-﻿LINUX_REPORT = False
+﻿LINUX_REPORT = True
 DEBUG = False
 import feedparser
 import random
@@ -45,7 +45,7 @@ LOGO_URL = ""
 site_urls = {}
 WEB_TITLE = "LinuxReport"
 FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
-
+WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
 if LINUX_REPORT:
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     site_urls = {
@@ -111,6 +111,8 @@ else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     URL_IMAGES = "http://covidreport.net/static/images/"
     WEB_TITLE = "COVID-19 Report"
+    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
+
 
     site_urls = {
               "https://www.reddit.com/r/Coronavirus/rising/.rss" :
@@ -155,7 +157,7 @@ class FlaskCache(object):
         global g_app
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY })
 
-    def Put(self, url, template, timeout = None):
+    def Put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
         
     def Get(self, url):
@@ -169,7 +171,7 @@ def load_url_worker(url):
     site_info = site_urls.get(url, None)
 
     if site_info is None:
-        site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS]
+        site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS * 2]
         site_urls[url] = site_info
 
     logo_url, site_url, expire_time = site_info
@@ -326,7 +328,8 @@ def index():
         text_color = 'black'
 
     page = render_template('page.html', columns = result, text_color = text_color,
-    logo_url = LOGO_URL, back_color = back_color, title = WEB_TITLE, favicon = FAVICON)
+    logo_url = LOGO_URL, back_color = back_color, title = WEB_TITLE, favicon = FAVICON,
+    welcome_html = Markup(WELCOME_HTML))
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
