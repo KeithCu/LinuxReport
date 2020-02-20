@@ -1,0 +1,9 @@
+feedparser==5.2.1
+Flask==1.1.1
+Flask-BabelEx==0.9.4
+Flask-Bootstrap==3.3.7.1
+Flask-Caching==1.8.0
+Flask-Mobility==1.0.0
+Werkzeug==1.0.0
+WTForms==2.2.1
+
