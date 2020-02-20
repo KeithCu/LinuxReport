@@ -163,7 +163,7 @@ class FlaskCache():
 
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
-       
+
     def get(self, url):
         template = self._cache.get(url)
         return template
@@ -172,11 +172,7 @@ class FlaskCache():
         self._cache.delete(url)
 
 def load_url_worker(url):
-    site_info = site_urls.get(url, None)
-
-    if site_info is None:
-        site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS * 2]
-        site_urls[url] = site_info
+    site_info = site_urls[url]
 
     _logo_url, site_url, expire_time = site_info
 
@@ -272,7 +268,7 @@ def index():
         site_info = site_urls.get(url, None)
 
         if site_info is None:
-            site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS]
+            site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS * 3]
             site_urls[url] = site_info
 
         logo_url, site_url, expire_time = site_info
@@ -312,7 +308,6 @@ def index():
 
             template = render_template('sitebox.html', entries=feedinfo, logo=logo_url, link=site_url)
             print("Adding html for %s with timeout %f." %(site_url, expire_time + jitter))
-            g_c.delete(site_url)
             g_c.put(site_url, template, timeout=expire_time + jitter)
 
         result[cur_col].append(template)
