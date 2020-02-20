@@ -140,6 +140,11 @@ else:
               "https://gnews.org/",
               EXPIRE_HOURS * 4],
 
+               "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
+             [URL_IMAGES + "CDC-Logo.png",
+              "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
+              EXPIRE_DAY],
+
             "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
              [URL_IMAGES + "PeakProsperity.png",
               "https://www.youtube.com/user/ChrisMartensondotcom/videos",
@@ -188,6 +193,7 @@ def load_url_worker(url):
         res = feedparser.parse(url)
         feedinfo = list(itertools.islice(res['entries'], 8))
         g_c.Put(url, feedinfo, timeout = expire_time)
+        print ("Adding RSS feed for %s with timeout %f." %( site_url, expire_time ))
         g_c.Del(url + "FETCHPID")
         end = timer()
         print ("Parsing from remote site %s in %f." %(url, end - start))
@@ -306,6 +312,7 @@ def index():
                 expire_time = 10
 
             template = render_template('sitebox.html', entries = feedinfo, logo = logo_url, link = site_url)
+            print ("Adding html for %s with timeout %f." %( site_url, expire_time + jitter))
             g_c.Put(site_url, template, timeout = expire_time + jitter)
 
         result[cur_col].append(template)
