@@ -54,7 +54,7 @@ SITE_URLS_LR = {
      "http://lxer.com/",
      EXPIRE_HOURS],
 
-    "http://www.reddit.com/r/linux/.rss" :
+    "http://www.reddit.com/r/linux/rising/.rss" :
     ["redditlogosmall.png",
      "Reddit Linux sub",
      "https://www.reddit.com/r/linux",
@@ -80,7 +80,7 @@ SITE_URLS_LR = {
 
     "http://www.osnews.com/feed/" :
     ["osnews-logo.png",
-    "OS News.com",
+     "OS News.com",
      "http://www.osnews.com/",
      EXPIRE_HOURS * 2],
 
@@ -235,11 +235,14 @@ g_c = None
 g_standard_order = list(site_urls.keys())
 g_standard_order_s = str(g_standard_order)
 
+g_first = True
+
 #The main page
 @g_app.route('/')
 def index():
 
     global g_c
+    global g_first
 
     if g_c is None:
         socket.setdefaulttimeout(5)
@@ -340,13 +343,22 @@ def index():
 
             template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url,
                                        alt_tag=logo_alt, link=site_url)
-            g_c.put(site_url, template, timeout=expire_time)
+
+            offset = 0
+
+            # Add 2.5 min offset so refreshes likely to expire together between page cache expirations.
+            if g_first:
+                offset = 150
+
+            g_c.put(site_url, template, timeout=expire_time + offset)
 
         result[cur_col].append(template)
 
         if not single_column:
             cur_col += 1
             cur_col %= 3
+
+    g_first = False
 
     result[0] = Markup(''.join(result[0]))
 
