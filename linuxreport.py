@@ -40,122 +40,123 @@ EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
-URL_IMAGES = "http://linuxreport.net/static/images/"
+SITE_URLS_LR = {
 
-LOGO_URL = ""
-site_urls = {}
-WEB_TITLE = "LinuxReport"
-FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
-WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
+    "https://www.reddit.com/r/China_Flu/rising/.rss" :
+    ["Coronavirus.jpg",
+     "https://www.reddit.com/r/China_Flu/",
+     EXPIRE_HOURS],
+
+    "http://lxer.com/module/newswire/headlines.rss" :
+    ["lxer.png",
+     "http://lxer.com/",
+     EXPIRE_HOURS],
+
+    "http://www.reddit.com/r/linux/.rss" :
+    ["redditlogosmall.png",
+     "https://www.reddit.com/r/linux",
+     EXPIRE_HOURS * 2],
+
+    "http://rss.slashdot.org/Slashdot/slashdotMain" :
+    ["slashdotlogo.png",
+     "https://slashdot.org/",
+     EXPIRE_HOURS],
+
+    "http://lwn.net/headlines/newrss" :
+    ["barepenguin-70.png",
+     "https://lwn.net/",
+     EXPIRE_DAY],
+
+    "http://news.ycombinator.com/rss" :
+    ["hackernews.jpg",
+     "http://news.ycombinator.com/",
+     EXPIRE_HOURS],
+
+    "http://www.osnews.com/feed/" :
+    ["osnews-logo.png",
+     "http://www.osnews.com/",
+     EXPIRE_HOURS * 2],
+
+    "http://www.geekwire.com/feed/" :
+    ["GeekWire.png",
+     "http://www.geekwire.com/",
+     EXPIRE_HOURS * 3], #Slow and slow-changing, so fetch less
+
+    "http://feeds.feedburner.com/linuxtoday/linux" :
+    ["linuxtd_logo.png",
+     "http://www.linuxtoday.com/",
+     EXPIRE_HOURS * 2],
+
+    "http://planet.debian.org/rss20.xml" :
+    ["Debian-OpenLogo.svg",
+     "http://planet.debian.org/",
+     EXPIRE_HOURS * 2],
+
+    "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
+    ["Google-News.png",
+     "https://news.google.com/search?q=coronavirus",
+     EXPIRE_HOURS],
+}
+
+SITE_URLS_CR = {
+    "https://www.reddit.com/r/Coronavirus/rising/.rss" :
+    ["redditlogosmall.png",
+     "https://www.reddit.com/r/Coronavirus/",
+     EXPIRE_HOURS],
+
+    "https://www.reddit.com/r/China_Flu/rising/.rss" :
+    ["Coronavirus.jpg",
+     "https://www.reddit.com/r/China_Flu/",
+     EXPIRE_HOURS],
+
+    "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
+    ["Google-News.png",
+     "https://news.google.com/search?q=coronavirus",
+     EXPIRE_HOURS],
+
+    "http://www.independent.co.uk/topic/coronavirus/rss" :
+    ["Independent-Corona.png",
+     "https://www.independent.co.uk/topic/coronavirus",
+     EXPIRE_HOURS * 4],
+
+    "https://gnews.org/feed/" :
+    ["gnews.png",
+     "https://gnews.org/",
+     EXPIRE_HOURS * 4],
+
+    "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
+    ["CDC-Logo.png",
+     "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
+     EXPIRE_DAY],
+
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
+    ["PeakProsperity.png",
+     "https://www.youtube.com/user/ChrisMartensondotcom/videos",
+     EXPIRE_DAY],
+
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
+    ["JohnCampbell.png",
+     "https://www.youtube.com/user/Campbellteaching/videos",
+     EXPIRE_DAY],
+}
+
 if LINUX_REPORT:
+    site_urls = SITE_URLS_LR
+    site_urls_alt = SITE_URLS_CR
+    URL_IMAGES = "http://linuxreport.net/static/images/"
+    FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
-    site_urls = {
+    WEB_TITLE = "LinuxReport"
+    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
 
-        "https://www.reddit.com/r/China_Flu/rising/.rss" :
-        [URL_IMAGES + "Coronavirus.jpg",
-         "https://www.reddit.com/r/China_Flu/",
-         EXPIRE_HOURS],
-
-        "http://lxer.com/module/newswire/headlines.rss" :
-        [URL_IMAGES + "lxer.png",
-         "http://lxer.com/",
-         EXPIRE_HOURS],
-
-        "http://www.reddit.com/r/linux/.rss" :
-        [URL_IMAGES + "redditlogosmall.png",
-         "https://www.reddit.com/r/linux",
-         EXPIRE_HOURS * 2],
-
-        "http://rss.slashdot.org/Slashdot/slashdotMain" :
-        [URL_IMAGES + "slashdotlogo.png",
-         "https://slashdot.org/",
-         EXPIRE_HOURS],
-
-        "http://lwn.net/headlines/newrss" :
-        [URL_IMAGES + "barepenguin-70.png",
-         "https://lwn.net/",
-         EXPIRE_DAY],
-
-        "http://news.ycombinator.com/rss" :
-        [URL_IMAGES + "hackernews.jpg",
-         "http://news.ycombinator.com/",
-         EXPIRE_HOURS],
-
-        "http://www.osnews.com/feed/" :
-        [URL_IMAGES + "osnews-logo.png",
-         "http://www.osnews.com/",
-         EXPIRE_HOURS * 2],
-
-        "http://www.geekwire.com/feed/" :
-        [URL_IMAGES + "GeekWire.png",
-         "http://www.geekwire.com/",
-         EXPIRE_HOURS * 3], #Slow and slow-changing, so fetch less
-
-        "http://feeds.feedburner.com/linuxtoday/linux" :
-        [URL_IMAGES + "linuxtd_logo.png",
-         "http://www.linuxtoday.com/",
-         EXPIRE_HOURS * 2],
-
-        "http://planet.debian.org/rss20.xml" :
-        [URL_IMAGES + "Debian-OpenLogo.svg",
-         "http://planet.debian.org/",
-         EXPIRE_HOURS * 2],
-
-        "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
-        [URL_IMAGES + "Google-News.png",
-         "https://news.google.com/search?q=coronavirus",
-         EXPIRE_HOURS],
-
-    }
 else:
+    site_urls = SITE_URLS_CR
+    site_urls_alt = SITE_URLS_LR
+    URL_IMAGES = "http://covidreport.net/static/images/"
     FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
-    URL_IMAGES = "http://covidreport.net/static/images/"
     WEB_TITLE = "COVID-19 Report"
     WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
-
-    site_urls = {
-        "https://www.reddit.com/r/Coronavirus/rising/.rss" :
-        [URL_IMAGES + "redditlogosmall.png",
-         "https://www.reddit.com/r/Coronavirus/",
-         EXPIRE_HOURS],
-
-        "https://www.reddit.com/r/China_Flu/rising/.rss" :
-        [URL_IMAGES + "Coronavirus.jpg",
-         "https://www.reddit.com/r/China_Flu/",
-         EXPIRE_HOURS],
-
-        "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
-        [URL_IMAGES + "Google-News.png",
-         "https://news.google.com/search?q=coronavirus",
-         EXPIRE_HOURS],
-
-        "http://www.independent.co.uk/topic/coronavirus/rss" :
-        [URL_IMAGES + "Independent-Corona.png",
-         "https://www.independent.co.uk/topic/coronavirus",
-         EXPIRE_HOURS * 4],
-
-        "https://gnews.org/feed/" :
-        [URL_IMAGES + "gnews.png",
-         "https://gnews.org/",
-         EXPIRE_HOURS * 4],
-
-        "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
-        [URL_IMAGES + "CDC-Logo.png",
-         "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
-         EXPIRE_DAY],
-
-        "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
-        [URL_IMAGES + "PeakProsperity.png",
-         "https://www.youtube.com/user/ChrisMartensondotcom/videos",
-         EXPIRE_DAY],
-
-        "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
-        [URL_IMAGES + "JohnCampbell.png",
-         "https://www.youtube.com/user/Campbellteaching/videos",
-         EXPIRE_DAY],
-
-    }
 
 class FlaskCache():
     def __init__(self):
@@ -188,7 +189,6 @@ def load_url_worker(url):
         res = feedparser.parse(url)
         feedinfo = list(itertools.islice(res['entries'], 8))
         g_c.put(url, feedinfo, timeout=expire_time)
-        print("Adding RSS feed for %s with timeout %f." %(site_url, expire_time))
         g_c.delete(url + "FETCHPID")
         end = timer()
         print("Parsing from remote site %s in %f." %(url, end - start))
@@ -268,7 +268,12 @@ def index():
         site_info = site_urls.get(url, None)
 
         if site_info is None:
-            site_info = [URL_IMAGES + "Custom.png", url + "HTML", EXPIRE_HOURS * 3]
+            #Check if site info is in other urls
+            site_info = site_urls_alt.get(url, None)
+
+            if site_info is None:
+                site_info = ["Custom.png", url + "HTML", EXPIRE_HOURS * 3]
+
             site_urls[url] = site_info
 
         logo_url, site_url, expire_time = site_info
@@ -306,8 +311,7 @@ def index():
                 jitter = 0
                 expire_time = 10
 
-            template = render_template('sitebox.html', entries=feedinfo, logo=logo_url, link=site_url)
-            print("Adding html for %s with timeout %f." %(site_url, expire_time + jitter))
+            template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url, link=site_url)
             g_c.put(site_url, template, timeout=expire_time + jitter)
 
         result[cur_col].append(template)
@@ -356,7 +360,6 @@ class ConfigForm(Form):
     dark_mode = BooleanField(label="Dark Mode")
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
-
 
 @g_app.route('/config', methods=['GET', 'POST'])
 def config():
