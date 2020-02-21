@@ -306,13 +306,11 @@ def index():
             #If not, feed should be in the RSS cache by now
             feedinfo = g_c.get(url)
 
-            jitter = random.randint(0, 60 * 15)
             if DEBUG:
-                jitter = 0
                 expire_time = 10
 
             template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url, link=site_url)
-            g_c.put(site_url, template, timeout=expire_time + jitter)
+            g_c.put(site_url, template, timeout=expire_time)
 
         result[cur_col].append(template)
 
