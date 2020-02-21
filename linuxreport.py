@@ -250,6 +250,11 @@ def index():
     else:
         dark_mode = True
 
+    if request.cookies.get("NoUnderlines") is None:
+        no_underlines = False
+    else:
+        no_underlines = True
+
     page_order = request.cookies.get('RssUrls')
     if page_order is not None:
         page_order = json.loads(page_order)
@@ -268,6 +273,9 @@ def index():
 
     if dark_mode:
         suffix = suffix + ":DARK"
+
+    if no_underlines:
+        suffix = suffix + ":NOUND"
 
     full_page = g_c.get(page_order_s + suffix)
     if full_page is not None:
@@ -353,10 +361,14 @@ def index():
         back_color = '#f6f5f4'
         text_color = 'black'
 
+    text_decoration = ""
+    if no_underlines:
+        text_decoration = "text-decoration:none;"
+
     page = render_template('page.html', columns=result, text_color=text_color,
                            logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE, 
                            description = WEB_DESCRIPTION, favicon=FAVICON,
-                           welcome_html=Markup(WELCOME_HTML))
+                           welcome_html=Markup(WELCOME_HTML), a_text_decoration = text_decoration)
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
@@ -377,8 +389,9 @@ class CustomRSSForm(Form):
     url = StringField('RSS URL', [validators.Length(min=10, max=120)])
 
 class ConfigForm(Form):
-    delete_cookie = BooleanField(label="Delete Cookie")
-    dark_mode = BooleanField(label="Dark Mode")
+    delete_cookie = BooleanField(label="Delete cookies")
+    dark_mode = BooleanField(label="Dark mode")
+    no_underlines = BooleanField(label="No underlines")
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
 
@@ -386,9 +399,14 @@ class ConfigForm(Form):
 def config():
     if request.method == 'GET':
         form = ConfigForm()
+
         dark_mode = request.cookies.get('DarkMode')
         if dark_mode:
             form.dark_mode.data = True
+
+        no_underlines = request.cookies.get('NoUnderlines')
+        if no_underlines is not None:
+            form.no_underlines.data = True
 
         page_order = request.cookies.get('RssUrls')
         if page_order is not None:
@@ -422,9 +440,10 @@ def config():
     else: #request.method == 'POST'
         form = ConfigForm(request.form)
         if form.delete_cookie.data:
-            resp = g_app.make_response("<HTML><BODY>Deleted cookie.</BODY></HTML>")
+            resp = g_app.make_response("<HTML><BODY>Deleted cookies.</BODY></HTML>")
             resp.delete_cookie('RssUrls')
             resp.delete_cookie('DarkMode')
+            resp.delete_cookie('NoUnderlines')
             return resp
 
         page_order = []
@@ -446,10 +465,16 @@ def config():
 
         #Pickle this stuff to a string to send as a cookie
         cookie_str = json.dumps(page_order)
-        resp = g_app.make_response("<HTML><BODY>Saved cookie for later.</BODY></HTML>")
+        resp = g_app.make_response("<HTML><BODY>Saved cookies for later.</BODY></HTML>")
         resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
         if form.dark_mode.data:
             resp.set_cookie('DarkMode', "1", max_age=EXPIRE_YEARS)
         else:
             resp.delete_cookie('DarkMode')
+
+        if form.no_underlines.data:
+            resp.set_cookie("NoUnderlines", "1", max_age=EXPIRE_YEARS)
+        else:
+            resp.delete_cookie("NoUnderlines")
+
         return resp

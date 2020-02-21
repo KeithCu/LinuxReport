@@ -15,15 +15,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>LinuxReport Customize</title>
+  <title>Customize</title>
 </head>
 <body>
 <form method="POST">
-  Delete the cookie:
+  Delete the cookies:
   {{ form.delete_cookie }}
   <br/>
-  Dark Mode:
+  Dark mode:
   {{ form.dark_mode }}
+  <br />
+  No underlines:
+  {{ form.no_underlines }}
+  <br />
   {{ form.urls }}
   {{ form.url_custom }}
   <button type="save" name="save">Save</button>
