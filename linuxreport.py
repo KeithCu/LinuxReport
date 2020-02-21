@@ -44,56 +44,67 @@ SITE_URLS_LR = {
 
     "https://www.reddit.com/r/China_Flu/rising/.rss" :
     ["Coronavirus.jpg",
+     "Reddit Corona virus sub",
      "https://www.reddit.com/r/China_Flu/",
      EXPIRE_HOURS],
 
     "http://lxer.com/module/newswire/headlines.rss" :
     ["lxer.png",
+     "Lxer news",
      "http://lxer.com/",
      EXPIRE_HOURS],
 
     "http://www.reddit.com/r/linux/.rss" :
     ["redditlogosmall.png",
+     "Reddit Linux sub",
      "https://www.reddit.com/r/linux",
      EXPIRE_HOURS * 2],
 
     "http://rss.slashdot.org/Slashdot/slashdotMain" :
     ["slashdotlogo.png",
+     "Slashdot",
      "https://slashdot.org/",
      EXPIRE_HOURS],
 
     "http://lwn.net/headlines/newrss" :
     ["barepenguin-70.png",
+     "LWN.net news",
      "https://lwn.net/",
      EXPIRE_DAY],
 
     "http://news.ycombinator.com/rss" :
     ["hackernews.jpg",
+     "Ycombinator news",
      "http://news.ycombinator.com/",
      EXPIRE_HOURS],
 
     "http://www.osnews.com/feed/" :
     ["osnews-logo.png",
+    "OS News.com",
      "http://www.osnews.com/",
      EXPIRE_HOURS * 2],
 
     "http://www.geekwire.com/feed/" :
     ["GeekWire.png",
+     "GeekWire",
      "http://www.geekwire.com/",
      EXPIRE_HOURS * 3], #Slow and slow-changing, so fetch less
 
     "http://feeds.feedburner.com/linuxtoday/linux" :
     ["linuxtd_logo.png",
+     "Linux Today",
      "http://www.linuxtoday.com/",
      EXPIRE_HOURS * 2],
 
     "http://planet.debian.org/rss20.xml" :
     ["Debian-OpenLogo.svg",
+     "Planet Debian",
      "http://planet.debian.org/",
      EXPIRE_HOURS * 2],
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
     ["Google-News.png",
+     "Google Coronavirus news",
      "https://news.google.com/search?q=coronavirus",
      EXPIRE_HOURS],
 }
@@ -101,41 +112,49 @@ SITE_URLS_LR = {
 SITE_URLS_CR = {
     "https://www.reddit.com/r/Coronavirus/rising/.rss" :
     ["redditlogosmall.png",
+     "Reddit Corona virus sub",
      "https://www.reddit.com/r/Coronavirus/",
      EXPIRE_HOURS],
 
     "https://www.reddit.com/r/China_Flu/rising/.rss" :
     ["Coronavirus.jpg",
+     "Reddit China Flu sub",
      "https://www.reddit.com/r/China_Flu/",
      EXPIRE_HOURS],
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
     ["Google-News.png",
+    "Google News",
      "https://news.google.com/search?q=coronavirus",
      EXPIRE_HOURS],
 
     "http://www.independent.co.uk/topic/coronavirus/rss" :
     ["Independent-Corona.png",
+     "Independent UK news",
      "https://www.independent.co.uk/topic/coronavirus",
      EXPIRE_HOURS * 4],
 
     "https://gnews.org/feed/" :
     ["gnews.png",
+    "Guo Media news",
      "https://gnews.org/",
      EXPIRE_HOURS * 4],
 
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
     ["CDC-Logo.png",
+     "Centers for Disease Control",
      "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
      EXPIRE_DAY],
 
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
     ["PeakProsperity.png",
+     "Chris Martenson Peak Prosperity",
      "https://www.youtube.com/user/ChrisMartensondotcom/videos",
      EXPIRE_DAY],
 
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
     ["JohnCampbell.png",
+     "Dr. John Campbell",
      "https://www.youtube.com/user/Campbellteaching/videos",
      EXPIRE_DAY],
 }
@@ -146,7 +165,8 @@ if LINUX_REPORT:
     URL_IMAGES = "http://linuxreport.net/static/images/"
     FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
-    WEB_TITLE = "LinuxReport"
+    WEB_TITLE = "Linux Report"
+    WEB_DESCRIPTION = "Linux News dashboard"
     WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
 
 else:
@@ -155,6 +175,7 @@ else:
     URL_IMAGES = "http://covidreport.net/static/images/"
     FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
+    WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
     WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
 
@@ -175,7 +196,7 @@ class FlaskCache():
 def load_url_worker(url):
     site_info = site_urls[url]
 
-    _logo_url, site_url, expire_time = site_info
+    _logo_url, _logo_alt, site_url, expire_time = site_info
 
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
@@ -272,11 +293,11 @@ def index():
             site_info = site_urls_alt.get(url, None)
 
             if site_info is None:
-                site_info = ["Custom.png", url + "HTML", EXPIRE_HOURS * 3]
+                site_info = ["Custom.png", "Custom site", url + "HTML", EXPIRE_HOURS * 3]
 
             site_urls[url] = site_info
 
-        logo_url, site_url, expire_time = site_info
+        logo_url, _logo_alt, site_url, expire_time = site_info
 
         #First check for the templatized content stored with site URL
         template = g_c.get(site_url)
@@ -297,7 +318,7 @@ def index():
     #2. Now we've got all the data, go through again to build the page
     for url in page_order:
         site_info = site_urls[url]
-        logo_url, site_url, expire_time = site_info
+        logo_url, logo_alt, site_url, expire_time = site_info
 
         #First check to see if we already have this result
         template = result_1.get(url, None)
@@ -309,7 +330,8 @@ def index():
             if DEBUG:
                 expire_time = 10
 
-            template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url, link=site_url)
+            template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url,
+                                       alt_tag=logo_alt, link=site_url)
             g_c.put(site_url, template, timeout=expire_time)
 
         result[cur_col].append(template)
@@ -333,7 +355,8 @@ def index():
 
     page = render_template('page.html', columns=result, text_color=text_color,
                            logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE, 
-                           favicon=FAVICON, welcome_html=Markup(WELCOME_HTML))
+                           description = WEB_DESCRIPTION, favicon=FAVICON,
+                           welcome_html=Markup(WELCOME_HTML))
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
@@ -410,7 +433,7 @@ def config():
 
         url_custom = list(form.url_custom)
         for site in url_custom:
-            if site.url.data != "http://":
+            if len(site.url.data) > 10: #URLs greater than 10 chars
                 urls.append(site)
 
         urls.sort(key=lambda x: x.pri.data)
