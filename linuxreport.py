@@ -157,6 +157,13 @@ SITE_URLS_CR = {
      "Dr. John Campbell",
      "https://www.youtube.com/user/Campbellteaching/videos",
      EXPIRE_DAY],
+
+    "https://corona.castos.com/feed" :
+    ["CoronaCastos2.png",
+     "Coronavirus Central Daily Podcast",
+     "https://coronaviruscentral.net",
+     EXPIRE_DAY],
+
 }
 
 if LINUX_REPORT:
@@ -475,10 +482,14 @@ def config():
             elif isinstance(urlf.form, CustomRSSForm):
                 page_order.append(urlf.url.data)
 
-        #Pickle this stuff to a string to send as a cookie
-        cookie_str = json.dumps(page_order)
-        resp = g_app.make_response("<HTML><BODY>Saved cookies for later.</BODY></HTML>")
-        resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
+        if page_order != g_standard_order:
+            #Pickle this stuff to a string to send as a cookie
+            cookie_str = json.dumps(page_order)
+            resp = g_app.make_response("<HTML><BODY>Saved cookies for later.</BODY></HTML>")
+            resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
+        else:
+            resp.delete_cookie('RssUrls')
+
         if form.dark_mode.data:
             resp.set_cookie('DarkMode', "1", max_age=EXPIRE_YEARS)
         else:
