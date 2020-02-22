@@ -124,7 +124,7 @@ SITE_URLS_CR = {
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
     ["Google-News.png",
-    "Google News",
+     "Google News",
      "https://news.google.com/search?q=coronavirus",
      EXPIRE_HOURS],
 
@@ -136,7 +136,7 @@ SITE_URLS_CR = {
 
     "https://gnews.org/feed/" :
     ["gnews.png",
-    "Guo Media news",
+     "Guo Media news",
      "https://gnews.org/",
      EXPIRE_HOURS * 4],
 
@@ -161,7 +161,7 @@ SITE_URLS_CR = {
     "https://corona.castos.com/feed" :
     ["CoronaCastos2.png",
      "Coronavirus Central Daily Podcast",
-     "https://coronaviruscentral.net",
+     "http://coronaviruscentral.net",
      EXPIRE_DAY],
 
 }
