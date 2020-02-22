@@ -36,7 +36,7 @@ if DEBUG or g_app.debug:
 EXPIRE_HOUR = 3600
 EXPIRE_DAY = 3600 * 6
 EXPIRE_DAYS = 86400 * 10
-EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
+EXPIRE_YEARS = 86400 * 365 * 2
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
@@ -100,7 +100,7 @@ SITE_URLS_LR = {
     ["Debian-OpenLogo.svg",
      "Planet Debian",
      "http://planet.debian.org/",
-     EXPIRE_HOUR * 2],
+     EXPIRE_HOUR * 3],
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
     ["Google-News.png",
@@ -163,7 +163,6 @@ SITE_URLS_CR = {
      "Coronavirus Central Daily Podcast",
      "http://coronaviruscentral.net",
      EXPIRE_HOUR * 3],
-
 }
 
 if LINUX_REPORT:
@@ -174,7 +173,7 @@ if LINUX_REPORT:
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     WEB_TITLE = "Linux Report"
     WEB_DESCRIPTION = "Linux News dashboard"
-    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport" >GitLab.</a>'
+    WELCOME_HTML = '(Refreshes hourly -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport" >GitLab.</a>'
 
 else:
     site_urls = SITE_URLS_CR
@@ -184,7 +183,7 @@ else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
-    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a  target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
+    WELCOME_HTML = '(Refreshes hourly -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a  target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
 
 class FlaskCache():
     def __init__(self):
@@ -352,10 +351,14 @@ def index():
                                        alt_tag=logo_alt, link=site_url)
 
             offset = 0
-
-            # Add 2.5 min offset so refreshes likely to expire together between page cache expirations.
+            # Add 2.5 min offset so refreshes likely to expire together between page expirations.
             if g_first:
                 offset = 150
+
+            # Retry if litle or no results
+            if len(feedinfo) < 2 and logo_url != "Custom.png":
+                print("Failed to fetch, retry in 15 minutes.")
+                expire_time = 60 * 15 - offset
 
             g_c.put(site_url, template, timeout=expire_time + offset)
 
