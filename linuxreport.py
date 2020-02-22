@@ -33,7 +33,7 @@ if DEBUG or g_app.debug:
     EXPIRE_MINUTES = 1
     print("Warning, in debug mode")
 
-EXPIRE_HOURS = 3600
+EXPIRE_HOUR = 3600
 EXPIRE_DAY = 3600 * 6
 EXPIRE_DAYS = 86400 * 10
 EXPIRE_YEARS = 60 * 60 * 24 * 365 * 2
@@ -46,25 +46,25 @@ SITE_URLS_LR = {
     ["Coronavirus.jpg",
      "Reddit Corona virus sub",
      "https://www.reddit.com/r/China_Flu/",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 
     "http://lxer.com/module/newswire/headlines.rss" :
     ["lxer.png",
      "Lxer news",
      "http://lxer.com/",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 
     "http://www.reddit.com/r/linux/rising/.rss" :
     ["redditlogosmall.png",
      "Reddit Linux sub",
      "https://www.reddit.com/r/linux",
-     EXPIRE_HOURS * 2],
+     EXPIRE_HOUR * 2],
 
     "http://rss.slashdot.org/Slashdot/slashdotMain" :
     ["slashdotlogo.png",
      "Slashdot",
      "https://slashdot.org/",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 
     "http://lwn.net/headlines/newrss" :
     ["barepenguin-70.png",
@@ -76,37 +76,37 @@ SITE_URLS_LR = {
     ["hackernews.jpg",
      "Ycombinator news",
      "http://news.ycombinator.com/",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 
     "http://www.osnews.com/feed/" :
     ["osnews-logo.png",
      "OS News.com",
      "http://www.osnews.com/",
-     EXPIRE_HOURS * 2],
+     EXPIRE_HOUR * 2],
 
     "http://www.geekwire.com/feed/" :
     ["GeekWire.png",
      "GeekWire",
      "http://www.geekwire.com/",
-     EXPIRE_HOURS * 3], #Slow and slow-changing, so fetch less
+     EXPIRE_HOUR * 3], #Slow and slow-changing, so fetch less
 
     "http://feeds.feedburner.com/linuxtoday/linux" :
     ["linuxtd_logo.png",
      "Linux Today",
      "http://www.linuxtoday.com/",
-     EXPIRE_HOURS * 2],
+     EXPIRE_HOUR * 2],
 
     "http://planet.debian.org/rss20.xml" :
     ["Debian-OpenLogo.svg",
      "Planet Debian",
      "http://planet.debian.org/",
-     EXPIRE_HOURS * 2],
+     EXPIRE_HOUR * 2],
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
     ["Google-News.png",
      "Google Coronavirus news",
      "https://news.google.com/search?q=coronavirus",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 }
 
 SITE_URLS_CR = {
@@ -114,31 +114,31 @@ SITE_URLS_CR = {
     ["redditlogosmall.png",
      "Reddit Corona virus sub",
      "https://www.reddit.com/r/Coronavirus/",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 
     "https://www.reddit.com/r/China_Flu/rising/.rss" :
     ["Coronavirus.jpg",
      "Reddit China Flu sub",
      "https://www.reddit.com/r/China_Flu/",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
     ["Google-News.png",
      "Google News",
      "https://news.google.com/search?q=coronavirus",
-     EXPIRE_HOURS],
+     EXPIRE_HOUR],
 
     "http://www.independent.co.uk/topic/coronavirus/rss" :
     ["Independent-Corona.png",
      "Independent UK news",
      "https://www.independent.co.uk/topic/coronavirus",
-     EXPIRE_HOURS * 4],
+     EXPIRE_HOUR * 4],
 
     "https://gnews.org/feed/" :
     ["gnews.png",
      "Guo Media news",
      "https://gnews.org/",
-     EXPIRE_HOURS * 4],
+     EXPIRE_HOUR * 4],
 
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
     ["CDC-Logo.png",
@@ -162,7 +162,7 @@ SITE_URLS_CR = {
     ["CoronaCastos2.png",
      "Coronavirus Central Daily Podcast",
      "http://coronaviruscentral.net",
-     EXPIRE_DAY],
+     EXPIRE_HOUR * 3],
 
 }
 
@@ -174,7 +174,7 @@ if LINUX_REPORT:
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     WEB_TITLE = "Linux Report"
     WEB_DESCRIPTION = "Linux News dashboard"
-    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
+    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport" >GitLab.</a>'
 
 else:
     site_urls = SITE_URLS_CR
@@ -184,7 +184,7 @@ else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
-    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
+    WELCOME_HTML = '(Refreshes automatically -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a  target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
 
 class FlaskCache():
     def __init__(self):
@@ -311,7 +311,7 @@ def index():
             site_info = site_urls_alt.get(url, None)
 
             if site_info is None:
-                site_info = ["Custom.png", "Custom site", url + "HTML", EXPIRE_HOURS * 3]
+                site_info = ["Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3]
 
             site_urls[url] = site_info
 
