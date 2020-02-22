@@ -482,10 +482,11 @@ def config():
             elif isinstance(urlf.form, CustomRSSForm):
                 page_order.append(urlf.url.data)
 
+        resp = g_app.make_response("<HTML><BODY>Saved cookies for later.</BODY></HTML>")
+
         if page_order != g_standard_order:
             #Pickle this stuff to a string to send as a cookie
             cookie_str = json.dumps(page_order)
-            resp = g_app.make_response("<HTML><BODY>Saved cookies for later.</BODY></HTML>")
             resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
         else:
             resp.delete_cookie('RssUrls')
