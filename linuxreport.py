@@ -173,8 +173,11 @@ if LINUX_REPORT:
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     WEB_TITLE = "Linux Report"
     WEB_DESCRIPTION = "Linux News dashboard"
-    WELCOME_HTML = '(Refreshes hourly -- See also <b><a target="_blank" href = "http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport" >GitLab.</a>'
-
+    ABOVE_HTML = ''
+    WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
+    '"http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank"'
+    'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
+    'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>')
 else:
     site_urls = SITE_URLS_CR
     site_urls_alt = SITE_URLS_LR
@@ -183,7 +186,15 @@ else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
-    WELCOME_HTML = '(Refreshes hourly -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a  target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/><i><a target = "_blank" href = "http://chng.it/RqYm4mh4JL">Sign this petition to request CDC do widespread testing</a></i>.'
+    ABOVE_HTML = ('<embed src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
+    'width="385" height = "216" /><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
+
+    WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
+    'http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
+    'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank"'
+    'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/><i><a target = "_blank" '
+    'href = "http://chng.it/RqYm4mh4JL">Sign this Change.org petition to request CDC do widespread '
+    'testing</a></i>.')
 
 class FlaskCache():
     def __init__(self):
@@ -390,7 +401,8 @@ def index():
     page = render_template('page.html', columns=result, text_color=text_color,
                            logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE, 
                            description = WEB_DESCRIPTION, favicon=FAVICON,
-                           welcome_html=Markup(WELCOME_HTML), a_text_decoration = text_decoration)
+                           welcome_html=Markup(WELCOME_HTML), a_text_decoration = text_decoration,
+                           above_html=Markup(ABOVE_HTML))
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
