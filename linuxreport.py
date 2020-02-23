@@ -186,8 +186,9 @@ else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
-    ABOVE_HTML = ('<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
-    'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos"src</a>')
+    ABOVE_HTML = (
+    '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
+    'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
     WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
     'http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
@@ -213,7 +214,7 @@ class FlaskCache():
 def load_url_worker(url):
     site_info = site_urls[url]
 
-    _logo_url, _logo_alt, site_url, expire_time = site_info
+    _logo_url, _logo_alt, _site_url, expire_time = site_info
 
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
