@@ -199,14 +199,15 @@ else:
 
 class FlaskCache():
     def __init__(self):
-        self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem', 'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY})
+        self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
+        'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
+        'CACHE_THRESHOLD' : 0})
 
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
 
     def get(self, url):
-        template = self._cache.get(url)
-        return template
+        return self._cache.get(url)
 
     def delete(self, url):
         self._cache.delete(url)
@@ -407,6 +408,8 @@ def index():
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
+        #Check to make sure cache entry still doesn't exist
+        #if g_c.get(page_order_s + suffix) is None:
         g_c.put(page_order_s + suffix, page, timeout=EXPIRE_MINUTES)
     return page
 
