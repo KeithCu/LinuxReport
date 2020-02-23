@@ -183,7 +183,7 @@ else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
-    WELCOME_HTML = '(Refreshes hourly -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a  target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>'
+    WELCOME_HTML = '(Refreshes hourly -- See also <b><a target="_blank" href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a  target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/><i><a target = "_blank" href = "http://chng.it/RqYm4mh4JL">Sign this petition to request CDC do widespread testing</a></i>.'
 
 class FlaskCache():
     def __init__(self):
