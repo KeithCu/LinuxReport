@@ -59,7 +59,7 @@ SITE_URLS_LR = {
     ["slashdotlogo.png",
      "Slashdot",
      "https://slashdot.org/",
-     EXPIRE_HOUR],
+     EXPIRE_HOUR * 2],
 
     "http://lwn.net/headlines/newrss" :
     ["barepenguin-70.png",
@@ -71,7 +71,7 @@ SITE_URLS_LR = {
     ["hackernews.jpg",
      "Ycombinator news",
      "http://news.ycombinator.com/",
-     EXPIRE_HOUR],
+     EXPIRE_HOUR * 2],
 
     "http://www.osnews.com/feed/" :
     ["osnews-logo.png",
@@ -127,7 +127,7 @@ SITE_URLS_CR = {
     ["Independent-Corona.png",
      "Independent UK news",
      "https://www.independent.co.uk/topic/coronavirus",
-     EXPIRE_HOUR * 4],
+     EXPIRE_HOUR * 5],
 
     "https://gnews.org/feed/" :
     ["gnews.png",
@@ -216,6 +216,7 @@ def load_url_worker(url):
 
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
+    #This isn't as useful anymore given the FETCHMODE.
     feedpid = g_c.get(url + "FETCHPID")
     if feedpid is None:
         g_c.put(url + "FETCHPID", os.getpid(), timeout=10)
