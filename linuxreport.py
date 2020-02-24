@@ -187,8 +187,10 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-    '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
-    'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
+    '<iframe width="385" height="216" src="https://www.youtube.com/embed/GuBB3GNGQIk" frameborder="0" allow="accelerometer; '
+    'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>')
+    # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
+    # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
     WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
     '"http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
