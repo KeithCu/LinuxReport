@@ -1,15 +1,12 @@
 ﻿import random
 import json
 import itertools
-
 # import html
 import os
 import time
 import socket
 from timeit import default_timer as timer
 import concurrent.futures
-
-import urllib3
 import feedparser
 
 from flask_mobility import Mobility
@@ -20,8 +17,6 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
 
 LINUX_REPORT = True
 DEBUG = False
-
-HTTP = urllib3.PoolManager()
 
 g_app = Flask(__name__)
 Mobility(g_app)
@@ -82,7 +77,7 @@ SITE_URLS_LR = {
     ["osnews-logo.png",
      "OS News.com",
      "http://www.osnews.com/",
-     EXPIRE_HOUR * 2],
+     EXPIRE_HOUR * 4],
 
     "http://www.geekwire.com/feed/" :
     ["GeekWire.png",
@@ -94,7 +89,7 @@ SITE_URLS_LR = {
     ["linuxtd_logo.png",
      "Linux Today",
      "http://www.linuxtoday.com/",
-     EXPIRE_HOUR * 2],
+     EXPIRE_HOUR * 3],
 
     "http://planet.debian.org/rss20.xml" :
     ["Debian-OpenLogo.svg",
@@ -305,6 +300,19 @@ def index():
     if full_page is not None:
         return full_page # Typically, the Python is finished here
 
+    #If any other process is fetching feeds, then we should just wait a bit before trying to render the page.
+    #This prevents a thundering herd of threads.
+    if g_c.get("FETCHMODE") is not None:
+        print ("Waiting on another process to finish fetching feeds.")
+        while g_c.get("FETCHMODE") is not None:
+            time.sleep(0.1)
+        print ("Done waiting.")
+
+        #Maybe the page is cached now, so check again.
+        full_page = g_c.get(page_order_s + suffix)
+        if full_page is not None:
+            return full_page
+
     if single_column:
         result = [[]]
     else:
@@ -340,8 +348,12 @@ def index():
         else:
             result_1[url] = template
 
+    delete_fetchmode = False
+
     # Asynchronously fetch all the needed URLs
     if len(needed_urls) > 0:
+        g_c.put("FETCHMODE", "FETCHMODE", timeout=10)
+        delete_fetchmode = True
         start = timer()
         fetch_urls_parallel(needed_urls)
         end = timer()
@@ -413,6 +425,10 @@ def index():
         #Check to make sure cache entry still doesn't exist
         #if g_c.get(page_order_s + suffix) is None:
         g_c.put(page_order_s + suffix, page, timeout=EXPIRE_MINUTES)
+
+    if delete_fetchmode:
+        g_c.delete("FETCHMODE")
+
     return page
 
 class ROStringField(StringField):
