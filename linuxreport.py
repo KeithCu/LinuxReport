@@ -191,7 +191,7 @@ else:
     'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
     WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
-    'http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
+    '"http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank"'
     'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/><i><a target = "_blank" '
     'href = "http://chng.it/RqYm4mh4JL">Sign this Change.org petition to request CDC do widespread '
