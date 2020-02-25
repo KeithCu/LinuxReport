@@ -35,12 +35,18 @@ EXPIRE_YEARS = 86400 * 365 * 2
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
 
-SITE_URLS_LR = {
+ALL_URLS = {
 
     "https://www.reddit.com/r/China_Flu/rising/.rss" :
     ["Coronavirus.jpg",
-     "Reddit Corona virus sub",
+     "Reddit China Flu sub",
      "https://www.reddit.com/r/China_Flu/",
+     EXPIRE_HOUR],
+
+    "https://www.reddit.com/r/Coronavirus/rising/.rss" :
+    ["redditlogosmall.png",
+     "Reddit Corona virus sub",
+     "https://www.reddit.com/r/Coronavirus/",
      EXPIRE_HOUR],
 
     "http://lxer.com/module/newswire/headlines.rss" :
@@ -102,26 +108,6 @@ SITE_URLS_LR = {
      "Google Coronavirus news",
      "https://news.google.com/search?q=coronavirus",
      EXPIRE_HOUR],
-}
-
-SITE_URLS_CR = {
-    "https://www.reddit.com/r/Coronavirus/rising/.rss" :
-    ["redditlogosmall.png",
-     "Reddit Corona virus sub",
-     "https://www.reddit.com/r/Coronavirus/",
-     EXPIRE_HOUR],
-
-    "https://www.reddit.com/r/China_Flu/rising/.rss" :
-    ["Coronavirus.jpg",
-     "Reddit China Flu sub",
-     "https://www.reddit.com/r/China_Flu/",
-     EXPIRE_HOUR],
-
-    "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
-    ["Google-News.png",
-     "Google News",
-     "https://news.google.com/search?q=coronavirus",
-     EXPIRE_HOUR],
 
     "http://www.independent.co.uk/topic/coronavirus/rss" :
     ["Independent-Corona.png",
@@ -158,11 +144,37 @@ SITE_URLS_CR = {
      "Coronavirus Central Daily Podcast",
      "http://coronaviruscentral.net",
      EXPIRE_HOUR * 3],
+
 }
+
+SITE_URLS_LR = [
+    "https://www.reddit.com/r/China_Flu/rising/.rss",
+    "http://lxer.com/module/newswire/headlines.rss",
+    "http://www.reddit.com/r/linux/rising/.rss",
+    "http://rss.slashdot.org/Slashdot/slashdotMain",
+    "http://lwn.net/headlines/newrss",
+    "http://news.ycombinator.com/rss",
+    "http://www.osnews.com/feed/",
+    "http://www.geekwire.com/feed/",
+    "http://feeds.feedburner.com/linuxtoday/linux",
+    "http://planet.debian.org/rss20.xml",
+    "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
+]
+
+SITE_URLS_CR = [
+    "https://www.reddit.com/r/Coronavirus/rising/.rss",
+    "https://www.reddit.com/r/China_Flu/rising/.rss",
+    "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
+    "http://www.independent.co.uk/topic/coronavirus/rss",
+    "https://gnews.org/feed/",
+    "https://tools.cdc.gov/api/v2/resources/media/403372.rss",
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w",
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
+    "https://corona.castos.com/feed",
+]
 
 if LINUX_REPORT:
     site_urls = SITE_URLS_LR
-    site_urls_alt = SITE_URLS_CR
     URL_IMAGES = "http://linuxreport.net/static/images/"
     FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
@@ -175,7 +187,6 @@ if LINUX_REPORT:
     'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>')
 else:
     site_urls = SITE_URLS_CR
-    site_urls_alt = SITE_URLS_LR
     URL_IMAGES = "http://covidreport.net/static/images/"
     FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
@@ -210,7 +221,7 @@ class FlaskCache():
         self._cache.delete(url)
 
 def load_url_worker(url):
-    site_info = site_urls[url]
+    site_info = ALL_URLS[url]
 
     _logo_url, _logo_alt, _site_url, expire_time = site_info
 
@@ -249,8 +260,7 @@ def fetch_urls_parallel(urls):
             future.result()
 
 g_c = None
-g_standard_order = list(site_urls.keys())
-g_standard_order_s = str(g_standard_order)
+g_standard_order_s = str(site_urls)
 
 g_first = True
 
@@ -280,7 +290,7 @@ def index():
         page_order = json.loads(page_order)
 
     if page_order is None:
-        page_order = g_standard_order
+        page_order = site_urls
 
     page_order_s = str(page_order)
 
@@ -327,16 +337,12 @@ def index():
     needed_urls = []
 
     for url in page_order:
-        site_info = site_urls.get(url, None)
+        site_info = ALL_URLS.get(url, None)
 
         if site_info is None:
-            #Check if site info is in other urls
-            site_info = site_urls_alt.get(url, None)
+            site_info = ["Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3]
 
-            if site_info is None:
-                site_info = ["Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3]
-
-            site_urls[url] = site_info
+            ALL_URLS[url] = site_info
 
         logo_url, _logo_alt, site_url, expire_time = site_info
 
@@ -362,7 +368,7 @@ def index():
 
     #2. Now we've got all the data, go through again to build the page
     for url in page_order:
-        site_info = site_urls[url]
+        site_info = ALL_URLS[url]
         logo_url, logo_alt, site_url, expire_time = site_info
 
         #First check to see if we already have this result
@@ -372,14 +378,11 @@ def index():
             #If not, feed should be in the RSS cache by now
             feedinfo = g_c.get(url)
 
-            if DEBUG:
-                expire_time = 10
-
             template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url,
                                        alt_tag=logo_alt, link=site_url)
 
-            offset = 0
             # Add 2.5 min offset so refreshes likely to expire together between page expirations.
+            offset = 0
             if g_first:
                 offset = 150
 
@@ -469,11 +472,11 @@ def config():
         if page_order is not None:
             page_order = json.loads(page_order)
         else:
-            page_order = list(site_urls.keys())
+            page_order = site_urls
 
         custom_count = 0
         for i, p_url in enumerate(page_order):
-            site_info = site_urls.get(p_url, None)
+            site_info = ALL_URLS.get(p_url, None)
             if site_info is not None and site_info[0] != "Custom.png":
                 urlf = UrlForm()
                 urlf.pri = (i + 1) * 10
