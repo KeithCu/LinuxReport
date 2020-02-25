@@ -525,7 +525,7 @@ def config():
 
         resp = g_app.make_response("<HTML><BODY>Saved cookies for later.</BODY></HTML>")
 
-        if page_order != g_standard_order:
+        if page_order != site_urls:
             #Pickle this stuff to a string to send as a cookie
             cookie_str = json.dumps(page_order)
             resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
