@@ -5,6 +5,7 @@ import itertools
 import os
 import time
 import socket
+import threading
 from timeit import default_timer as timer
 import concurrent.futures
 import feedparser
@@ -113,13 +114,13 @@ ALL_URLS = {
     ["Independent-Corona.png",
      "Independent UK news",
      "https://www.independent.co.uk/topic/coronavirus",
-     EXPIRE_HOUR * 5],
+     EXPIRE_HOUR * 3],
 
     "https://gnews.org/feed/" :
     ["gnews.png",
      "Guo Media news",
      "https://gnews.org/",
-     EXPIRE_HOUR * 4],
+     EXPIRE_HOUR * 3],
 
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
     ["CDC-Logo.png",
@@ -214,6 +215,9 @@ class FlaskCache():
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
 
+    def has (self, url):
+        return self._cache.cache.has(url)
+
     def get(self, url):
         return self._cache.get(url)
 
@@ -223,13 +227,12 @@ class FlaskCache():
 def load_url_worker(url):
     site_info = ALL_URLS[url]
 
-    _logo_url, _logo_alt, _site_url, expire_time = site_info
+    logo_url, _logo_alt, site_url, expire_time = site_info
 
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
     #This isn't as useful anymore given the FETCHMODE.
-    feedpid = g_c.get(url + "FETCHPID")
-    if feedpid is None:
+    if g_c.has(url + "FETCHPID") == False:
         g_c.put(url + "FETCHPID", os.getpid(), timeout=10)
         feedpid = g_c.get(url + "FETCHPID") #Check to make sure it's us
 
@@ -237,7 +240,14 @@ def load_url_worker(url):
         start = timer()
         res = feedparser.parse(url)
         feedinfo = list(itertools.islice(res['entries'], 8))
+
+        if len(feedinfo) < 2 and logo_url != "Custom.png":
+            print("Failed to fetch, retry in 15 minutes.")
+            expire_time = 60 * 15
+
         g_c.put(url, feedinfo, timeout=expire_time)
+        #Delete the template so that we refresh it next time
+        g_c.delete(site_url)
         g_c.delete(url + "FETCHPID")
         end = timer()
         print("Parsing from remote site %s in %f." %(url, end - start))
@@ -245,13 +255,26 @@ def load_url_worker(url):
         print("Waiting for someone else to parse remote site %s" %(url))
 
         # Someone else is fetching, so wait
-        while feedpid is not None:
+        while g_c.has(url + "FETCHPID") == True:
             time.sleep(0.1)
-            feedpid = g_c.get(url + "FETCHPID")
 
         print("Done waiting for someone else to parse remote site %s" %(url))
 
+
+def wait_and_set_fetch_mode():
+    #If any other process is fetching feeds, then we should just wait a bit.
+    #This prevents a thundering herd of threads.
+    if g_c.has("FETCHMODE"):
+        print ("Waiting on another process to finish fetching feeds.")
+        while g_c.has("FETCHMODE"):
+            time.sleep(0.1)
+        print ("Done waiting.")
+
+    g_c.put("FETCHMODE", "FETCHMODE", timeout = 20)
+
 def fetch_urls_parallel(urls):
+    wait_and_set_fetch_mode()
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
@@ -259,17 +282,31 @@ def fetch_urls_parallel(urls):
             url = future_to_url[future]
             future.result()
 
+    g_c.delete("FETCHMODE")
+
+def refresh_thread():
+    for url in ALL_URLS.keys():
+        wait_and_set_fetch_mode()
+
+        if not g_c.has(url):
+            load_url_worker(url)
+
+        g_c.delete("FETCHMODE")
+        time.sleep(0.2) #Give time for other processes to run
+
+def fetch_urls_thread():
+    t = threading.Thread(target=refresh_thread, args=())
+    t.setDaemon(True) #It's okay to kill this thread when the process is trying to exit.
+    t.start()
+
 g_c = None
 g_standard_order_s = str(site_urls)
-
-g_first = True
 
 #The main page
 @g_app.route('/')
 def index():
 
     global g_c
-    global g_first
 
     if g_c is None:
         socket.setdefaulttimeout(5)
@@ -311,19 +348,6 @@ def index():
     if full_page is not None:
         return full_page # Typically, the Python is finished here
 
-    #If any other process is fetching feeds, then we should just wait a bit before trying to render the page.
-    #This prevents a thundering herd of threads.
-    if g_c.get("FETCHMODE") is not None:
-        print ("Waiting on another process to finish fetching feeds.")
-        while g_c.get("FETCHMODE") is not None:
-            time.sleep(0.1)
-        print ("Done waiting.")
-
-        #Maybe the page is cached now, so check again.
-        full_page = g_c.get(page_order_s + suffix)
-        if full_page is not None:
-            return full_page
-
     if single_column:
         result = [[]]
     else:
@@ -332,35 +356,31 @@ def index():
     cur_col = 0
 
     # 2 phase process:
-    # 1. Go through URLs and collect the template and the needed feeds.
-    result_1 = {}
+    # 1. Go through URLs and collect the needed feeds.
     needed_urls = []
+    need_fetch = False
 
     for url in page_order:
         site_info = ALL_URLS.get(url, None)
 
         if site_info is None:
             site_info = ["Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3]
-
             ALL_URLS[url] = site_info
 
         logo_url, _logo_alt, site_url, expire_time = site_info
 
-        #First check for the templatized content stored with site URL
-        template = g_c.get(site_url)
+        has_rss = g_c.has(url)
 
-        #If we don't have the template, the feed has expired
-        if template is None:
+        #Check for the templatized content stored with site URL
+        if g_c.has(site_url) == False and has_rss == False: #If don't have template or RSS, have to fetch now
             needed_urls.append(url)
         else:
-            result_1[url] = template
+            #Check to see if the RSS feed is out of date, which means the template is old.
+            if has_rss == False:
+                need_fetch = True
 
-    delete_fetchmode = False
-
-    # Asynchronously fetch all the needed URLs
+    #Immediately fetch all needed feeds
     if len(needed_urls) > 0:
-        g_c.put("FETCHMODE", "FETCHMODE", timeout=10)
-        delete_fetchmode = True
         start = timer()
         fetch_urls_parallel(needed_urls)
         end = timer()
@@ -371,35 +391,22 @@ def index():
         site_info = ALL_URLS[url]
         logo_url, logo_alt, site_url, expire_time = site_info
 
-        #First check to see if we already have this result
-        template = result_1.get(url, None)
+        template = g_c.get(site_url)
         if template is None:
 
-            #If not, feed should be in the RSS cache by now
+            #Feed should be in the RSS cache by now
             feedinfo = g_c.get(url)
 
             template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url,
                                        alt_tag=logo_alt, link=site_url)
 
-            # Add 2.5 min offset so refreshes likely to expire together between page expirations.
-            offset = 0
-            if g_first:
-                offset = 150
-
-            # Retry if litle or no results
-            if len(feedinfo) < 2 and logo_url != "Custom.png":
-                print("Failed to fetch, retry in 15 minutes.")
-                expire_time = 60 * 15 - offset
-
-            g_c.put(site_url, template, timeout=expire_time + offset)
+            g_c.put(site_url, template, timeout=EXPIRE_HOUR * 12)
 
         result[cur_col].append(template)
 
         if not single_column:
             cur_col += 1
             cur_col %= 3
-
-    g_first = False
 
     result[0] = Markup(''.join(result[0]))
 
@@ -426,12 +433,16 @@ def index():
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
-        #Check to make sure cache entry still doesn't exist
-        #if g_c.get(page_order_s + suffix) is None:
-        g_c.put(page_order_s + suffix, page, timeout=EXPIRE_MINUTES)
 
-    if delete_fetchmode:
-        g_c.delete("FETCHMODE")
+        expire = EXPIRE_MINUTES
+        if need_fetch:
+            expire = 30 #Page is already out of date, so cache page for only 30 seconds
+
+        g_c.put(page_order_s + suffix, page, timeout=expire)
+
+    # Spin up a thread to fetch all the expired feeds
+    if need_fetch == True and g_c.has("FETCHMODE") is False:
+        fetch_urls_thread()
 
     return page
 
