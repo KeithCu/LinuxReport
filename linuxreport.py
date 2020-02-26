@@ -206,7 +206,7 @@ else:
     'href = "http://chng.it/RqYm4mh4JL">Sign this Change.org petition to request CDC do widespread '
     'testing</a></i>.')
 
-class FlaskCache():
+class FSCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
         'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
@@ -223,6 +223,37 @@ class FlaskCache():
 
     def delete(self, url):
         self._cache.delete(url)
+
+# Alternate backend to Memcached. It is slower, so don't bother for now.
+class MEMCache():
+    def __init__(self):
+        self._cache = Cache(g_app, config={'CACHE_TYPE': 'memcached', })
+
+    def put(self, url, template, timeout):
+        if len(url) > 250:
+            url = hash (url)
+        self._cache.set(url, template, timeout)
+
+    def has(self, url):
+        if len(url) > 250:
+            url = hash (url)
+        return self._cache.cache.has(url)
+
+    def has(self, url):
+        if len (url) > 250:
+            url = hash (url)
+        return self._cache.get(url) is not None
+
+    def get(self, url):
+        if len (url) > 250:
+            url = hash (url)
+        return self._cache.get(url)
+
+    def delete(self, url):
+        if len (url) > 250:
+            url = hash (url)
+        self._cache.delete(url)
+
 
 def load_url_worker(url):
     site_info = ALL_URLS[url]
@@ -310,7 +341,7 @@ def index():
 
     if g_c is None:
         socket.setdefaulttimeout(5)
-        g_c = FlaskCache()
+        g_c = FSCache()
 
     if request.cookies.get('DarkMode') is None:
         dark_mode = False
