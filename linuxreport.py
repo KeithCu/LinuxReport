@@ -314,7 +314,7 @@ def wait_and_set_fetch_mode():
     #If any other process is fetching feeds, then we should just wait a bit.
     #This prevents a thundering herd of threads.
     if g_c.has("FETCHMODE"):
-        print("Waiting on another process to finish fetching feeds.")
+        print("Waiting on another process to finish fetching.")
         while g_c.has("FETCHMODE"):
             time.sleep(0.1)
         print("Done waiting.")
@@ -335,13 +335,11 @@ def fetch_urls_parallel(urls):
 
 def refresh_thread():
     for url in ALL_URLS.keys():
-        wait_and_set_fetch_mode()
-
         if not g_c.has(url):
+            wait_and_set_fetch_mode()
             load_url_worker(url)
-
-        g_c.delete("FETCHMODE")
-        time.sleep(0.2) #Give time for other processes to run
+            g_c.delete("FETCHMODE")
+            time.sleep(0.2) #Give time for other processes to run
 
 def fetch_urls_thread():
     t = threading.Thread(target=refresh_thread, args=())
