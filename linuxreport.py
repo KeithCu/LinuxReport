@@ -267,6 +267,15 @@ def filter_fake_news(url, feedinfo):
                 entries.remove(entry)
 
         return entries
+    elif url == "http://www.independent.co.uk/topic/coronavirus/rss":
+        entries = feedinfo['entries'].copy()
+
+        #Remove biased anti-Trump articles.
+        for entry in feedinfo['entries']:
+            if entry.title.find("Trump") > 0:
+                entries.remove(entry)
+
+        return entries
 
     return feedinfo['entries']
 
@@ -308,7 +317,6 @@ def load_url_worker(url):
             time.sleep(0.1)
 
         print("Done waiting for someone else to parse remote site %s" %(url))
-
 
 def wait_and_set_fetch_mode():
     #If any other process is fetching feeds, then we should just wait a bit.
