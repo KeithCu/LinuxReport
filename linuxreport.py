@@ -258,14 +258,18 @@ class MEMCache():
 # https://www.rt.com/usa/459233-google-liberal-bias-news-study/
 # CNN is fake: https://www.realclearpolitics.com/video/2019/03/26/glenn_greenwald_cnn_and_msnbc_are_like_state_tv_with_ex-intel_officials_as_contributors.html
 def filter_fake_news(url, feedinfo):
-    entries = feedinfo['entries'].copy()
 
     if url == "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984":
+        entries = feedinfo['entries'].copy()
+
         for entry in feedinfo['entries']:
             if entry.link.find("cnn") > 0:
                 entries.remove(entry)
 
-    return entries
+        return entries
+
+    return feedinfo['entries']
+
 
 def load_url_worker(url):
     site_info = ALL_URLS[url]
