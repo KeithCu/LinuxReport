@@ -215,7 +215,7 @@ class FlaskCache():
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
 
-    def has (self, url):
+    def has(self, url):
         return self._cache.cache.has(url)
 
     def get(self, url):
@@ -232,7 +232,7 @@ def load_url_worker(url):
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
     #This isn't as useful anymore given the FETCHMODE.
-    if g_c.has(url + "FETCHPID") == False:
+    if not g_c.has(url + "FETCHPID"):
         g_c.put(url + "FETCHPID", os.getpid(), timeout=10)
         feedpid = g_c.get(url + "FETCHPID") #Check to make sure it's us
 
@@ -255,7 +255,7 @@ def load_url_worker(url):
         print("Waiting for someone else to parse remote site %s" %(url))
 
         # Someone else is fetching, so wait
-        while g_c.has(url + "FETCHPID") == True:
+        while g_c.has(url + "FETCHPID"):
             time.sleep(0.1)
 
         print("Done waiting for someone else to parse remote site %s" %(url))
@@ -265,12 +265,12 @@ def wait_and_set_fetch_mode():
     #If any other process is fetching feeds, then we should just wait a bit.
     #This prevents a thundering herd of threads.
     if g_c.has("FETCHMODE"):
-        print ("Waiting on another process to finish fetching feeds.")
+        print("Waiting on another process to finish fetching feeds.")
         while g_c.has("FETCHMODE"):
             time.sleep(0.1)
-        print ("Done waiting.")
+        print("Done waiting.")
 
-    g_c.put("FETCHMODE", "FETCHMODE", timeout = 20)
+    g_c.put("FETCHMODE", "FETCHMODE", timeout=20)
 
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
@@ -367,16 +367,16 @@ def index():
             site_info = ["Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3]
             ALL_URLS[url] = site_info
 
-        logo_url, _logo_alt, site_url, expire_time = site_info
+        logo_url, _logo_alt, site_url, _expire_time = site_info
 
         has_rss = g_c.has(url)
 
         #Check for the templatized content stored with site URL
-        if g_c.has(site_url) == False and has_rss == False: #If don't have template or RSS, have to fetch now
+        if not g_c.has(site_url) and not has_rss: #If don't have template or RSS, have to fetch now
             needed_urls.append(url)
         else:
             #Check to see if the RSS feed is out of date, which means the template is old.
-            if has_rss == False:
+            if not has_rss:
                 need_fetch = True
 
     #Immediately fetch all needed feeds
@@ -389,12 +389,16 @@ def index():
     #2. Now we've got all the data, go through again to build the page
     for url in page_order:
         site_info = ALL_URLS[url]
-        logo_url, logo_alt, site_url, expire_time = site_info
+        logo_url, logo_alt, site_url, _expire_time = site_info
 
         template = g_c.get(site_url)
         if template is None:
 
-            #Feed should be in the RSS cache by now
+            #The only reasons we don't have a template now is because:
+            # 1. It's startup, or a custom feed.
+            # 2. The feed was expired and refetched, and the template deleted after.
+            # In either case, the RSS feed should be good for at least an hour so this is
+            # pretty guaranteed to work and not crash.
             feedinfo = g_c.get(url)
 
             template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + logo_url,
@@ -426,9 +430,9 @@ def index():
         text_decoration = "text-decoration:none;"
 
     page = render_template('page.html', columns=result, text_color=text_color,
-                           logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE, 
-                           description = WEB_DESCRIPTION, favicon=FAVICON,
-                           welcome_html=Markup(WELCOME_HTML), a_text_decoration = text_decoration,
+                           logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE,
+                           description=WEB_DESCRIPTION, favicon=FAVICON,
+                           welcome_html=Markup(WELCOME_HTML), a_text_decoration=text_decoration,
                            above_html=Markup(ABOVE_HTML))
 
     # Only cache standard order
@@ -436,12 +440,12 @@ def index():
 
         expire = EXPIRE_MINUTES
         if need_fetch:
-            expire = 30 #Page is already out of date, so cache page for only 30 seconds
+            expire = 30 #Page is already out of date, so cache for only 30 seconds
 
         g_c.put(page_order_s + suffix, page, timeout=expire)
 
     # Spin up a thread to fetch all the expired feeds
-    if need_fetch == True and g_c.has("FETCHMODE") is False:
+    if need_fetch and not g_c.has("FETCHMODE"):
         fetch_urls_thread()
 
     return page
