@@ -9,7 +9,7 @@ import threading
 from timeit import default_timer as timer
 import concurrent.futures
 import feedparser
-from feedfilter import prefilter_news
+from  .feedfilter import prefilter_news
 
 from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
