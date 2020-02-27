@@ -1,6 +1,8 @@
+{% extends "base.html" %}
 <!doctype html>
 <html lang="en">
   <head>
+    {{ super() }}
     <link rel="shortcut icon" type="image/png" href="{{favicon}}">
     <link rel="shortcut icon" sizes="192x192" href="{{favicon}}">
     <link rel="apple-touch-icon" href="{{favicon}}">
@@ -10,6 +12,7 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{{title}}</title>
     <style>
+
       * {
         box-sizing: border-box;
       }
@@ -58,6 +61,7 @@
     </script>
   </head>
   <body style="background-color:{{ back_color }}">
+    {{ super() }}    
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
     <center>{{ above_html }}</center>
     <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:100px;"></center>

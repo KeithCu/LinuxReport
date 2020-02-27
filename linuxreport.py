@@ -11,6 +11,7 @@ import concurrent.futures
 import feedparser
 from  .feedfilter import prefilter_news
 
+from flask_bootstrap import Bootstrap
 from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
 from flask_caching import Cache
@@ -21,8 +22,8 @@ LINUX_REPORT = True
 DEBUG = False
 
 g_app = Flask(__name__)
+bootstrap = Bootstrap(g_app)
 Mobility(g_app)
-application = g_app
 
 EXPIRE_MINUTES = 60 * 5
 
@@ -374,9 +375,9 @@ def index():
     if no_underlines:
         suffix = suffix + ":NOUND"
 
-    full_page = g_c.get(page_order_s + suffix)
-    if full_page is not None:
-        return full_page # Typically, the Python is finished here
+    # full_page = g_c.get(page_order_s + suffix)
+    # if full_page is not None:
+    #     return full_page # Typically, the Python is finished here
 
     if single_column:
         result = [[]]
