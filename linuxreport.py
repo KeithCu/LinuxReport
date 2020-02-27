@@ -9,6 +9,7 @@ import threading
 from timeit import default_timer as timer
 import concurrent.futures
 import feedparser
+from feedfilter import prefilter_news
 
 from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
@@ -254,32 +255,6 @@ class MEMCache():
             url = hash (url)
         self._cache.delete(url)
 
-# Google boosts CNN and other fake news, so filter it:
-# https://www.rt.com/usa/459233-google-liberal-bias-news-study/
-# CNN is fake: https://www.realclearpolitics.com/video/2019/03/26/glenn_greenwald_cnn_and_msnbc_are_like_state_tv_with_ex-intel_officials_as_contributors.html
-def filter_fake_news(url, feedinfo):
-
-    if url == "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984":
-        entries = feedinfo['entries'].copy()
-
-        for entry in feedinfo['entries']:
-            if entry.link.find("cnn") > 0:
-                entries.remove(entry)
-
-        return entries
-    elif url == "http://www.independent.co.uk/topic/coronavirus/rss":
-        entries = feedinfo['entries'].copy()
-
-        #Remove biased anti-Trump articles.
-        for entry in feedinfo['entries']:
-            if entry.title.find("Trump") > 0:
-                entries.remove(entry)
-
-        return entries
-
-    return feedinfo['entries']
-
-
 def load_url_worker(url):
     site_info = ALL_URLS[url]
 
@@ -295,7 +270,7 @@ def load_url_worker(url):
     if feedpid == os.getpid():
         start = timer()
         res = feedparser.parse(url)
-        entries = filter_fake_news(url, res)
+        entries = prefilter_news(url, res)
 
         feedinfo = list(itertools.islice(entries, 8))
 
