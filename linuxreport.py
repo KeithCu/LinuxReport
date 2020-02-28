@@ -178,6 +178,7 @@ SITE_URLS_CR = [
 ]
 
 if LINUX_REPORT:
+    feedparser.USER_AGENT = "Linux Report -- http://linuxreport.net/"
     site_urls = SITE_URLS_LR
     URL_IMAGES = "http://linuxreport.net/static/images/"
     FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
@@ -190,6 +191,7 @@ if LINUX_REPORT:
     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
     'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>')
 else:
+    feedparser.USER_AGENT = "Covid-19 Report -- http://covidreport.net/"
     site_urls = SITE_URLS_CR
     URL_IMAGES = "http://covidreport.net/static/images/"
     FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
@@ -226,7 +228,8 @@ class FSCache():
     def delete(self, url):
         self._cache.delete(url)
 
-# Alternate backend to Memcached. It is slower, so don't bother for now.
+# Alternate backend using memcached. It is 2x slower without the page cache, and 15% slower with,
+# so don't bother for now.
 class MEMCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'memcached', })
