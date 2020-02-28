@@ -197,17 +197,16 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-    '<iframe width="385" height="216" src="https://www.youtube.com/embed/GuBB3GNGQIk" frameborder="0" allow="accelerometer; '
+    '<iframe width="385" height="216" src="https://www.youtube.com/embed/kr1AkRtIHX4" frameborder="0" allow="accelerometer; '
     'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>')
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
     WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
-    '"http://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
-    'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a  target="_blank"'
-    'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/><i><a target = "_blank" '
-    'href = "http://chng.it/RqYm4mh4JL">Sign this Change.org petition to request CDC do widespread '
-    'testing</a></i>.')
+    '"http://linuxreport.net/">LinuxReport</a></b>) - Fork me on '
+    '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
+    ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/>'
+    '<a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a>' )
 
 class FSCache():
     def __init__(self):
