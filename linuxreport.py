@@ -278,13 +278,14 @@ def load_url_worker(url):
 
         feedinfo = list(itertools.islice(entries, 8))
 
-        if len(feedinfo) < 2 and logo_url != "Custom.png":
+        if len(feedinfo) > 2:
+            #Delete the template so that we refresh it next time
+            g_c.delete(site_url)
+        elif logo_url != "Custom.png":
             print("Failed to fetch %s, retry in 15 minutes." %(url))
             expire_time = 60 * 15
 
         g_c.put(url, feedinfo, timeout=expire_time)
-        #Delete the template so that we refresh it next time
-        g_c.delete(site_url)
         g_c.delete(url + "FETCHPID")
         end = timer()
         print("Parsing from remote site %s in %f." %(url, end - start))
