@@ -1,4 +1,5 @@
-﻿import random
+﻿import sys
+import random
 import json
 import itertools
 # import html
@@ -16,6 +17,8 @@ from flask import Flask, render_template, Markup, request
 from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, \
                     validators
+
+sys.path.insert(0,'/srv/http/flask')
 
 LINUX_REPORT = True
 DEBUG = False
@@ -232,27 +235,27 @@ class MEMCache():
 
     def put(self, url, template, timeout):
         if len(url) > 250:
-            url = hash (url)
+            url = hash(url)
         self._cache.set(url, template, timeout)
 
     def has(self, url):
         if len(url) > 250:
-            url = hash (url)
+            url = hash(url)
         return self._cache.cache.has(url)
 
     def has(self, url):
         if len (url) > 250:
-            url = hash (url)
+            url = hash(url)
         return self._cache.get(url) is not None
 
     def get(self, url):
         if len (url) > 250:
-            url = hash (url)
+            url = hash(url)
         return self._cache.get(url)
 
     def delete(self, url):
         if len (url) > 250:
-            url = hash (url)
+            url = hash(url)
         self._cache.delete(url)
 
 def load_url_worker(url):
