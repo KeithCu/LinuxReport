@@ -10,15 +10,14 @@ import threading
 from timeit import default_timer as timer
 import concurrent.futures
 import feedparser
-from  .feedfilter import prefilter_news
-
 from flask_mobility import Mobility
 from flask import Flask, render_template, Markup, request
 from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, \
                     validators
 
-sys.path.insert(0,'/srv/http/flask')
+sys.path.insert(0,'/srv/http/flask/')
+from  feedfilter import prefilter_news
 
 LINUX_REPORT = True
 DEBUG = False
