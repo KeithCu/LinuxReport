@@ -1,1 +1,1 @@
-#File to let Python import from current directory
+import os, sys; sys.path.append(os.path.dirname(os.path.realpath(__file__)))
