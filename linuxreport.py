@@ -279,7 +279,7 @@ def load_url_worker(url):
         feedinfo = list(itertools.islice(entries, 8))
 
         if len(feedinfo) < 2 and logo_url != "Custom.png":
-            print("Failed to fetch, retry in 15 minutes.")
+            print("Failed to fetch %s, retry in 15 minutes." %(url))
             expire_time = 60 * 15
 
         g_c.put(url, feedinfo, timeout=expire_time)
@@ -561,7 +561,7 @@ def config():
 
         url_custom = list(form.url_custom)
         for site in url_custom:
-            if len(site.url.data) > 10: #URLs greater than 10 chars
+            if len(site.url.data) > 10 and len(site.url.data) < 120: #URLs 10 - 120
                 urls.append(site)
 
         urls.sort(key=lambda x: x.pri.data)
