@@ -323,7 +323,10 @@ def fetch_urls_parallel(urls):
 
 def refresh_thread():
     for url in ALL_URLS.keys():
-        if not g_c.has(url):
+        site_info = ALL_URLS[url]
+        logo_url, _logo_alt, _site_url, _expire_time = site_info
+
+        if not g_c.has(url) and logo_url != "Custom.png":
             wait_and_set_fetch_mode()
             load_url_worker(url)
             g_c.delete("FETCHMODE")
