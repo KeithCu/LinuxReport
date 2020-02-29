@@ -186,10 +186,10 @@ if LINUX_REPORT:
     WEB_TITLE = "Linux Report"
     WEB_DESCRIPTION = "Linux News dashboard"
     ABOVE_HTML = ''
-    WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
+    WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
     '"http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank"'
     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
-    'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a>')
+    'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')
 else:
     feedparser.USER_AGENT = "Covid-19 Report -- http://covidreport.net/"
     site_urls = SITE_URLS_CR
@@ -204,11 +204,11 @@ else:
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
-    WELCOME_HTML = ('(Refreshes hourly -- See also <b><a target="_blank" href = '
+    WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
     '"http://linuxreport.net/">LinuxReport</a></b>) - Fork me on '
     '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
-    ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/>'
-    '<a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a>' )
+    ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>'
+    '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>' )
 
 class FSCache():
     def __init__(self):
