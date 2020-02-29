@@ -350,15 +350,15 @@ def index():
         socket.setdefaulttimeout(5)
         g_c = FSCache()
 
-    if request.cookies.get('DarkMode') is None:
-        dark_mode = False
-    else:
+    if request.cookies.get('DarkMode') or request.args.get('DarkMode', False):
         dark_mode = True
-
-    if request.cookies.get("NoUnderlines") is None:
-        no_underlines = False
     else:
+        dark_mode = False
+
+    if request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False):
         no_underlines = True
+    else:
+        no_underlines = False
 
     page_order = request.cookies.get('RssUrls')
     if page_order is not None:
