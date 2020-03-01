@@ -5,6 +5,7 @@ import itertools
 # import html
 import os
 import time
+from datetime import datetime, timedelta
 import socket
 import threading
 from timeit import default_timer as timer
@@ -217,11 +218,23 @@ else:
     ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>'
     '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>' )
 
+
+class rssfeed_info:
+    def __init__(self, entries):
+        self.entries = entries
+        self.expiration = datetime.utcnow() + timedelta(seconds=EXPIRE_DAY)
+
 class FSCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
         'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
         'CACHE_THRESHOLD' : 0})
+
+    def has_feed_expired(self, url):
+        feed_info = g_c.get(url)
+        if feed_info == None:
+            return True
+        return feed_info.expiration < datetime.utcnow()
 
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
@@ -241,34 +254,31 @@ class MEMCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'memcached', })
 
-    def put(self, url, template, timeout):
+    def normalize_url(url):
         if len(url) > 250:
             url = hash(url)
+        return url
+
+    def put(self, url, template, timeout):
+        url = normalize_url(url)
         self._cache.set(url, template, timeout)
 
     def has(self, url):
-        if len(url) > 250:
-            url = hash(url)
+        url = normalize_url(url)
         return self._cache.cache.has(url)
 
     def has(self, url):
-        if len (url) > 250:
-            url = hash(url)
+        url = normalize_url(url)
         return self._cache.get(url) is not None
 
     def get(self, url):
-        if len (url) > 250:
-            url = hash(url)
+        url = normalize_url(url)
         return self._cache.get(url)
 
     def delete(self, url):
-        if len (url) > 250:
-            url = hash(url)
+        url = normalize_url(url)
         self._cache.delete(url)
 
-class rssfeed_info:
-    def __init__(self, entries):
-        self.entries = entries
 
 def load_url_worker(url):
     site_info = ALL_URLS[url]
@@ -297,7 +307,9 @@ def load_url_worker(url):
             print("Failed to fetch %s, retry in 15 minutes." %(url))
             expire_time = 60 * 15
 
-        g_c.put(url, rssfeed_info(entries), timeout=expire_time)
+        rssfeed = rssfeed_info(entries)
+        rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+        g_c.put(url, rssfeed, timeout=EXPIRE_DAYS)
         g_c.delete(url + "FETCHPID")
         end = timer()
         print("Parsing from remote site %s in %f." %(url, end - start))
@@ -416,7 +428,7 @@ def index():
             site_info = rssinfo("Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3)
             ALL_URLS[url] = site_info
 
-        has_rss = g_c.has(url)
+        has_rss = not g_c.has_feed_expired(url)
 
         #Check for the templatized content stored with site URL
         if not g_c.has(site_info.site_url) and not has_rss: #If don't have template or RSS, have to fetch now
