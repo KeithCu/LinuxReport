@@ -266,6 +266,10 @@ class MEMCache():
             url = hash(url)
         self._cache.delete(url)
 
+class rssfeed_info:
+    def __init__(self, entries):
+        self.entries = entries
+
 def load_url_worker(url):
     site_info = ALL_URLS[url]
 
@@ -281,6 +285,7 @@ def load_url_worker(url):
     if feedpid == os.getpid():
         start = timer()
         res = feedparser.parse(url)
+
         entries = prefilter_news(url, res)
 
         feedinfo = list(itertools.islice(entries, 8))
@@ -292,7 +297,7 @@ def load_url_worker(url):
             print("Failed to fetch %s, retry in 15 minutes." %(url))
             expire_time = 60 * 15
 
-        g_c.put(url, feedinfo, timeout=expire_time)
+        g_c.put(url, rssfeed_info(entries), timeout=expire_time)
         g_c.delete(url + "FETCHPID")
         end = timer()
         print("Parsing from remote site %s in %f." %(url, end - start))
@@ -440,7 +445,7 @@ def index():
             # 2. The feed was expired and refetched, and the template deleted after.
             # In either case, the RSS feed should be good for at least an hour so this is
             # pretty guaranteed to work and not crash.
-            feedinfo = g_c.get(url)
+            feedinfo = g_c.get(url).entries
 
             template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + site_info.logo_url,
                                        alt_tag=site_info.logo_alt, link=site_info.site_url)
