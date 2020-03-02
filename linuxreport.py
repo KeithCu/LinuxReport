@@ -349,7 +349,7 @@ def refresh_thread():
     for url in ALL_URLS.keys():
         site_info = ALL_URLS[url]
 
-        if not g_c.has(url) and site_info.logo_url != "Custom.png":
+        if g_c.has_feed_expired(url) and site_info.logo_url != "Custom.png":
             wait_and_set_fetch_mode()
             load_url_worker(url)
             g_c.delete("FETCHMODE")
