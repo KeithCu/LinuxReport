@@ -19,6 +19,7 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
 
 sys.path.insert(0,'/srv/http/flask/')
 from  feedfilter import prefilter_news
+from shared import rssfeed_info
 
 LINUX_REPORT = True
 DEBUG = False
@@ -217,12 +218,6 @@ else:
     '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
     ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>'
     '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>' )
-
-
-class rssfeed_info:
-    def __init__(self, entries):
-        self.entries = entries
-        self.expiration = datetime.utcnow() + timedelta(seconds=EXPIRE_DAY)
 
 class FSCache():
     def __init__(self):
