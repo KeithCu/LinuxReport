@@ -208,7 +208,7 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-    '<iframe width="385" height="216" src="https://www.youtube.com/embed/kr1AkRtIHX4" frameborder="0" allow="accelerometer; '
+    '<iframe width="385" height="216" src="https://www.youtube.com/embed/CNQB-Q67DpE" frameborder="0" allow="accelerometer; '
     'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>')
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
@@ -293,9 +293,9 @@ def load_url_worker(url):
 
         entries = prefilter_news(url, res)
 
-        feedinfo = list(itertools.islice(entries, 8))
+        entries = list(itertools.islice(entries, 8))
 
-        if len(feedinfo) > 2:
+        if len(entries) > 2:
             #Delete the template so that we refresh it next time
             g_c.delete(site_info.site_url)
         elif site_info.logo_url != "Custom.png":
@@ -452,9 +452,9 @@ def index():
             # 2. The feed was expired and refetched, and the template deleted after.
             # In either case, the RSS feed should be good for at least an hour so this is
             # pretty guaranteed to work and not crash.
-            feedinfo = g_c.get(url).entries
+            entries = g_c.get(url).entries
 
-            template = render_template('sitebox.html', entries=feedinfo, logo=URL_IMAGES + site_info.logo_url,
+            template = render_template('sitebox.html', entries=entries, logo=URL_IMAGES + site_info.logo_url,
                                        alt_tag=site_info.logo_alt, link=site_info.site_url)
 
             g_c.put(site_info.site_url, template, timeout=EXPIRE_HOUR * 12)
