@@ -568,7 +568,8 @@ def config():
     else: #request.method == 'POST'
         form = ConfigForm(request.form)
         if form.delete_cookie.data:
-            resp = g_app.make_response("<HTML><BODY>Deleted cookies.</BODY></HTML>")
+            template = render_template('configdone.html', message="Deleted cookies.")
+            resp = g_app.make_response(template)
             resp.delete_cookie('RssUrls')
             resp.delete_cookie('DarkMode')
             resp.delete_cookie('NoUnderlines')
@@ -591,7 +592,8 @@ def config():
             elif isinstance(urlf.form, CustomRSSForm):
                 page_order.append(urlf.url.data)
 
-        resp = g_app.make_response("<HTML><BODY>Saved cookies for later.</BODY></HTML>")
+        template = render_template('configdone.html', message="Cookies saved for later.")
+        resp = g_app.make_response(template)
 
         if page_order != site_urls:
             #Pickle this stuff to a string to send as a cookie
