@@ -227,7 +227,7 @@ class FSCache():
 
     def has_feed_expired(self, url):
         feed_info = g_c.get(url)
-        if feed_info is None:
+        if feed_info is None or isinstance(feed_info, list):
             return True
         return feed_info.expiration < datetime.utcnow()
 
