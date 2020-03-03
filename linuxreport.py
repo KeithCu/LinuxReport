@@ -545,7 +545,7 @@ def config():
         custom_count = 0
         for i, p_url in enumerate(page_order):
             site_info = ALL_URLS.get(p_url, None)
-            if site_info is not None and site_info[0] != "Custom.png":
+            if site_info is not None and site_info.logo_url != "Custom.png":
                 urlf = UrlForm()
                 urlf.pri = (i + 1) * 10
                 urlf.url = p_url
