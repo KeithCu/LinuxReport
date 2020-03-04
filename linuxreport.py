@@ -208,7 +208,7 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-            '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"</a>'
+            '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
     # '<iframe width="385" height="216" src="https://www.youtube.com/embed/CNQB-Q67DpE" frameborder="0" allow="accelerometer; '
     # 'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
     )
@@ -436,9 +436,9 @@ def index():
     if no_underlines:
         suffix = suffix + ":NOUND"
 
-    # full_page = g_c.get(page_order_s + suffix)
-    # if full_page is not None:
-    #     return full_page # Typically, the Python is finished here
+    full_page = g_c.get(page_order_s + suffix)
+    if full_page is not None:
+        return full_page # Typically, the Python is finished here
 
     if single_column:
         result = [[]]
