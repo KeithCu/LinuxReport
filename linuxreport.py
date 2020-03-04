@@ -18,8 +18,8 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
                     validators
 
 sys.path.insert(0,'/srv/http/flask/')
-from  feedfilter import prefilter_news
-from shared import rssfeed_info
+from feedfilter import prefilter_news
+from shared import RssFeed
 
 LINUX_REPORT = True
 DEBUG = False
@@ -36,12 +36,12 @@ if DEBUG or g_app.debug:
 
 EXPIRE_HOUR = 3600
 EXPIRE_DAY = 3600 * 6
-EXPIRE_DAYS = 86400 * 10
+EXPIRE_WEEK = 86400 * 7
 EXPIRE_YEARS = 86400 * 365 * 2
 
-g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_DAYS
+g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 
-class rssinfo:
+class RssInfo:
     def __init__(self, logo_url, logo_alt, site_url, expire_time):
         self.logo_url = logo_url
         self.logo_alt = logo_alt
@@ -51,109 +51,109 @@ class rssinfo:
 ALL_URLS = {
 
     "https://www.reddit.com/r/China_Flu/rising/.rss" :
-     rssinfo("Coronavirus.jpg",
+     RssInfo("Coronavirus.jpg",
      "Reddit China Flu sub",
      "https://www.reddit.com/r/China_Flu/",
      EXPIRE_HOUR),
 
     "https://www.reddit.com/r/Coronavirus/rising/.rss" :
-     rssinfo("redditlogosmall.png",
+     RssInfo("redditlogosmall.png",
      "Reddit Corona virus sub",
      "https://www.reddit.com/r/Coronavirus/",
      EXPIRE_HOUR),
 
     "http://lxer.com/module/newswire/headlines.rss" :
-     rssinfo("lxer.png",
+     RssInfo("lxer.png",
      "Lxer news",
      "http://lxer.com/",
      EXPIRE_HOUR),
 
-    "http://www.reddit.com/r/linux/rising/.rss" :
-     rssinfo("redditlogosmall.png",
+    "https://www.reddit.com/r/linux/rising/.rss" :
+     RssInfo("redditlogosmall.png",
      "Reddit Linux sub",
      "https://www.reddit.com/r/linux",
      EXPIRE_HOUR * 2),
 
     "http://rss.slashdot.org/Slashdot/slashdotMain" :
-     rssinfo("slashdotlogo.png",
+     RssInfo("slashdotlogo.png",
      "Slashdot",
      "https://slashdot.org/",
      EXPIRE_HOUR * 2),
 
-    "http://lwn.net/headlines/newrss" :
-     rssinfo("barepenguin-70.png",
+    "https://lwn.net/headlines/newrss" :
+     RssInfo("barepenguin-70.png",
      "LWN.net news",
      "https://lwn.net/",
      EXPIRE_DAY),
 
-    "http://news.ycombinator.com/rss" :
-     rssinfo("hackernews.jpg",
+    "https://news.ycombinator.com/rss" :
+     RssInfo("hackernews.jpg",
      "Ycombinator news",
      "http://news.ycombinator.com/",
      EXPIRE_HOUR * 2),
 
-    "http://www.osnews.com/feed/" :
-     rssinfo("osnews-logo.png",
+    "https://www.osnews.com/feed/" :
+     RssInfo("osnews-logo.png",
      "OS News.com",
      "http://www.osnews.com/",
      EXPIRE_HOUR * 4),
 
-    "http://www.geekwire.com/feed/" :
-     rssinfo("GeekWire.png",
+    "https://www.geekwire.com/feed/" :
+     RssInfo("GeekWire.png",
      "GeekWire",
      "http://www.geekwire.com/",
      EXPIRE_HOUR * 3), #Slow and slow-changing, so fetch less
 
     "http://feeds.feedburner.com/linuxtoday/linux" :
-     rssinfo("linuxtd_logo.png",
+     RssInfo("linuxtd_logo.png",
      "Linux Today",
      "http://www.linuxtoday.com/",
      EXPIRE_HOUR * 3),
 
-    "http://planet.debian.org/rss20.xml" :
-     rssinfo("Debian-OpenLogo.svg",
+    "https://planet.debian.org/rss20.xml" :
+     RssInfo("Debian-OpenLogo.svg",
      "Planet Debian",
      "http://planet.debian.org/",
      EXPIRE_HOUR * 3),
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
-     rssinfo("Google-News.png",
+     RssInfo("Google-News.png",
      "Google Coronavirus news",
      "https://news.google.com/search?q=coronavirus",
      EXPIRE_HOUR),
 
     "http://www.independent.co.uk/topic/coronavirus/rss" :
-     rssinfo("Independent-Corona.png",
+     RssInfo("Independent-Corona.png",
      "Independent UK news",
      "https://www.independent.co.uk/topic/coronavirus",
      EXPIRE_HOUR * 3),
 
     "https://gnews.org/feed/" :
-    rssinfo("gnews.png",
+    RssInfo("gnews.png",
      "Guo Media news",
      "https://gnews.org/",
      EXPIRE_HOUR * 3),
 
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
-     rssinfo("CDC-Logo.png",
+     RssInfo("CDC-Logo.png",
      "Centers for Disease Control",
      "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
      EXPIRE_DAY),
 
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
-     rssinfo("PeakProsperity.png",
+     RssInfo("PeakProsperity.png",
      "Chris Martenson Peak Prosperity",
      "https://www.youtube.com/user/ChrisMartensondotcom/videos",
      EXPIRE_DAY),
 
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
-     rssinfo("JohnCampbell.png",
+     RssInfo("JohnCampbell.png",
      "Dr. John Campbell",
      "https://www.youtube.com/user/Campbellteaching/videos",
      EXPIRE_DAY),
 
     "https://corona.castos.com/feed" :
-     rssinfo("CoronaCastos2.png",
+     RssInfo("CoronaCastos2.png",
      "Coronavirus Central Daily Podcast",
      "http://coronaviruscentral.net",
      EXPIRE_HOUR * 3),
@@ -163,14 +163,14 @@ ALL_URLS = {
 SITE_URLS_LR = [
     "https://www.reddit.com/r/China_Flu/rising/.rss",
     "http://lxer.com/module/newswire/headlines.rss",
-    "http://www.reddit.com/r/linux/rising/.rss",
+    "https://www.reddit.com/r/linux/rising/.rss",
     "http://rss.slashdot.org/Slashdot/slashdotMain",
-    "http://lwn.net/headlines/newrss",
-    "http://news.ycombinator.com/rss",
-    "http://www.osnews.com/feed/",
-    "http://www.geekwire.com/feed/",
+    "https://lwn.net/headlines/newrss",
+    "https://news.ycombinator.com/rss",
+    "https://www.osnews.com/feed/",
+    "https://www.geekwire.com/feed/",
     "http://feeds.feedburner.com/linuxtoday/linux",
-    "http://planet.debian.org/rss20.xml",
+    "https://planet.debian.org/rss20.xml",
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
 ]
 
@@ -219,17 +219,28 @@ else:
     ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>'
     '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>' )
 
+EXPIRE_FILE = False
 class FSCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
         'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
         'CACHE_THRESHOLD' : 0})
 
+    #This deserializes entire feed, just to get the timestamp
+    #Not called too often so doesn't matter currently.
     def has_feed_expired(self, url):
         feed_info = g_c.get(url)
-        if feed_info is None or isinstance(feed_info, list):
+        if not isinstance(feed_info, RssFeed):
             return True
         return feed_info.expiration < datetime.utcnow()
+
+    #This should be faster, but needs extra files to be created
+    #EXPIRE_FILE = True
+    def has_feed_expiredfast(self, url):
+        expires = g_c.get(url + ":EXPIRES")
+        if expires is None:
+            return True
+        return expires < datetime.utcnow()
 
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
@@ -274,11 +285,10 @@ class MEMCache():
         url = normalize_url(url)
         self._cache.delete(url)
 
-
 def load_url_worker(url):
-    site_info = ALL_URLS[url]
+    rss_info = ALL_URLS[url]
 
-    expire_time = site_info.expire_time
+    expire_time = rss_info.expire_time
 
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
@@ -289,25 +299,56 @@ def load_url_worker(url):
 
     if feedpid == os.getpid():
         start = timer()
-        res = feedparser.parse(url)
+
+        etag = ''
+        last_modified = datetime.utcnow() - timedelta(seconds=EXPIRE_YEARS)
+
+        rssfeed = g_c.get(url)
+        if rssfeed != None:
+            etag = rssfeed.etag
+            last_modified = rssfeed.last_modified
+
+        res = feedparser.parse(url, etag=etag, modified=last_modified)
+
+        #No content changed:
+        if hasattr(res, 'status') and (res.status == 304 or res.status == 301):
+            print("No new info parsing from: %s, etag: %s, last_modified: %s." %(url, etag, last_modified))
+
+            rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+            g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
+            if EXPIRE_FILE:
+                g_c.put(url + ":EXPIRES", rssfeed.expiration, timeout=EXPIRE_WEEK)
+            g_c.delete(url + "FETCHPID")
+            return
 
         entries = prefilter_news(url, res)
 
         entries = list(itertools.islice(entries, 8))
 
-        if len(entries) > 2:
-            #Delete the template so that we refresh it next time
-            g_c.delete(site_info.site_url)
-        elif site_info.logo_url != "Custom.png":
+        if len(entries) <= 2 and rss_info.logo_url != "Custom.png":
             print("Failed to fetch %s, retry in 15 minutes." %(url))
             expire_time = 60 * 15
 
-        rssfeed = rssfeed_info(entries)
+        rssfeed = RssFeed(entries)
         rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
-        g_c.put(url, rssfeed, timeout=EXPIRE_DAYS)
+        if hasattr(res, 'etag'):
+            rssfeed.etag = res.etag
+
+        if hasattr(res, 'modified'):
+            rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.modified_parsed))
+        elif res.feed.get('updated_parsed', None) is not None:
+            rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.feed.updated_parsed))
+
+        g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
+        if EXPIRE_FILE:
+            g_c.put(url + ":EXPIRES", rssfeed.expiration, timeout=EXPIRE_WEEK)
+
+        if len(entries) > 2:
+            g_c.delete(rss_info.site_url)
+
         g_c.delete(url + "FETCHPID")
         end = timer()
-        print("Parsing from remote site %s in %f." %(url, end - start))
+        print("Parsing from: %s, etag: %s, last-modified %s, in %f." %(url, rssfeed.etag, rssfeed.last_modified, end - start))
     else:
         print("Waiting for someone else to parse remote site %s" %(url))
 
@@ -342,9 +383,9 @@ def fetch_urls_parallel(urls):
 
 def refresh_thread():
     for url in ALL_URLS.keys():
-        site_info = ALL_URLS[url]
+        rss_info = ALL_URLS[url]
 
-        if g_c.has_feed_expired(url) and site_info.logo_url != "Custom.png":
+        if g_c.has_feed_expired(url) and rss_info.logo_url != "Custom.png":
             wait_and_set_fetch_mode()
             load_url_worker(url)
             g_c.delete("FETCHMODE")
@@ -417,21 +458,19 @@ def index():
     need_fetch = False
 
     for url in page_order:
-        site_info = ALL_URLS.get(url, None)
+        rss_info = ALL_URLS.get(url, None)
 
-        if site_info is None:
-            site_info = rssinfo("Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3)
-            ALL_URLS[url] = site_info
+        if rss_info is None:
+            rss_info = RssInfo("Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3)
+            ALL_URLS[url] = rss_info
 
-        has_rss = not g_c.has_feed_expired(url)
+        expired_rss = g_c.has_feed_expired(url)
 
         #Check for the templatized content stored with site URL
-        if not g_c.has(site_info.site_url) and not has_rss: #If don't have template or RSS, have to fetch now
+        if not g_c.has(rss_info.site_url) and expired_rss: #If don't have template or RSS, have to fetch now
             needed_urls.append(url)
-        else:
-            #Check to see if the RSS feed is out of date, which means the template is old.
-            if not has_rss:
-                need_fetch = True
+        elif expired_rss:
+            need_fetch = True
 
     #Immediately fetch all needed feeds
     if len(needed_urls) > 0:
@@ -442,9 +481,9 @@ def index():
 
     #2. Now we've got all the data, go through again to build the page
     for url in page_order:
-        site_info = ALL_URLS[url]
+        rss_info = ALL_URLS[url]
 
-        template = g_c.get(site_info.site_url)
+        template = g_c.get(rss_info.site_url)
         if template is None:
 
             #The only reasons we don't have a template now is because:
@@ -454,10 +493,10 @@ def index():
             # pretty guaranteed to work and not crash.
             entries = g_c.get(url).entries
 
-            template = render_template('sitebox.html', entries=entries, logo=URL_IMAGES + site_info.logo_url,
-                                       alt_tag=site_info.logo_alt, link=site_info.site_url)
+            template = render_template('sitebox.html', entries=entries, logo=URL_IMAGES + rss_info.logo_url,
+                                       alt_tag=rss_info.logo_alt, link=rss_info.site_url)
 
-            g_c.put(site_info.site_url, template, timeout=EXPIRE_HOUR * 12)
+            g_c.put(rss_info.site_url, template, timeout=EXPIRE_HOUR * 12)
 
         result[cur_col].append(template)
 
@@ -544,8 +583,8 @@ def config():
 
         custom_count = 0
         for i, p_url in enumerate(page_order):
-            site_info = ALL_URLS.get(p_url, None)
-            if site_info is not None and site_info.logo_url != "Custom.png":
+            rss_info = ALL_URLS.get(p_url, None)
+            if rss_info is not None and rss_info.logo_url != "Custom.png":
                 urlf = UrlForm()
                 urlf.pri = (i + 1) * 10
                 urlf.url = p_url
