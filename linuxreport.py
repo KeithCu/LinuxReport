@@ -193,7 +193,7 @@ if LINUX_REPORT:
     FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     WEB_TITLE = "Linux Report"
-    WEB_DESCRIPTION = "Linux News dashboard"
+    WEB_DESCRIPTION = "Linux News"
     ABOVE_HTML = ''
     WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
     '"http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank"'
@@ -205,26 +205,29 @@ else:
     URL_IMAGES = "http://covidreport.net/static/images/"
     FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
-    WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news dashboard"
+    WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-    '<iframe width="385" height="216" src="https://www.youtube.com/embed/CNQB-Q67DpE" frameborder="0" allow="accelerometer; '
-    'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>')
+            '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"</a>'
+    # '<iframe width="385" height="216" src="https://www.youtube.com/embed/CNQB-Q67DpE" frameborder="0" allow="accelerometer; '
+    # 'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
+    )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
     WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
     '"http://linuxreport.net/">LinuxReport</a></b>) - Fork me on '
     '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
-    ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>'
-    '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>' )
+    ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>')
+#    '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>')
 
 EXPIRE_FILE = False
 class FSCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
-        'CACHE_DIR' : '/tmp/linuxreport/', 'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
-        'CACHE_THRESHOLD' : 0})
+                                           'CACHE_DIR' : '/tmp/linuxreport/',
+                                           'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
+                                           'CACHE_THRESHOLD' : 0})
 
     #This deserializes entire feed, just to get the timestamp
     #Not called too often so doesn't matter currently.
@@ -326,8 +329,8 @@ def load_url_worker(url):
         entries = list(itertools.islice(entries, 8))
 
         if len(entries) <= 2 and rss_info.logo_url != "Custom.png":
-            print("Failed to fetch %s, retry in 15 minutes." %(url))
-            expire_time = 60 * 15
+            print("Failed to fetch %s, retry in 30 minutes." %(url))
+            expire_time = 60 * 30
 
         rssfeed = RssFeed(entries)
         rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
@@ -367,7 +370,7 @@ def wait_and_set_fetch_mode():
             time.sleep(0.1)
         print("Done waiting.")
 
-    g_c.put("FETCHMODE", "FETCHMODE", timeout=20)
+    g_c.put("FETCHMODE", "FETCHMODE", timeout=10)
 
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
@@ -409,15 +412,8 @@ def index():
         socket.setdefaulttimeout(5)
         g_c = FSCache()
 
-    if request.cookies.get('DarkMode') or request.args.get('DarkMode', False):
-        dark_mode = True
-    else:
-        dark_mode = False
-
-    if request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False):
-        no_underlines = True
-    else:
-        no_underlines = False
+    dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
+    no_underlines = request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False)
 
     page_order = request.cookies.get('RssUrls')
     if page_order is not None:
@@ -437,13 +433,12 @@ def index():
 
     if dark_mode:
         suffix = suffix + ":DARK"
-
     if no_underlines:
         suffix = suffix + ":NOUND"
 
-    full_page = g_c.get(page_order_s + suffix)
-    if full_page is not None:
-        return full_page # Typically, the Python is finished here
+    # full_page = g_c.get(page_order_s + suffix)
+    # if full_page is not None:
+    #     return full_page # Typically, the Python is finished here
 
     if single_column:
         result = [[]]
@@ -466,13 +461,13 @@ def index():
 
         expired_rss = g_c.has_feed_expired(url)
 
-        #Check for the templatized content stored with site URL
-        if not g_c.has(rss_info.site_url) and expired_rss: #If don't have template or RSS, have to fetch now
+        # If don't have template or RSS, have to fetch now
+        if not g_c.has(rss_info.site_url) and expired_rss:
             needed_urls.append(url)
         elif expired_rss:
             need_fetch = True
 
-    #Immediately fetch all needed feeds
+    # Fetch all needed feeds
     if len(needed_urls) > 0:
         start = timer()
         fetch_urls_parallel(needed_urls)
@@ -532,7 +527,7 @@ def index():
 
         expire = EXPIRE_MINUTES
         if need_fetch:
-            expire = 30 #Page is already out of date, so cache for only 30 seconds
+            expire = 30 #Page is already out of date, so cache for 30 seconds
 
         g_c.put(page_order_s + suffix, page, timeout=expire)
 
