@@ -48,6 +48,9 @@ class RssInfo:
         self.site_url = site_url
         self.expire_time = expire_time
 
+#Mechanism to throw away old cookies.
+URLS_COOKIE_VERSION = 1
+
 ALL_URLS = {
 
     "https://www.reddit.com/r/China_Flu/rising/.rss" :
@@ -415,9 +418,11 @@ def index():
     dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
     no_underlines = request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False)
 
-    page_order = request.cookies.get('RssUrls')
-    if page_order is not None:
-        page_order = json.loads(page_order)
+    page_order = None
+    if request.cookies.get('UrlsVer') == str(URLS_COOKIE_VERSION):
+        page_order = request.cookies.get('RssUrls')
+        if page_order is not None:
+                page_order = json.loads(page_order)
 
     if page_order is None:
         page_order = site_urls
@@ -484,6 +489,7 @@ def index():
             #The only reasons we don't have a template now is because:
             # 1. It's startup, or a custom feed.
             # 2. The feed was expired and refetched, and the template deleted after.
+
             # In either case, the RSS feed should be good for at least an hour so this is
             # pretty guaranteed to work and not crash.
             entries = g_c.get(url).entries
@@ -633,8 +639,10 @@ def config():
             #Pickle this stuff to a string to send as a cookie
             cookie_str = json.dumps(page_order)
             resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
+            resp.set_cookie('UrlsVer', str(URLS_COOKIE_VERSION), max_age=EXPIRE_YEARS)
         else:
             resp.delete_cookie('RssUrls')
+            resp.delete_cookies('UrlsVer')
 
         if form.dark_mode.data:
             resp.set_cookie('DarkMode', "1", max_age=EXPIRE_YEARS)
