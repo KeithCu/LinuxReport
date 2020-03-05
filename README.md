@@ -8,6 +8,8 @@ To run on your own machine, You need to setup Python and a web server.
 
 ```bash
 $ git clone https://github.com/KeithCu/LinuxReport
-$ sudo pip install -r LinuxReport/requirements.txt
+$ cd linuxreport
+$ sudo pip install -r requirements.txt
+$ python -m flask run
 ```
 Web servers need a configuration file to tell it where the flask software is. A sample Apache one is included.
