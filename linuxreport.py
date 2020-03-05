@@ -49,7 +49,7 @@ class RssInfo:
         self.expire_time = expire_time
 
 #Mechanism to throw away old cookies.
-URLS_COOKIE_VERSION = 1
+URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {
 
@@ -419,7 +419,7 @@ def index():
     no_underlines = request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False)
 
     page_order = None
-    if request.cookies.get('UrlsVer') == str(URLS_COOKIE_VERSION):
+    if request.cookies.get('UrlsVer') == URLS_COOKIE_VERSION:
         page_order = request.cookies.get('RssUrls')
         if page_order is not None:
                 page_order = json.loads(page_order)
@@ -639,7 +639,7 @@ def config():
             #Pickle this stuff to a string to send as a cookie
             cookie_str = json.dumps(page_order)
             resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
-            resp.set_cookie('UrlsVer', str(URLS_COOKIE_VERSION), max_age=EXPIRE_YEARS)
+            resp.set_cookie('UrlsVer', URLS_COOKIE_VERSION, max_age=EXPIRE_YEARS)
         else:
             resp.delete_cookie('RssUrls')
             resp.delete_cookies('UrlsVer')
