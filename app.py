@@ -642,7 +642,7 @@ def config():
             resp.set_cookie('UrlsVer', URLS_COOKIE_VERSION, max_age=EXPIRE_YEARS)
         else:
             resp.delete_cookie('RssUrls')
-            resp.delete_cookies('UrlsVer')
+            resp.delete_cookie('UrlsVer')
 
         if form.dark_mode.data:
             resp.set_cookie('DarkMode', "1", max_age=EXPIRE_YEARS)
