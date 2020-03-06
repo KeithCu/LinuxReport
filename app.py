@@ -211,9 +211,9 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-            '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
-    # '<iframe width="385" height="216" src="https://www.youtube.com/embed/CNQB-Q67DpE" frameborder="0" allow="accelerometer; '
-    # 'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
+      #      '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
+     '<iframe width="385" height="216" src="https://www.youtube.com/embed/UDY5COg2P2c" frameborder="0" allow="accelerometer; '
+     'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
