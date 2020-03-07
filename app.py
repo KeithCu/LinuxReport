@@ -215,13 +215,15 @@ else:
     ABOVE_HTML = (
       #      '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
      '<iframe width="385" height="216" src="https://www.youtube.com/embed/UDY5COg2P2c" frameborder="0" allow="accelerometer; '
-     'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
+     'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
+     '<a target="_blank" href = "https://old.reddit.com/r/Covid2019/comments/fah93r/a_vaccine_isnt_coming/">'
+     '<font size="10"><code><b>Warning from Reddit: "No Vaccine Ever"</code></b></font></a>'
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
-    WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
-    '"http://linuxreport.net/">LinuxReport</a></b>) - Fork me on '
+    WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" '
+    'href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on '
     '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
     ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>')
 #    '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>')
@@ -297,21 +299,21 @@ class MEMCache():
 #If we've seen this title in other feeds, then filter it.
 def filtersimilarTitles(url, entries):
 
-        if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
-            entries = entries.copy()
+    if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
+        entries = entries.copy()
 
-            feed_alt = g_c.get("https://www.reddit.com/r/China_Flu/rising/.rss")
+        feed_alt = g_c.get("https://www.reddit.com/r/China_Flu/rising/.rss")
 
-            if feed_alt:
-                for entry in entries:
-                        for entry_alt in feed_alt.entries:
-                            dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
-                            if dist < 0.4:
-                                #See what shows up as a close match, but don't delete yet.
-                                print ("1: %s, 2: %s, J-W: %s." %(entry.title, entry_alt.title, str(dist)))
-                                #entries.remove(entry)
+        if feed_alt:
+            for entry in entries:
+                for entry_alt in feed_alt.entries:
+                    dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
+                    if dist < 0.4:
+                        #See what shows up as a close match, but don't delete yet.
+                        print ("1: %s, 2: %s, J-W: %s." %(entry.title, entry_alt.title, str(dist)))
+                        #entries.remove(entry)
 
-        return entries
+    return entries
 
 
 
