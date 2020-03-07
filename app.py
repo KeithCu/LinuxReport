@@ -16,6 +16,8 @@ from flask import Flask, render_template, Markup, request
 from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, \
                     validators
+import jellyfish
+
 
 sys.path.insert(0,'/srv/http/flask/')
 from feedfilter import prefilter_news
@@ -53,16 +55,16 @@ URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {
 
-    "https://www.reddit.com/r/China_Flu/rising/.rss" :
-     RssInfo("Coronavirus.jpg",
-     "Reddit China Flu sub",
-     "https://www.reddit.com/r/China_Flu/",
-     EXPIRE_HOUR),
-
     "https://www.reddit.com/r/Coronavirus/rising/.rss" :
      RssInfo("redditlogosmall.png",
      "Reddit Corona virus sub",
      "https://www.reddit.com/r/Coronavirus/",
+     EXPIRE_HOUR),
+
+    "https://www.reddit.com/r/China_Flu/rising/.rss" :
+     RssInfo("Coronavirus.jpg",
+     "Reddit China Flu sub",
+     "https://www.reddit.com/r/China_Flu/",
      EXPIRE_HOUR),
 
     "http://lxer.com/module/newswire/headlines.rss" :
@@ -291,6 +293,28 @@ class MEMCache():
         url = normalize_url(url)
         self._cache.delete(url)
 
+
+#If we've seen this title in other feeds, then filter it.
+def filtersimilarTitles(url, entries):
+
+        if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
+            entries = entries.copy()
+
+            feed_alt = g_c.get("https://www.reddit.com/r/China_Flu/rising/.rss")
+
+            if feed_alt:
+                for entry in entries:
+                        for entry_alt in feed_alt.entries:
+                            dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
+                            if dist < 0.4:
+                                #See what shows up as a close match, but don't delete yet.
+                                print ("1: %s, 2: %s, J-W: %s." %(entry.title, entry_alt.title, str(dist)))
+                                #entries.remove(entry)
+
+        return entries
+
+
+
 def load_url_worker(url):
     rss_info = ALL_URLS[url]
 
@@ -328,6 +352,8 @@ def load_url_worker(url):
             return
 
         entries = prefilter_news(url, res)
+
+        entries = filtersimilarTitles(url, entries)
 
         entries = list(itertools.islice(entries, 8))
 
@@ -410,6 +436,7 @@ g_standard_order_s = str(site_urls)
 def index():
 
     global g_c
+    #page_start = timer()
 
     if g_c is None:
         socket.setdefaulttimeout(5)
@@ -540,6 +567,8 @@ def index():
     # Spin up a thread to fetch all the expired feeds
     if need_fetch and not g_c.has("FETCHMODE"):
         fetch_urls_thread()
+
+    #print("Rendered page in %f sec." % (timer() - page_start))
 
     return page
 
