@@ -299,19 +299,24 @@ class MEMCache():
 #If we've seen this title in other feeds, then filter it.
 def filtersimilarTitles(url, entries):
 
-    if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
-        entries = entries.copy()
+    feed_alt = None
 
+    if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
         feed_alt = g_c.get("https://www.reddit.com/r/China_Flu/rising/.rss")
 
-        if feed_alt:
-            for entry in entries:
-                for entry_alt in feed_alt.entries:
-                    dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
-                    if dist < 0.4:
-                        #See what shows up as a close match, but don't delete yet.
-                        print ("1: %s, 2: %s, J-W: %s." %(entry.title, entry_alt.title, str(dist)))
-                        #entries.remove(entry)
+    if url == "https://www.reddit.com/r/China_Flu/rising/.rss":
+        feed_alt = g_c.get("https://www.reddit.com/r/Coronavirus/rising/.rss")
+
+    if feed_alt:
+        entries = entries.copy()
+
+        for entry in entries:
+            for entry_alt in feed_alt.entries:
+                dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
+                if dist < 0.3:
+                    #See what shows up as a close match, but don't delete yet.
+                    print ("Similar title: 1: %s, 2: %s, J-W: %s." %(entry.title, entry_alt.title, str(dist)))
+                    #entries.remove(entry)
 
     return entries
 
