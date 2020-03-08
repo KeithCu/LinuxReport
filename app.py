@@ -217,7 +217,7 @@ else:
      '<iframe width="385" height="216" src="https://www.youtube.com/embed/UDY5COg2P2c" frameborder="0" allow="accelerometer; '
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://old.reddit.com/r/Covid2019/comments/fah93r/a_vaccine_isnt_coming/">'
-     '<font size="10"><code><b>Warning from Reddit: "No Vaccine Ever"</code></b></font></a>'
+     '<code><font size="10"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
