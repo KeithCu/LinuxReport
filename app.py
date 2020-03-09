@@ -16,8 +16,6 @@ from flask import Flask, render_template, Markup, request
 from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, \
                     validators
-import jellyfish
-
 
 sys.path.insert(0,'/srv/http/flask/')
 from feedfilter import prefilter_news
@@ -218,6 +216,8 @@ else:
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://old.reddit.com/r/Covid2019/comments/fah93r/a_vaccine_isnt_coming/">'
      '<code><font size="10"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
+     '<br><a target="_blank" href = "https://translate.google.com/translate?sl=auto&tl=en&u=https%3A%2F%2Fcatania.liveuniversity.it%2F2020%2F03%2F09%2Fcoronavirus-conte-italia-zona-rossa%2F">'
+     '<code><font size="10"><b>All of Italy on Lockdown</b></font></code></a>'
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
@@ -320,9 +320,12 @@ def filtersimilarTitles(url, entries):
 #                dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
                 if dist > 0.20:
                     print ("Similar title: 1: %s, 2: %s, diff: %s." %(entry.title, entry_alt.title, str(dist)))
-                    if entry in entries:
-                        print ("Deleted title.")
+                    try: #Entry could have been removed by another similar title
                         entries.remove(entry)
+                    except:
+                        pass
+                    else:
+                        print ("Deleted title.")
 
     return entries
 
