@@ -308,15 +308,20 @@ def filtersimilarTitles(url, entries):
         feed_alt = g_c.get("https://www.reddit.com/r/Coronavirus/rising/.rss")
 
     if feed_alt:
-        entries = entries.copy()
+        entries_c = entries.copy()
 
-        for entry in entries:
+        for entry in entries_c:
+            entry_set = set(entry.title.split())
+
             for entry_alt in feed_alt.entries:
-                dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
-                if dist < 0.3:
-                    #See what shows up as a close match, but don't delete yet.
-                    print ("Similar title: 1: %s, 2: %s, J-W: %s." %(entry.title, entry_alt.title, str(dist)))
-                    #entries.remove(entry)
+                entry_alt_set = set(entry_alt.title.split())
+                c = entry_set.intersection(entry_alt_set)
+                dist = float(len(c)) / (len(entry_set) + len(entry_alt_set) - len(c))
+#                dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
+                if dist > 0.20:
+                    #Se e what shows up as a close match, but don't delete yet.
+                    print ("Similar title: 1: %s, 2: %s, diff: %s." %(entry.title, entry_alt.title, str(dist)))
+                    entries.remove(entry)
 
     return entries
 
@@ -411,7 +416,7 @@ def wait_and_set_fetch_mode():
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
         for future in concurrent.futures.as_completed(future_to_url):
