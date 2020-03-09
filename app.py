@@ -319,9 +319,10 @@ def filtersimilarTitles(url, entries):
                 dist = float(len(c)) / (len(entry_set) + len(entry_alt_set) - len(c))
 #                dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
                 if dist > 0.20:
-                    #Se e what shows up as a close match, but don't delete yet.
                     print ("Similar title: 1: %s, 2: %s, diff: %s." %(entry.title, entry_alt.title, str(dist)))
-#                    entries.remove(entry)
+                    if entry in entries:
+                        print ("Deleted title.")
+                        entries.remove(entry)
 
     return entries
 
@@ -416,7 +417,7 @@ def wait_and_set_fetch_mode():
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
         for future in concurrent.futures.as_completed(future_to_url):
