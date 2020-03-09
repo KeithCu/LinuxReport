@@ -321,7 +321,7 @@ def filtersimilarTitles(url, entries):
                 if dist > 0.20:
                     #Se e what shows up as a close match, but don't delete yet.
                     print ("Similar title: 1: %s, 2: %s, diff: %s." %(entry.title, entry_alt.title, str(dist)))
-                    entries.remove(entry)
+#                    entries.remove(entry)
 
     return entries
 
