@@ -215,9 +215,14 @@ else:
      '<iframe width="385" height="216" src="https://www.youtube.com/embed/UDY5COg2P2c" frameborder="0" allow="accelerometer; '
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://old.reddit.com/r/Covid2019/comments/fah93r/a_vaccine_isnt_coming/">'
-     '<code><font size="10"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
-     '<br><a target="_blank" href = "https://translate.google.com/translate?sl=auto&tl=en&u=https%3A%2F%2Fcatania.liveuniversity.it%2F2020%2F03%2F09%2Fcoronavirus-conte-italia-zona-rossa%2F">'
-     '<code><font size="10"><b>All of Italy on Lockdown</b></font></code></a>'
+     '<code><font size="9"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
+     #'<br><a target="_blank" href = "https://translate.google.com/translate?sl=auto&tl=en&u=https%3A%2F%2Fcatania.liveuniversity.it%2F2020%2F03%2F09%2Fcoronavirus-conte-italia-zona-rossa%2F">'
+     #'<code><font size="10"><b>All of Italy on Lockdown</b></font></code></a>'
+     '<br><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fg776s/from_the_frontlines_of_seattle_kirkland_a_lot_of/">'
+     '<code><font size="9"><b>Many Sick in Seattle</b></font></code></a>'
+     '<br><a target="_blank" href = "https://docs.google.com/document/d/e/2PACX-1vQuHYLsCvNJuzydGL0H6hbRZhUhFeyYIku8HEg7ZIeZ9HRpzKMuJ0JpVXF46F9En466S2M5k82-GIa5/pub?from=timeline&isappinstalled=0">'
+     '<code><font size="9"><b>Open Letter to US Gov\'t from Purdue Professor</b></font></code></a>'
+
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
