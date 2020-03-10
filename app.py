@@ -218,10 +218,12 @@ else:
      '<code><font size="9"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
      #'<br><a target="_blank" href = "https://translate.google.com/translate?sl=auto&tl=en&u=https%3A%2F%2Fcatania.liveuniversity.it%2F2020%2F03%2F09%2Fcoronavirus-conte-italia-zona-rossa%2F">'
      #'<code><font size="10"><b>All of Italy on Lockdown</b></font></code></a>'
-     '<br><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fg776s/from_the_frontlines_of_seattle_kirkland_a_lot_of/">'
+     '<br/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fg776s/from_the_frontlines_of_seattle_kirkland_a_lot_of/">'
      '<code><font size="9"><b>Many Sick in Seattle</b></font></code></a>'
-     '<br><a target="_blank" href = "https://docs.google.com/document/d/e/2PACX-1vQuHYLsCvNJuzydGL0H6hbRZhUhFeyYIku8HEg7ZIeZ9HRpzKMuJ0JpVXF46F9En466S2M5k82-GIa5/pub?from=timeline&isappinstalled=0">'
+     '<br/><a target="_blank" href = "https://docs.google.com/document/d/e/2PACX-1vQuHYLsCvNJuzydGL0H6hbRZhUhFeyYIku8HEg7ZIeZ9HRpzKMuJ0JpVXF46F9En466S2M5k82-GIa5/pub?from=timeline&isappinstalled=0">'
      '<code><font size="9"><b>Open Letter to US Gov\'t from Purdue Professor</b></font></code></a>'
+     '<br/><a target="_blank" href = "https://www.scmp.com/news/china/science/article/3074351/coronavirus-can-travel-twice-far-official-safe-distance-and-stay">'
+     '<code><font size="9"><b>Airborne Virus Can Linger for 30 Minutes, Danger From 15 Feet</b></font></code></a>'
 
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
