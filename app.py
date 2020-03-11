@@ -216,13 +216,11 @@ else:
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://old.reddit.com/r/Covid2019/comments/fah93r/a_vaccine_isnt_coming/">'
      '<code><font size="9"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
-     #'<br><a target="_blank" href = "https://translate.google.com/translate?sl=auto&tl=en&u=https%3A%2F%2Fcatania.liveuniversity.it%2F2020%2F03%2F09%2Fcoronavirus-conte-italia-zona-rossa%2F">'
-     #'<code><font size="10"><b>All of Italy on Lockdown</b></font></code></a>'
-     '<br/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fg776s/from_the_frontlines_of_seattle_kirkland_a_lot_of/">'
-     '<code><font size="9"><b>Many Sick in Seattle</b></font></code></a>'
-     '<br/><a target="_blank" href = "https://docs.google.com/document/d/e/2PACX-1vQuHYLsCvNJuzydGL0H6hbRZhUhFeyYIku8HEg7ZIeZ9HRpzKMuJ0JpVXF46F9En466S2M5k82-GIa5/pub?from=timeline&isappinstalled=0">'
+     '<br/><hr/><a target="_blank" href = "http://archive.is/CPPLo">'
+     '<code><font size="9"><b>Delays at CDC and FDA</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/e/2PACX-1vQuHYLsCvNJuzydGL0H6hbRZhUhFeyYIku8HEg7ZIeZ9HRpzKMuJ0JpVXF46F9En466S2M5k82-GIa5/pub?from=timeline&isappinstalled=0">'
      '<code><font size="9"><b>Open Letter to US Gov\'t from Purdue Professor</b></font></code></a>'
-     '<br/><a target="_blank" href = "https://www.scmp.com/news/china/science/article/3074351/coronavirus-can-travel-twice-far-official-safe-distance-and-stay">'
+     '<br/><hr/><a target="_blank" href = "https://www.scmp.com/news/china/science/article/3074351/coronavirus-can-travel-twice-far-official-safe-distance-and-stay">'
      '<code><font size="9"><b>Airborne Virus Can Linger for 30 Minutes, Danger From 15 Feet</b></font></code></a>'
 
     )
@@ -572,11 +570,15 @@ def index():
     if no_underlines:
         text_decoration = "text-decoration:none;"
 
+    above_html = ABOVE_HTML
+    if not single_column:
+        above_html = above_html.replace("<hr/>", "")
+
     page = render_template('page.html', columns=result, text_color=text_color,
                            logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE,
                            description=WEB_DESCRIPTION, favicon=FAVICON,
                            welcome_html=Markup(WELCOME_HTML), a_text_decoration=text_decoration,
-                           above_html=Markup(ABOVE_HTML))
+                           above_html=Markup(above_html))
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
