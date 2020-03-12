@@ -161,6 +161,12 @@ ALL_URLS = {
      "http://coronaviruscentral.net",
      EXPIRE_HOUR * 3),
 
+    "https://pandemic.warroom.org/feed/" :
+     RssInfo("WarRoom.png",
+     "War Room: Pandemic",
+     "https://pandemic.warroom.org/",
+     EXPIRE_HOUR * 3),
+
 }
 
 SITE_URLS_LR = [
@@ -182,11 +188,12 @@ SITE_URLS_CR = [
     "https://www.reddit.com/r/China_Flu/rising/.rss",
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
     "http://www.independent.co.uk/topic/coronavirus/rss",
+    "https://pandemic.warroom.org/feed/",
     "https://gnews.org/feed/",
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w",
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
     "https://corona.castos.com/feed",
+    "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
 ]
 
 if LINUX_REPORT:
@@ -216,12 +223,12 @@ else:
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://old.reddit.com/r/Covid2019/comments/fah93r/a_vaccine_isnt_coming/">'
      '<code><font size="9"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.vox.com/science-and-health/2020/3/11/21173187/coronavirus-covid-19-hand-washing-sanitizer-compared-soap-is-dope">'
-     '<code><font size="9"><b>Good News: Soap Destroys Coronavirus</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://translate.google.com/translate?sl=auto&tl=en&u=https%3A%2F%2Fwww.novinky.cz%2Fzahranicni%2Fkoronavirus%2Fclanek%2Fhamacek-vlada-by-mela-rozhodnout-o-vyhlaseni-nouzoveho-stavu-40316389">'
+     '<code><font size="9"><b>Czech Republic Cancels All Events >30 People</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/e/2PACX-1vQuHYLsCvNJuzydGL0H6hbRZhUhFeyYIku8HEg7ZIeZ9HRpzKMuJ0JpVXF46F9En466S2M5k82-GIa5/pub?from=timeline&isappinstalled=0">'
      '<code><font size="9"><b>Open Letter to US Gov\'t from Purdue Professor</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.scmp.com/news/china/science/article/3074351/coronavirus-can-travel-twice-far-official-safe-distance-and-stay">'
-     '<code><font size="9"><b>Airborne Virus Can Linger for 30 Minutes, Danger From 15 Feet</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://www.nature.com/articles/s41598-019-38808-z">'
+     '<code><font size="9"><b>Virus Sheds While Speaking & Breathing</b></font></code></a>'
 
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
