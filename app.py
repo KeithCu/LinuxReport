@@ -225,8 +225,8 @@ else:
      '<code><font size="9"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://translate.google.com/translate?sl=auto&tl=en&u=https%3A%2F%2Fwww.novinky.cz%2Fzahranicni%2Fkoronavirus%2Fclanek%2Fhamacek-vlada-by-mela-rozhodnout-o-vyhlaseni-nouzoveho-stavu-40316389">'
      '<code><font size="9"><b>Czech Republic Cancels All Events >30 People</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/e/2PACX-1vQuHYLsCvNJuzydGL0H6hbRZhUhFeyYIku8HEg7ZIeZ9HRpzKMuJ0JpVXF46F9En466S2M5k82-GIa5/pub?from=timeline&isappinstalled=0">'
-     '<code><font size="9"><b>Open Letter to US Gov\'t from Purdue Professor</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://medium.com/@savesightmd/an-old-drug-for-the-new-virus-a6fd6a0843bc">'
+     '<code><font size="9"><b>Chloroquine, Used for Malaria, Stops Coronavirus+</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.nature.com/articles/s41598-019-38808-z">'
      '<code><font size="9"><b>Virus Sheds While Speaking & Breathing</b></font></code></a>'
 
