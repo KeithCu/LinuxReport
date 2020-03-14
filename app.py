@@ -225,8 +225,8 @@ else:
      '<code><font size="9"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.businessinsider.com/us-labs-are-working-to-solve-coronavirus-testing-shortage-2020-3">'
      '<code><font size="9"><b>Healthcare Giants and Startups Racing to Ramp Up Testing</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://medium.com/@savesightmd/an-old-drug-for-the-new-virus-a6fd6a0843bc">'
-     '<code><font size="9"><b>Chloroquine, Used for Malaria, Stops Coronavirus</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0109180">'
+     '<code><font size="9"><b>Chloroquine, Used for Malaria, Plus Zinc Stops Coronavirus</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fhwsm7/ncov_stability_3hr_in_aerosol_4_hr_on_copper_24hr/">'
      #'<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
 
