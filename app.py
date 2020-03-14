@@ -227,8 +227,8 @@ else:
      '<code><font size="9"><b>Healthcare Giants and Startups Racing to Ramp Up Testing</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://medium.com/@savesightmd/an-old-drug-for-the-new-virus-a6fd6a0843bc">'
      '<code><font size="9"><b>Chloroquine, Used for Malaria, Stops Coronavirus</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fhwsm7/ncov_stability_3hr_in_aerosol_4_hr_on_copper_24hr/">'
-     '<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
+     #'<br/><hr/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fhwsm7/ncov_stability_3hr_in_aerosol_4_hr_on_copper_24hr/">'
+     #'<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
 
     )
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
