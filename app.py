@@ -227,6 +227,9 @@ else:
      '<code><font size="9"><b>Healthcare Giants and Startups Racing to Ramp Up Testing</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0109180">'
      '<code><font size="9"><b>Chloroquine, Used for Malaria, Plus Zinc Stops Coronavirus</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://medium.com/@donnellymjd/covid-19-new-york-will-be-the-next-italy-but-doesnt-have-to-be-54a5c8137d42">'
+     '<code><font size="9"><b>New York Will Be The Next Italy (Unless It Shuts Down Now)</b></font></code></a>'
+
      #'<br/><hr/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fhwsm7/ncov_stability_3hr_in_aerosol_4_hr_on_copper_24hr/">'
      #'<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
 
