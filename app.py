@@ -225,7 +225,7 @@ else:
      '<code><font size="9"><b>Warning from Reddit: "No Vaccine Ever"</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.businessinsider.com/us-labs-are-working-to-solve-coronavirus-testing-shortage-2020-3">'
      '<code><font size="9"><b>Healthcare Giants and Startups Racing to Ramp Up Testing</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0109180">'
+     '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      '<code><font size="9"><b>Chloroquine, Used for Malaria, Plus Zinc Stops Coronavirus</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://translate.google.com/translate?sl=it&tl=en&u=https%3A%2F%2Fwww.repubblica.it%2Fsalute%2Fmedicina-e-ricerca%2F2020%2F03%2F16%2Fnews%2Fcoronavirus_studio_il_50-75_dei_casi_a_vo_sono_asintomatici_e_molto_contagiosi-251474302%2F%3Fref%3DRHPPTP-BH-I251454518-C12-P3-S2.4-T1">'
      '<code><font size="9"><b>50-75% of Patients in Italy are Asymptomatic</b></font></code></a>'
