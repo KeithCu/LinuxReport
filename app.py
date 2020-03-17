@@ -228,7 +228,7 @@ else:
      '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      '<code><font size="9"><b>Chloroquine, Used for Malaria, Plus Zinc Stops Coronavirus</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://translate.google.com/translate?sl=it&tl=en&u=https%3A%2F%2Fwww.repubblica.it%2Fsalute%2Fmedicina-e-ricerca%2F2020%2F03%2F16%2Fnews%2Fcoronavirus_studio_il_50-75_dei_casi_a_vo_sono_asintomatici_e_molto_contagiosi-251474302%2F%3Fref%3DRHPPTP-BH-I251454518-C12-P3-S2.4-T1">'
-     '<code><font size="9"><b>50-75% of Patients in Italian Town are Asymptomatic</b></font></code></a>'
+     '<code><font size="9"><b>50-75% of Citizens in Italian Town are Asymptomatic</b></font></code></a>'
 
      #'<br/><hr/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fhwsm7/ncov_stability_3hr_in_aerosol_4_hr_on_copper_24hr/">'
      #'<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
