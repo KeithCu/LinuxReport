@@ -219,7 +219,7 @@ else:
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
       #      '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
-     '<iframe width="385" height="216" src="https://www.youtube.com/embed/rRgnQs6D1u8" frameborder="0" allow="accelerometer; '
+     '<iframe width="385" height="216" src="https://www.youtube.com/embed/UgChZVA4vdc" frameborder="0" allow="accelerometer; '
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/flm5ho/from_an_essential_shipping_worker_its_getting_bad/">'
      '<code><font size="9"><b>Getting Bad at Fedex!</b></font></code></a>'
