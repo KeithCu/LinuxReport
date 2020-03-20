@@ -224,7 +224,7 @@ else:
      '<a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/flm5ho/from_an_essential_shipping_worker_its_getting_bad/">'
      '<code><font size="9"><b>Getting Bad at Fedex!</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.rstreet.org/2020/03/18/small-regulatory-reforms-that-can-help-people-during-the-pandemic/">'
-     '<code><font size="9"><b>Small Regulatory Reforms That Can Help People During Pandemic</b></font></code></a>'
+     '<code><font size="9"><b>Small Regulatory Reforms That Can Help During Pandemic</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.techdirt.com/articles/20200317/04381644114/volunteers-3d-print-unobtainable-11000-valve-1-to-keep-covid-19-patients-alive-original-manufacturer-threatens-to-sue.shtml">'
      #'<code><font size="9"><b>Volunteers 3D-Print Unobtainable $11,000 Respiratory Valve, Original Manufacturer Threatens To Sue</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
