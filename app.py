@@ -219,12 +219,12 @@ else:
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
       #      '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
-     '<iframe width="385" height="216" src="https://www.youtube.com/embed/gJqSdmNNwW4" frameborder="0" allow="accelerometer; '
+     '<iframe width="385" height="216" src="https://www.youtube.com/embed/rRgnQs6D1u8" frameborder="0" allow="accelerometer; '
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/flm5ho/from_an_essential_shipping_worker_its_getting_bad/">'
      '<code><font size="9"><b>Getting Bad at Fedex!</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.rstreet.org/2020/03/18/small-regulatory-reforms-that-can-help-people-during-the-pandemic/">'
-     '<code><font size="9"><b>Small Regulatory Reforms That Can Help During Pandemic</b></font></code></a>'
+     '<code><font size="9"><b>Small Regulatory Reforms That Can Help</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.techdirt.com/articles/20200317/04381644114/volunteers-3d-print-unobtainable-11000-valve-1-to-keep-covid-19-patients-alive-original-manufacturer-threatens-to-sue.shtml">'
      #'<code><font size="9"><b>Volunteers 3D-Print Unobtainable $11,000 Respiratory Valve, Original Manufacturer Threatens To Sue</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
