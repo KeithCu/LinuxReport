@@ -219,7 +219,7 @@ else:
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
       #      '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
-     '<iframe width="385" height="216" src="https://www.youtube.com/embed/ugtN6HCqatc" frameborder="0" allow="accelerometer; '
+     '<iframe width="385" height="216" src="https://www.youtube.com/embed/MPGw5Ucmwk8" frameborder="0" allow="accelerometer; '
      'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://theintercept.com/2020/03/24/kaiser-permanente-nurses-coronavirus/">'
      '<code><font size="9"><b>Nurses Threatened For Wearing Their Own Masks</b></font></code></a>'
