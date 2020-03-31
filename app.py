@@ -218,17 +218,17 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-      #      '<a target = "_blank" href = "https://imgur.com/7vS9Tum"><img width = "400" src = "http://covidreport.net/static/images/7vS9Tum.jpg"/></a>'
-     '<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
-     'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
-     '<a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fr8hpa/rudy_giulliani_and_charlie_kirks_twitter_account/">'
-     '<code><font size="9"><b>Twitter Suspends Rudy Giuliani\'s Feed Over Chloroquine!</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.detroitnews.com/story/opinion/2020/03/26/opinion-michigans-doctors-fight-coronavirus-and-governors-office/2922272001/">'
-     '<code><font size="9"><b>MI Governor Outlaws Chloroquine, Threatens Doctors</b></font></code></a>'
+          '<a target = "_blank" href = "https://patch.com/new-york/new-york-city/photos-navy-hospital-ship-usns-comfort-arrives-new-york-city"><img width = "400" src = "http://covidreport.net/static/images/USNSComfort2.jpg"/></a>'
+     #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
+     #'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
+     #'<a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fr8hpa/rudy_giulliani_and_charlie_kirks_twitter_account/">'
+     #'<code><font size="9"><b>Twitter Suspends Rudy Giuliani\'s Feed Over Chloroquine!</b></font></code></a>'
+     #'<br/><hr/><a target="_blank" href = "https://www.detroitnews.com/story/opinion/2020/03/26/opinion-michigans-doctors-fight-coronavirus-and-governors-office/2922272001/">'
+     #'<code><font size="9"><b>MI Governor Outlaws Chloroquine, Threatens Doctors</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://twitter.com/BorisJohnson/status/1243496858095411200">'
      #'<code><font size="9"><b>UK PM Boris Johnson Tests Positive</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=1TJdjhd_XG8">'
-     '<code><font size="9"><b>700 Patients Saved with Chloroquine, $20 treatment!</b></font></code></a>'
+     #'<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=1TJdjhd_XG8">'
+     #'<code><font size="9"><b>700 Patients Saved with Chloroquine, $20 treatment!</b></font></code></a>'
 
      #'<br/><hr/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fhwsm7/ncov_stability_3hr_in_aerosol_4_hr_on_copper_24hr/">'
      #'<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
