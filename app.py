@@ -225,8 +225,8 @@ else:
      '<code><font size="9"><b>Crisis on Teddy Roosevelt Carrier</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.wral.com/coronavirus/coughs-sneezes-travel-farther-than-you-might-think/19036630/">'
      '<code><font size="9"><b>Coughs and Sneezes Travel 20+ feet, 60 MPH </b></font></code></a>'
-     #'<br/><hr/><a target="_blank" href = "https://twitter.com/BorisJohnson/status/1243496858095411200">'
-     #'<code><font size="9"><b>UK PM Boris Johnson Tests Positive</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/1SesxgaPnpT6OfCYuaFSwXzDK4cDKMbivoALprcVFj48/edit">'
+     '<code><font size="9"><b>Dr. Vladimir Zelenko $20 Treatment Guidelines</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=1TJdjhd_XG8">'
      #'<code><font size="9"><b>700 Patients Saved with Chloroquine, $20 treatment!</b></font></code></a>'
 
