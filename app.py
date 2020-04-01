@@ -218,7 +218,7 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-          '<a target = "_blank" href = "https://patch.com/new-york/new-york-city/photos-navy-hospital-ship-usns-comfort-arrives-new-york-city"><img width = "400" src = "http://covidreport.net/static/images/USNSComfort2.jpg"/></a><br/>'
+          '<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
      #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
      #'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
      '<a target="_blank" href = "https://archive.is/8SYhJ">'
