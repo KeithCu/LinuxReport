@@ -218,13 +218,13 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (
-          '<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
+          #'<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
      #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
      #'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
-     '<a target="_blank" href = "https://archive.is/8SYhJ">'
-     '<code><font size="9"><b>Crisis on Teddy Roosevelt Carrier</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.wral.com/coronavirus/coughs-sneezes-travel-farther-than-you-might-think/19036630/">'
-     '<code><font size="9"><b>Coughs and Sneezes Travel 20+ feet, 60 MPH </b></font></code></a>'
+     #'<a target="_blank" href = "https://archive.is/8SYhJ">'
+     #'<code><font size="9"><b>Crisis on Teddy Roosevelt Carrier</b></font></code></a>'
+     #'<br/><hr/><a target="_blank" href = "https://www.wral.com/coronavirus/coughs-sneezes-travel-farther-than-you-might-think/19036630/">'
+     #'<code><font size="9"><b>Coughs and Sneezes Travel 20+ feet, 60 MPH </b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/1SesxgaPnpT6OfCYuaFSwXzDK4cDKMbivoALprcVFj48/edit">'
      '<code><font size="9"><b>Dr. Vladimir Zelenko $20 Treatment Guidelines</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=1TJdjhd_XG8">'
