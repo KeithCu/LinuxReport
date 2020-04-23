@@ -217,7 +217,7 @@ else:
     LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
-    ABOVE_HTML = (
+    ABOVE_HTML = (''
         #'<a target = "_blank" href = "http://covidreport.net/static/covidactivities.html"><img width = "500" src = "http://covidreport.net/static/images/Exercise.jpg"/></a><br/>'
           #'<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
      #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
