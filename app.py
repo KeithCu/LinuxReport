@@ -155,7 +155,7 @@ ALL_URLS = {
      "https://www.youtube.com/user/Campbellteaching/videos",
      EXPIRE_DAY),
 
-    "https://corona.castos.com/feed" :
+    "https://coronavirus-central.castos.com/feed" :
      RssInfo("CoronaCastos2.png",
      "Coronavirus Central Daily Podcast",
      "http://coronaviruscentral.net",
@@ -226,8 +226,8 @@ else:
      #'<code><font size="9"><b>Fun Ways For Families To Exercise</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.wral.com/coronavirus/coughs-sneezes-travel-farther-than-you-might-think/19036630/">'
      #'<code><font size="9"><b>Coughs and Sneezes Travel 20+ feet, 60 MPH </b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
-     '<code><font size="9"><b>Zinc Is The Key</b></font></code></a>'
+     #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
+     #'<code><font size="9"><b>Zinc Is The Key</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=1TJdjhd_XG8">'
      #'<code><font size="9"><b>700 Patients Saved with Chloroquine, $20 treatment!</b></font></code></a>'
 
