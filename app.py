@@ -192,7 +192,7 @@ SITE_URLS_CR = [
     "https://gnews.org/feed/",
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w",
-    "https://corona.castos.com/feed",
+    "https://coronavirus-central.castos.com/feed",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
 ]
 
