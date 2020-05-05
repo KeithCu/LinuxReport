@@ -218,6 +218,8 @@ else:
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (''
+         '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">'
+     '<code><font size="6"><b>Help Me Update Headlines -- Send Pull Requests!</b></font></code></a>'
         #'<a target = "_blank" href = "http://covidreport.net/static/covidactivities.html"><img width = "500" src = "http://covidreport.net/static/images/Exercise.jpg"/></a><br/>'
           #'<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
      #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
@@ -235,6 +237,7 @@ else:
      #'<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
 
     )
+
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
