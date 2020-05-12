@@ -219,7 +219,7 @@ else:
     WEB_TITLE = "COVID-19 Report"
     ABOVE_HTML = (''
          '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">'
-     '<code><font size="6"><b>Help Me Update Headlines -- Send Pull Requests!</b></font></code></a>'
+     '<code><font size="6"><b>Help Me Update Headlines -- Just requires changing HTML in a text file...</b></font></code></a>'
         #'<a target = "_blank" href = "http://covidreport.net/static/covidactivities.html"><img width = "500" src = "http://covidreport.net/static/images/Exercise.jpg"/></a><br/>'
           #'<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
      #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
