@@ -204,7 +204,10 @@ if LINUX_REPORT:
     LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
     WEB_TITLE = "Linux Report"
     WEB_DESCRIPTION = "Linux News"
-    ABOVE_HTML = ''
+    ABOVE_HTML = (''
+         '<a target="_blank" href = "http://live.detroitquaranteam.com/">'
+        '<code><font size="9"><b>Software Wars Release Party, Saturday 9pm EDT</b></font></code></a>'
+    )
     WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
     '"http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank"'
     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
@@ -224,8 +227,8 @@ else:
           #'<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
      #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
      #'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
-     #'<a target="_blank" href = "https://www.fda.gov/news-events/press-announcements/coronavirus-covid-19-update-fda-revokes-emergency-use-authorization-chloroquine-and">'
-     #'<code><font size="9"><b>FDA Revokes Emergency Use Authorization for Hydroxychloroquine! (But Only Applies to Inpatient Use)</b></font></code></a>'
+     '<a target="_blank" href = "http://live.detroitquaranteam.com/">'
+     '<code><font size="9"><b>Software Wars Release Party, Saturday 9pm EDT</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/1SesxgaPnpT6OfCYuaFSwXzDK4cDKMbivoALprcVFj48/edit">'
      #'<code><font size="9"><b>In spite of Hundreds of Success Stories...</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
