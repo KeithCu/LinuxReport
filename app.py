@@ -205,7 +205,7 @@ if LINUX_REPORT:
     WEB_TITLE = "Linux Report"
     WEB_DESCRIPTION = "Linux News"
     ABOVE_HTML = (''
-    '<a target="_blank" href = "https://keithcu.com/wordpress/?p=4041">'
+    '<a target="_blank" href = "https://keithcu.com/wordpress/?page_id=407">'
     '<code><font size="9"><b>Software Wars Free Download</b></font></code></a>'
     )
     WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
@@ -227,7 +227,7 @@ else:
           #'<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
      #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
      #'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
-     '<a target="_blank" href = "https://keithcu.com/wordpress/?p=4041">'
+     '<a target="_blank" href = "https://keithcu.com/wordpress/?page_id=407">'
      '<code><font size="9"><b>Software Wars Free Download</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://www.scmp.com/news/china/science/article/3089771/coronavirus-may-be-here-much-longer-due-rapid-mutations">'
      #'<code><font size="9"><b>Coronavirus May Be Here For Much Longer - Due To Rapid Mutations</b></font></code></a>'
