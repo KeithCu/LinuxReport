@@ -236,8 +236,8 @@ else:
      #'<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=1TJdjhd_XG8">'
      #'<code><font size="9"><b>700 Patients Saved with Chloroquine, $20 treatment!</b></font></code></a>'
 
-     #'<br/><hr/><a target="_blank" href = "https://www.reddit.com/r/China_Flu/comments/fhwsm7/ncov_stability_3hr_in_aerosol_4_hr_on_copper_24hr/">'
-     #'<code><font size="9"><b>Virus Lingers in Air for >3 Hours, Stable For 4 hr on Copper, 24 hr on Cardboard, 2-3 Days On Plastic / Steel</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://youtu.be/3ywj-PZTt4g?t=355">'
+     '<code><font size="9"><b>Quercetin (an OTC Plant Pigment Supplement) + Zinc Stop COVID-19!</b></font></code></a>'
 
     )
 
