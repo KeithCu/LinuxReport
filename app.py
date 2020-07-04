@@ -231,13 +231,13 @@ else:
     # '<code><font size="6"><b>Software Wars Free Download</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
-     #'<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=1TJdjhd_XG8">'
-     #'<code><font size="9"><b>700 Patients Saved with Chloroquine, $20 treatment!</b></font></code></a>'
 
      '<a target="_blank" href = "https://youtu.be/3ywj-PZTt4g?t=355">'
      '<code><font size="9"><b>Quercetin (an OTC Plant Pigment Supplement) + Zinc Stop COVID-19</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=W9YFXo84lCk">'
      '<code><font size="9"><b>Supplement Known About Since April</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://www.reporter.am/coronavirus-chinese-expert-says-herd-immunity-impossible/">'
+     '<code><font size="9"><b>Leading Shanghai Doctor - Herd Immunity Impossible!</b></font></code></a>'
 
 
     )
