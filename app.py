@@ -233,12 +233,11 @@ else:
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
 
      '<a target="_blank" href = "https://youtu.be/3ywj-PZTt4g?t=355">'
-     '<code><font size="9"><b>Quercetin (an OTC Plant Pigment Supplement) + Zinc Stop COVID-19</b></font></code></a>'
+     '<code><font size="9"><b>Quercetin, a Plant Pigment Supplement + Zinc Stop COVID-19</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=W9YFXo84lCk">'
-     '<code><font size="9"><b>Supplement Known About Since April</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.reporter.am/coronavirus-chinese-expert-says-herd-immunity-impossible/">'
-     '<code><font size="9"><b>Leading Shanghai Doctor - Herd Immunity Impossible!</b></font></code></a>'
-
+     '<code><font size="9"><b>Known About Since April</b></font></code></a>'
+     #'<br/><hr/><a target="_blank" href = "https://www.reporter.am/coronavirus-chinese-expert-says-herd-immunity-impossible/">'
+     #'<code><font size="9"><b>Leading Shanghai Doctor - Herd Immunity Impossible!</b></font></code></a>'
 
     )
 
