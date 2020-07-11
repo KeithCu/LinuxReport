@@ -236,9 +236,8 @@ else:
      '<code><font size="9"><b>Quercetin, a Plant Pigment Supplement + Zinc Stop COVID-19</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://twitter.com/__ice9/status/1281013400752009216">'
      '<code><font size="9"><b>Quercetin Phytosome, Liposomal Quercetin, Isoquercetin, or EMIQ (Modified Isoquercetin) Needed for High Plasma Levels</b></font></code></a>'
-     #'<br/><hr/><a target="_blank" href = "https://www.reporter.am/coronavirus-chinese-expert-says-herd-immunity-impossible/">'
-     #'<code><font size="9"><b>Leading Shanghai Doctor - Herd Immunity Impossible!</b></font></code></a>'
-
+     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=F-pwPIXCXX8">'
+     '<code><font size="9"><b>1st Covid-19 Whistleblower - Li-Meng Yan from Hong Kong</b></font></code></a>'
     )
 
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
