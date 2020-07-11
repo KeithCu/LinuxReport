@@ -232,12 +232,12 @@ else:
      #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
 
-     '<a target="_blank" href = "https://youtu.be/3ywj-PZTt4g?t=355">'
-     '<code><font size="9"><b>Quercetin, a Plant Pigment Supplement + Zinc Stop COVID-19</b></font></code></a>'
+     '<a target="_blank" href = "https://www.frontiersin.org/articles/10.3389/fimmu.2020.01451/full">'
+     '<code><font size="9"><b>Quercetin Research Paper to Prevent and Treat COVID-19</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://twitter.com/__ice9/status/1281013400752009216">'
      '<code><font size="9"><b>Quercetin Phytosome, Liposomal Quercetin, Isoquercetin, or EMIQ (Modified Isoquercetin) Needed for High Plasma Levels</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=F-pwPIXCXX8">'
-     '<code><font size="9"><b>1st Covid-19 Whistleblower - Li-Meng Yan from Hong Kong</b></font></code></a>'
+     '<code><font size="9"><b>1st Covid-19 Virologist Whistleblower - Li-Meng Yan from Hong Kong</b></font></code></a>'
     )
 
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
