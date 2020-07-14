@@ -232,10 +232,10 @@ else:
      #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
 
-     '<a target="_blank" href = "https://www.frontiersin.org/articles/10.3389/fimmu.2020.01451/full">'
-     '<code><font size="9"><b>Quercetin Research Paper to Prevent and Treat COVID-19</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=qhyEBIpaIaM">'
-     '<code><font size="9"><b>Getting Covid-19 Twice Is Possible</b></font></code></a>'
+     '<a target="_blank" href = "https://www.evms.edu/covid-19/covid_care_for_clinicians/">'
+     '<code><font size="9"><b>Eastern Virginia Medical School Queretin-Based Covid-19 Protocol</b></font></code></a>'
+     #'<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=qhyEBIpaIaM">'
+     #'<code><font size="9"><b>Getting Covid-19 Twice Is Possible</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=F-pwPIXCXX8">'
      '<code><font size="9"><b>1st Covid-19 Virologist Whistleblower - Li-Meng Yan from Hong Kong</b></font></code></a>'
     )
