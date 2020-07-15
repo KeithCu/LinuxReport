@@ -236,8 +236,8 @@ else:
      '<code><font size="9"><b>Eastern Virginia Medical School Quercetin-Based Covid-19 Protocol</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=cav-OCuNmBI">'
      '<code><font size="9"><b>CCP Covid-19 Coverup - Crime Of The Century!</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=F-pwPIXCXX8">'
-     '<code><font size="9"><b>1st Covid-19 Virologist Whistleblower - Li-Meng Yan from Hong Kong</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://www.researchsquare.com/article/rs-22057/v1">'
+     '<code><font size="9"><b>Catechin (Green Tea) and Curcumin (Turmeric) Interfere with Covid-19</b></font></code></a>'
     )
 
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
