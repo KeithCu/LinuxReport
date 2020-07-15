@@ -234,8 +234,8 @@ else:
 
      '<a target="_blank" href = "https://www.evms.edu/covid-19/covid_care_for_clinicians/">'
      '<code><font size="9"><b>Eastern Virginia Medical School Quercetin-Based Covid-19 Protocol</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=JfDpuouYUFc">'
-     '<code><font size="9"><b>Dr. Chris Martenson: Covid-19 Worse Than We Thought!</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=cav-OCuNmBI">'
+     '<code><font size="9"><b>CCP Covid-19 Coverup - Crime Of The Century!</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=F-pwPIXCXX8">'
      '<code><font size="9"><b>1st Covid-19 Virologist Whistleblower - Li-Meng Yan from Hong Kong</b></font></code></a>'
     )
