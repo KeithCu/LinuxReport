@@ -232,7 +232,7 @@ else:
      #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
 
-     '<a target="_blank" href = "https://twitter.com/sup_sam/status/1284224173368172544">'
+     '<a target="_blank" href = "https://twitter.com/keithccurtis/status/1284232972388962305">'
      '<code><font size="9"><b>#AskFDA About Quercetin!</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://english.elpais.com/science_tech/2020-07-17/over-half-of-coronavirus-hospital-patients-in-spain-have-developed-neurological-problems-studies-show.html">'
      '<code><font size="9"><b>Half of Spanish Hospitalized Covid Patients Have Neurological Problems</b></font></code></a>'
