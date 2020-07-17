@@ -232,10 +232,10 @@ else:
      #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
 
-     '<a target="_blank" href = "https://www.evms.edu/covid-19/covid_care_for_clinicians/">'
-     '<code><font size="9"><b>Eastern Virginia Medical School Quercetin-Based Covid-19 Protocol</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=cav-OCuNmBI">'
-     '<code><font size="9"><b>CCP Covid-19 Coverup - Crime Of The Century!</b></font></code></a>'
+     '<a target="_blank" href = "https://twitter.com/sup_sam/status/1284224173368172544">'
+     '<code><font size="9"><b>#AskFDA About Quercetin!</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://english.elpais.com/science_tech/2020-07-17/over-half-of-coronavirus-hospital-patients-in-spain-have-developed-neurological-problems-studies-show.html">'
+     '<code><font size="9"><b>Half of Spanish Hospitalized Covid Patients Have Neurological Problems</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://www.researchsquare.com/article/rs-22057/v1">'
      '<code><font size="9"><b>Catechin (Green Tea) and Curcumin (Turmeric) Interfere with Covid-19</b></font></code></a>'
     )
