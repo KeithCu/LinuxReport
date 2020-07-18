@@ -236,8 +236,8 @@ else:
      '<code><font size="9"><b>#AskFDA About Quercetin!</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://english.elpais.com/science_tech/2020-07-17/over-half-of-coronavirus-hospital-patients-in-spain-have-developed-neurological-problems-studies-show.html">'
      '<code><font size="9"><b>Half of Spanish Hospitalized Covid Patients Have Neurological Problems</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.researchsquare.com/article/rs-22057/v1">'
-     '<code><font size="9"><b>Catechin (Green Tea) and Curcumin (Turmeric) Interfere with Covid-19</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://www.sciencedirect.com/science/article/abs/pii/S0166354219307211?via%3Dihub">'
+     '<code><font size="9"><b>Ivermectin (Non-OTC) Stops Covid-19</b></font></code></a>'
     )
 
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
