@@ -232,12 +232,12 @@ else:
      #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
 
-     '<a target="_blank" href = "https://twitter.com/keithccurtis/status/1284232972388962305">'
-     '<code><font size="9"><b>#AskFDA About Quercetin!</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://english.elpais.com/science_tech/2020-07-17/over-half-of-coronavirus-hospital-patients-in-spain-have-developed-neurological-problems-studies-show.html">'
-     '<code><font size="9"><b>Half of Spanish Hospitalized Covid Patients Have Neurological Problems</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.sciencedirect.com/science/article/abs/pii/S0166354219307211?via%3Dihub">'
-     '<code><font size="9"><b>Ivermectin (Non-OTC) Stops Covid-19</b></font></code></a>'
+     '<a target="_blank" href = "https://health.economictimes.indiatimes.com/news/diagnostics/ashwagandha-can-be-effective-covid-19-preventive-drug-finds-research-by-iit-delhi-and-japans-aist/75820118">'
+     '<code><font size="9"><b>Ashwagandha (Ayurvedic Herb) Can Prevent COVID-19</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://youtu.be/xZJixjgu3tk?t=2591">'
+     '<code><font size="9"><b>Dr. Paul Marik Talks Quercetin</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://townhall.com/columnists/johnandandyschlafly/2020/07/15/hydroxychloroquine-should-be-available-over-the-counter-n2572496">'
+     '<code><font size="9"><b>Hydroxychloroquine Should Be Available Over the Counter</b></font></code></a>'
     )
 
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
