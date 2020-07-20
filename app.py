@@ -238,6 +238,10 @@ else:
      '<code><font size="9"><b>Dr. Paul Marik Talks Quercetin</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://townhall.com/columnists/johnandandyschlafly/2020/07/15/hydroxychloroquine-should-be-available-over-the-counter-n2572496">'
      '<code><font size="9"><b>Hydroxychloroquine Should Be Available Over the Counter</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7102583/">'
+     '<code><font size="9"><b>Melatonin Helps Treat Covid-19</b></font></code></a>'
+
+
     )
 
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
