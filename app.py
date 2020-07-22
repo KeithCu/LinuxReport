@@ -21,7 +21,7 @@ sys.path.insert(0,'/srv/http/flask/')
 from feedfilter import prefilter_news
 from shared import RssFeed
 
-LINUX_REPORT = False
+LINUX_REPORT = True
 DEBUG = False
 
 g_app = Flask(__name__)
@@ -155,12 +155,6 @@ ALL_URLS = {
      "https://www.youtube.com/user/Campbellteaching/videos",
      EXPIRE_DAY),
 
-    "https://coronavirus-central.castos.com/feed" :
-     RssInfo("CoronaCastos2.png",
-     "Coronavirus Central Daily Podcast",
-     "http://coronaviruscentral.net",
-     EXPIRE_HOUR * 3),
-
     "https://pandemic.warroom.org/feed/" :
      RssInfo("WarRoom.png",
      "War Room: Pandemic",
@@ -192,7 +186,6 @@ SITE_URLS_CR = [
     "https://gnews.org/feed/",
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w",
-    "https://coronavirus-central.castos.com/feed",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
 ]
 
