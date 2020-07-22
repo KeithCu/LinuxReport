@@ -21,7 +21,7 @@ sys.path.insert(0,'/srv/http/flask/')
 from feedfilter import prefilter_news
 from shared import RssFeed
 
-LINUX_REPORT = True
+LINUX_REPORT = False
 DEBUG = False
 
 g_app = Flask(__name__)
@@ -233,15 +233,15 @@ else:
      #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
 
      '<a target="_blank" href = "https://youtu.be/jmQWOPDqxWA?t=452">'
-     '<code><font size="9"><b>Bill Gates Wrongly Says HydroxyChloroquine Does Not Work!</b></font></code></a>'
+     '<code><font size="9"><b>Bill Gates Wrongly Says Hydroxychloroquine Does Not Work</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/1SesxgaPnpT6OfCYuaFSwXzDK4cDKMbivoALprcVFj48/edit">'
      '<code><font size="9"><b>Dr. Zev Zelenko Letter From March About Hydroxychloroquine + Zinc</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://youtu.be/xZJixjgu3tk?t=2591">'
      #'<code><font size="9"><b>Dr. Paul Marik Talks Quercetin</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://townhall.com/columnists/johnandandyschlafly/2020/07/15/hydroxychloroquine-should-be-available-over-the-counter-n2572496">'
      '<code><font size="9"><b>Hydroxychloroquine Should Be Available Over the Counter</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7102583/">'
-     '<code><font size="9"><b>Melatonin Helps Treat Covid-19</b></font></code></a>'
+     '<br/><hr/><a target="_blank" href = "https://threadreaderapp.com/thread/1249505664398954497.html">'
+     '<code><font size="9"><b>Long List Of  Benefits of Quercetin</b></font></code></a>'
 
 
     )
