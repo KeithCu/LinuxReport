@@ -231,8 +231,8 @@ else:
      #'<code><font size="9"><b>Dr. Zev Zelenko Letter From March About Hydroxychloroquine + Zinc</b></font></code></a>'
      #'<br/><hr/><a target="_blank" href = "https://youtu.be/xZJixjgu3tk?t=2591">'
      #'<code><font size="9"><b>Dr. Paul Marik Talks Quercetin</b></font></code></a>'
-     '<a target="_blank" href = "https://www.youtube.com/watch?v=oaX8-JbaacE">'
-     '<code><font size="9"><b>America Doctors Beg For More People to use Hydroxychloroquine</b></font></code></a>'
+     '<a target="_blank" href = "https://petitions.whitehouse.gov/petition/permitting-over-counter-otc-use-hydroxychloroquine-hcq-protect-against-covid-19-under-emergency-eo">'
+     '<code><font size="9"><b>White House Petition to Make Hydroxychloroquine Available OTC</b></font></code></a>'
      '<br/><hr/><a target="_blank" href = "https://threadreaderapp.com/thread/1249505664398954497.html">'
      '<code><font size="9"><b>Long List Of  Benefits of Quercetin</b></font></code></a>'
 
