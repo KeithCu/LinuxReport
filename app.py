@@ -233,9 +233,8 @@ else:
      #'<code><font size="9"><b>Dr. Paul Marik Talks Quercetin</b></font></code></a>'
      '<a target="_blank" href = "https://petitions.whitehouse.gov/petition/permitting-over-counter-otc-use-hydroxychloroquine-hcq-protect-against-covid-19-under-emergency-eo">'
      '<code><font size="9"><b>White House Petition to Make Hydroxychloroquine Available OTC</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://threadreaderapp.com/thread/1249505664398954497.html">'
-     '<code><font size="9"><b>Long List Of  Benefits of Quercetin</b></font></code></a>'
-
+     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=EeXXe1H8GM8">'
+     '<code><font size="9"><b>Dr. Scarlett Yan Interview</b></font></code></a>'
 
     )
 
