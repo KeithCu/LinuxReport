@@ -4,7 +4,9 @@
 --------------------------------------------------------------------------------
 Simple, customizable and fast Linux and Covid-19 news site based on Python / Flask. Meant to be a http://drudgereport.com/ clone for Linux or Covid-19 news, updated automatically 24/7.
 
-Takes advantage of thread pools and process pools of Apache to be high-performance and scalable. Some people People incorrectly say that Python is slow, but this typically starts returning the page in 2 ms. 
+Takes advantage of thread pools and process pools to be high-performance and scalable. One server Some people People incorrectly say that Python is slow, but this typically starts returning the page in 2 ms.
+
+As of January, 2021, DrudgeReport handles 23 million page-views per day, which is 266 requests per second. Ignoring the images, one [8-core, $160 per month Linode](https://www.linode.com/pricing/) would be able handle all of DrudgeReport's traffic.
 
 Feel free to request more default RSS feeds, or send pull requests.
 
