@@ -1,6 +1,7 @@
 ﻿import sys
 import random
 import json
+from enum import Enum
 import itertools
 # import html
 import os
@@ -16,12 +17,19 @@ from flask import Flask, render_template, Markup, request
 from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, \
                     validators
+from autoscraper import AutoScraper
 
 sys.path.insert(0,'/srv/http/flask/')
 from feedfilter import prefilter_news
 from shared import RssFeed
 
-LINUX_REPORT = True
+class Mode(Enum):
+    LINUX_REPORT = 1
+    COVID_REPORT = 2
+    TECHNO_REPORT = 3
+
+MODE = Mode.TECHNO_REPORT
+
 DEBUG = False
 
 g_app = Flask(__name__)
@@ -35,7 +43,7 @@ if DEBUG or g_app.debug:
     print("Warning, in debug mode")
 
 EXPIRE_HOUR = 3600
-EXPIRE_DAY = 3600 * 6
+EXPIRE_DAY = 3600 * 12
 EXPIRE_WEEK = 86400 * 7
 EXPIRE_YEARS = 86400 * 365 * 2
 
@@ -51,119 +59,152 @@ class RssInfo:
 #Mechanism to throw away old cookies.
 URLS_COOKIE_VERSION = "1"
 
-ALL_URLS = {
+ALL_URLS = {}
 
-    "https://www.reddit.com/r/Coronavirus/rising/.rss" :
-     RssInfo("redditlogosmall.png",
-     "Reddit Corona virus sub",
-     "https://www.reddit.com/r/Coronavirus/",
-     EXPIRE_HOUR),
+if MODE == Mode.COVID_REPORT or MODE == Mode.LINUX_REPORT:
+    ALL_URLS = {
 
-    "https://www.reddit.com/r/China_Flu/rising/.rss" :
-     RssInfo("Coronavirus.jpg",
-     "Reddit China Flu sub",
-     "https://www.reddit.com/r/China_Flu/",
-     EXPIRE_HOUR),
+        "https://www.reddit.com/r/Coronavirus/rising/.rss" :
+        RssInfo("redditlogosmall.png",
+        "Reddit Corona virus sub",
+        "https://www.reddit.com/r/Coronavirus/",
+        EXPIRE_HOUR),
 
-    "http://lxer.com/module/newswire/headlines.rss" :
-     RssInfo("lxer.png",
-     "Lxer news",
-     "http://lxer.com/",
-     EXPIRE_HOUR),
+        "https://www.reddit.com/r/China_Flu/rising/.rss" :
+        RssInfo("Coronavirus.jpg",
+        "Reddit China Flu sub",
+        "https://www.reddit.com/r/China_Flu/",
+        EXPIRE_HOUR),
 
-    "https://www.reddit.com/r/linux/rising/.rss" :
-     RssInfo("redditlogosmall.png",
-     "Reddit Linux sub",
-     "https://www.reddit.com/r/linux",
-     EXPIRE_HOUR * 2),
+        "http://lxer.com/module/newswire/headlines.rss" :
+        RssInfo("lxer.png",
+        "Lxer news",
+        "http://lxer.com/",
+        EXPIRE_DAY * 8),
 
-    "http://rss.slashdot.org/Slashdot/slashdotMain" :
-     RssInfo("slashdotlogo.png",
-     "Slashdot",
-     "https://slashdot.org/",
-     EXPIRE_HOUR * 2),
+        "https://www.reddit.com/r/linux/rising/.rss" :
+        RssInfo("redditlogosmall.png",
+        "Reddit Linux sub",
+        "https://www.reddit.com/r/linux",
+        EXPIRE_DAY * 8),
 
-    "https://lwn.net/headlines/newrss" :
-     RssInfo("barepenguin-70.png",
-     "LWN.net news",
-     "https://lwn.net/",
-     EXPIRE_DAY),
+        "http://rss.slashdot.org/Slashdot/slashdotMain" :
+        RssInfo("slashdotlogo.png",
+        "Slashdot",
+        "https://slashdot.org/",
+        EXPIRE_DAY * 8),
 
-    "https://news.ycombinator.com/rss" :
-     RssInfo("hackernews.jpg",
-     "Ycombinator news",
-     "http://news.ycombinator.com/",
-     EXPIRE_HOUR * 2),
+        "https://lwn.net/headlines/newrss" :
+        RssInfo("barepenguin-70.png",
+        "LWN.net news",
+        "https://lwn.net/",
+        EXPIRE_DAY * 8),
 
-    "https://www.osnews.com/feed/" :
-     RssInfo("osnews-logo.png",
-     "OS News.com",
-     "http://www.osnews.com/",
-     EXPIRE_HOUR * 4),
+        "https://news.ycombinator.com/rss" :
+        RssInfo("hackernews.jpg",
+        "Ycombinator news",
+        "http://news.ycombinator.com/",
+        EXPIRE_DAY * 8),
 
-    "https://www.geekwire.com/feed/" :
-     RssInfo("GeekWire.png",
-     "GeekWire",
-     "http://www.geekwire.com/",
-     EXPIRE_HOUR * 3), #Slow and slow-changing, so fetch less
+        "https://www.osnews.com/feed/" :
+        RssInfo("osnews-logo.png",
+        "OS News.com",
+        "http://www.osnews.com/",
+        EXPIRE_DAY * 8),
 
-    "http://feeds.feedburner.com/linuxtoday/linux" :
-     RssInfo("linuxtd_logo.png",
-     "Linux Today",
-     "http://www.linuxtoday.com/",
-     EXPIRE_HOUR * 3),
+        "https://www.geekwire.com/feed/" :
+        RssInfo("GeekWire.png",
+        "GeekWire",
+        "http://www.geekwire.com/",
+        EXPIRE_DAY * 8), #Slow and slow-changing, so fetch less
 
-    "https://planet.debian.org/rss20.xml" :
-     RssInfo("Debian-OpenLogo.svg",
-     "Planet Debian",
-     "http://planet.debian.org/",
-     EXPIRE_HOUR * 3),
+        "http://feeds.feedburner.com/linuxtoday/linux" :
+        RssInfo("linuxtd_logo.png",
+        "Linux Today",
+        "http://www.linuxtoday.com/",
+        EXPIRE_DAY * 8),
 
-    "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
-     RssInfo("Google-News.png",
-     "Google Coronavirus news",
-     "https://news.google.com/search?q=coronavirus",
-     EXPIRE_HOUR),
+        "https://planet.debian.org/rss20.xml" :
+        RssInfo("Debian-OpenLogo.svg",
+        "Planet Debian",
+        "http://planet.debian.org/",
+        EXPIRE_DAY * 8),
 
-    "http://www.independent.co.uk/topic/coronavirus/rss" :
-     RssInfo("Independent-Corona.png",
-     "Independent UK news",
-     "https://www.independent.co.uk/topic/coronavirus",
-     EXPIRE_HOUR * 3),
+        "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
+        RssInfo("Google-News.png",
+        "Google Coronavirus news",
+        "https://news.google.com/search?q=coronavirus",
+        EXPIRE_HOUR),
 
-    "https://gnews.org/feed/" :
-    RssInfo("gnews.png",
-     "Guo Media news",
-     "https://gnews.org/",
-     EXPIRE_HOUR * 3),
+        "http://www.independent.co.uk/topic/coronavirus/rss" :
+        RssInfo("Independent-Corona.png",
+        "Independent UK news",
+        "https://www.independent.co.uk/topic/coronavirus",
+        EXPIRE_HOUR * 3),
 
-    "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
-     RssInfo("CDC-Logo.png",
-     "Centers for Disease Control",
-     "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
-     EXPIRE_DAY),
+        "https://gnews.org/feed/" :
+        RssInfo("gnews.png",
+        "Guo Media news",
+        "https://gnews.org/",
+        EXPIRE_HOUR * 3),
 
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
-     RssInfo("PeakProsperity.png",
-     "Chris Martenson Peak Prosperity",
-     "https://www.youtube.com/user/ChrisMartensondotcom/videos",
-     EXPIRE_DAY),
+        "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
+        RssInfo("CDC-Logo.png",
+        "Centers for Disease Control",
+        "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
+        EXPIRE_DAY),
 
-    "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
-     RssInfo("JohnCampbell.png",
-     "Dr. John Campbell",
-     "https://www.youtube.com/user/Campbellteaching/videos",
-     EXPIRE_DAY),
+        "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w" :
+        RssInfo("PeakProsperity.png",
+        "Chris Martenson Peak Prosperity",
+        "https://www.youtube.com/user/ChrisMartensondotcom/videos",
+        EXPIRE_DAY),
 
-    "https://pandemic.warroom.org/feed/" :
-     RssInfo("WarRoom.png",
-     "War Room: Pandemic",
-     "https://pandemic.warroom.org/",
-     EXPIRE_HOUR * 3),
+        "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg" :
+        RssInfo("JohnCampbell.png",
+        "Dr. John Campbell",
+        "https://www.youtube.com/user/Campbellteaching/videos",
+        EXPIRE_DAY),
 
-}
+        "https://pandemic.warroom.org/feed/" :
+        RssInfo("WarRoom.png",
+        "War Room: Pandemic",
+        "https://pandemic.warroom.org/",
+        EXPIRE_HOUR * 3),
+    }
 
-SITE_URLS_LR = [
+elif MODE ==  Mode.TECHNO_REPORT:
+    ALL_URLS = {
+
+        "http://detroiteq.com/feed" :
+        RssInfo("deq.png",
+        "Detroit Electronic Quarterly",
+        "http://detroiteq.com/",
+        EXPIRE_DAY),
+
+        "https://www.google.com/alerts/feeds/12151242449143161443/11244181596833604895" :
+        RssInfo("Google-News.png",
+        "Google Detroit Techno news",
+        "https://news.google.com/search?q=detroit techno",
+        EXPIRE_DAY),
+
+        "https://keithcu.com/KeithPrivate0132/" :
+        RssInfo("Custom.png",
+        "RockSteady Disco",
+        "https://rocksteadydisco.bandcamp.com/",
+        EXPIRE_DAY),
+
+        "https://keithcu.com/BandcampTest/" :
+        RssInfo("Custom.png",
+        "Eddie Logix",
+        "https://eddielogix.bandcamp.com/",
+        EXPIRE_DAY),
+
+    }
+
+if MODE == Mode.LINUX_REPORT:
+    feedparser.USER_AGENT = "Linux Report -- http://linuxreport.net/"
+    site_urls = [
     "https://www.reddit.com/r/China_Flu/rising/.rss",
     "http://lxer.com/module/newswire/headlines.rss",
     "https://www.reddit.com/r/linux/rising/.rss",
@@ -175,9 +216,22 @@ SITE_URLS_LR = [
     "http://feeds.feedburner.com/linuxtoday/linux",
     "https://planet.debian.org/rss20.xml",
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
-]
+    ]
 
-SITE_URLS_CR = [
+    URL_IMAGES = "http://linuxreport.net/static/images/"
+    FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
+    LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
+    WEB_TITLE = "Linux Report"
+    WEB_DESCRIPTION = "Linux News"
+    ABOVE_HTML = ''
+    WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
+    '"http://covidreport.keithcu.com/">CovidReport</a></b>) - Fork me on <a target="_blank"'
+    'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
+    'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')
+
+elif MODE == Mode.COVID_REPORT:
+    feedparser.USER_AGENT = "Covid-19 Report -- http://covidreport.net/"
+    site_urls = [
     "https://www.reddit.com/r/Coronavirus/rising/.rss",
     "https://www.reddit.com/r/China_Flu/rising/.rss",
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
@@ -187,65 +241,39 @@ SITE_URLS_CR = [
     "https://tools.cdc.gov/api/v2/resources/media/403372.rss",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
-]
-
-if LINUX_REPORT:
-    feedparser.USER_AGENT = "Linux Report -- http://linuxreport.net/"
-    site_urls = SITE_URLS_LR
-    URL_IMAGES = "http://linuxreport.net/static/images/"
-    FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
-    LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
-    WEB_TITLE = "Linux Report"
-    WEB_DESCRIPTION = "Linux News"
-    ABOVE_HTML = (''
-    #'<a target="_blank" href = "https://keithcu.com/wordpress/?page_id=407">'
-    #'<code><font size="6"><b>Software Wars Free Download</b></font></code></a>'
-    )
-    WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
-    '"http://covidreport.net/">CovidReport</a></b>) - Fork me on <a target="_blank"'
-    'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
-    'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')
-else:
-    feedparser.USER_AGENT = "Covid-19 Report -- http://covidreport.net/"
-    site_urls = SITE_URLS_CR
-    URL_IMAGES = "http://covidreport.net/static/images/"
-    FAVICON = "http://covidreport.net/static/images/covidreport192.ico"
-    LOGO_URL = "http://covidreport.net/static/images/CovidReport.png"
+    ]
+    URL_IMAGES = "http://covidreport.keithcu.com/static/images/"
+    FAVICON = "http://covidreport.keithcu.com//static/images/covidreport192.ico"
+    LOGO_URL = "http://covidreport.keithcu.com/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
-    ABOVE_HTML = (''
-         #'<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">'
-     #'<code><font size="6"><b>Help Me Update Headlines -- Just requires changing HTML in a text file...</b></font></code></a>'
-        #'<a target = "_blank" href = "http://covidreport.net/static/covidactivities.html"><img width = "500" src = "http://covidreport.net/static/images/Exercise.jpg"/></a><br/>'
-          #'<a target = "_blank" href = "https://archive.is/8SYhJ"><img width = "500" src = "http://covidreport.net/static/images/USSTeddyRoosevelt.jpg"/></a><br/>'
-     #'<iframe width="385" height="216" src="https://www.youtube.com/embed/6EQXhViMBdg" frameborder="0" allow="accelerometer; '
-     #'autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe><br/>'
-    #'<a target="_blank" href = "https://keithcu.com/wordpress/?page_id=407">'
-    # '<code><font size="6"><b>Software Wars Free Download</b></font></code></a>'
-     #'<br/><hr/><a target="_blank" href = "https://journals.plos.org/plospathogens/article?id=10.1371/journal.ppat.1001176">'
-     #'<code><font size="9"><b>And In-Vitro Studies Showing how it Enables Zinc to Stop Viral Replication</b></font></code></a>'
-
-     #'<a target="_blank" href = "https://youtu.be/jmQWOPDqxWA?t=452">'
-     #'<code><font size="9"><b>Bill Gates Wrongly Says Hydroxychloroquine Does Not Work</b></font></code></a>'
-     #'<br/><hr/><a target="_blank" href = "https://docs.google.com/document/d/1SesxgaPnpT6OfCYuaFSwXzDK4cDKMbivoALprcVFj48/edit">'
-     #'<code><font size="9"><b>Dr. Zev Zelenko Letter From March About Hydroxychloroquine + Zinc</b></font></code></a>'
-     #'<br/><hr/><a target="_blank" href = "https://youtu.be/xZJixjgu3tk?t=2591">'
-     #'<code><font size="9"><b>Dr. Paul Marik Talks Quercetin</b></font></code></a>'
-     '<a target="_blank" href = "https://petitions.whitehouse.gov/petition/permitting-over-counter-otc-use-hydroxychloroquine-hcq-protect-against-covid-19-under-emergency-eo">'
-     '<code><font size="9"><b>White House Petition to Make Hydroxychloroquine Available OTC</b></font></code></a>'
-     '<br/><hr/><a target="_blank" href = "https://www.youtube.com/watch?v=EeXXe1H8GM8">'
-     '<code><font size="9"><b>Dr. Scarlett Yan Interview</b></font></code></a>'
-
-    )
-
+    ABOVE_HTML = ''
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
 
-    WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" '
-    'href = "http://linuxreport.net/">LinuxReport</a></b>) - Fork me on '
+    WELCOME_HTML = ('<font size="4">(Refreshes hourly) - Fork me on '
     '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
     ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>')
 #    '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>')
+
+elif MODE == Mode.TECHNO_REPORT:
+    base_url = "http://news.thedetroitilove.com/"
+    feedparser.USER_AGENT = "Detroit Techno Report -- " + base_url
+    site_urls = [
+    "http://detroiteq.com/feed",
+    "https://www.google.com/alerts/feeds/12151242449143161443/11244181596833604895",
+    "https://keithcu.com/KeithPrivate0132/",
+    "https://keithcu.com/BandcampTest/",
+    ]
+
+    URL_IMAGES = base_url + "static/images/"
+    FAVICON = base_url + "static/images/covidreport192.ico"
+    LOGO_URL = base_url + "static/images/TechnoReport.png"
+    WEB_DESCRIPTION = "Detroit Techno News"
+    WEB_TITLE = "TechnoReport"
+    ABOVE_HTML = ''
+
+    WELCOME_HTML = ('<font size="4">(Refreshes Daily)</font>')
 
 EXPIRE_FILE = False
 class FSCache():
@@ -289,7 +317,7 @@ class MEMCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'memcached', })
 
-    def normalize_url(url):
+    def normalize_url(self, url):
         if len(url) > 250:
             url = hash(url)
         return url
@@ -349,7 +377,6 @@ def filtersimilarTitles(url, entries):
     return entries
 
 
-
 def load_url_worker(url):
     rss_info = ALL_URLS[url]
 
@@ -365,46 +392,87 @@ def load_url_worker(url):
     if feedpid == os.getpid():
         start = timer()
 
-        etag = ''
-        last_modified = datetime.utcnow() - timedelta(seconds=EXPIRE_YEARS)
+        if "bandcamp" in url or "keithcu" in url:
+            scraper = AutoScraper()
 
-        rssfeed = g_c.get(url)
-        if rssfeed != None:
-            etag = rssfeed.etag
-            last_modified = rssfeed.last_modified
+            result2 = []
+            try:
+                scraper.load('bandcamp-scrape')
+                result2 = scraper.get_result_similar(url, grouped=True)
 
-        res = feedparser.parse(url, etag=etag, modified=last_modified)
+            except:
+                #Special strings to trigger the proper auto-parsing for bandcamp
+                #Hard-coded for Rocksteady disco.
+                url_rocksteady = 'https://keithcu.com/KeithPrivate0132/'
+                wanted_list = ['https://keithcu.com/album/rsd020-abc-versions',
+                                'RSD020 // ABC Versions']
+                result = scraper.build(url=url_rocksteady, wanted_list=wanted_list)
+                result2 = scraper.get_result_similar(url_rocksteady, grouped=True)
+                scraper.save('bandcamp-scrape')
 
-        #No content changed:
-        if rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
-            print("No new info parsing from: %s, etag: %s, last_modified: %s." %(url, etag, last_modified))
+                #Now that the model is build, try again for the proper URL
+                result = scraper.build(url=url, wanted_list=wanted_list)
+                result2 = scraper.get_result_similar(url, grouped=True)
 
+            #Format received: dictionary containing two lists
+            #Format needed: list containing dictionary entries for title and link                
+            rules = list(result2.keys())
+            rule1 = rules[0]
+            rule2 = rules[1]
+
+            rss_feed = []
+            for entry_url, entry_title in zip(result2[rule1], result2[rule2]):
+                entry_dict = {"title" : entry_title, "link" : entry_url}
+                rss_feed.append(entry_dict)
+
+            entries = list(itertools.islice(rss_feed, 8))
+
+            rssfeed = RssFeed(entries)
             rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+
             g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
-            if EXPIRE_FILE:
-                g_c.put(url + ":EXPIRES", rssfeed.expiration, timeout=EXPIRE_WEEK)
-            g_c.delete(url + "FETCHPID")
-            return
 
-        entries = prefilter_news(url, res)
+        else:
+            etag = ''
+            last_modified = datetime.utcnow() - timedelta(seconds=EXPIRE_YEARS)
 
-        entries = filtersimilarTitles(url, entries)
+            rssfeed = g_c.get(url)
+            if rssfeed != None:
+                etag = rssfeed.etag
+                last_modified = rssfeed.last_modified
 
-        entries = list(itertools.islice(entries, 8))
+            res = feedparser.parse(url, etag=etag, modified=last_modified)
 
-        if len(entries) <= 2 and rss_info.logo_url != "Custom.png":
-            print("Failed to fetch %s, retry in 30 minutes." %(url))
-            expire_time = 60 * 30
+            #No content changed:
+            if rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
+                print("No new info parsing from: %s, etag: %s, last_modified: %s." %(url, etag, last_modified))
 
-        rssfeed = RssFeed(entries)
-        rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
-        if hasattr(res, 'etag'):
-            rssfeed.etag = res.etag
+                rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+                g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
+                if EXPIRE_FILE:
+                    g_c.put(url + ":EXPIRES", rssfeed.expiration, timeout=EXPIRE_WEEK)
+                g_c.delete(url + "FETCHPID")
+                return
 
-        if hasattr(res, 'modified'):
-            rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.modified_parsed))
-        elif res.feed.get('updated_parsed', None) is not None:
-            rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.feed.updated_parsed))
+            entries = prefilter_news(url, res)
+
+            entries = filtersimilarTitles(url, entries)
+
+            entries = list(itertools.islice(entries, 8))
+
+            if len(entries) <= 2 and rss_info.logo_url != "Custom.png":
+                print("Failed to fetch %s, retry in 30 minutes." %(url))
+                expire_time = 60 * 30
+
+            rssfeed = RssFeed(entries)
+            rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+            if hasattr(res, 'etag'):
+                rssfeed.etag = res.etag
+
+            if hasattr(res, 'modified'):
+                rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.modified_parsed))
+            elif res.feed.get('updated_parsed', None) is not None:
+                rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.feed.updated_parsed))
 
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
         if EXPIRE_FILE:
@@ -439,7 +507,7 @@ def wait_and_set_fetch_mode():
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
         for future in concurrent.futures.as_completed(future_to_url):
