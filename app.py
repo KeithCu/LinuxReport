@@ -182,7 +182,7 @@ elif MODE ==  Mode.TECHNO_REPORT:
         "http://detroiteq.com/",
         EXPIRE_DAY),
 
-        "https://www.google.com/alerts/feeds/12151242449143161443/11244181596833604895" :
+        "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530" :
         RssInfo("Google-News.png",
         "Google Detroit Techno news",
         "https://news.google.com/search?q=detroit techno",
@@ -261,7 +261,7 @@ elif MODE == Mode.TECHNO_REPORT:
     feedparser.USER_AGENT = "Detroit Techno Report -- " + base_url
     site_urls = [
     "http://detroiteq.com/feed",
-    "https://www.google.com/alerts/feeds/12151242449143161443/11244181596833604895",
+    "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530",
     "https://keithcu.com/KeithPrivate0132/",
     "https://keithcu.com/BandcampTest/",
     ]
@@ -397,7 +397,7 @@ def load_url_worker(url):
 
             result2 = []
             try:
-                scraper.load('bandcamp-scrape')
+                scraper.load('/tmp/bandcamp-scrape')
                 result2 = scraper.get_result_similar(url, grouped=True)
 
             except:
@@ -408,10 +408,12 @@ def load_url_worker(url):
                                 'RSD020 // ABC Versions']
                 result = scraper.build(url=url_rocksteady, wanted_list=wanted_list)
                 result2 = scraper.get_result_similar(url_rocksteady, grouped=True)
-                scraper.save('bandcamp-scrape')
+                scraper.save('/tmp/bandcamp-scrape')
 
                 #Now that the model is build, try again for the proper URL
-                result = scraper.build(url=url, wanted_list=wanted_list)
+                scraper = AutoScraper()
+                scraper.load('/tmp/bandcamp-scrape')
+                #result = scraper.build(url=url, wanted_list=wanted_list)
                 result2 = scraper.get_result_similar(url, grouped=True)
 
             #Format received: dictionary containing two lists
