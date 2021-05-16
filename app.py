@@ -49,6 +49,8 @@ EXPIRE_YEARS = 86400 * 365 * 2
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 
+MAX_ITEMS = 8
+
 class RssInfo:
     def __init__(self, logo_url, logo_alt, site_url, expire_time):
         self.logo_url = logo_url
@@ -265,6 +267,7 @@ elif MODE == Mode.COVID_REPORT:
     LOGO_URL = "http://covidreport.keithcu.com/static/images/CovidReport.png"
     WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
     WEB_TITLE = "COVID-19 Report"
+
     ABOVE_HTML = ''
     # '<video controls preload="metadata" src="http://covidreport.net/static/images/Humany.mp4" autostart="false"'
     # 'width="385" height = "216" </video><a href = "https://www.youtube.com/channel/UCx_JS-Fzrq-bXUYP0mk9Zag/videos">src</a>')
@@ -286,6 +289,8 @@ elif MODE == Mode.TECHNO_REPORT:
     "https://keithcu.com/PlanetETest",
     "https://keithcu.com/SampledDetroitTest",
     ]
+
+    MAX_ITEMS = 11
 
     URL_IMAGES = base_url + "static/images/"
     FAVICON = base_url + "static/images/covidreport192.ico"
@@ -450,7 +455,7 @@ def load_url_worker(url):
                 entry_dict = {"title" : entry_title, "link" : entry_url}
                 rss_feed.append(entry_dict)
 
-            entries = list(itertools.islice(rss_feed, 8))
+            entries = list(itertools.islice(rss_feed, MAX_ITEMS))
 
             rssfeed = RssFeed(entries)
             rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
@@ -483,7 +488,7 @@ def load_url_worker(url):
 
             entries = filtersimilarTitles(url, entries)
 
-            entries = list(itertools.islice(entries, 8))
+            entries = list(itertools.islice(entries, MAX_ITEMS))
 
             if len(entries) <= 2 and rss_info.logo_url != "Custom.png":
                 print("Failed to fetch %s, retry in 30 minutes." %(url))
