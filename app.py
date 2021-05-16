@@ -290,11 +290,13 @@ elif MODE == Mode.TECHNO_REPORT:
     URL_IMAGES = base_url + "static/images/"
     FAVICON = base_url + "static/images/covidreport192.ico"
     LOGO_URL = base_url + "static/images/TechnoReport.png"
-    WEB_DESCRIPTION = "Detroit Techno News"
-    WEB_TITLE = "TechnoReport"
-    ABOVE_HTML = ''
+    WEB_DESCRIPTION = "Detroit Techno, Arts and Events News"
+    WEB_TITLE = "The Detroit Report"
+    ABOVE_HTML_FILE = "detroitreportabove.html"
 
     WELCOME_HTML = ('<font size="4">(Refreshes Daily)</font>')
+
+
 
 EXPIRE_FILE = False
 class FSCache():
@@ -675,7 +677,8 @@ def index():
     if no_underlines:
         text_decoration = "text-decoration:none;"
 
-    above_html = ABOVE_HTML
+    above_html = str(open(ABOVE_HTML_FILE).read())
+
     if not single_column:
         above_html = above_html.replace("<hr/>", "")
 
