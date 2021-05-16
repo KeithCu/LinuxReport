@@ -220,6 +220,12 @@ elif MODE ==  Mode.TECHNO_REPORT:
         "https://sampleddetroit.bandcamp.com/music",
         EXPIRE_DAY),
 
+        "https://keithcu.com/WomenOnWaxTest/" :
+        RssInfo("womenonwax.png",
+        "Women On Wax",
+        "https://womenonwax.com/",
+        EXPIRE_DAY),
+
     }
 
 if MODE == Mode.LINUX_REPORT:
@@ -279,7 +285,7 @@ elif MODE == Mode.COVID_REPORT:
 
 elif MODE == Mode.TECHNO_REPORT:
     base_url = "http://news.thedetroitilove.com/"
-    feedparser.USER_AGENT = "Detroit Techno Report -- " + base_url
+    feedparser.USER_AGENT = "The Detroit Techno Report -- " + base_url
     site_urls = [
     "http://detroiteq.com/feed",
     "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530",
@@ -288,6 +294,7 @@ elif MODE == Mode.TECHNO_REPORT:
     "https://placeintimeandspace.com/feed/",
     "https://keithcu.com/PlanetETest",
     "https://keithcu.com/SampledDetroitTest",
+    "https://keithcu.com/WomenOnWaxTest/",
     ]
 
     MAX_ITEMS = 11
@@ -300,7 +307,6 @@ elif MODE == Mode.TECHNO_REPORT:
     ABOVE_HTML_FILE = "detroitreportabove.html"
 
     WELCOME_HTML = ('<font size="4">(Refreshes Daily)</font>')
-
 
 
 EXPIRE_FILE = False
@@ -420,7 +426,44 @@ def load_url_worker(url):
     if feedpid == os.getpid():
         start = timer()
 
-        if "bandcamp" in url or "keithcu" in url:
+        if "Women" in url: #Special work for the women...
+            scraper = AutoScraper()
+
+            result2 = []
+            try:
+                scraper.load('/tmp/wowax-scrape')
+                result2 = scraper.get_result_similar(url, grouped=True)
+
+            except:
+                #Special strings to trigger the proper auto-parsing for Women On Wax
+                url_rocksteady = 'https://keithcu.com/WomenOnWaxTest/'
+                wanted_list = ['https://www.traxsource.com/title/1492869/blind-amerikkka',
+                                'Blind Amerikkka']
+                result = scraper.build(url=url_rocksteady, wanted_list=wanted_list)
+                result2 = scraper.get_result_similar(url_rocksteady, grouped=True)
+                scraper.save('/tmp/wowax-scrape')
+
+            #Format received: dictionary containing two lists
+            #Format needed: list containing dictionary entries for title and link                
+            rules = list(result2.keys())
+            rule1 = rules[0]
+            rule2 = rules[1]
+
+            rss_feed = []
+            for entry_url, entry_title in zip(result2[rule1], result2[rule2]):
+                entry_dict = {"title" : entry_title, "link" : entry_url}
+                rss_feed.append(entry_dict)
+
+            #Put them in reverse order
+            entries = list(reversed(rss_feed))
+            entries = list(itertools.islice(entries, MAX_ITEMS))
+
+            rssfeed = RssFeed(entries)
+            rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+
+            g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
+
+        elif "bandcamp" in url or "keithcu" in url:
             scraper = AutoScraper()
 
             result2 = []
