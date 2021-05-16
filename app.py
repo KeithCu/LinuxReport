@@ -191,13 +191,31 @@ elif MODE ==  Mode.TECHNO_REPORT:
         "https://keithcu.com/KeithPrivate0132/" :
         RssInfo("Custom.png",
         "RockSteady Disco",
-        "https://rocksteadydisco.bandcamp.com/",
+        "https://rocksteadydisco.bandcamp.com/music",
         EXPIRE_DAY),
 
-        "https://keithcu.com/BandcampTest/" :
+        "https://keithcu.com/BandcampTest2/" :
         RssInfo("Custom.png",
-        "Eddie Logix",
-        "https://eddielogix.bandcamp.com/",
+        "Transmat",
+        "https://transmatdetroit.bandcamp.com/music",
+        EXPIRE_DAY),
+
+        "https://placeintimeandspace.com/feed/" :
+        RssInfo("Custom.png",
+        "Place In Time And Space",
+        "https://placeintimeandspace.com/",
+        EXPIRE_DAY),
+
+        "https://keithcu.com/PlanetETest" :
+        RssInfo("Custom.png",
+        "Planet-E Communications",
+        "https://planetecommunications.bandcamp.com/music",
+        EXPIRE_DAY),
+
+        "https://keithcu.com/SampledDetroitTest" :
+        RssInfo("Custom.png",
+        "Sampled Detroit",
+        "https://sampleddetroit.bandcamp.com/music",
         EXPIRE_DAY),
 
     }
@@ -263,7 +281,10 @@ elif MODE == Mode.TECHNO_REPORT:
     "http://detroiteq.com/feed",
     "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530",
     "https://keithcu.com/KeithPrivate0132/",
-    "https://keithcu.com/BandcampTest/",
+    "https://keithcu.com/BandcampTest2/",
+    "https://placeintimeandspace.com/feed/",
+    "https://keithcu.com/PlanetETest",
+    "https://keithcu.com/SampledDetroitTest",
     ]
 
     URL_IMAGES = base_url + "static/images/"
