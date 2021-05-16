@@ -284,7 +284,7 @@ elif MODE == Mode.COVID_REPORT:
 #    '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>')
 
 elif MODE == Mode.TECHNO_REPORT:
-    base_url = "http://news.thedetroitilove.com/"
+    base_url = "https://news.thedetroitilove.com/"
     feedparser.USER_AGENT = "The Detroit Techno Report -- " + base_url
     site_urls = [
     "http://detroiteq.com/feed",
