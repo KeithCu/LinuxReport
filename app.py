@@ -189,31 +189,31 @@ elif MODE ==  Mode.TECHNO_REPORT:
         EXPIRE_DAY),
 
         "https://keithcu.com/KeithPrivate0132/" :
-        RssInfo("Custom.png",
+        RssInfo("RockSteadyDisco.png",
         "RockSteady Disco",
         "https://rocksteadydisco.bandcamp.com/music",
         EXPIRE_DAY),
 
         "https://keithcu.com/BandcampTest2/" :
-        RssInfo("Custom.png",
+        RssInfo("Transmat.png",
         "Transmat",
         "https://transmatdetroit.bandcamp.com/music",
         EXPIRE_DAY),
 
         "https://placeintimeandspace.com/feed/" :
-        RssInfo("Custom.png",
+        RssInfo("pits.png",
         "Place In Time And Space",
         "https://placeintimeandspace.com/",
         EXPIRE_DAY),
 
         "https://keithcu.com/PlanetETest" :
-        RssInfo("Custom.png",
+        RssInfo("planete.png",
         "Planet-E Communications",
         "https://planetecommunications.bandcamp.com/music",
         EXPIRE_DAY),
 
         "https://keithcu.com/SampledDetroitTest" :
-        RssInfo("Custom.png",
+        RssInfo("SampledDetroit.png",
         "Sampled Detroit",
         "https://sampleddetroit.bandcamp.com/music",
         EXPIRE_DAY),
