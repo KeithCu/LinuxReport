@@ -190,7 +190,7 @@ elif MODE ==  Mode.TECHNO_REPORT:
         "https://news.google.com/search?q=detroit techno",
         EXPIRE_DAY),
 
-        "https://keithcu.com/KeithPrivate0132/" :
+        "https://keithcu.com/BandcampTestRS/" :
         RssInfo("RockSteadyDisco.png",
         "RockSteady Disco",
         "https://rocksteadydisco.bandcamp.com/music",
@@ -284,12 +284,14 @@ elif MODE == Mode.COVID_REPORT:
 #    '<font size = "5"><i><a target = "_blank" href = "https://ncov2019.live/">ncov2019.live</a></i></font>')
 
 elif MODE == Mode.TECHNO_REPORT:
-    base_url = "https://news.thedetroitilove.com/"
+    base_url = "http://news.thedetroitilove.com/"
+    FAVICON = "http://news.thedetroitilove.com/static/images/technoreport.ico"
+
     feedparser.USER_AGENT = "The Detroit Techno Report -- " + base_url
     site_urls = [
     "http://detroiteq.com/feed",
     "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530",
-    "https://keithcu.com/KeithPrivate0132/",
+    "https://keithcu.com/BandcampTestRS/",
     "https://keithcu.com/BandcampTest2/",
     "https://placeintimeandspace.com/feed/",
     "https://keithcu.com/PlanetETest",
@@ -304,7 +306,7 @@ elif MODE == Mode.TECHNO_REPORT:
     LOGO_URL = base_url + "static/images/TechnoReport.png"
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News"
     WEB_TITLE = "The Detroit Report"
-    ABOVE_HTML_FILE = "detroitreportabove.html"
+    ABOVE_HTML_FILE = "/srv/http/flask/detroitreportabove.html"
 
     WELCOME_HTML = ('<font size="4">(Refreshes Daily)</font>')
 
@@ -436,11 +438,11 @@ def load_url_worker(url):
 
             except:
                 #Special strings to trigger the proper auto-parsing for Women On Wax
-                url_rocksteady = 'https://keithcu.com/WomenOnWaxTest/'
+                url_wow = 'https://keithcu.com/WomenOnWaxTest/'
                 wanted_list = ['https://www.traxsource.com/title/1492869/blind-amerikkka',
                                 'Blind Amerikkka']
-                result = scraper.build(url=url_rocksteady, wanted_list=wanted_list)
-                result2 = scraper.get_result_similar(url_rocksteady, grouped=True)
+                result = scraper.build(url=url_wow, wanted_list=wanted_list)
+                result2 = scraper.get_result_similar(url_wow, grouped=True)
                 scraper.save('/tmp/wowax-scrape')
 
             #Format received: dictionary containing two lists
@@ -474,7 +476,7 @@ def load_url_worker(url):
             except:
                 #Special strings to trigger the proper auto-parsing for bandcamp
                 #Hard-coded for Rocksteady disco.
-                url_rocksteady = 'https://keithcu.com/KeithPrivate0132/'
+                url_rocksteady = 'https://keithcu.com/BandcampTestRS/'
                 wanted_list = ['https://keithcu.com/album/rsd020-abc-versions',
                                 'RSD020 // ABC Versions']
                 result = scraper.build(url=url_rocksteady, wanted_list=wanted_list)
