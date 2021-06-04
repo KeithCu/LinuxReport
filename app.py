@@ -285,7 +285,6 @@ elif MODE == Mode.COVID_REPORT:
 
 elif MODE == Mode.TECHNO_REPORT:
     base_url = "http://news.thedetroitilove.com/"
-    FAVICON = "http://news.thedetroitilove.com/static/images/technoreport.ico"
 
     feedparser.USER_AGENT = "The Detroit Techno Report -- " + base_url
     site_urls = [
@@ -302,8 +301,8 @@ elif MODE == Mode.TECHNO_REPORT:
     MAX_ITEMS = 11
 
     URL_IMAGES = base_url + "static/images/"
-    FAVICON = base_url + "static/images/covidreport192.ico"
-    LOGO_URL = base_url + "static/images/TechnoReport.png"
+    FAVICON = URL_IMAGES + "technoreport.ico"
+    LOGO_URL = URL_IMAGES + "TechnoReport.png"
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News"
     WEB_TITLE = "The Detroit Report"
     ABOVE_HTML_FILE = "/srv/http/flask/detroitreportabove.html"
