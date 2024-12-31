@@ -18,6 +18,7 @@ from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, \
                     validators
 from autoscraper import AutoScraper
+import difflib
 
 sys.path.insert(0,'/srv/http/flask/')
 from feedfilter import prefilter_news
@@ -133,7 +134,6 @@ class MEMCache():
 
 #If we've seen this title in other feeds, then filter it.
 def filtersimilarTitles(url, entries):
-
     feed_alt = None
 
     if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
@@ -146,21 +146,18 @@ def filtersimilarTitles(url, entries):
         entries_c = entries.copy()
 
         for entry in entries_c:
-            entry_set = set(entry.title.split())
-
+            entry_words = sorted(entry.title.split())
             for entry_alt in feed_alt.entries:
-                entry_alt_set = set(entry_alt.title.split())
-                c = entry_set.intersection(entry_alt_set)
-                dist = float(len(c)) / (len(entry_set) + len(entry_alt_set) - len(c))
-#                dist = jellyfish.jaro_winkler(entry.title, entry_alt.title)
-                if dist > 0.20:
-                    print ("Similar title: 1: %s, 2: %s, diff: %s." %(entry.title, entry_alt.title, str(dist)))
-                    try: #Entry could have been removed by another similar title
+                entry_alt_words = sorted(entry_alt.title.split())
+                similarity = difflib.SequenceMatcher(None, entry_words, entry_alt_words).ratio()
+                if similarity > 0.7:  # Adjust the threshold as needed
+                    print(f"Similar title: 1: {entry.title}, 2: {entry_alt.title}, similarity: {similarity}.")
+                    try:  # Entry could have been removed by another similar title
                         entries.remove(entry)
                     except:
                         pass
                     else:
-                        print ("Deleted title.")
+                        print("Deleted title.")
 
     return entries
 
