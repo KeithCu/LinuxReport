@@ -1,3 +1,5 @@
+from shared import RssInfo, EXPIRE_DAY
+
 ALL_URLS = {
     "http://detroiteq.com/feed" :
     RssInfo("deq.png",
@@ -48,7 +50,7 @@ ALL_URLS = {
     EXPIRE_DAY),
 }
 
-feedparser.USER_AGENT = "The Detroit Techno Report -- http://news.thedetroitilove.com/"
+USER_AGENT = "The Detroit Techno Report -- http://news.thedetroitilove.com/"
 site_urls = [
     "http://detroiteq.com/feed",
     "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530",

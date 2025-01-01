@@ -1,3 +1,5 @@
+from shared import RssInfo, EXPIRE_HOUR, EXPIRE_DAY
+
 ALL_URLS = {
     "https://www.reddit.com/r/Coronavirus/rising/.rss" :
     RssInfo("redditlogosmall.png",
@@ -54,7 +56,7 @@ ALL_URLS = {
     EXPIRE_DAY),
 }
 
-feedparser.USER_AGENT = "Covid-19 Report -- http://covidreport.net/"
+USER_AGENT = "Covid-19 Report -- http://covidreport.net/"
 site_urls = [
     "https://www.reddit.com/r/Coronavirus/rising/.rss",
     "https://www.reddit.com/r/China_Flu/rising/.rss",

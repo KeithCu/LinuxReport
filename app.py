@@ -1,35 +1,35 @@
 ﻿import sys
-import random
-import json
-from enum import Enum
-import itertools
-# import html
 import os
 import time
-from datetime import datetime, timedelta
+import json
 import socket
+import random
 import threading
-from timeit import default_timer as timer
+import itertools
 import concurrent.futures
-import feedparser
-from flask_mobility import Mobility
-from flask import Flask, render_template, Markup, request
-from flask_caching import Cache
-from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, \
-                    validators
-from autoscraper import AutoScraper
+from enum import Enum
+from datetime import datetime, timedelta
+from timeit import default_timer as timer
 import difflib
 
-sys.path.insert(0,'/srv/http/flask/')
+import feedparser
+from flask import Flask, render_template, request
+from flask_mobility import Mobility
+from flask_caching import Cache
+from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators
+from markupsafe import Markup
+from autoscraper import AutoScraper
+
+sys.path.insert(0, '/srv/http/flask/')
 from feedfilter import prefilter_news
-from shared import RssFeed, RssInfo
+from shared import RssFeed, RssInfo, EXPIRE_MINUTES, EXPIRE_HOUR, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS
 
 class Mode(Enum):
     LINUX_REPORT = 1
     COVID_REPORT = 2
     TECHNO_REPORT = 3
 
-MODE = Mode.TECHNO_REPORT
+MODE = Mode.COVID_REPORT
 
 DEBUG = False
 
@@ -37,16 +37,9 @@ g_app = Flask(__name__)
 Mobility(g_app)
 application = g_app
 
-EXPIRE_MINUTES = 60 * 5
-
 if DEBUG or g_app.debug:
     EXPIRE_MINUTES = 1
     print("Warning, in debug mode")
-
-EXPIRE_HOUR = 3600
-EXPIRE_DAY = 3600 * 12
-EXPIRE_WEEK = 86400 * 7
-EXPIRE_YEARS = 86400 * 365 * 2
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 
@@ -64,6 +57,7 @@ elif MODE == Mode.COVID_REPORT:
 elif MODE == Mode.TECHNO_REPORT:
     from techno_report_settings import *
 
+feedparser.USER_AGENT = USER_AGENT
 EXPIRE_FILE = False
 class FSCache():
     def __init__(self):
@@ -176,8 +170,10 @@ def load_url_worker(url):
 
     if feedpid == os.getpid():
         start = timer()
+        rssfeed = None
 
         if "Women" in url: #Special work for the women...
+            pass
             scraper = AutoScraper()
 
             result2 = []
@@ -215,6 +211,7 @@ def load_url_worker(url):
             g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
 
         elif "bandcamp" in url or "keithcu" in url:
+            pass
             scraper = AutoScraper()
 
             result2 = []
@@ -305,9 +302,9 @@ def load_url_worker(url):
         if len(entries) > 2:
             g_c.delete(rss_info.site_url)
 
+        print("Parsing from: %s, etag: %s, last-modified %s, in %f." %(url, rssfeed.etag, rssfeed.last_modified, end - start))
         g_c.delete(url + "FETCHPID")
         end = timer()
-        print("Parsing from: %s, etag: %s, last-modified %s, in %f." %(url, rssfeed.etag, rssfeed.last_modified, end - start))
     else:
         print("Waiting for someone else to parse remote site %s" %(url))
 
@@ -386,9 +383,9 @@ def index():
     suffix = ""
     single_column = False
 
-    if request.MOBILE:
-        suffix = ":MOBILE"
-        single_column = True
+    # if request.MOBILE:
+    #     suffix = ":MOBILE"
+    #     single_column = True
 
     if dark_mode:
         suffix = suffix + ":DARK"

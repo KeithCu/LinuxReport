@@ -1,3 +1,5 @@
+from shared import RssInfo, EXPIRE_HOUR, EXPIRE_DAY
+
 ALL_URLS = {
     "https://www.reddit.com/r/Coronavirus/rising/.rss" :
     RssInfo("redditlogosmall.png",
@@ -108,7 +110,7 @@ ALL_URLS = {
     EXPIRE_HOUR * 3),
 }
 
-feedparser.USER_AGENT = "Linux Report -- http://linuxreport.net/"
+USER_AGENT = "Linux Report -- http://linuxreport.net/"
 site_urls = [
     "https://www.reddit.com/r/China_Flu/rising/.rss",
     "http://lxer.com/module/newswire/headlines.rss",
