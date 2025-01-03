@@ -20,7 +20,7 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
 from markupsafe import Markup
 from autoscraper import AutoScraper
 
-sys.path.insert(0, '/srv/http/flask/')
+sys.path.insert(0, '/srv/http/LinuxReport2/')
 from feedfilter import prefilter_news
 from shared import RssFeed, RssInfo, EXPIRE_MINUTES, EXPIRE_HOUR, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS
 
@@ -29,7 +29,7 @@ class Mode(Enum):
     COVID_REPORT = 2
     TECHNO_REPORT = 3
 
-MODE = Mode.COVID_REPORT
+MODE = Mode.LINUX_REPORT
 
 DEBUG = False
 
@@ -302,9 +302,10 @@ def load_url_worker(url):
         if len(entries) > 2:
             g_c.delete(rss_info.site_url)
 
-        print("Parsing from: %s, etag: %s, last-modified %s, in %f." %(url, rssfeed.etag, rssfeed.last_modified, end - start))
         g_c.delete(url + "FETCHPID")
         end = timer()
+        print("Parsing from: %s, etag: %s, last-modified %s, in %f." %(url, rssfeed.etag, rssfeed.last_modified, end - start))
+
     else:
         print("Waiting for someone else to parse remote site %s" %(url))
 
