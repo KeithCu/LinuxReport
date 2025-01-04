@@ -20,7 +20,6 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
 from markupsafe import Markup
 from autoscraper import AutoScraper
 
-sys.path.insert(0, '/srv/http/LinuxReport2/')
 from feedfilter import prefilter_news
 from shared import RssFeed, RssInfo, EXPIRE_MINUTES, EXPIRE_HOUR, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS
 
@@ -30,6 +29,8 @@ class Mode(Enum):
     TECHNO_REPORT = 3
 
 MODE = Mode.LINUX_REPORT
+
+sys.path.insert(0, '/srv/http/LinuxReport2/')
 
 DEBUG = False
 
@@ -94,38 +95,6 @@ class FSCache():
     def delete(self, url):
         self._cache.delete(url)
 
-# Alternate backend using memcached. It is 2x slower without the page cache, and 15% slower with,
-# so don't bother for now.
-class MEMCache():
-    def __init__(self):
-        self._cache = Cache(g_app, config={'CACHE_TYPE': 'memcached', })
-
-    def normalize_url(self, url):
-        if len(url) > 250:
-            url = hash(url)
-        return url
-
-    def put(self, url, template, timeout):
-        url = normalize_url(url)
-        self._cache.set(url, template, timeout)
-
-    def has(self, url):
-        url = normalize_url(url)
-        return self._cache.cache.has(url)
-
-    def has(self, url):
-        url = normalize_url(url)
-        return self._cache.get(url) is not None
-
-    def get(self, url):
-        url = normalize_url(url)
-        return self._cache.get(url)
-
-    def delete(self, url):
-        url = normalize_url(url)
-        self._cache.delete(url)
-
-
 #If we've seen this title in other feeds, then filter it.
 def filtersimilarTitles(url, entries):
     feed_alt = None
@@ -162,13 +131,13 @@ def load_url_worker(url):
     expire_time = rss_info.expire_time
 
     #This FETCHPID logic is to prevent race conditions of
-    #multiple Python processes fetching an expired RSS feed.
+    #multiple Python processes / threads fetching an expired RSS feed.
     #This isn't as useful anymore given the FETCHMODE.
     if not g_c.has(url + "FETCHPID"):
-        g_c.put(url + "FETCHPID", os.getpid(), timeout=10)
+        g_c.put(url + "FETCHPID", (os.getpid(), threading.get_ident()), timeout=10)
         feedpid = g_c.get(url + "FETCHPID") #Check to make sure it's us
 
-    if feedpid == os.getpid():
+    if feedpid == (os.getpid(), threading.get_ident()):
         start = timer()
         rssfeed = None
 
@@ -316,15 +285,14 @@ def load_url_worker(url):
         print("Done waiting for someone else to parse remote site %s" %(url))
 
 def wait_and_set_fetch_mode():
-    #If any other process is fetching feeds, then we should just wait a bit.
+    #If any other process or thread is fetching feeds, then we should just wait a bit.
     #This prevents a thundering herd of threads.
-    if g_c.has("FETCHMODE"):
+    while g_c.has("FETCHMODE"):
         print("Waiting on another process to finish fetching.")
-        while g_c.has("FETCHMODE"):
-            time.sleep(0.1)
-        print("Done waiting.")
-
+        time.sleep(0.2)
+    print("Done waiting.")
     g_c.put("FETCHMODE", "FETCHMODE", timeout=10)
+
 
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
