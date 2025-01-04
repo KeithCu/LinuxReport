@@ -13,7 +13,7 @@ from timeit import default_timer as timer
 import difflib
 
 import feedparser
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, g
 from flask_mobility import Mobility
 from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators
@@ -384,9 +384,9 @@ def index():
     suffix = ""
     single_column = False
 
-    # if request.MOBILE:
-    #     suffix = ":MOBILE"
-    #     single_column = True
+    if g.is_mobile:
+        suffix = ":MOBILE"
+        single_column = True
 
     if dark_mode:
         suffix = suffix + ":DARK"
