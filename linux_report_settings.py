@@ -12,7 +12,7 @@ ALL_URLS = {
     RssInfo("redditlogosmall.webp",
     "Reddit Linux sub",
     "https://www.reddit.com/r/linux",
-    EXPIRE_HOUR),
+    EXPIRE_HOUR * 4),
 
     "http://rss.slashdot.org/Slashdot/slashdotMain" :
     RssInfo("slashdotlogo.webp",
@@ -42,7 +42,7 @@ ALL_URLS = {
     RssInfo("GeekWire.png",
     "GeekWire",
     "http://www.geekwire.com/",
-    EXPIRE_HOUR * 4), #Slow and slow-changing, so fetch less
+    EXPIRE_HOUR * 8), #Slow and slow-changing, so fetch less
 
     "http://feeds.feedburner.com/linuxtoday/linux" :
     RssInfo("linuxtd_logo.png",
