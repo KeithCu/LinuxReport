@@ -522,7 +522,7 @@ class ConfigForm(Form):
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
 
-@g_app.route('/config', methods=['GET', 'POST'])
+@g_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
 def config():
     if request.method == 'GET':
         form = ConfigForm()
