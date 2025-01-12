@@ -6,7 +6,7 @@ Simple and fast news site based on Python / Flask. Meant to be a http://drudgere
 
 Here's the running code: https://covidreport.keithcu.com/ 
 
-Takes advantage of thread pools and process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page in 2 ms. As a comparison, DrudgeReport handles about 23 million page-views per day, which is 266 requests per second. Ignoring the images, which could be cheaply served by a CDN, one [8-core, $160 per month Linode](https://www.linode.com/pricing/) would be able handle that same amount of traffic running this site.
+Takes advantage of thread pools and process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page in 2 ms.
 
 Feel free to request more default RSS feeds, or send pull requests.
 
