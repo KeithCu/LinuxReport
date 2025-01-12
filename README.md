@@ -6,7 +6,7 @@ Simple and fast news site based on Python / Flask. Meant to be a http://drudgere
 
 Here's the running code: https://covidreport.keithcu.com/ 
 
-Takes advantage of thread pools and process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page in 2 ms.
+Takes advantage of thread pools and process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page after less than 10 lines of my Python code.
 
 Feel free to request more default RSS feeds, or send pull requests.
 
