@@ -4,7 +4,7 @@
 --------------------------------------------------------------------------------
 Simple and fast news site based on Python / Flask. Meant to be a http://drudgereport.com/ clone for Linux or Covid-19 news, updated automatically 24/7, and customizable by the user, including custom feeds and the critically important dark mode.
 
-Here's the running code: https://covidreport.keithcu.com/ 
+Here's the running code: https://linuxreport.net 
 
 Takes advantage of thread pools and process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page after less than 10 lines of my Python code.
 
