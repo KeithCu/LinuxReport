@@ -75,7 +75,7 @@ FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
 LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
 WEB_TITLE = "Linux Report"
 WEB_DESCRIPTION = "Linux News"
-ABOVE_HTML_FILE = '/srv/http/LinuxReport2/linuxreportabove.html'
+ABOVE_HTML_FILE = 'linuxreportabove.html'
 WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
 '"http://covidreport.keithcu.com/">CovidReport</a></b>) - Fork me on <a target="_blank"'
 'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'

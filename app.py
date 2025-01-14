@@ -332,7 +332,7 @@ def index():
     #page_start = timer()
 
     if g_c is None:
-        socket.setdefaulttimeout(7)
+        socket.setdefaulttimeout(15)
         g_c = FSCache()
 
     dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
@@ -490,7 +490,7 @@ class ConfigForm(Form):
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
 
-@g_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
+@g_app.route('/config', methods=['GET', 'POST'])
 def config():
     if request.method == 'GET':
         form = ConfigForm()
