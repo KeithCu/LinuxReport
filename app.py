@@ -44,6 +44,7 @@ if DEBUG or g_app.debug:
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 
 MAX_ITEMS = 8
+RSS_TIMEOUT = 15
 
 #Mechanism to throw away old cookies.
 URLS_COOKIE_VERSION = "1"
@@ -165,7 +166,7 @@ def load_url_worker(url):
     #multiple Python processes fetching an expired RSS feed.
     #This isn't as useful anymore given the FETCHMODE.
     if not g_c.has(url + "FETCHPID"):
-        g_c.put(url + "FETCHPID", os.getpid(), timeout=10)
+        g_c.put(url + "FETCHPID", os.getpid(), timeout=RSS_TIMEOUT)
         feedpid = g_c.get(url + "FETCHPID") #Check to make sure it's us
 
     if feedpid == os.getpid():
@@ -265,7 +266,7 @@ def load_url_worker(url):
             res = feedparser.parse(url, etag=etag, modified=last_modified)
 
             #No content changed:
-            if rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
+            if False and rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
                 print("No new info parsing from: %s, etag: %s, last_modified: %s." %(url, etag, last_modified))
 
                 rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
@@ -324,7 +325,7 @@ def wait_and_set_fetch_mode():
             time.sleep(0.1)
         print("Done waiting.")
 
-    g_c.put("FETCHMODE", "FETCHMODE", timeout=10)
+    g_c.put("FETCHMODE", "FETCHMODE", timeout=RSS_TIMEOUT)
 
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
@@ -364,7 +365,7 @@ def index():
     #page_start = timer()
 
     if g_c is None:
-        socket.setdefaulttimeout(7)
+        socket.setdefaulttimeout(RSS_TIMEOUT)
         g_c = FSCache()
 
     dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
