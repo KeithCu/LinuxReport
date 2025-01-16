@@ -56,7 +56,7 @@ ALL_URLS = {
     EXPIRE_DAY),
 }
 
-USER_AGENT = "Covid-19 Report -- http://covidreport.net/"
+USER_AGENT = "Covid-19 Report -- http://covidreport.org/"
 site_urls = [
     "https://www.reddit.com/r/Coronavirus/rising/.rss",
     "https://www.reddit.com/r/China_Flu/rising/.rss",
@@ -69,13 +69,15 @@ site_urls = [
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
 ]
 
-URL_IMAGES = "http://covidreport.keithcu.com/static/images/"
-FAVICON = "http://covidreport.keithcu.com//static/images/covidreport192.ico"
-LOGO_URL = "http://covidreport.keithcu.com/static/images/CovidReport.png"
+domain = "http://covidreport.org/"
+
+URL_IMAGES = domain + "/static/images/"
+FAVICON = domain + "/static/images/covidreport192.ico"
+LOGO_URL = domain + "/static/images/CovidReport.png"
 WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
 WEB_TITLE = "COVID-19 Report"
 
-ABOVE_HTML = ''
+ABOVE_HTML_FILE = 'covidreportabove.html'
 WELCOME_HTML = ('<font size="4">(Refreshes hourly) - Fork me on '
 '<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
 ' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>')
