@@ -2,7 +2,7 @@ from shared import RssInfo, EXPIRE_HOUR, EXPIRE_DAY
 
 ALL_URLS = {
     "https://www.reddit.com/r/Coronavirus/rising/.rss" :
-    RssInfo("redditlogosmall.png",
+    RssInfo("redditlogosmall.webp",
     "Reddit Corona virus sub",
     "https://www.reddit.com/r/Coronavirus/",
     EXPIRE_HOUR),
@@ -19,25 +19,7 @@ ALL_URLS = {
     "https://news.google.com/search?q=coronavirus",
     EXPIRE_HOUR),
 
-    "http://www.independent.co.uk/topic/coronavirus/rss" :
-    RssInfo("Independent-Corona.png",
-    "Independent UK news",
-    "https://www.independent.co.uk/topic/coronavirus",
-    EXPIRE_HOUR * 3),
-
-    "https://pandemic.warroom.org/feed/" :
-    RssInfo("WarRoom.png",
-    "War Room: Pandemic",
-    "https://pandemic.warroom.org/",
-    EXPIRE_HOUR * 3),
-
-    "https://gnews.org/feed/" :
-    RssInfo("gnews.png",
-    "Guo Media news",
-    "https://gnews.org/",
-    EXPIRE_HOUR * 3),
-
-    "https://tools.cdc.gov/api/v2/resources/media/403372.rss" :
+    "https://tools.cdc.gov/api/v2/resources/media/404952.rss" :
     RssInfo("CDC-Logo.png",
     "Centers for Disease Control",
     "https://www.cdc.gov/coronavirus/2019-nCoV/index.html",
@@ -61,15 +43,12 @@ site_urls = [
     "https://www.reddit.com/r/Coronavirus/rising/.rss",
     "https://www.reddit.com/r/China_Flu/rising/.rss",
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
-    "http://www.independent.co.uk/topic/coronavirus/rss",
-    "https://pandemic.warroom.org/feed/",
-    "https://gnews.org/feed/",
-    "https://tools.cdc.gov/api/v2/resources/media/403372.rss",
+    "https://tools.cdc.gov/api/v2/resources/media/404952.rss",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
 ]
 
-domain = "http://covidreport.org/"
+domain = "http://covidreport.org"
 
 URL_IMAGES = domain + "/static/images/"
 FAVICON = domain + "/static/images/covidreport192.ico"
@@ -77,7 +56,9 @@ LOGO_URL = domain + "/static/images/CovidReport.png"
 WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
 WEB_TITLE = "COVID-19 Report"
 
-ABOVE_HTML_FILE = 'covidreportabove.html'
-WELCOME_HTML = ('<font size="4">(Refreshes hourly) - Fork me on '
-'<a target="_blank" href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or'
-' <a target="_blank" href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/></font>')
+ABOVE_HTML_FILE = '/srv/http/CovidReport2/covidreportabove.html'
+
+WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
+'"https://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
+'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
+'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')
