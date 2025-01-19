@@ -47,6 +47,42 @@
         clear: both;
       }
       {%- endif %}
+
+
+      .pagination-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 10px;
+        margin: 10px 0;
+      }
+
+      .pagination-controls button {
+        padding: 5px 15px;
+        border: 2px solid #092236;
+        border-radius: 5px;
+        background-color: #f6f6f6;
+        color: #3b5971;
+        font-size: 14px;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .pagination-controls button:hover:not(:disabled) {
+        background-color: #0078D7;
+        color: white;
+        transform: scale(1.05);
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      .pagination-controls button:disabled {
+        background-color: #e0e0e0;
+        color: #a0a0a0;
+        cursor: not-allowed;
+      }
+
     </style>
     <script>
       function redirect() {
@@ -71,3 +107,63 @@
   </body>
 </html>
  
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const feeds = document.querySelectorAll(".pagination-controls");
+
+  feeds.forEach(feedControls => {
+    const feedId = feedControls.dataset.feedId;
+    const feedContainer = document.getElementById(feedId);
+
+    if (!feedContainer) {
+      console.error(`Feed container with ID "${feedId}" not found.`);
+      return; // Skip this feed if the container is missing
+    }
+
+    const items = feedContainer.querySelectorAll(".linkclass");
+    const prevBtn = feedControls.querySelector(".prev-btn");
+    const nextBtn = feedControls.querySelector(".next-btn");
+
+    if (items.length === 0) {
+      console.warn(`No items found for feed "${feedId}".`);
+      prevBtn.disabled = true;
+      nextBtn.disabled = true;
+      return;
+    }
+
+    const itemsPerPage = 8; // Entries per page
+    let currentPage = 0;
+    const totalItems = items.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+
+    function updatePagination() {
+      const start = currentPage * itemsPerPage;
+      const end = start + itemsPerPage;
+
+      items.forEach((item, index) => {
+        item.style.display = index >= start && index < end ? "block" : "none";
+      });
+
+      prevBtn.disabled = currentPage === 0;
+      nextBtn.disabled = currentPage >= totalPages - 1;
+    }
+
+    prevBtn.addEventListener("click", () => {
+      if (currentPage > 0) {
+        currentPage--;
+        updatePagination();
+      }
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (currentPage < totalPages - 1) {
+        currentPage++;
+        updatePagination();
+      }
+    });
+
+    // Initialize pagination for this feed
+    updatePagination();
+  });
+});
+</script>

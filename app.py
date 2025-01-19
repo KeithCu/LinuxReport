@@ -30,7 +30,7 @@ class Mode(Enum):
 
 MODE = Mode.LINUX_REPORT
 
-sys.path.insert(0, '/srv/http/LinuxReport2/')
+sys.path.insert(0, '.')
 
 DEBUG = False
 
@@ -44,7 +44,7 @@ if DEBUG or g_app.debug:
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 
-MAX_ITEMS = 8
+MAX_ITEMS = 32
 
 #Mechanism to throw away old cookies.
 URLS_COOKIE_VERSION = "1"
@@ -362,7 +362,7 @@ def index():
         suffix = suffix + ":NOUND"
 
     full_page = g_c.get(page_order_s + suffix)
-    if full_page is not None:
+    if DEBUG == False and full_page is not None:
         return full_page # Typically, the Python is finished here
 
     if single_column:
@@ -404,7 +404,7 @@ def index():
         rss_info = ALL_URLS[url]
 
         template = g_c.get(rss_info.site_url)
-        if template is None:
+        if template is None or DEBUG == True:
 
             #The only reasons we don't have a template now is because:
             # 1. It's startup, or a custom feed.
@@ -415,9 +415,10 @@ def index():
             entries = g_c.get(url).entries
 
             template = render_template('sitebox.html', entries=entries, logo=URL_IMAGES + rss_info.logo_url,
-                                       alt_tag=rss_info.logo_alt, link=rss_info.site_url)
+                                       alt_tag=rss_info.logo_alt, link=rss_info.site_url, feed_id = rss_info.site_url)
 
-            g_c.put(rss_info.site_url, template, timeout=EXPIRE_HOUR * 12)
+            if DEBUG == False:
+                g_c.put(rss_info.site_url, template, timeout=EXPIRE_HOUR * 12)
 
         result[cur_col].append(template)
 
