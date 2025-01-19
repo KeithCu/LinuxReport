@@ -77,6 +77,6 @@ WEB_TITLE = "Linux Report"
 WEB_DESCRIPTION = "Linux News"
 ABOVE_HTML_FILE = '/srv/http/LinuxReport2/linuxreportabove.html'
 WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
-'"http://covidreport.keithcu.com/">CovidReport</a></b>) - Fork me on <a target="_blank"'
+'"http://covidreport.org/">CovidReport</a></b>) - Fork me on <a target="_blank"'
 'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
 'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')

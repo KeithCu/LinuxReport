@@ -63,7 +63,7 @@ EXPIRE_FILE = False
 class FSCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
-                                           'CACHE_DIR' : '/tmp/linuxreport/',
+                                           'CACHE_DIR' : '/run/linuxreport/',
                                            'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
                                            'CACHE_THRESHOLD' : 0})
 
