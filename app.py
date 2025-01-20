@@ -20,7 +20,7 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
 from markupsafe import Markup
 from autoscraper import AutoScraper
 
-sys.path.insert(0, '/srv/http/LinuxReport2/')
+sys.path.insert(0, '.')
 
 from feedfilter import prefilter_news
 from shared import RssFeed, RssInfo, EXPIRE_MINUTES, EXPIRE_HOUR, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS
@@ -29,8 +29,11 @@ class Mode(Enum):
     LINUX_REPORT = 1
     COVID_REPORT = 2
     TECHNO_REPORT = 3
+    AI_REPORT = 4
+    PYTHON_REPORT = 5
+    TRUMP_Report = 6
 
-MODE = Mode.LINUX_REPORT
+MODE = Mode.AI_REPORT
 
 DEBUG = False
 
@@ -58,6 +61,8 @@ elif MODE == Mode.COVID_REPORT:
     from covid_report_settings import *
 elif MODE == Mode.TECHNO_REPORT:
     from techno_report_settings import *
+elif MODE == Mode.AI_REPORT:
+    from ai_report_settings import *
 
 feedparser.USER_AGENT = USER_AGENT
 EXPIRE_FILE = False

@@ -1,6 +1,8 @@
-![LinuxReport logo](http://keithcu.com/LinuxReport2.png)
+![LinuxReport logo](https://keithcu.com/LinuxReport2.png)
 **and**
-![CovidReport logo](http://keithcu.com//CovidReport.png)
+![CovidReport logo](https://keithcu.com//CovidReport.png)
+**and**
+![AIReport_logo](https://github.com/KeithCu/LinuxReport/blob/master/static/images/AIReport.png)
 --------------------------------------------------------------------------------
 Simple and fast news site based on Python / Flask. Meant to be a http://drudgereport.com/ clone for Linux or Covid-19 news, updated automatically 24/7, and customizable by the user, including custom feeds and the critically important dark mode.
 
