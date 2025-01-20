@@ -27,8 +27,11 @@ class Mode(Enum):
     LINUX_REPORT = 1
     COVID_REPORT = 2
     TECHNO_REPORT = 3
+    AI_REPORT = 4
+    PYTHON_REPORT = 5
+    TRUMP_Report = 6
 
-MODE = Mode.LINUX_REPORT
+MODE = Mode.AI_REPORT
 
 sys.path.insert(0, '.')
 
@@ -57,13 +60,15 @@ elif MODE == Mode.COVID_REPORT:
     from covid_report_settings import *
 elif MODE == Mode.TECHNO_REPORT:
     from techno_report_settings import *
+elif MODE == Mode.AI_REPORT:
+    from ai_report_settings import *
 
 feedparser.USER_AGENT = USER_AGENT
 EXPIRE_FILE = False
 class FSCache():
     def __init__(self):
         self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
-                                           'CACHE_DIR' : '/tmp/linuxreport/',
+                                           'CACHE_DIR' : '/run/linuxreport/',
                                            'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
                                            'CACHE_THRESHOLD' : 0})
 
@@ -443,7 +448,8 @@ def index():
     if no_underlines:
         text_decoration = "text-decoration:none;"
 
-    above_html = str(open(ABOVE_HTML_FILE).read())
+    #above_html = str(open(ABOVE_HTML_FILE).read())
+    above_html = ""
 
     if not single_column:
         above_html = above_html.replace("<hr/>", "")
