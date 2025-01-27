@@ -31,7 +31,7 @@ class Mode(Enum):
     TECHNO_REPORT = 3
     AI_REPORT = 4
     PYTHON_REPORT = 5
-    TRUMP_Report = 6
+    TRUMP_REPORT = 6
 
 MODE = Mode.AI_REPORT
 
@@ -63,6 +63,8 @@ elif MODE == Mode.TECHNO_REPORT:
     from techno_report_settings import *
 elif MODE == Mode.AI_REPORT:
     from ai_report_settings import *
+elif MODE == Mode.TRUMP_REPORT:
+    from trump_report_settings import *
 
 feedparser.USER_AGENT = USER_AGENT
 EXPIRE_FILE = False
@@ -100,38 +102,6 @@ class FSCache():
 
     def delete(self, url):
         self._cache.delete(url)
-
-# Alternate backend using memcached. It is 2x slower without the page cache, and 15% slower with,
-# so don't bother for now.
-class MEMCache():
-    def __init__(self):
-        self._cache = Cache(g_app, config={'CACHE_TYPE': 'memcached', })
-
-    def normalize_url(self, url):
-        if len(url) > 250:
-            url = hash(url)
-        return url
-
-    def put(self, url, template, timeout):
-        url = normalize_url(url)
-        self._cache.set(url, template, timeout)
-
-    def has(self, url):
-        url = normalize_url(url)
-        return self._cache.cache.has(url)
-
-    def has(self, url):
-        url = normalize_url(url)
-        return self._cache.get(url) is not None
-
-    def get(self, url):
-        url = normalize_url(url)
-        return self._cache.get(url)
-
-    def delete(self, url):
-        url = normalize_url(url)
-        self._cache.delete(url)
-
 
 #If we've seen this title in other feeds, then filter it.
 def filtersimilarTitles(url, entries):
@@ -179,23 +149,31 @@ def load_url_worker(url):
         start = timer()
         rssfeed = None
 
-        if "Women" in url: #Special work for the women...
-            pass
+        if "Women" in url or "bandcamp" in url:
             scraper = AutoScraper()
 
             result2 = []
             try:
-                scraper.load('/tmp/wowax-scrape')
+                if "Women" in url:
+                    scraper.load('/tmp/wowax-scrape')
+                elif "bandcamp" in url:
+                    scraper.load('/tmp/bandcamp-scrape')
                 result2 = scraper.get_result_similar(url, grouped=True)
 
             except:
-                #Special strings to trigger the proper auto-parsing for Women On Wax
-                url_wow = 'https://keithcu.com/WomenOnWaxTest/'
-                wanted_list = ['https://www.traxsource.com/title/1492869/blind-amerikkka',
-                                'Blind Amerikkka']
-                result = scraper.build(url=url_wow, wanted_list=wanted_list)
-                result2 = scraper.get_result_similar(url_wow, grouped=True)
-                scraper.save('/tmp/wowax-scrape')
+                if "Women" in url:
+                    url_fetch = 'https://keithcu.com/WomenOnWaxTest/'
+                    wanted_list = ['https://www.traxsource.com/title/1492869/blind-amerikkka', 'Blind Amerikkka']
+                elif "bandcamp" in url:
+                    url_fetch = 'https://keithcu.com/BandcampTestRS/'
+                    wanted_list = ['https://keithcu.com/album/rsd020-abc-versions', 'RSD020 // ABC Versions']
+
+                result = scraper.build(url=url_fetch, wanted_list=wanted_list)
+                result2 = scraper.get_result_similar(url_fetch, grouped=True)
+                if "Women" in url:
+                    scraper.save('/tmp/wowax-scrape')
+                elif "bandcamp" in url:
+                    scraper.save('/tmp/bandcamp-scrape')
 
             #Format received: dictionary containing two lists
             #Format needed: list containing dictionary entries for title and link                
@@ -211,49 +189,6 @@ def load_url_worker(url):
             #Put them in reverse order
             entries = list(reversed(rss_feed))
             entries = list(itertools.islice(entries, MAX_ITEMS))
-
-            rssfeed = RssFeed(entries)
-            rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
-
-            g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
-
-        elif "bandcamp" in url or "keithcu" in url:
-            pass
-            scraper = AutoScraper()
-
-            result2 = []
-            try:
-                scraper.load('/tmp/bandcamp-scrape')
-                result2 = scraper.get_result_similar(url, grouped=True)
-
-            except:
-                #Special strings to trigger the proper auto-parsing for bandcamp
-                #Hard-coded for Rocksteady disco.
-                url_rocksteady = 'https://keithcu.com/BandcampTestRS/'
-                wanted_list = ['https://keithcu.com/album/rsd020-abc-versions',
-                                'RSD020 // ABC Versions']
-                result = scraper.build(url=url_rocksteady, wanted_list=wanted_list)
-                result2 = scraper.get_result_similar(url_rocksteady, grouped=True)
-                scraper.save('/tmp/bandcamp-scrape')
-
-                #Now that the model is build, try again for the proper URL
-                scraper = AutoScraper()
-                scraper.load('/tmp/bandcamp-scrape')
-                #result = scraper.build(url=url, wanted_list=wanted_list)
-                result2 = scraper.get_result_similar(url, grouped=True)
-
-            #Format received: dictionary containing two lists
-            #Format needed: list containing dictionary entries for title and link                
-            rules = list(result2.keys())
-            rule1 = rules[0]
-            rule2 = rules[1]
-
-            rss_feed = []
-            for entry_url, entry_title in zip(result2[rule1], result2[rule2]):
-                entry_dict = {"title" : entry_title, "link" : entry_url}
-                rss_feed.append(entry_dict)
-
-            entries = list(itertools.islice(rss_feed, MAX_ITEMS))
 
             rssfeed = RssFeed(entries)
             rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
@@ -277,22 +212,19 @@ def load_url_worker(url):
 
                 rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
                 g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
-                if EXPIRE_FILE:
-                    g_c.put(url + ":EXPIRES", rssfeed.expiration, timeout=EXPIRE_WEEK)
                 g_c.delete(url + "FETCHPID")
                 return
 
             entries = prefilter_news(url, res)
-
             entries = filtersimilarTitles(url, entries)
-
             entries = list(itertools.islice(entries, MAX_ITEMS))
 
             if len(entries) <= 2 and rss_info.logo_url != "Custom.png":
                 print("Failed to fetch %s, retry in 30 minutes." %(url))
                 expire_time = 60 * 30
-
-            rssfeed = RssFeed(entries)
+            else:
+                rssfeed = RssFeed(entries)
+                
             rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
             if hasattr(res, 'etag'):
                 rssfeed.etag = res.etag
@@ -303,8 +235,6 @@ def load_url_worker(url):
                 rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.feed.updated_parsed))
 
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
-        if EXPIRE_FILE:
-            g_c.put(url + ":EXPIRES", rssfeed.expiration, timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
             g_c.delete(rss_info.site_url)
@@ -444,13 +374,6 @@ def index():
 
         template = g_c.get(rss_info.site_url)
         if template is None:
-
-            #The only reasons we don't have a template now is because:
-            # 1. It's startup, or a custom feed.
-            # 2. The feed was expired and refetched, and the template deleted after.
-
-            # In either case, the RSS feed should be good for at least an hour so this is
-            # pretty guaranteed to work and not crash.
             entries = g_c.get(url).entries
 
             template = render_template('sitebox.html', entries=entries, logo=URL_IMAGES + rss_info.logo_url,
