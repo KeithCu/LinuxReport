@@ -7,10 +7,10 @@ ALL_URLS = {
     "https://www.reddit.com/r/Coronavirus/",
     EXPIRE_HOUR),
 
-    "https://www.reddit.com/r/China_Flu/rising/.rss" :
+    "https://www.reddit.com/r/COVID19/.rss" :
     RssInfo("Coronavirus.jpg",
-    "Reddit China Flu sub",
-    "https://www.reddit.com/r/China_Flu/",
+    "Reddit Covid-19 sub",
+    "https://www.reddit.com/r/COVID19/",
     EXPIRE_HOUR),
 
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984" :
@@ -41,7 +41,7 @@ ALL_URLS = {
 USER_AGENT = "Covid-19 Report -- http://covidreport.org/"
 site_urls = [
     "https://www.reddit.com/r/Coronavirus/rising/.rss",
-    "https://www.reddit.com/r/China_Flu/rising/.rss",
+    "https://www.reddit.com/r/COVID19/.rss",
     "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",
     "https://tools.cdc.gov/api/v2/resources/media/404952.rss",
     "https://www.youtube.com/feeds/videos.xml?channel_id=UCD2-QVBQi48RRQTD4Jhxu8w",
