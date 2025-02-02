@@ -47,7 +47,7 @@ if DEBUG or g_app.debug:
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 
-MAX_ITEMS = 24
+MAX_ITEMS = 40
 RSS_TIMEOUT = 15
 
 #Mechanism to throw away old cookies.
@@ -132,6 +132,41 @@ def filtersimilarTitles(url, entries):
 
     return entries
 
+def merge_entries(new_entries, old_entries, title_threshold=0.85):
+    """
+    Merge two lists of feed entries, preserving order and avoiding duplicates.
+    Two entries are considered the same if:
+      - They share the same link.
+    
+    New entries take precedence over cached ones.
+    """
+    merged = []
+    seen_links = set()
+    new_titles = []  # to compare against old titles
+
+    # Process new entries first.
+    for entry in new_entries:
+        # Get unique key and title. (Assumes entries are dicts.)
+        key = entry.get('link')
+        title = entry.get('title')
+        if key:
+            seen_links.add(key)
+        if title:
+            new_titles.append(title)
+        merged.append(entry)
+
+    # Append old entries only if they’re not already represented.
+    for entry in old_entries:
+        key = entry.get('link')
+        title = entry.get('title')
+        # Skip if the link already exists.
+        if key and key in seen_links:
+            continue
+        
+        merged.append(entry)
+
+    return merged
+
 
 def load_url_worker(url):
     rss_info = ALL_URLS[url]
@@ -207,7 +242,7 @@ def load_url_worker(url):
             res = feedparser.parse(url, etag=etag, modified=last_modified)
 
             #No content changed:
-            if False and rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
+            if rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
                 print("No new info parsing from: %s, etag: %s, last_modified: %s." %(url, etag, last_modified))
 
                 rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
@@ -217,13 +252,14 @@ def load_url_worker(url):
 
             entries = prefilter_news(url, res)
             entries = filtersimilarTitles(url, entries)
+            # Merge with cached entries (if any) to retain history.
+            old_feed = g_c.get(url)
+
+            if old_feed and entries is not None:
+                entries = merge_entries(entries, old_feed.entries)
             entries = list(itertools.islice(entries, MAX_ITEMS))
 
-            if len(entries) <= 2 and rss_info.logo_url != "Custom.png":
-                print("Failed to fetch %s, retry in 30 minutes." %(url))
-                expire_time = 60 * 30
-            else:
-                rssfeed = RssFeed(entries)
+            rssfeed = RssFeed(entries)
                 
             rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
             if hasattr(res, 'etag'):
