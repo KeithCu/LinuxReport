@@ -242,7 +242,7 @@ def load_url_worker(url):
             res = feedparser.parse(url, etag=etag, modified=last_modified)
 
             #No content changed:
-            if rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
+            if False and rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
                 print("No new info parsing from: %s, etag: %s, last_modified: %s." %(url, etag, last_modified))
 
                 rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
