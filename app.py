@@ -226,13 +226,13 @@ def load_url_worker(url):
             entries = list(itertools.islice(entries, MAX_ITEMS))
 
             rssfeed = RssFeed(entries)
-            rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+            rssfeed.expiration = datetime.now(timezone.utc) + timedelta(seconds=expire_time)
 
             g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
 
         else:
             etag = ''
-            last_modified = datetime.utcnow() - timedelta(seconds=EXPIRE_YEARS)
+            last_modified = datetime.now(timezone.utc) - timedelta(seconds=EXPIRE_YEARS)
 
             rssfeed = g_c.get(url)
             if rssfeed != None:

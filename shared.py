@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 class RssFeed:
     def __init__(self, entries):
         self.entries = entries
-        self.expiration = datetime.utcnow() + timedelta(seconds=86400)
+        self.expiration = datetime.now(timezone.utc) + timedelta(seconds=86400)
         self.etag = ''
-        self.last_modified = datetime.utcnow() - timedelta(seconds=86400 * 365 * 2)
+        self.last_modified = datetime.now(timezone.utc) - timedelta(seconds=86400 * 365 * 2)
 
 class RssInfo:
     def __init__(self, logo_url, logo_alt, site_url, expire_time):
