@@ -52,7 +52,7 @@ domain = "http://covidreport.org"
 
 URL_IMAGES = domain + "/static/images/"
 FAVICON = domain + "/static/images/covidreport192.ico"
-LOGO_URL = domain + "/static/images/CovidReport.png"
+LOGO_URL = domain + "/static/images/CovidReport.webp"
 WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
 WEB_TITLE = "COVID-19 Report"
 

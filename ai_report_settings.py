@@ -7,7 +7,7 @@ ALL_URLS = {
     "https://www.reddit.com/r/LocalLlama/",
     EXPIRE_HOUR),
 
-    "https://venturebeat.com/category/ai/feed" :
+    "https://venturebeat.com/category/ai/feed/" :
     RssInfo("VentureBeat_logo.png",
     "VentureBeat AI",
     "https://venturebeat.com/category/ai/",
@@ -38,10 +38,10 @@ ALL_URLS = {
     EXPIRE_DAY),
 }
 
-USER_AGENT = "AI Report -- http://aireport.keithcu.com"
+USER_AGENT = "AI Report -- https://aireport.keithcu.com"
 site_urls = [
     "https://www.reddit.com/r/LocalLlama/.rss",
-    "https://venturebeat.com/category/ai/feed",
+    "https://venturebeat.com/category/ai/feed/",
     "https://www.theregister.com/software/ai_ml/headlines.atom",
     "https://hnrss.org/newest?tags=ai",
     "https://www.reddit.com/r/Python/.rss",
@@ -49,11 +49,10 @@ site_urls = [
 ]
 
 domain = "https://aireport.keithcu.com"
-domain = "http://localhost:5000"
 
 URL_IMAGES = domain + "/static/images/"
 FAVICON = domain + "/static/images/covidreport192.ico"
-LOGO_URL = domain + "/static/images/AIReport.png"
+LOGO_URL = domain + "/static/images/AIReport.webp"
 WEB_DESCRIPTION = "AI News"
 WEB_TITLE = "AI Report"
 

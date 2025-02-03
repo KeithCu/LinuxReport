@@ -8,7 +8,7 @@ import threading
 import itertools
 import concurrent.futures
 from enum import Enum
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from timeit import default_timer as timer
 import difflib
 
@@ -81,7 +81,7 @@ class FSCache():
         feed_info = g_c.get(url)
         if not isinstance(feed_info, RssFeed):
             return True
-        return feed_info.expiration < datetime.utcnow()
+        return feed_info.expiration < datetime.now(timezone.utc)
 
     #This should be faster, but needs extra files to be created
     #EXPIRE_FILE = True
@@ -89,7 +89,7 @@ class FSCache():
         expires = g_c.get(url + ":EXPIRES")
         if expires is None:
             return True
-        return expires < datetime.utcnow()
+        return expires < datetime.now(timezone.utc)
 
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
@@ -261,7 +261,7 @@ def load_url_worker(url):
 
             rssfeed = RssFeed(entries)
                 
-            rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
+            rssfeed.expiration = datetime.now(timezone.utc) + timedelta(seconds=expire_time)
             if hasattr(res, 'etag'):
                 rssfeed.etag = res.etag
 

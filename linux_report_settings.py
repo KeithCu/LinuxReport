@@ -57,7 +57,7 @@ ALL_URLS = {
     EXPIRE_HOUR * 4),
 }
 
-USER_AGENT = "Linux Report -- http://linuxreport.net/"
+USER_AGENT = "Linux Report -- https://linuxreport.net/"
 site_urls = [
     "http://lxer.com/module/newswire/headlines.rss",
     "https://www.reddit.com/r/linux/.rss",
@@ -70,13 +70,13 @@ site_urls = [
     "https://planet.debian.org/rss20.xml",
 ]
 
-URL_IMAGES = "http://linuxreport.net/static/images/"
-FAVICON = "http://linuxreport.net/static/images/linuxreport192.ico"
-LOGO_URL = "http://linuxreport.net/static/images/LinuxReport2.png"
+URL_IMAGES = "https://linuxreport.net/static/images/"
+FAVICON = "https://linuxreport.net/static/images/linuxreport192.ico"
+LOGO_URL = "https://linuxreport.net/static/images/LinuxReport2.webp"
 WEB_TITLE = "Linux Report"
 WEB_DESCRIPTION = "Linux News"
 ABOVE_HTML_FILE = 'linuxreportabove.html'
 WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
-'"http://covidreport.org/">CovidReport</a></b>) - Fork me on <a target="_blank"'
+'"https://covidreport.org/">CovidReport</a></b>) - Fork me on <a target="_blank"'
 'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
 'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')
