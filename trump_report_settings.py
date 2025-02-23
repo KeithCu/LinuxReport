@@ -38,7 +38,7 @@ ALL_URLS = {
     EXPIRE_DAY),
 
     "https://freebeacon.com/feed/" :
-    RssInfo("Python-logo-notext.svg",
+    RssInfo("freebeacon.png",
     "Free Beacon",
     "https://freebeacon.com",
     EXPIRE_HOUR * 4),
@@ -87,8 +87,8 @@ site_urls = [
     "https://conservativereview.com/feeds/feed.rss",
 ]
 
-#domain = "http://trumpreport.info"
-domain = "http://localhost:5000"
+domain = "http://trumpreport.info"
+
 
 URL_IMAGES = domain + "/static/images/"
 FAVICON = domain + "/static/images/TrumpReport.webp"
