@@ -24,7 +24,7 @@ sys.path.insert(0, '.')
 
 from feedfilter import prefilter_news
 import shared
-from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR
+from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES
 from patriotsfetch import fetch_patriots
 
 class Mode(Enum):
