@@ -23,7 +23,9 @@ from autoscraper import AutoScraper
 sys.path.insert(0, '.')
 
 from feedfilter import prefilter_news
-from shared import RssFeed, RssInfo, EXPIRE_MINUTES, EXPIRE_HOUR, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS
+import shared
+from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR
+from patriotsfetch import fetch_patriots
 
 class Mode(Enum):
     LINUX_REPORT = 1
@@ -33,7 +35,7 @@ class Mode(Enum):
     PYTHON_REPORT = 5
     TRUMP_REPORT = 6
 
-MODE = Mode.AI_REPORT
+MODE = Mode.TRUMP_REPORT
 
 DEBUG = False
 
@@ -45,7 +47,7 @@ if DEBUG or g_app.debug:
     EXPIRE_MINUTES = 1
     print("Warning, in debug mode")
 
-g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
+g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = shared.EXPIRE_WEEK
 
 MAX_ITEMS = 40
 RSS_TIMEOUT = 15
@@ -104,7 +106,7 @@ class FSCache():
         self._cache.delete(url)
 
 #If we've seen this title in other feeds, then filter it.
-def filtersimilarTitles(url, entries):
+def filter_similar_titles(url, entries):
     feed_alt = None
 
     if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
@@ -162,7 +164,7 @@ def merge_entries(new_entries, old_entries, title_threshold=0.85):
         # Skip if the link already exists.
         if key and key in seen_links:
             continue
-        
+
         merged.append(entry)
 
     return merged
@@ -173,6 +175,8 @@ def load_url_worker(url):
 
     expire_time = rss_info.expire_time
 
+    feedpid = None
+    
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
     #This isn't as useful anymore given the FETCHMODE.
@@ -239,7 +243,10 @@ def load_url_worker(url):
                 etag = rssfeed.etag
                 last_modified = rssfeed.last_modified
 
-            res = feedparser.parse(url, etag=etag, modified=last_modified)
+            if "patriots" in url:
+                res = fetch_patriots()
+            else:
+                res = feedparser.parse(url, etag=etag, modified=last_modified)
 
             #No content changed:
             if False and rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
@@ -251,7 +258,7 @@ def load_url_worker(url):
                 return
 
             entries = prefilter_news(url, res)
-            entries = filtersimilarTitles(url, entries)
+            entries = filter_similar_titles(url, entries)
             # Merge with cached entries (if any) to retain history.
             old_feed = g_c.get(url)
 
@@ -262,13 +269,13 @@ def load_url_worker(url):
             rssfeed = RssFeed(entries)
                 
             rssfeed.expiration = datetime.now(timezone.utc) + timedelta(seconds=expire_time)
-            if hasattr(res, 'etag'):
-                rssfeed.etag = res.etag
+            # if hasattr(res, 'etag'):
+            #     rssfeed.etag = res.etag
 
-            if hasattr(res, 'modified'):
-                rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.modified_parsed))
-            elif res.feed.get('updated_parsed', None) is not None:
-                rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.feed.updated_parsed))
+            # if hasattr(res, 'modified'):
+            #     rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.modified_parsed))
+            # elif res.feed.get('updated_parsed', None) is not None:
+            #     rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.feed.updated_parsed))
 
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
 
@@ -277,16 +284,15 @@ def load_url_worker(url):
 
         g_c.delete(url + "FETCHPID")
         end = timer()
-        print("Parsing from: %s, etag: %s, last-modified %s, in %f." %(url, rssfeed.etag, rssfeed.last_modified, end - start))
-
+        print(f"Parsing from: {url}, etag: {rssfeed.etag}, last-modified {rssfeed.last_modified}, in {end - start:f}.")
     else:
-        print("Waiting for someone else to parse remote site %s" %(url))
+        print(f"Waiting for someone else to parse remote site {url}.")
 
         # Someone else is fetching, so wait
         while g_c.has(url + "FETCHPID"):
             time.sleep(0.1)
 
-        print("Done waiting for someone else to parse remote site %s" %(url))
+        print(f"Done waiting for someone else to parse {url}.")
 
 def wait_and_set_fetch_mode():
     #If any other process is fetching feeds, then we should just wait a bit.
@@ -312,18 +318,16 @@ def fetch_urls_parallel(urls):
     g_c.delete("FETCHMODE")
 
 def refresh_thread():
-    for url in ALL_URLS.keys():
-        rss_info = ALL_URLS[url]
-
+    for url, rss_info in ALL_URLS.items():
         if g_c.has_feed_expired(url) and rss_info.logo_url != "Custom.png":
             wait_and_set_fetch_mode()
             load_url_worker(url)
             g_c.delete("FETCHMODE")
-            time.sleep(0.2) #Give time for other processes to run
+            time.sleep(0.2)  # Give time for other processes to run
 
 def fetch_urls_thread():
     t = threading.Thread(target=refresh_thread, args=())
-    t.setDaemon(True) #It's okay to kill this thread when the process is trying to exit.
+    t.daemon = True #It's okay to kill this thread when the process is trying to exit.
     t.start()
 
 g_c = None
