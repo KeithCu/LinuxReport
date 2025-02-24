@@ -74,6 +74,13 @@
     button[type="submit"]:hover {
       background-color: #005a9e;
     }
+
+    .url-entry {
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #f0f0f0;
+    cursor: move;
+    }
   </style>
 </head>
 <body>
@@ -95,10 +102,86 @@
       <label for="sans_serif">Sans Serif Font:</label>
       {{ form.sans_serif }}
     </div>
-    {{ form.urls }}
-    {{ form.url_custom }}
+    <div class="url-list">
+      {% for urlf in form.urls %}
+      <div class="url-entry" draggable="true">
+        {{ render_field(urlf.url) }}
+      </div>
+      {% endfor %}
+      {% for rssf in form.url_custom %}
+      <div class="url-entry" draggable="true">
+        {{ render_field(rssf.url) }}
+      </div>
+      {% endfor %}
+    </div>
     <button type="submit" name="save">Save</button>
   </form>
 </div>
 </body>
 </html>
+<script>document.addEventListener('DOMContentLoaded', function() {
+  const urlEntries = document.querySelectorAll('.url-entry');
+  let draggedItem = null;
+
+  urlEntries.forEach(entry => {
+    // When dragging starts
+    entry.addEventListener('dragstart', function() {
+      draggedItem = this;
+      setTimeout(() => this.style.display = 'none', 0); // Hide temporarily
+    });
+
+    // When dragging ends
+    entry.addEventListener('dragend', function() {
+      setTimeout(() => {
+        this.style.display = 'block'; // Show again
+        draggedItem = null;
+      }, 0);
+    });
+
+    // Allow dropping by preventing default behavior
+    entry.addEventListener('dragover', function(e) {
+      e.preventDefault();
+    });
+
+    // Visual feedback when dragging over an item
+    entry.addEventListener('dragenter', function(e) {
+      e.preventDefault();
+      this.style.border = '2px dashed #000'; // Add a dashed border
+    });
+
+    // Remove visual feedback when leaving
+    entry.addEventListener('dragleave', function() {
+      this.style.border = ''; // Reset border
+    });
+
+    // Handle the drop
+    entry.addEventListener('drop', function() {
+      this.style.border = ''; // Reset border
+      if (this !== draggedItem) {
+        let allEntries = Array.from(urlEntries);
+        let draggedIndex = allEntries.indexOf(draggedItem);
+        let targetIndex = allEntries.indexOf(this);
+
+        // Move the dragged item to the new position
+        if (draggedIndex < targetIndex) {
+          this.parentNode.insertBefore(draggedItem, this.nextSibling);
+        } else {
+          this.parentNode.insertBefore(draggedItem, this);
+        }
+
+        // Update priorities after reordering
+        updatePriorities();
+      }
+    });
+  });
+
+  // Function to update priority values
+  function updatePriorities() {
+    const urlEntries = document.querySelectorAll('.url-entry');
+    urlEntries.forEach((entry, index) => {
+      const priorityInput = entry.querySelector('input[name="priority[]"]');
+      priorityInput.value = (index + 1) * 10; // Assign values like 10, 20, 30, etc.
+    });
+  }
+});
+</script>
