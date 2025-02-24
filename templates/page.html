@@ -20,7 +20,10 @@
       a {
           {{ a_text_decoration }}
       }
-
+      code {
+          {{ text_font_style }}
+      }
+      
       a:link, a:visited, a:hover, a:active {
         color:{{ text_color }};
       }
@@ -31,6 +34,7 @@
 
       .linkclass {
         margin-bottom: .6em;
+        font-size: medium
       }
 
       {%- if not g.is_mobile %}

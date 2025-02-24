@@ -346,6 +346,7 @@ def index():
 
     dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
     no_underlines = request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False)
+    sans_serif = request.cookies.get("SansSerif") or request.args.get('SansSerif', False)
 
     page_order = None
     if request.cookies.get('UrlsVer') == URLS_COOKIE_VERSION:
@@ -369,9 +370,11 @@ def index():
         suffix = suffix + ":DARK"
     if no_underlines:
         suffix = suffix + ":NOUND"
+    if sans_serif:
+        suffix = suffix + ":SANS"
 
     full_page = g_c.get(page_order_s + suffix)
-    if full_page is not None:
+    if not DEBUG and full_page is not None:
         return full_page # Typically, the Python is finished here
 
     if single_column:
@@ -444,8 +447,16 @@ def index():
     if no_underlines:
         text_decoration = "text-decoration:none;"
 
-    #above_html = str(open(ABOVE_HTML_FILE).read()
-    above_html = ''
+    text_font_style = ""
+    if sans_serif:
+        text_font_style = "font-family: sans-serif;"
+
+    try:
+        print(os.getcwd())
+        with open(ABOVE_HTML_FILE, 'r') as f:
+            above_html = f.read()
+    except FileNotFoundError:
+        above_html = ""
 
     if not single_column:
         above_html = above_html.replace("<hr/>", "")
@@ -454,7 +465,7 @@ def index():
                            logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE,
                            description=WEB_DESCRIPTION, favicon=FAVICON,
                            welcome_html=Markup(WELCOME_HTML), a_text_decoration=text_decoration,
-                           above_html=Markup(above_html))
+                           text_font_style=text_font_style, above_html=Markup(above_html))
 
     # Only cache standard order
     if page_order_s == g_standard_order_s:
@@ -488,8 +499,9 @@ class CustomRSSForm(Form):
 
 class ConfigForm(Form):
     delete_cookie = BooleanField(label="Delete cookies")
-    dark_mode = BooleanField(label="Dark mode")
-    no_underlines = BooleanField(label="No underlines")
+    dark_mode = BooleanField(label="Dark Mode")
+    no_underlines = BooleanField(label="No Underlines")
+    sans_serif = BooleanField(label="Sans Serif Font")
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
 
@@ -505,6 +517,10 @@ def config():
         no_underlines = request.cookies.get('NoUnderlines')
         if no_underlines is not None:
             form.no_underlines.data = True
+
+        sans_serif = request.cookies.get('SansSerif')
+        if sans_serif:
+            form.sans_serif.data = True
 
         page_order = request.cookies.get('RssUrls')
         if page_order is not None:
@@ -543,6 +559,7 @@ def config():
             resp.delete_cookie('RssUrls')
             resp.delete_cookie('DarkMode')
             resp.delete_cookie('NoUnderlines')
+            resp.delete_cookie('SansSerif')
             return resp
 
         page_order = []
@@ -583,5 +600,10 @@ def config():
             resp.set_cookie("NoUnderlines", "1", max_age=EXPIRE_YEARS)
         else:
             resp.delete_cookie("NoUnderlines")
+
+        if form.sans_serif.data:
+            resp.set_cookie("SansSerif", "1", max_age=EXPIRE_YEARS)
+        else:
+            resp.delete_cookie("SansSerif")
 
         return resp

@@ -3,9 +3,7 @@
   {%- for e in entries %}
   <div class="linkclass" data-index="{{ loop.index0 }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
     <code>
-      <font size="5">
         <a target="_blank" href="{{ e.link | safe }}">{{ e.title | safe }}</a>
-      </font>
     </code>
   </div>
   {%- endfor %}
