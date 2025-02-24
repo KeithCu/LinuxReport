@@ -487,11 +487,11 @@ def index():
 
 class UrlForm(Form):
     pri = IntegerField('Priority')
-    url = StringField('RSS URL', render_kw={"readonly": True, "style": "width: 300px;"})
+    url = StringField(' ', render_kw={"readonly": True, "style": "width: 300px;"})
 
 class CustomRSSForm(Form):
     pri = IntegerField('Priority')
-    url = StringField('RSS URL', render_kw={"style": "width: 300px;"}, validators=[validators.Length(min=10, max=120)])
+    url = StringField(' ', render_kw={"style": "width: 300px;"}, validators=[validators.Length(min=10, max=120)])
 
 class ConfigForm(Form):
     delete_cookie = BooleanField(label="Delete cookies")
