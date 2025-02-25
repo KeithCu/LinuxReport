@@ -106,11 +106,14 @@
     <div class="url-list">
       {% for urlf in form.urls %}
       <div class="url-entry" draggable="true">
+        {{ render_field(urlf.pri) }}
         {{ render_field(urlf.url) }}
       </div>
       {% endfor %}
+      <div><I>Add Custom RSS feeds here. More coming...</I></div>
       {% for rssf in form.url_custom %}
       <div class="url-entry" draggable="true">
+        {{ render_field(rssf.pri) }}
         {{ render_field(rssf.url) }}
       </div>
       {% endfor %}
