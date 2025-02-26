@@ -5,56 +5,47 @@ ALL_URLS = {
     "http://lxer.com/module/newswire/headlines.rss" :
     RssInfo("lxer.webp",
     "Lxer news",
-    "http://lxer.com/",
-    EXPIRE_HOUR),
+    "http://lxer.com/"),
 
     "https://www.reddit.com/r/linux/.rss" :
     RssInfo("redditlogosmall.webp",
     "Reddit Linux sub",
-    "https://www.reddit.com/r/linux",
-    EXPIRE_HOUR * 4),
+    "https://www.reddit.com/r/linux"),
 
     "http://rss.slashdot.org/Slashdot/slashdotMain" :
     RssInfo("slashdotlogo.webp",
     "Slashdot",
-    "https://slashdot.org/",
-    EXPIRE_HOUR * 2),
+    "https://slashdot.org/"),
 
     "https://lwn.net/headlines/newrss" :
     RssInfo("barepenguin-70.webp",
     "LWN.net news",
-    "https://lwn.net/",
-    EXPIRE_DAY),
+    "https://lwn.net/"),
 
     "https://news.ycombinator.com/rss" :
     RssInfo("hackernews.webp",
     "Ycombinator news",
-    "http://news.ycombinator.com/",
-    EXPIRE_HOUR * 2),
+    "http://news.ycombinator.com/"),
 
     "https://www.osnews.com/feed/" :
     RssInfo("osnews-logo.webp",
     "OS News.com",
-    "http://www.osnews.com/",
-    EXPIRE_HOUR * 4),
+    "http://www.osnews.com/"),
 
     "https://www.geekwire.com/feed/" :
     RssInfo("GeekWire.png",
     "GeekWire",
-    "http://www.geekwire.com/",
-    EXPIRE_HOUR * 8), #Slow and slow-changing, so fetch less
+    "http://www.geekwire.com/"), #Slow and slow-changing, so fetch less
 
     "http://feeds.feedburner.com/linuxtoday/linux" :
     RssInfo("linuxtd_logo.png",
     "Linux Today",
-    "http://www.linuxtoday.com/",
-    EXPIRE_DAY),
+    "http://www.linuxtoday.com/"),
 
     "https://planet.debian.org/rss20.xml" :
     RssInfo("Debian-OpenLogo.svg",
     "Planet Debian",
-    "http://planet.debian.org/",
-    EXPIRE_HOUR * 4),
+    "http://planet.debian.org/"),
 }
 
 USER_AGENT = "Linux Report -- https://linuxreport.net/"

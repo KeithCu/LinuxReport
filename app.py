@@ -11,6 +11,7 @@ from enum import Enum
 from datetime import datetime, timedelta, timezone
 from timeit import default_timer as timer
 import difflib
+import zoneinfo
 
 import feedparser
 from flask import Flask, render_template, request, g
@@ -24,7 +25,7 @@ sys.path.insert(0, '.')
 
 from feedfilter import prefilter_news
 import shared
-from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES
+from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES, FeedHistory, TZ
 from patriotsfetch import fetch_patriots
 
 class Mode(Enum):
@@ -37,11 +38,11 @@ class Mode(Enum):
 
 MODE = Mode.TRUMP_REPORT
 
-DEBUG = False
-
 g_app = Flask(__name__)
 Mobility(g_app)
 application = g_app
+
+DEBUG = False
 
 if DEBUG or g_app.debug:
     EXPIRE_MINUTES = 1
@@ -56,6 +57,8 @@ RSS_TIMEOUT = 15
 URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {}
+
+history = FeedHistory()
 
 if MODE == Mode.LINUX_REPORT:
     from linux_report_settings import *
@@ -80,19 +83,11 @@ class FSCache():
     #This deserializes entire feed, just to get the timestamp
     #Not called too often so doesn't matter currently.
     def has_feed_expired(self, url):
-        feed_info = g_c.get(url)
-        if not isinstance(feed_info, RssFeed):
+        feed = self.get(url)
+        if not isinstance(feed, RssFeed):
             return True
-        return feed_info.expiration < datetime.now(timezone.utc)
-
-    #This should be faster, but needs extra files to be created
-    #EXPIRE_FILE = True
-    def has_feed_expiredfast(self, url):
-        expires = g_c.get(url + ":EXPIRES")
-        if expires is None:
-            return True
-        return expires < datetime.now(timezone.utc)
-
+        return history.has_expired(url, feed.last_fetch)
+    
     def put(self, url, template, timeout):
         self._cache.set(url, template, timeout)
 
@@ -169,11 +164,8 @@ def merge_entries(new_entries, old_entries, title_threshold=0.85):
 
     return merged
 
-
 def load_url_worker(url):
     rss_info = ALL_URLS[url]
-
-    expire_time = rss_info.expire_time
 
     feedpid = None
     
@@ -188,95 +180,23 @@ def load_url_worker(url):
         start = timer()
         rssfeed = None
 
-        if "Women" in url or "bandcamp" in url:
-            scraper = AutoScraper()
+        rssfeed = g_c.get(url)
 
-            result2 = []
-            try:
-                if "Women" in url:
-                    scraper.load('/tmp/wowax-scrape')
-                elif "bandcamp" in url:
-                    scraper.load('/tmp/bandcamp-scrape')
-                result2 = scraper.get_result_similar(url, grouped=True)
-
-            except:
-                if "Women" in url:
-                    url_fetch = 'https://keithcu.com/WomenOnWaxTest/'
-                    wanted_list = ['https://www.traxsource.com/title/1492869/blind-amerikkka', 'Blind Amerikkka']
-                elif "bandcamp" in url:
-                    url_fetch = 'https://keithcu.com/BandcampTestRS/'
-                    wanted_list = ['https://keithcu.com/album/rsd020-abc-versions', 'RSD020 // ABC Versions']
-
-                result = scraper.build(url=url_fetch, wanted_list=wanted_list)
-                result2 = scraper.get_result_similar(url_fetch, grouped=True)
-                if "Women" in url:
-                    scraper.save('/tmp/wowax-scrape')
-                elif "bandcamp" in url:
-                    scraper.save('/tmp/bandcamp-scrape')
-
-            #Format received: dictionary containing two lists
-            #Format needed: list containing dictionary entries for title and link                
-            rules = list(result2.keys())
-            rule1 = rules[0]
-            rule2 = rules[1]
-
-            rss_feed = []
-            for entry_url, entry_title in zip(result2[rule1], result2[rule2]):
-                entry_dict = {"title" : entry_title, "link" : entry_url}
-                rss_feed.append(entry_dict)
-
-            #Put them in reverse order
-            entries = list(reversed(rss_feed))
-            entries = list(itertools.islice(entries, MAX_ITEMS))
-
-            rssfeed = RssFeed(entries)
-            rssfeed.expiration = datetime.now(timezone.utc) + timedelta(seconds=expire_time)
-
-            g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
-
+        if "patriots" in url:
+            res = fetch_patriots()
         else:
-            etag = ''
-            last_modified = datetime.now(timezone.utc) - timedelta(seconds=EXPIRE_YEARS)
+            res = feedparser.parse(url)
 
-            rssfeed = g_c.get(url)
-            if rssfeed != None:
-                etag = rssfeed.etag
-                last_modified = rssfeed.last_modified
+        entries = prefilter_news(url, res)
+        entries = filter_similar_titles(url, entries)
+        # Merge with cached entries (if any) to retain history.
+        old_feed = g_c.get(url)
 
-            if "patriots" in url:
-                res = fetch_patriots()
-            else:
-                res = feedparser.parse(url, etag=etag, modified=last_modified)
+        if old_feed and entries is not None:
+            entries = merge_entries(entries, old_feed.entries)
+        entries = list(itertools.islice(entries, MAX_ITEMS))
 
-            #No content changed:
-            if False and rssfeed and hasattr(res, 'status') and (res.status == 304 or res.status == 301):
-                print("No new info parsing from: %s, etag: %s, last_modified: %s." %(url, etag, last_modified))
-
-                rssfeed.expiration = datetime.utcnow() + timedelta(seconds=expire_time)
-                g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
-                g_c.delete(url + "FETCHPID")
-                return
-
-            entries = prefilter_news(url, res)
-            entries = filter_similar_titles(url, entries)
-            # Merge with cached entries (if any) to retain history.
-            old_feed = g_c.get(url)
-
-            if old_feed and entries is not None:
-                entries = merge_entries(entries, old_feed.entries)
-            entries = list(itertools.islice(entries, MAX_ITEMS))
-
-            rssfeed = RssFeed(entries)
-                
-            rssfeed.expiration = datetime.now(timezone.utc) + timedelta(seconds=expire_time)
-            # if hasattr(res, 'etag'):
-            #     rssfeed.etag = res.etag
-
-            # if hasattr(res, 'modified'):
-            #     rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.modified_parsed))
-            # elif res.feed.get('updated_parsed', None) is not None:
-            #     rssfeed.last_modified = datetime.fromtimestamp(time.mktime(res.feed.updated_parsed))
-
+        rssfeed = RssFeed(entries, datetime.now(TZ))            
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
@@ -284,7 +204,7 @@ def load_url_worker(url):
 
         g_c.delete(url + "FETCHPID")
         end = timer()
-        print(f"Parsing from: {url}, etag: {rssfeed.etag}, last-modified {rssfeed.last_modified}, in {end - start:f}.")
+        print(f"Parsing from: {url}, in {end - start:f}.")
     else:
         print(f"Waiting for someone else to parse remote site {url}.")
 

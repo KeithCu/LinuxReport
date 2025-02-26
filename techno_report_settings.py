@@ -4,50 +4,42 @@ ALL_URLS = {
     "http://detroiteq.com/feed" :
     RssInfo("deq.png",
     "Detroit Electronic Quarterly",
-    "http://detroiteq.com/",
-    EXPIRE_DAY),
+    "http://detroiteq.com/"),
 
     "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530" :
     RssInfo("Google-News.png",
     "Google Detroit Techno news",
-    "https://news.google.com/search?q=detroit techno",
-    EXPIRE_DAY),
+    "https://news.google.com/search?q=detroit techno"),
 
     "https://keithcu.com/BandcampTestRS/" :
     RssInfo("RockSteadyDisco.png",
     "RockSteady Disco",
-    "https://rocksteadydisco.bandcamp.com/music",
-    EXPIRE_DAY),
+    "https://rocksteadydisco.bandcamp.com/music"),
 
     "https://keithcu.com/BandcampTest2/" :
     RssInfo("Transmat.png",
     "Transmat",
-    "https://transmatdetroit.bandcamp.com/music",
-    EXPIRE_DAY),
+    "https://transmatdetroit.bandcamp.com/music"),
 
     "https://placeintimeandspace.com/feed/" :
     RssInfo("pits.png",
     "Place In Time And Space",
-    "https://placeintimeandspace.com/",
-    EXPIRE_DAY),
+    "https://placeintimeandspace.com/"),
 
     "https://keithcu.com/PlanetETest" :
     RssInfo("planete.png",
     "Planet-E Communications",
-    "https://planetecommunications.bandcamp.com/music",
-    EXPIRE_DAY),
+    "https://planetecommunications.bandcamp.com/music"),
 
     "https://keithcu.com/SampledDetroitTest" :
     RssInfo("SampledDetroit.png",
     "Sampled Detroit",
-    "https://sampleddetroit.bandcamp.com/music",
-    EXPIRE_DAY),
+    "https://sampleddetroit.bandcamp.com/music"),
 
     "https://keithcu.com/WomenOnWaxTest/" :
     RssInfo("womenonwax.png",
     "Women On Wax",
-    "https://womenonwax.com/",
-    EXPIRE_DAY),
+    "https://womenonwax.com/"),
 }
 
 USER_AGENT = "The Detroit Techno Report -- http://news.thedetroitilove.com/"

@@ -4,75 +4,62 @@ ALL_URLS = {
     "https://revolver.news/feed" :
     RssInfo("revolvernews.png",
     "Revolver News",
-    "https://revolver.news/",
-    EXPIRE_HOUR * 2),
+    "https://revolver.news/"),
 
     "https://justthenews.com/rss.xml" :
     RssInfo("justthenewslogo.svg",
     "Just The News",
-    "https://justthenews.com/",
-    EXPIRE_HOUR * 2),
+    "https://justthenews.com/"),
 
     "https://citizenfreepress.com/feed/" :
     RssInfo("citizenfreepress.webp",
     "Citizen Free Press",
-    "https://citizenfreepress.com",
-    EXPIRE_HOUR * 2),
+    "https://citizenfreepress.com"),
 
     "https://patriots.win/fakefeed" : #No RSS feed, custom parser will handle
     RssInfo("patriotswin.webp",
     "Patriots.win",
-    "https://patriots.win",
-    EXPIRE_HOUR * 2),
+    "https://patriots.win"),
 
     "https://thefederalist.com/feed/" :
     RssInfo("federalist.webp",
     "The Federalist",
-    "https://thefederalist.com/",
-    EXPIRE_HOUR * 2),
+    "https://thefederalist.com/"),
 
     "http://bonginoreport.com/index.rss" :
     RssInfo("bonginoreport.png",
     "Bongino Report",
-    "https://bonginoreport.com",
-    EXPIRE_HOUR * 2),
+    "https://bonginoreport.com"),
 
     "https://freebeacon.com/feed/" :
     RssInfo("freebeacon.png",
     "Free Beacon",
-    "https://freebeacon.com",
-    EXPIRE_HOUR * 2),
+    "https://freebeacon.com"),
 
     "https://feeds.feedburner.com/breitbart" :
     RssInfo("breitbart.webp",
     "Breitbart",
-    "https://breitbart.com",
-    EXPIRE_HOUR * 2),
+    "https://breitbart.com"),
 
     "https://nypost.com/feed/" :
     RssInfo("nypost.webp",
     "New York Post",
-    "https://nypost.com",
-    EXPIRE_HOUR * 2),
+    "https://nypost.com"),
 
     "https://www.washingtonexaminer.com/feed/" :
     RssInfo("washingtonexaminer.webp",
     "Washington Examiner",
-    "https://washingtonexaminer.com",
-    EXPIRE_HOUR * 2),
+    "https://washingtonexaminer.com"),
 
     "https://conservativereview.com/feeds/feed.rss" :
     RssInfo("conservativereview.webp",
     "Conservative Review",
-    "https://conservativereview.com",
-    EXPIRE_HOUR * 3),
+    "https://conservativereview.com"),
 
     "https://townhall.com/feed/" :
     RssInfo("logo-townhall.svg",
     "Townhall",
-    "https://townhall.com",
-    EXPIRE_HOUR * 2),
-
+    "https://townhall.com"),
 
 }
 
