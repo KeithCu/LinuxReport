@@ -61,12 +61,18 @@ ALL_URLS = {
     "https://washingtonexaminer.com",
     EXPIRE_HOUR * 2),
 
-
     "https://conservativereview.com/feeds/feed.rss" :
     RssInfo("conservativereview.webp",
     "Conservative Review",
     "https://conservativereview.com",
     EXPIRE_HOUR * 3),
+
+    "https://townhall.com/feed/" :
+    RssInfo("logo-townhall.svg",
+    "Townhall",
+    "https://townhall.com",
+    EXPIRE_HOUR * 2),
+
 
 }
 
@@ -80,6 +86,7 @@ site_urls = [
     "https://justthenews.com/rss.xml",
     "https://thefederalist.com/feed/",
     "https://freebeacon.com/feed/",
+    "https://townhall.com/feed/",
     "https://citizenfreepress.com/feed/",
     "http://bonginoreport.com/index.rss",
     "https://nypost.com/feed/",
