@@ -4,38 +4,32 @@ ALL_URLS = {
     "https://www.reddit.com/r/LocalLlama/.rss" :
     RssInfo("LocalLlama.png",
     "Machine Learning sub",
-    "https://www.reddit.com/r/LocalLlama/",
-    EXPIRE_HOUR),
+    "https://www.reddit.com/r/LocalLlama/"),
 
     "https://venturebeat.com/category/ai/feed/" :
     RssInfo("VentureBeat_logo.png",
     "VentureBeat AI",
-    "https://venturebeat.com/category/ai/",
-    EXPIRE_HOUR),
+    "https://venturebeat.com/category/ai/"),
 
     "https://www.theregister.com/software/ai_ml/headlines.atom" :
     RssInfo("RegisterLogo.png",
     "The Register AI News",
-    "https://www.theregister.com/software/ai_ml/",
-    EXPIRE_HOUR),
+    "https://www.theregister.com/software/ai_ml/"),
 
     "https://hnrss.org/newest?tags=ai" :
     RssInfo("hackernews.webp",
     "YCombinator",
-    "https://news.ycombinator.com/",
-    EXPIRE_DAY),
+    "https://news.ycombinator.com/"),
 
     "https://www.reddit.com/r/Python/.rss" :
     RssInfo("redditlogosmall.webp",
     "Reddit Python",
-    "https://www.reddit.com/r/Python/",
-    EXPIRE_DAY),
+    "https://www.reddit.com/r/Python/"),
 
     "https://planetpython.org/rss20.xml" :
     RssInfo("Python-logo-notext.svg",
     "Planet Python",
-    "https://planetpython.org/",
-    EXPIRE_DAY),
+    "https://planetpython.org/"),
 }
 
 USER_AGENT = "AI Report -- https://aireport.keithcu.com"
