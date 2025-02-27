@@ -28,7 +28,7 @@ sys.path.insert(0, PATH)
 from feedfilter import prefilter_news
 import shared
 from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES, FeedHistory, TZ
-from patriotsfetch import fetch_patriots
+from seleniumfetch import fetch_site_posts 
 
 class Mode(Enum):
     LINUX_REPORT = 1
@@ -75,6 +75,7 @@ elif MODE == Mode.TRUMP_REPORT:
     from trump_report_settings import *
 
 feedparser.USER_AGENT = USER_AGENT
+
 EXPIRE_FILE = False
 class FSCache():
     def __init__(self):
@@ -185,8 +186,9 @@ def load_url_worker(url):
 
         rssfeed = g_c.get(url)
 
-        if "patriots" in url:
-            res = fetch_patriots()
+        if "fakefeed" in url:
+            rss_info = ALL_URLS[url]
+            res = fetch_site_posts(rss_info.site_url)
         else:
             res = feedparser.parse(url)
 

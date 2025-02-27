@@ -35,7 +35,7 @@ ALL_URLS = {
     "https://www.geekwire.com/feed/" :
     RssInfo("GeekWire.png",
     "GeekWire",
-    "http://www.geekwire.com/"), #Slow and slow-changing, so fetch less
+    "http://www.geekwire.com/"),
 
     "http://feeds.feedburner.com/linuxtoday/linux" :
     RssInfo("linuxtd_logo.png",
@@ -46,6 +46,11 @@ ALL_URLS = {
     RssInfo("Debian-OpenLogo.svg",
     "Planet Debian",
     "http://planet.debian.org/"),
+
+    "https://breitbart.com/fakefeed" :
+    RssInfo("breitbart.webp",
+    "Breitbart Tech feed",
+    "https://breitbart.com/tech/"),
 }
 
 USER_AGENT = "Linux Report -- https://linuxreport.net/"
@@ -56,6 +61,7 @@ site_urls = [
     "https://lwn.net/headlines/newrss",
     "https://news.ycombinator.com/rss",
     "https://www.osnews.com/feed/",
+    "https://breitbart.com/fakefeed" ,
     "https://www.geekwire.com/feed/",
     "http://feeds.feedburner.com/linuxtoday/linux",
     "https://planet.debian.org/rss20.xml",
