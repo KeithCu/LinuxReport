@@ -39,7 +39,7 @@ SMOOTHING_FACTOR = 0.7                # Weight for exponential smoothing (0-1)
 
 class FeedHistory:
     """Manages historical fetch data and refresh intervals."""
-    def __init__(self, data_file: str = "feed_history.pickle"):
+    def __init__(self, data_file: str):
         self.data_file = Path(data_file)
         self.lock = threading.RLock()
         self.data: Dict[str, dict] = self._load_data()
@@ -62,13 +62,13 @@ class FeedHistory:
         bucket = dt.hour // BUCKET_SIZE_HOURS
         return f"{'weekday' if is_weekday else 'weekend'}-{bucket}"
 
-    def update_fetch(self, url: str, new_articles: int, fetch_time: datetime):
-        """Record fetch outcome and update history."""
+    def update_fetch(self, url: str, new_articles: int):
+        fetch_time = datetime.now(TZ)
         with self.lock:
             feed_data = self.data.setdefault(url, {
                 "buckets": {},  # Frequency per time bucket
                 "recent": [],   # Last HISTORY_WINDOW fetches: (time, new_articles)
-                "interval": EXPIRE_HOUR.total_seconds()  # Default in seconds
+                "interval": EXPIRE_HOUR  # Default in seconds
             })
 
             # Update recent fetches

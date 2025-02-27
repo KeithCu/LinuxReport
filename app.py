@@ -21,7 +21,9 @@ from wtforms import Form, BooleanField, FormField, FieldList, StringField, Integ
 from markupsafe import Markup
 from autoscraper import AutoScraper
 
-sys.path.insert(0, '.')
+PATH = '/run/linuxreport'
+
+sys.path.insert(0, PATH)
 
 from feedfilter import prefilter_news
 import shared
@@ -58,7 +60,8 @@ URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {}
 
-history = FeedHistory()
+
+history = FeedHistory(data_file = f"{PATH}/feed_history{str(MODE)}.pickle")
 
 if MODE == Mode.LINUX_REPORT:
     from linux_report_settings import *
@@ -187,14 +190,22 @@ def load_url_worker(url):
         else:
             res = feedparser.parse(url)
 
-        entries = prefilter_news(url, res)
-        entries = filter_similar_titles(url, entries)
+        new_entries = prefilter_news(url, res)
+        new_entries = filter_similar_titles(url, new_entries)
         # Merge with cached entries (if any) to retain history.
         old_feed = g_c.get(url)
 
-        if old_feed and entries is not None:
-            entries = merge_entries(entries, old_feed.entries)
+        new_count = len(new_entries)
+
+        if old_feed and old_feed.entries:
+            new_count = len(set(e.get('link') for e in new_entries) - set(e.get('link') for e in old_feed.entries))
+            entries = merge_entries(new_entries, old_feed.entries)
+        else:
+            entries = new_entries
+
         entries = list(itertools.islice(entries, MAX_ITEMS))
+
+        history.update_fetch(url, new_count)
 
         rssfeed = RssFeed(entries, datetime.now(TZ))            
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
