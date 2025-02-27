@@ -30,11 +30,18 @@ ALL_URLS = {
     RssInfo("Python-logo-notext.svg",
     "Planet Python",
     "https://planetpython.org/"),
+
+    "https://www.reddit.com/r/Grok/.rss" :
+    RssInfo("Grok.gif",
+    "Reddit Grok",
+    "https://www.reddit.com/r/Grok/"),
+
 }
 
 USER_AGENT = "AI Report -- https://aireport.keithcu.com"
 site_urls = [
     "https://www.reddit.com/r/LocalLlama/.rss",
+    "https://www.reddit.com/r/Grok/.rss",
     "https://venturebeat.com/category/ai/feed/",
     "https://www.theregister.com/software/ai_ml/headlines.atom",
     "https://hnrss.org/newest?tags=ai",
@@ -42,11 +49,10 @@ site_urls = [
     "https://planetpython.org/rss20.xml",
 ]
 
-domain = "https://aireport.keithcu.com"
-
-URL_IMAGES = domain + "/static/images/"
-FAVICON = domain + "/static/images/covidreport192.ico"
-LOGO_URL = domain + "/static/images/AIReport.webp"
+DOMAIN = "https://aireport.keithcu.com"
+URL_IMAGES = DOMAIN + "/static/images/"
+FAVICON = URL_IMAGES + "covidreport192.ico"
+LOGO_URL = URL_IMAGES + "AIReport.webp"
 WEB_DESCRIPTION = "AI News"
 WEB_TITLE = "AI Report"
 
