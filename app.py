@@ -194,6 +194,9 @@ def load_url_worker(url):
 
         new_entries = prefilter_news(url, res)
         new_entries = filter_similar_titles(url, new_entries)
+        #Trim the entries
+        new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
+
         # Merge with cached entries (if any) to retain history.
         old_feed = g_c.get(url)
 

@@ -31,7 +31,7 @@ EXPIRE_YEARS = 86400 * 365 * 2
 from shared import RssFeed, RssInfo, EXPIRE_HOUR, EXPIRE_DAY
 
 # Constants
-MIN_INTERVAL = timedelta(minutes=1)
+MIN_INTERVAL = timedelta(minutes=60)
 MAX_INTERVAL = timedelta(hours=24)
 BUCKET_SIZE_HOURS = 4                 # 6 buckets per day
 HISTORY_WINDOW = 5                    # Track last 5 fetches
