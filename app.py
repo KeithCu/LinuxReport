@@ -16,10 +16,12 @@ import zoneinfo
 import feedparser
 from flask import Flask, render_template, request, g
 from flask_mobility import Mobility
-from flask_caching import Cache
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators
 from markupsafe import Markup
 from autoscraper import AutoScraper
+
+from pathlib import Path
+import diskcache
 
 PATH = '/run/linuxreport'
 
@@ -76,33 +78,28 @@ elif MODE == Mode.TRUMP_REPORT:
 
 feedparser.USER_AGENT = USER_AGENT
 
-EXPIRE_FILE = False
-class FSCache():
-    def __init__(self):
-        self._cache = Cache(g_app, config={'CACHE_TYPE': 'filesystem',
-                                           'CACHE_DIR' : '/run/linuxreport/',
-                                           'CACHE_DEFAULT_TIMEOUT' : EXPIRE_DAY,
-                                           'CACHE_THRESHOLD' : 0})
+class DiskCacheWrapper:
+    def __init__(self, cache_dir):
+        self.cache = diskcache.Cache(cache_dir)
 
-    #This deserializes entire feed, just to get the timestamp
-    #Not called too often so doesn't matter currently.
+    def has(self, key):
+        return key in self.cache
+
+    def get(self, key):
+        return self.cache.get(key)
+
+    def put(self, key, value, timeout=None):
+        self.cache.set(key, value, expire=timeout)
+
+    def delete(self, key):
+        self.cache.delete(key)
+
     def has_feed_expired(self, url):
-        feed = self.get(url)
-        if not isinstance(feed, RssFeed):
+        last_fetch = self.get(url + ":last_fetch")
+        if last_fetch is None:
             return True
-        return history.has_expired(url, feed.last_fetch)
-    
-    def put(self, url, template, timeout):
-        self._cache.set(url, template, timeout)
+        return history.has_expired(url, last_fetch)
 
-    def has(self, url):
-        return self._cache.cache.has(url)
-
-    def get(self, url):
-        return self._cache.get(url)
-
-    def delete(self, url):
-        self._cache.delete(url)
 
 #If we've seen this title in other feeds, then filter it.
 def filter_similar_titles(url, entries):
@@ -194,7 +191,7 @@ def load_url_worker(url):
 
         new_entries = prefilter_news(url, res)
         new_entries = filter_similar_titles(url, new_entries)
-        #Trim the entries
+        #Trim the entries to the limit before compare so it doesn't find 500 new entries.
         new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
 
         # Merge with cached entries (if any) to retain history.
@@ -208,12 +205,14 @@ def load_url_worker(url):
         else:
             entries = new_entries
 
+        #Trim the limit again after merge.
         entries = list(itertools.islice(entries, MAX_ITEMS))
 
         history.update_fetch(url, new_count)
 
-        rssfeed = RssFeed(entries, datetime.now(TZ))            
+        rssfeed = RssFeed(entries)            
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
+        g_c.put(url + ":last_fetch", datetime.now(TZ), timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
             g_c.delete(rss_info.site_url)
@@ -278,7 +277,7 @@ def index():
 
     if g_c is None:
         socket.setdefaulttimeout(RSS_TIMEOUT)
-        g_c = FSCache()
+        g_c = DiskCacheWrapper('.')
 
     dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
     no_underlines = request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False)
