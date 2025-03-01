@@ -277,7 +277,7 @@ def index():
 
     if g_c is None:
         socket.setdefaulttimeout(RSS_TIMEOUT)
-        g_c = DiskCacheWrapper('.')
+        g_c = DiskCacheWrapper(PATH)
 
     dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
     no_underlines = request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False)
