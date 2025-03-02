@@ -52,7 +52,7 @@ site_urls = [
 DOMAIN = "https://aireport.keithcu.com"
 URL_IMAGES = DOMAIN + "/static/images/"
 FAVICON = URL_IMAGES + "covidreport192.ico"
-LOGO_URL = URL_IMAGES + "AIReport.webp"
+LOGO_URL = URL_IMAGES + "aireportfancy.webp"
 WEB_DESCRIPTION = "AI News"
 WEB_TITLE = "AI Report"
 
