@@ -74,19 +74,8 @@ def save_as_webp(image_content):
 
     return filename
 
-def update_html_file(html_file, title, image_filename):
+def update_html_file(html_file, title, image_filename, article_url):
     """Update the HTML file with a new entry, keeping only the latest two."""
-    # Define the new entry
-    new_entry = f'''
-<center>
-  <code>
-    <font size="6"><b>{title}</b></font>
-  </code>
-  <br/>
-  <img src="/static/images/{image_filename}" width="300" alt="{title}">
-</center>
-'''
-
     # Read existing content or initialize empty
     try:
         with open(html_file, 'r') as f:
@@ -98,15 +87,34 @@ def update_html_file(html_file, title, image_filename):
     soup = BeautifulSoup(content, 'html.parser')
 
     # Create the new center element
-    new_center = BeautifulSoup(new_entry, 'html.parser').center
+    new_center = soup.new_tag('center')
+
+    # Title as a clickable link
+    code = soup.new_tag('code')
+    font = soup.new_tag('font', size='6')
+    b = soup.new_tag('b')
+    a_title = soup.new_tag('a', href=article_url, target='_blank')
+    a_title.string = title
+    b.append(a_title)
+    font.append(b)
+    code.append(font)
+    new_center.append(code)
+
+    # Line break
+    br = soup.new_tag('br')
+    new_center.append(br)
+
+    # Image as a clickable link
+    a_img = soup.new_tag('a', href=article_url, target='_blank')
+    img = soup.new_tag('img', src=f'/static/images/{image_filename}', width='300', alt=title)
+    a_img.append(img)
+    new_center.append(a_img)
 
     # Insert the new entry at the beginning
     soup.insert(0, new_center)
 
-    # Find all <center> elements
+    # Keep only the first two <center> elements
     centers = soup.find_all('center')
-
-    # Remove excess entries (keep only the first two)
     for center in centers[2:]:
         center.decompose()
 
