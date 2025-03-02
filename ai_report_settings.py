@@ -36,18 +36,23 @@ ALL_URLS = {
     "Reddit Grok",
     "https://www.reddit.com/r/Grok/"),
 
-
     "https://huggingface.co/blog/feed.xml" :
     RssInfo("hf-logo.svg",
     "HuggingFace Blog",
     "https://huggingface.co/blog/"),
+
+    "https://feed.infoq.com/ai-ml-data-eng/" :
+    RssInfo("infoq.png",
+    "InfoQ AI",
+    "https://www.infoq.com/ai-ml-data-eng/")
 }
 
 USER_AGENT = "AI Report -- https://aireport.keithcu.com"
 site_urls = [
     "https://www.reddit.com/r/LocalLlama/.rss",
-    "https://www.reddit.com/r/Grok/.rss",
+    "https://feed.infoq.com/ai-ml-data-eng/" :
     "https://huggingface.co/blog/feed.xml",
+    "https://www.reddit.com/r/Grok/.rss",
     "https://venturebeat.com/category/ai/feed/",
     "https://www.theregister.com/software/ai_ml/headlines.atom",
     "https://hnrss.org/newest?tags=ai",
