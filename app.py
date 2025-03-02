@@ -184,7 +184,6 @@ def load_url_worker(url):
         rssfeed = g_c.get(url)
 
         if "fakefeed" in url:
-            rss_info = ALL_URLS[url]
             res = fetch_site_posts(rss_info.site_url)
         else:
             res = feedparser.parse(url)
@@ -328,7 +327,7 @@ def index():
         rss_info = ALL_URLS.get(url, None)
 
         if rss_info is None:
-            rss_info = RssInfo("Custom.png", "Custom site", url + "HTML", EXPIRE_HOUR * 3)
+            rss_info = RssInfo("Custom.png", "Custom site", url + "HTML")
             ALL_URLS[url] = rss_info
 
         expired_rss = g_c.has_feed_expired(url)
