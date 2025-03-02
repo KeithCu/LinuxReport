@@ -147,7 +147,7 @@ def main():
     image_filename = save_as_webp(image_content)
 
     # Update the HTML file
-    update_html_file(html_file, title, image_filename)
+    update_html_file(html_file, title, image_filename, url)
 
     print(f"Added image to {html_file} with title '{title}'")
 
