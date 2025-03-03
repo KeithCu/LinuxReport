@@ -41,10 +41,10 @@ ALL_URLS = {
     "Breitbart",
     "https://breitbart.com"),
 
-    "https://nypost.com/feed/" :
+    "https://nypost.com/politics/feed/" :
     RssInfo("nypost.webp",
-    "New York Post",
-    "https://nypost.com"),
+    "New York Post Politics Section",
+    "https://nypost.com/politics/"),
 
     "https://www.washingtonexaminer.com/feed/" :
     RssInfo("washingtonexaminer.webp",
@@ -70,13 +70,13 @@ site_urls = [
     "https://feeds.feedburner.com/breitbart",
     "https://patriots.win/fakefeed",
     "https://revolver.news/feed",
+    "https://nypost.com/politics/feed/",
     "https://justthenews.com/rss.xml",
     "https://thefederalist.com/feed/",
     "https://freebeacon.com/feed/",
     "https://townhall.com/feed/",
     "https://citizenfreepress.com/feed/",
     "http://bonginoreport.com/index.rss",
-    "https://nypost.com/feed/",
     "https://www.washingtonexaminer.com/feed/",
     "https://conservativereview.com/feeds/feed.rss",
 ]
