@@ -50,7 +50,7 @@ ALL_URLS = {
 USER_AGENT = "AI Report -- https://aireport.keithcu.com"
 site_urls = [
     "https://www.reddit.com/r/LocalLlama/.rss",
-    "https://feed.infoq.com/ai-ml-data-eng/" :
+    "https://feed.infoq.com/ai-ml-data-eng/",
     "https://huggingface.co/blog/feed.xml",
     "https://www.reddit.com/r/Grok/.rss",
     "https://venturebeat.com/category/ai/feed/",
@@ -69,7 +69,7 @@ WEB_TITLE = "AI Report"
 
 ABOVE_HTML_FILE = 'covidreportabove.html'
 
-WELCOME_HTML = ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
+WELCOME_HTML = ('<font size="4">(Displays instantly, refreshes hourly -- See also <b><a target="_blank" href = '
 '"https://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
 'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
 'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')

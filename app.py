@@ -278,9 +278,9 @@ def index():
         socket.setdefaulttimeout(RSS_TIMEOUT)
         g_c = DiskCacheWrapper(PATH)
 
-    dark_mode = request.cookies.get('DarkMode') or request.args.get('DarkMode', False)
-    no_underlines = request.cookies.get("NoUnderlines") or request.args.get('NoUnderlines', False)
-    sans_serif = request.cookies.get("SansSerif") or request.args.get('SansSerif', False)
+    dark_mode = request.cookies.get('DarkMode') 
+    no_underlines = (request.cookies.get("NoUnderlines", "1") == "1") 
+    sans_serif = (request.cookies.get("SansSerif", "1") == "1") 
 
     page_order = None
     if request.cookies.get('UrlsVer') == URLS_COOKIE_VERSION:
@@ -444,13 +444,11 @@ def config():
         if dark_mode:
             form.dark_mode.data = True
 
-        no_underlines = request.cookies.get('NoUnderlines')
-        if no_underlines is not None:
-            form.no_underlines.data = True
+        no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
+        form.no_underlines.data = no_underlines_cookie == "1"
 
-        sans_serif = request.cookies.get('SansSerif')
-        if sans_serif:
-            form.sans_serif.data = True
+        sans_serif_cookie = request.cookies.get('SansSerif', "1")
+        form.sans_serif.data = sans_serif_cookie == "1"
 
         page_order = request.cookies.get('RssUrls')
         if page_order is not None:
@@ -526,14 +524,7 @@ def config():
         else:
             resp.delete_cookie('DarkMode')
 
-        if form.no_underlines.data:
-            resp.set_cookie("NoUnderlines", "1", max_age=EXPIRE_YEARS)
-        else:
-            resp.delete_cookie("NoUnderlines")
-
-        if form.sans_serif.data:
-            resp.set_cookie("SansSerif", "1", max_age=EXPIRE_YEARS)
-        else:
-            resp.delete_cookie("SansSerif")
+        resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
+        resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_YEARS)
 
         return resp
