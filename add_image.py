@@ -106,7 +106,7 @@ def update_html_file(html_file, title, image_filename, article_url):
 
     # Image as a clickable link
     a_img = soup.new_tag('a', href=article_url, target='_blank')
-    img = soup.new_tag('img', src=f'/static/images/{image_filename}', width='300', alt=title)
+    img = soup.new_tag('img', src=f'/static/images/{image_filename}', width='500', alt=title)
     a_img.append(img)
     new_center.append(a_img)
 
