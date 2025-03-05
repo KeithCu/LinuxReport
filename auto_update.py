@@ -8,7 +8,7 @@ import importlib.util
 import re
 from rapidfuzz import process, fuzz
 import string
-
+import datetime
 from jinja2 import Template
 
 from add_image import fetch_largest_image, save_as_webp, update_html_file
@@ -24,11 +24,14 @@ client = OpenAI(
     base_url="https://api.together.xyz/v1",
 )
 
-banned_words = [
+BANNED_WORDS = [
     "tmux",
+    "redox",
 ]
 modetoprompt = {
-    "linux": f"Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other distro. Of course anything non-distro-specific is fine, but nothing about the following topics: {', '.join(banned_words)}.\n",
+    "linux": f"""Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other
+    distro. Of course anything non-distro-specific is fine, but nothing about the 
+    following topics: {', '.join(BANNED_WORDS)}.\n""",
     "ai": "AI Language Model Researchers. Nothing about AI security.",
     "covid": "COVID-19 researchers",
     "trump": "Trump's biggest fans",
@@ -36,11 +39,19 @@ modetoprompt = {
 
 base = "/srv/http/"
 
-modetopath = {
+MODE_TO_PATH = {
     "linux": base + "LinuxReport2",
     "ai": base + "aireport",
     "covid": base + "CovidReport2",
     "trump": base + "trumpreport",
+}
+
+#Simple schedule for when to do updates. Service calls hourly
+MODE_TO_SCHEDULE = {
+    "linux": [8, 12, 16],
+    "ai": [8, 16],
+    "covid": [8, 16],
+    "trump": [4, 8, 10, 12, 14, 16, 20],
 }
 
 cache = DiskCacheWrapper(".")
@@ -161,7 +172,7 @@ def main(mode):
     ALL_URLS = module.ALL_URLS
 
     base_path = PATH
-    mode_dir = os.path.join(base_path, modetopath[mode])
+    mode_dir = os.path.join(base_path, MODE_TO_PATH[mode])
     html_file = f"{mode}reportabove.html"
     prompt_ai = f""" Rank these article titles by relevance to {prompt} 
     Please talk over the the titles to decide which ones sound interesting.
@@ -185,11 +196,13 @@ def main(mode):
         sys.exit(1)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", required=True, choices=["linux", "ai", "covid", "trump"])
 
+    cwd = os.getcwd()
+    for mode in MODE_TO_PATH.keys():
+        if mode in cwd:
+            hours = MODE_TO_SCHEDULE[mode]
+            current_hour = datetime.datetime.now(TZ).hour
+            if current_hour in hours:
+                main(mode)
+                break
 
-    #main("linux")
-    #main("ai")
-    #main("trump")
-    
