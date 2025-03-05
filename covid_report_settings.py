@@ -45,8 +45,8 @@ site_urls = [
 domain = "http://covidreport.org"
 
 URL_IMAGES = domain + "/static/images/"
-FAVICON = domain + "/static/images/covidreport192.ico"
-LOGO_URL = domain + "/static/images/CovidReport.webp"
+FAVICON = URL_IMAGES + "covidreport192.ico"
+LOGO_URL = URL_IMAGES + "covidreportfancy.webp"
 WEB_DESCRIPTION = "COVID-19 and SARS-COV-2 news"
 WEB_TITLE = "COVID-19 Report"
 
