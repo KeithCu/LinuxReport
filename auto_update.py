@@ -41,9 +41,7 @@ modetopath = {
     "trump": base + "trumpreport",
 }
 
-PATH = f"C:\\run\\linuxreport" #FIXME: TEMPORARY OVERRIDE
-
-cache = DiskCacheWrapper(PATH)
+cache = DiskCacheWrapper(".")
 
 ALL_URLS = {}
 
@@ -145,10 +143,7 @@ def main(mode):
     global ALL_URLS
     prompt = modetoprompt[mode]
 
-    # FIXME: TEMPORARY OVERRIDE
-    module_path = f"C:\\users\\keith\\OneDrive\\Desktop\\LinuxReport2\\LinuxReport\\{mode}_report_settings.py"
-
-    # module = __import__(module_path)
+    module_path = f"{mode}_report_settings.py"
 
     if not os.path.isfile(module_path):
         raise FileNotFoundError(f"Module file not found: {module_path}")
@@ -188,8 +183,9 @@ def main(mode):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", required=True, choices=["linux", "ai", "covid", "trump"])
-    
+
+
     #main("linux")
-    main("ai")
+    #main("ai")
     #main("trump")
     
