@@ -16,6 +16,8 @@ from shared import FeedHistory, RssFeed, TZ
 import feedparser
 from app import DiskCacheWrapper, PATH
 
+from timeit import default_timer as timer
+
 # Initialize Together AI client
 client = OpenAI(
     api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
@@ -27,7 +29,7 @@ banned_words = [
 ]
 modetoprompt = {
     "linux": f"Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other distro. Of course anything non-distro-specific is fine, but nothing about the following topics: {', '.join(banned_words)}.\n",
-    "ai": "AI Language Model Researchers",
+    "ai": "AI Language Model Researchers. Nothing about AI security.",
     "covid": "COVID-19 researchers",
     "trump": "Trump's biggest fans",
 }
@@ -59,7 +61,7 @@ def fetch_recent_articles():
             title = entry["title"]
             articles.append({"title": title, "url": entry["link"]})
             count += 1
-            if count >= 8:
+            if count > 5:
                 break
 
     return articles
@@ -67,13 +69,15 @@ def fetch_recent_articles():
 def ask_ai_top_articles(articles, prompt, model):
     prompt_full = prompt + "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(articles, 1))
     print (prompt_full)
+    start = timer()
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt_full}],
         max_tokens=3000,
     )
 
-    print(response.choices[0].message.content)
+    end = timer()
+    print(f"LLM Response: {response.choices[0].message.content} in {end - start:f}.")
     return response.choices[0].message.content
 
 def extract_top_titles_from_ai(text):
@@ -113,7 +117,7 @@ headline_template = Template("""
 <center>
 <code>
 <a href="{{ url }}">
-<font size="6"><b>{{ title }}</b></font>
+<font size="5"><b>{{ title }}</b></font>
 </a>
 </code>
 </center>
@@ -160,9 +164,9 @@ def main(mode):
     mode_dir = os.path.join(base_path, modetopath[mode])
     html_file = f"{mode}reportabove.html"
     prompt_ai = f""" Rank these article titles by relevance to {prompt} 
-    Please talk over the the titles over which ones sound interesting.
+    Please talk over the the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
-    When you are done discussing the titles, put *** and then list the tope 3.
+    When you are done discussing the titles, put *** and then list the top 3.
     """
     model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
