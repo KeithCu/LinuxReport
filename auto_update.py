@@ -81,6 +81,7 @@ def fetch_largest_image(url):
             image_url = largest_image['src']
 
         absolute_image_url = urljoin(url, image_url)
+        print (f"largest image found {absolute_image_url}")
         return absolute_image_url  # Return the URL instead of content
 
     except requests.RequestException as e:
@@ -217,7 +218,7 @@ def main(mode):
     mode_dir = os.path.join(base_path, MODE_TO_PATH[mode])
     html_file = f"{mode}reportabove.html"
     prompt_ai = f""" Rank these article titles by relevance to {prompt} 
-    Please talk over the the titles to decide which ones sound interesting.
+    Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
     When you are done discussing the titles, put *** and then list the top 3.
     """
