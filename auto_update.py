@@ -73,10 +73,42 @@ cache = DiskCacheWrapper(".")
 
 ALL_URLS = {}
 
+def get_final_response(url, headers, max_redirects=2):
+    for _ in range(max_redirects):
+        try:
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching {url}: {e}")
+            return None
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        meta_refresh = soup.find('meta', attrs={'http-equiv': lambda x: x and x.lower() == 'refresh'})
+
+        if not meta_refresh:
+            return response
+
+        content = meta_refresh.get('content', '')
+        parts = content.split(';')
+        target_url = None
+        for part in parts:
+            if part.strip().lower().startswith('url='):
+                target_url = part.strip()[4:].strip()  # Extract the URL after 'url='
+                break
+
+        if target_url:
+            url = urljoin(url, target_url)
+            continue
+        else:
+            return response
+
+    print("Error: Too many meta refresh redirects")
+    return None
+
 def fetch_largest_image(url):
     try:    #A better user agent increases chance of success
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'}
-        response = requests.get(url, headers=headers, timeout=10)
+        response = get_final_response(url, headers)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -100,15 +132,6 @@ def fetch_largest_image(url):
         return None
 
 def fetch_largest_image_selenium(url):
-    """
-    Uses Selenium to navigate to a URL, find all images, download them, and return the largest one by file size in bytes.
-    
-    Args:
-        url (str): The URL of the webpage to scrape images from
-        
-    Returns:
-        tuple: (image_url, file_size_in_bytes) of the largest image, or (None, 0) if no images found
-    """
     try:
         driver = create_driver()
 
@@ -174,7 +197,6 @@ def fetch_largest_image_selenium(url):
         print(f"Error accessing the webpage or processing images: {e}")
         driver.quit()
         return (None, 0)
-
 
 
 def fetch_recent_articles():
