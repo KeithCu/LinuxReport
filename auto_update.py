@@ -3,6 +3,7 @@ import os
 import sys
 from openai import OpenAI
 from pathlib import Path
+from timeit import default_timer as timer
 import argparse
 import importlib.util
 import re
@@ -15,11 +16,22 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
+import urllib.request
+import os
+from PIL import Image
+import io
+
 from shared import FeedHistory, RssFeed, TZ
 import feedparser
 from app import DiskCacheWrapper, PATH
+from seleniumfetch import create_driver
 
-from timeit import default_timer as timer
 
 # Initialize Together AI client
 client = OpenAI(
@@ -62,9 +74,8 @@ cache = DiskCacheWrapper(".")
 ALL_URLS = {}
 
 def fetch_largest_image(url):
-    """Fetch the URL of the largest image from the given URL."""
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
+    try:    #A better user agent increases chance of success
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'}
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -87,6 +98,83 @@ def fetch_largest_image(url):
     except requests.RequestException as e:
         print(f"Error fetching image: {e}")
         return None
+
+def fetch_largest_image_selenium(url):
+    """
+    Uses Selenium to navigate to a URL, find all images, download them, and return the largest one by file size in bytes.
+    
+    Args:
+        url (str): The URL of the webpage to scrape images from
+        
+    Returns:
+        tuple: (image_url, file_size_in_bytes) of the largest image, or (None, 0) if no images found
+    """
+    try:
+        driver = create_driver()
+
+        driver.get(url)
+
+        try:
+            # Example: Wait for the Twitter search bar (class or ID might change, so verify current Twitter HTML)
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'input[aria-label="Search query"]'))
+            )
+            print("Twitter page loaded successfully.")
+        except Exception as e:
+            print(f"Timeout waiting for Twitter page to load: {e}")
+            driver.quit()
+            return (None, 0)
+
+        images = driver.find_elements(By.TAG_NAME, 'img')
+        
+        if not images:
+            print("No images found on the page.")
+            driver.quit()
+            return (None, 0)
+
+        largest_image_url = None
+        largest_size = 0
+
+        for img in images:
+            try:
+                img_url = img.get_attribute('src')
+                if not img_url or 'data:' in img_url:  # Skip data URLs or invalid URLs
+                    continue
+
+                try:
+                    with urllib.request.urlopen(img_url) as response:
+                        image_data = response.read()
+                    
+                    image_size = len(image_data)
+                    
+                    # Update if this image is larger than the current largest
+                    if image_size > largest_size:
+                        largest_size = image_size
+                        largest_image_url = img_url
+
+                except Exception as e:
+                    print(f"Error downloading or measuring {img_url}: {e}")
+                    continue
+
+            except Exception as e:
+                print(f"Error processing image element: {e}")
+                continue
+
+        driver.quit()  # Close the browser
+
+        if largest_image_url:
+            print(f"Largest image URL: {largest_image_url}")
+            print(f"Size: {largest_size} bytes")
+            return (largest_image_url, largest_size)
+        else:
+            print("No valid images found.")
+            return (None, 0)
+
+    except Exception as e:
+        print(f"Error accessing the webpage or processing images: {e}")
+        driver.quit()
+        return (None, 0)
+
 
 
 def fetch_recent_articles():
@@ -162,7 +250,7 @@ headline_template = Template("""
 <font size="5"><b>{{ title }}</b></font>
 </a>
 </code>
-{% if loop_index == 0 and image_url %}
+{% if image_url %}
 <br/>
 <a href="{{ url }}" target="_blank">
 <img src="{{ image_url }}" width="500" alt="{{ title }}">
@@ -172,28 +260,36 @@ headline_template = Template("""
 <br/>
 """)
 
-# Replace the generate_headlines_html function in auto_update.py around line 332
 def generate_headlines_html(top_articles, output_file):
+    # Step 1: Find the first article with an available image
+    image_article_index = None
+    image_url = None
+    for i, article in enumerate(top_articles[:3]):
+        potential_image_url = fetch_largest_image(article["url"])
+        if potential_image_url:
+            image_article_index = i
+            image_url = potential_image_url
+            break  # Stop at the first article with an image
+
+    # Step 2: Generate HTML for each of the three headlines
     html_parts = []
-    for i, article in enumerate(top_articles[:3]):  # Take up to three articles
-        image_url = None
-        if i == 0:  # Only fetch image for the first article
-            image_url = fetch_largest_image(article["url"])
-        
+    for i, article in enumerate(top_articles[:3]):
+        # Only pass image_url if this article is the one with the image
+        current_image_url = image_url if i == image_article_index else None
         rendered_html = headline_template.render(
             url=article["url"],
             title=article["title"],
-            image_url=image_url,
-            loop_index=i  # Pass the index for the template to use
+            image_url=current_image_url
         )
         html_parts.append(rendered_html)
-    
+
+    # Combine all headline HTML
     full_html = "\n".join(html_parts)
-    
+
+    # Step 3: Write to the output file
     output_dir = os.path.dirname(output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-    
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(full_html)
 
