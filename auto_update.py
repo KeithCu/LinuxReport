@@ -10,6 +10,11 @@ from rapidfuzz import process, fuzz
 import string
 import datetime
 from jinja2 import Template
+import requests
+from urllib.parse import urljoin
+
+from bs4 import BeautifulSoup
+
 
 from add_image import fetch_largest_image, save_as_webp, update_html_file
 from shared import FeedHistory, RssFeed, TZ
@@ -58,6 +63,33 @@ cache = DiskCacheWrapper(".")
 
 ALL_URLS = {}
 
+def fetch_largest_image(url):
+    """Fetch the URL of the largest image from the given URL."""
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        og_image = soup.find('meta', property='og:image')
+        if og_image and og_image.get('content'):
+            image_url = og_image['content']
+        else:
+            images = soup.find_all('img', {'src': True, 'width': True, 'height': True})
+            if not images:
+                print("No suitable image found with dimensions.")
+                return None
+            largest_image = max(images, key=lambda img: int(img['width']) * int(img['height']))
+            image_url = largest_image['src']
+
+        absolute_image_url = urljoin(url, image_url)
+        return absolute_image_url  # Return the URL instead of content
+
+    except requests.RequestException as e:
+        print(f"Error fetching image: {e}")
+        return None
+
+
 def fetch_recent_articles():
     global cache    
     articles = []
@@ -72,7 +104,7 @@ def fetch_recent_articles():
             title = entry["title"]
             articles.append({"title": title, "url": entry["link"]})
             count += 1
-            if count > 5:
+            if count == 5:
                 break
 
     return articles
@@ -127,32 +159,44 @@ def get_article_for_title(target_title, articles):
 headline_template = Template("""
 <center>
 <code>
-<a href="{{ url }}">
+<a href="{{ url }}" target="_blank">
 <font size="5"><b>{{ title }}</b></font>
 </a>
 </code>
+{% if loop_index == 0 and image_url %}
+<br/>
+<a href="{{ url }}" target="_blank">
+<img src="{{ image_url }}" width="500" alt="{{ title }}">
+</a>
+{% endif %}
 </center>
 <br/>
 """)
 
+# Replace the generate_headlines_html function in auto_update.py around line 332
 def generate_headlines_html(top_articles, output_file):
     html_parts = []
-    for article in top_articles[:3]:  # Take up to three articles
+    for i, article in enumerate(top_articles[:3]):  # Take up to three articles
+        image_url = None
+        if i == 0:  # Only fetch image for the first article
+            image_url = fetch_largest_image(article["url"])
+        
         rendered_html = headline_template.render(
             url=article["url"],
-            title=article["title"]
+            title=article["title"],
+            image_url=image_url,
+            loop_index=i  # Pass the index for the template to use
         )
         html_parts.append(rendered_html)
     
     full_html = "\n".join(html_parts)
     
     output_dir = os.path.dirname(output_file)
-    if output_dir:  # If there's a directory in the path
+    if output_dir:
         os.makedirs(output_dir, exist_ok=True)
     
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(full_html)
-
 
 def main(mode):
     global ALL_URLS
