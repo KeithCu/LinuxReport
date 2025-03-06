@@ -15,8 +15,6 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-
-from add_image import fetch_largest_image, save_as_webp, update_html_file
 from shared import FeedHistory, RssFeed, TZ
 import feedparser
 from app import DiskCacheWrapper, PATH
