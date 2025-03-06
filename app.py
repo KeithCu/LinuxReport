@@ -27,7 +27,7 @@ PATH = '/run/linuxreport'
 
 sys.path.insert(0, PATH)
 
-from feedfilter import prefilter_news
+from feedfilter import prefilter_news, filter_similar_titles, merge_entries
 import shared
 from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES, FeedHistory, TZ
 from seleniumfetch import fetch_site_posts 
@@ -61,7 +61,6 @@ RSS_TIMEOUT = 15
 URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {}
-
 
 history = FeedHistory(data_file = f"{PATH}/feed_history{str(MODE)}.pickle")
 
@@ -100,70 +99,6 @@ class DiskCacheWrapper:
             return True
         return history.has_expired(url, last_fetch)
 
-
-#If we've seen this title in other feeds, then filter it.
-def filter_similar_titles(url, entries):
-    feed_alt = None
-
-    if url == "https://www.reddit.com/r/Coronavirus/rising/.rss":
-        feed_alt = g_c.get("https://www.reddit.com/r/China_Flu/rising/.rss")
-
-    if url == "https://www.reddit.com/r/China_Flu/rising/.rss":
-        feed_alt = g_c.get("https://www.reddit.com/r/Coronavirus/rising/.rss")
-
-    if feed_alt:
-        entries_c = entries.copy()
-
-        for entry in entries_c:
-            entry_words = sorted(entry.title.split())
-            for entry_alt in feed_alt.entries:
-                entry_alt_words = sorted(entry_alt.title.split())
-                similarity = difflib.SequenceMatcher(None, entry_words, entry_alt_words).ratio()
-                if similarity > 0.7:  # Adjust the threshold as needed
-                    print(f"Similar title: 1: {entry.title}, 2: {entry_alt.title}, similarity: {similarity}.")
-                    try:  # Entry could have been removed by another similar title
-                        entries.remove(entry)
-                    except:
-                        pass
-                    else:
-                        print("Deleted title.")
-
-    return entries
-
-def merge_entries(new_entries, old_entries, title_threshold=0.85):
-    """
-    Merge two lists of feed entries, preserving order and avoiding duplicates.
-    Two entries are considered the same if:
-      - They share the same link.
-    
-    New entries take precedence over cached ones.
-    """
-    merged = []
-    seen_links = set()
-    new_titles = []  # to compare against old titles
-
-    # Process new entries first.
-    for entry in new_entries:
-        # Get unique key and title. (Assumes entries are dicts.)
-        key = entry.get('link')
-        title = entry.get('title')
-        if key:
-            seen_links.add(key)
-        if title:
-            new_titles.append(title)
-        merged.append(entry)
-
-    # Append old entries only if they’re not already represented.
-    for entry in old_entries:
-        key = entry.get('link')
-        title = entry.get('title')
-        # Skip if the link already exists.
-        if key and key in seen_links:
-            continue
-
-        merged.append(entry)
-
-    return merged
 
 def load_url_worker(url):
     rss_info = ALL_URLS[url]

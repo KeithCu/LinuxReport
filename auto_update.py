@@ -241,7 +241,7 @@ if __name__ == "__main__":
 
     cwd = os.getcwd()
     for mode in MODE_TO_PATH.keys():
-        if mode in cwd:
+        if mode.lower() in cwd.lower():
             hours = MODE_TO_SCHEDULE[mode]
             current_hour = datetime.datetime.now(TZ).hour
             if current_hour in hours:
