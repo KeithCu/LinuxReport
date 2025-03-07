@@ -119,22 +119,23 @@ def load_url_worker(url):
             if previous_top_5 == current_top_5:
                 top_articles = old_feed.top_articles        
 
-        if len(top_articles) == 10: #disable for now
-            prompt = shared.modetoprompt2[MODE]
-            articles = [{"title": e["title"], "url": e["link"]} for e in entries[:5]]
-            model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-            ai_response = shared.ask_ai_top_articles(articles, model)
-            top_titles = shared.extract_top_titles_from_ai(ai_response)
-            for title in top_titles:
-                for article in articles:
-                    if shared.normalize(title) == shared.normalize(article["title"]):
-                        image_url = auto_update.fetch_largest_image(article["url"])
-                        top_articles.append({
-                            "title": article["title"],
-                            "url": article["url"],
-                            "image_url": image_url
-                        })
-                        break
+        # OpenAI's code doesn't work with sub-interpreters so disable for now.
+        # if len(top_articles) == 0:
+        #     prompt = shared.modetoprompt2[MODE]
+        #     articles = [{"title": e["title"], "url": e["link"]} for e in entries[:5]]
+        #     model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+        #     ai_response = shared.ask_ai_top_articles(articles, model)
+        #     top_titles = shared.extract_top_titles_from_ai(ai_response)
+        #     for title in top_titles:
+        #         for article in articles:
+        #             if shared.normalize(title) == shared.normalize(article["title"]):
+        #                 image_url = auto_update.fetch_largest_image(article["url"])
+        #                 top_articles.append({
+        #                     "title": article["title"],
+        #                     "url": article["url"],
+        #                     "image_url": image_url
+        #                 })
+        #                 break
 
         rssfeed = RssFeed(entries, top_articles=top_articles)
 

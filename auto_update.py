@@ -10,7 +10,7 @@ import datetime
 from jinja2 import Template
 import requests
 from urllib.parse import urljoin
-
+import re
 from rapidfuzz import process, fuzz
 
 from bs4 import BeautifulSoup
@@ -26,11 +26,19 @@ import os
 from PIL import Image
 import io
 
-from shared import FeedHistory, RssFeed, TZ, Mode, MODE, ask_ai_top_articles, extract_top_titles_from_ai, modetoprompt, normalize, get_article_for_title
+from shared import FeedHistory, RssFeed, TZ, Mode, MODE, g_c
 import feedparser
 from shared import DiskCacheWrapper, PATH
 from seleniumfetch import create_driver
 
+
+from openai import OpenAI
+
+# Initialize Together AI client
+client = OpenAI(
+    api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
+    base_url="https://api.together.xyz/v1",
+)
 
 
 base = "/srv/http/"
@@ -258,6 +266,101 @@ def generate_headlines_html(top_articles, output_file):
         os.makedirs(output_dir, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(full_html)
+
+BANNED_WORDS = [
+    "tmux",
+    "redox",
+]
+
+modetoprompt2 = {
+    Mode.LINUX_REPORT: f"""Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other
+    distro. Of course anything non-distro-specific is fine, but nothing about the 
+    following topics: {', '.join(BANNED_WORDS)}.\n""",
+    Mode.AI_REPORT : "AI Language Model Researchers. Nothing about AI security.",
+    Mode.COVID_REPORT : "COVID-19 researchers",
+    Mode.TRUMP_REPORT : "Trump's biggest fans",
+}
+
+modetoprompt = {
+    "linux": f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
+    distro. Of course anything non-distro-specific is fine, but nothing about the 
+    following topics: {', '.join(BANNED_WORDS)}.\n""",
+    "ai": "AI Language Model Researchers. Nothing about AI security.",
+    "covid": "COVID-19 researchers",
+    "trump": "Trump's biggest fans",
+}
+
+PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]} 
+    Please talk over the titles to decide which ones sound interesting.
+    Some headlines will be irrelevant, those are easy to exclude.
+    When you are done discussing the titles, put *** and then list the top 3.
+    """
+
+MAX_PREVIOUS_HEADLINES = 9  # Example: Remember the last 9 headlines (configurable)
+
+
+def get_article_for_title(target_title, articles):
+
+    titles = [article["title"] for article in articles]
+
+    best_title, score, index = process.extractOne(target_title, titles, processor=normalize, scorer=fuzz.ratio)
+    return articles[index]
+
+def ask_ai_top_articles(articles, model):
+    previous_urls = g_c.get("previously_selected_urls")
+    if not isinstance(previous_urls, list):
+        previous_urls = []
+
+    filtered_articles = [article for article in articles if article["url"] not in previous_urls]
+    
+    if not filtered_articles:
+        print("No new articles available after filtering previously selected ones.")
+        return "No new articles to rank."
+
+    prompt_full = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
+    print(prompt_full)
+    
+    # Get AI response
+    start = timer()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt_full}],
+        max_tokens=3000,
+    )
+    end = timer()
+    print(f"LLM Response: {response.choices[0].message.content} in {end - start:f}.")
+    response_text = response.choices[0].message.content
+    
+    top_titles = extract_top_titles_from_ai(response_text)
+    top_articles = [get_article_for_title(title, filtered_articles) for title in top_titles]
+    
+    new_urls = [article["url"] for article in top_articles if article]
+    updated_urls = previous_urls + new_urls  # Append new selections
+    
+    if len(updated_urls) > MAX_PREVIOUS_HEADLINES:
+        updated_urls = updated_urls[-MAX_PREVIOUS_HEADLINES:]
+    
+    g_c.put("previously_selected_urls", updated_urls)
+    
+    return response_text
+    
+def extract_top_titles_from_ai(text):
+    lines = text.splitlines()
+    titles = []
+    
+    for line in lines:
+        match = re.match(r"^\d+\.\s+(.+)$", line)
+        if match:
+            title = match.group(1).strip("*").strip()
+            titles.append(title)
+            if len(titles) == 3:
+                break
+    
+    return titles
+
+def normalize(text):
+    return text.lower().translate(str.maketrans("", "", string.punctuation)).strip()
+
 
 def main(mode):
     global ALL_URLS
