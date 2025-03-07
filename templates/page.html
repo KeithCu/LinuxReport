@@ -43,7 +43,21 @@
         width: 33.33%;
         padding: 10px;
       }
-      
+
+      .image-container {
+        width: 100%;
+      }
+
+      .image-container img {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+
+      .title-container {
+        margin-top: 10px;
+      }
+      /* Clear floats after the columns */
       .row:after {
         content: "";
         display: table;
@@ -98,7 +112,7 @@
   <body style="background-color:{{ back_color }}">
     <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
     <center>{{ above_html }}</center>
-    <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:225px;"></center>
+    <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:175px;"></center>
     <center><small>{{ welcome_html }}</small></center>
     <div class="row">
       <div class="column">{{ columns[0] }}</div>

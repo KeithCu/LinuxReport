@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import os
 import time
 import json
@@ -119,7 +119,7 @@ def load_url_worker(url):
             if previous_top_5 == current_top_5:
                 top_articles = old_feed.top_articles        
 
-        if len(top_articles) == 0:
+        if len(top_articles) == 10: #disable for now
             prompt = shared.modetoprompt2[MODE]
             articles = [{"title": e["title"], "url": e["link"]} for e in entries[:5]]
             model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
@@ -170,7 +170,7 @@ def wait_and_set_fetch_mode():
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
         for future in concurrent.futures.as_completed(future_to_url):

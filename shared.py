@@ -134,7 +134,7 @@ def get_article_for_title(target_title, articles):
     return articles[index]
 
 def ask_ai_top_articles(articles, model):
-    previous_urls = g_c.get("previously_selected_urls", [])
+    previous_urls = g_c.get("previously_selected_urls")
     if not isinstance(previous_urls, list):
         previous_urls = []
 

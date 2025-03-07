@@ -1,14 +1,23 @@
 <div class="box" id="feed-{{ feed_id }}">
-  <center><a target="_blank" href="{{ link }}"><img src="{{ logo }}" alt = "{{ alt_tag | safe }}" style="max-height:100px;"/></a></center>
+  <center><a target="_blank" href="{{ link }}"><img src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height:100px;"/></a></center>
   <div class="pagination-controls" data-feed-id="feed-{{ feed_id }}">
-    <button class="prev-btn" disabled>&lt;</button>
-    <button class="next-btn">&gt;</button>
+    <button class="prev-btn" disabled><</button>
+    <button class="next-btn">></button>
   </div>  
   {%- for e in entries %}
   <div class="linkclass" data-index="{{ loop.index0 }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
-    <code>
+    {% if e.link in top_images %}
+    <div class="image-container">
+      <a target="_blank" href="{{ e.link | safe }}">
+        <img src="{{ top_images[e.link] }}" alt="{{ e.title | safe }}"/>
+      </a>
+    </div>
+    {% endif %}
+    <div class="title-container">
+      <code>
         <a target="_blank" href="{{ e.link | safe }}">{{ e.title | safe }}</a>
-    </code>
+      </code>
+    </div>
   </div>
   {%- endfor %}
 </div>
