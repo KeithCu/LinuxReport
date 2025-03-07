@@ -85,21 +85,19 @@ class FeedHistory:
             else:
                 feed_data["weekend_buckets"].add(bucket_num)
 
-            # Exit initial phase if sufficient data collected
-            if feed_data["in_initial_phase"]:
-                weekday_complete = len(feed_data["weekday_buckets"]) == 12
-                weekend_started = len(feed_data["weekend_buckets"]) > 0
-                now = datetime.now(TZ)
-                is_saturday = now.weekday() == 5  # Saturday
-                after_saturday_6pm = is_saturday and now.hour >= 18
-
-                # Exit initial phase after Monday (weekday complete) and some weekend data,
-                # but re-enter on Saturday morning until 6 PM
-                if weekday_complete and weekend_started and not (is_saturday and now.hour < 18):
-                    feed_data["in_initial_phase"] = False
-                # Ensure we stay in initial phase on Saturday until 6 PM if weekend buckets incomplete
-                elif is_saturday and len(feed_data["weekend_buckets"]) < 12:
-                    feed_data["in_initial_phase"] = True
+            # Determine initial phase status based on current day type and relevant bucket completeness
+            now = datetime.now(TZ)
+            is_weekday = now.weekday() < 5
+            weekday_buckets_complete = len(feed_data["weekday_buckets"]) == 12
+            weekend_buckets_complete = len(feed_data["weekend_buckets"]) == 12
+            
+            # Set initial phase status based on current day type:
+            # - On weekdays: require weekday buckets to be complete
+            # - On weekends: require weekend buckets to be complete
+            if is_weekday:
+                feed_data["in_initial_phase"] = not weekday_buckets_complete
+            else:
+                feed_data["in_initial_phase"] = not weekend_buckets_complete
 
             # Adjust interval based on recent success and bucket
             self._adjust_interval(url)
