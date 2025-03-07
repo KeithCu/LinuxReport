@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import os
 import time
 import json
@@ -7,7 +7,6 @@ import random
 import threading
 import itertools
 import concurrent.futures
-from enum import Enum
 from datetime import datetime, timedelta, timezone
 from timeit import default_timer as timer
 import difflib
@@ -23,30 +22,21 @@ from autoscraper import AutoScraper
 from pathlib import Path
 import diskcache
 
-PATH = '/run/linuxreport'
 
-sys.path.insert(0, PATH)
 
 from feedfilter import prefilter_news, filter_similar_titles, merge_entries
 import shared
-from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES, FeedHistory, TZ
+from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES, TZ, MODE, Mode, g_c
+import auto_update
 from seleniumfetch import fetch_site_posts 
 
-class Mode(Enum):
-    LINUX_REPORT = 1
-    COVID_REPORT = 2
-    TECHNO_REPORT = 3
-    AI_REPORT = 4
-    PYTHON_REPORT = 5
-    TRUMP_REPORT = 6
-
-MODE = Mode.TRUMP_REPORT
+sys.path.insert(0, shared.PATH)
 
 g_app = Flask(__name__)
 Mobility(g_app)
 application = g_app
 
-DEBUG = False
+DEBUG = True
 
 if DEBUG or g_app.debug:
     EXPIRE_MINUTES = 1
@@ -62,7 +52,6 @@ URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {}
 
-history = FeedHistory(data_file = f"{PATH}/feed_history{str(MODE)}.pickle")
 
 if MODE == Mode.LINUX_REPORT:
     from linux_report_settings import *
@@ -76,28 +65,6 @@ elif MODE == Mode.TRUMP_REPORT:
     from trump_report_settings import *
 
 feedparser.USER_AGENT = USER_AGENT
-
-class DiskCacheWrapper:
-    def __init__(self, cache_dir):
-        self.cache = diskcache.Cache(cache_dir)
-
-    def has(self, key):
-        return key in self.cache
-
-    def get(self, key):
-        return self.cache.get(key)
-
-    def put(self, key, value, timeout=None):
-        self.cache.set(key, value, expire=timeout)
-
-    def delete(self, key):
-        self.cache.delete(key)
-
-    def has_feed_expired(self, url):
-        last_fetch = self.get(url + ":last_fetch")
-        if last_fetch is None:
-            return True
-        return history.has_expired(url, last_fetch)
 
 
 def load_url_worker(url):
@@ -142,9 +109,35 @@ def load_url_worker(url):
         #Trim the limit again after merge.
         entries = list(itertools.islice(entries, MAX_ITEMS))
 
-        history.update_fetch(url, new_count)
+        shared.history.update_fetch(url, new_count)
 
-        rssfeed = RssFeed(entries)            
+        top_articles = []
+
+        if old_feed and old_feed.entries:
+            previous_top_5 = set(e['link'] for e in old_feed.entries[:5])
+            current_top_5 = set(e['link'] for e in entries[:5])
+            if previous_top_5 == current_top_5:
+                top_articles = old_feed.top_articles        
+
+        if len(top_articles) == 0:
+            prompt = shared.modetoprompt2[MODE]
+            articles = [{"title": e["title"], "url": e["link"]} for e in entries[:5]]
+            model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+            ai_response = shared.ask_ai_top_articles(articles, model)
+            top_titles = shared.extract_top_titles_from_ai(ai_response)
+            for title in top_titles:
+                for article in articles:
+                    if shared.normalize(title) == shared.normalize(article["title"]):
+                        image_url = auto_update.fetch_largest_image(article["url"])
+                        top_articles.append({
+                            "title": article["title"],
+                            "url": article["url"],
+                            "image_url": image_url
+                        })
+                        break
+
+        rssfeed = RssFeed(entries, top_articles=top_articles)
+
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
         g_c.put(url + ":last_fetch", datetime.now(TZ), timeout=EXPIRE_WEEK)
 
@@ -199,19 +192,14 @@ def fetch_urls_thread():
     t.daemon = True #It's okay to kill this thread when the process is trying to exit.
     t.start()
 
-g_c = None
 g_standard_order_s = str(site_urls)
 
 #The main page
 @g_app.route('/')
 def index():
-
-    global g_c
     #page_start = timer()
 
-    if g_c is None:
-        socket.setdefaulttimeout(RSS_TIMEOUT)
-        g_c = DiskCacheWrapper(PATH)
+    # socket.setdefaulttimeout(RSS_TIMEOUT)
 
     dark_mode = request.cookies.get('DarkMode') 
     no_underlines = (request.cookies.get("NoUnderlines", "1") == "1") 
@@ -285,10 +273,11 @@ def index():
         rss_info = ALL_URLS[url]
 
         template = g_c.get(rss_info.site_url)
-        if template is None:
-            entries = g_c.get(url).entries
-
-            template = render_template('sitebox.html', entries=entries, logo=URL_IMAGES + rss_info.logo_url,
+        if DEBUG or template is None:
+            feed = g_c.get(url)
+            entries = feed.entries
+            top_images = {article['url']: article['image_url'] for article in feed.top_articles if article['image_url']}
+            template = render_template('sitebox.html', top_images=top_images, entries=entries, logo=URL_IMAGES + rss_info.logo_url,
                                        alt_tag=rss_info.logo_alt, link=rss_info.site_url, feed_id = rss_info.site_url)
 
             g_c.put(rss_info.site_url, template, timeout=EXPIRE_HOUR * 12)

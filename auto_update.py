@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 import os
 import sys
-from openai import OpenAI
 from pathlib import Path
 from timeit import default_timer as timer
 import argparse
 import importlib.util
-import re
-from rapidfuzz import process, fuzz
 import string
 import datetime
 from jinja2 import Template
 import requests
 from urllib.parse import urljoin
+
+from rapidfuzz import process, fuzz
 
 from bs4 import BeautifulSoup
 
@@ -27,30 +26,12 @@ import os
 from PIL import Image
 import io
 
-from shared import FeedHistory, RssFeed, TZ
+from shared import FeedHistory, RssFeed, TZ, Mode, MODE, ask_ai_top_articles, extract_top_titles_from_ai, modetoprompt, normalize, get_article_for_title
 import feedparser
-from app import DiskCacheWrapper, PATH
+from shared import DiskCacheWrapper, PATH
 from seleniumfetch import create_driver
 
 
-# Initialize Together AI client
-client = OpenAI(
-    api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
-    base_url="https://api.together.xyz/v1",
-)
-
-BANNED_WORDS = [
-    "tmux",
-    "redox",
-]
-modetoprompt = {
-    "linux": f"""Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other
-    distro. Of course anything non-distro-specific is fine, but nothing about the 
-    following topics: {', '.join(BANNED_WORDS)}.\n""",
-    "ai": "AI Language Model Researchers. Nothing about AI security.",
-    "covid": "COVID-19 researchers",
-    "trump": "Trump's biggest fans",
-}
 
 base = "/srv/http/"
 
@@ -109,6 +90,8 @@ def fetch_largest_image(url):
     try:    #A better user agent increases chance of success
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'}
         response = get_final_response(url, headers)
+        if response is None:
+            return None
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -116,7 +99,12 @@ def fetch_largest_image(url):
         if og_image and og_image.get('content'):
             image_url = og_image['content']
         else:
-            images = soup.find_all('img', {'src': True, 'width': True, 'height': True})
+            exclude_text = "Linux_opengraph"  # Define the chunk of text to exclude
+            images = soup.find_all('img', {
+                'src': lambda x: x is not None and exclude_text not in x,
+                'width': True,
+                'height': True
+            })
             if not images:
                 print("No suitable image found with dimensions.")
                 return None
@@ -127,7 +115,7 @@ def fetch_largest_image(url):
         print (f"largest image found {absolute_image_url}")
         return absolute_image_url  # Return the URL instead of content
 
-    except requests.RequestException as e:
+    except Exception as e:
         print(f"Error fetching image: {e}")
         return None
 
@@ -218,50 +206,6 @@ def fetch_recent_articles():
 
     return articles
 
-def ask_ai_top_articles(articles, prompt, model):
-    prompt_full = prompt + "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(articles, 1))
-    print (prompt_full)
-    start = timer()
-    response = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt_full}],
-        max_tokens=3000,
-    )
-
-    end = timer()
-    print(f"LLM Response: {response.choices[0].message.content} in {end - start:f}.")
-    return response.choices[0].message.content
-
-def extract_top_titles_from_ai(text):
-    # Split the text into individual lines
-    lines = text.splitlines()
-    titles = []
-    
-    # Iterate through each line
-    for line in lines:
-        # Check if the line starts with a number followed by a period and space (e.g., "1. ")
-        match = re.match(r"^\d+\.\s+(.+)$", line)
-        if match:
-            # Extract the title (everything after the number and period) and clean it
-            title = match.group(1).strip("*").strip()
-            titles.append(title)
-            # Stop after collecting 3 titles
-            if len(titles) == 3:
-                break
-    
-    return titles
-
-def normalize(text):
-    return text.lower().translate(str.maketrans("", "", string.punctuation)).strip()
-
-# Function to find the closest matching article
-def get_article_for_title(target_title, articles):
-    # Extract the list of article titles
-    titles = [article["title"] for article in articles]
-    # Find the best match using fuzzy matching with normalization
-    best_title, score, index = process.extractOne(target_title, titles, processor=normalize, scorer=fuzz.ratio)
-    # Return the corresponding article
-    return articles[index]
 
 
 # Define the Jinja2 template for a single headline
@@ -335,11 +279,7 @@ def main(mode):
     base_path = PATH
     mode_dir = os.path.join(base_path, MODE_TO_PATH[mode])
     html_file = f"{mode}reportabove.html"
-    prompt_ai = f""" Rank these article titles by relevance to {prompt} 
-    Please talk over the titles to decide which ones sound interesting.
-    Some headlines will be irrelevant, those are easy to exclude.
-    When you are done discussing the titles, put *** and then list the top 3.
-    """
+
     model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
     try:
@@ -348,7 +288,7 @@ def main(mode):
             print(f"No articles found for mode: {mode}")
             sys.exit(1)
 
-        full_response = ask_ai_top_articles(articles, prompt_ai, model)
+        full_response = ask_ai_top_articles(articles, model)
         top_3 = extract_top_titles_from_ai(full_response)
         top_3_articles = [get_article_for_title(title, articles) for title in top_3]
         generate_headlines_html(top_3_articles, html_file)

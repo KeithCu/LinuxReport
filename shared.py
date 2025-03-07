@@ -1,17 +1,46 @@
 from datetime import datetime, timedelta, timezone
+import os
 import pickle
 import json
+import re
+import diskcache
+from enum import Enum
+
+import string
+from timeit import default_timer as timer
 from pathlib import Path
 import threading
 import time
 from typing import Dict, List, Optional
 import zoneinfo
+from openai import OpenAI
+from rapidfuzz import process, fuzz
+
+
+from FeedHistory import FeedHistory
+
+# Initialize Together AI client
+client = OpenAI(
+    api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
+    base_url="https://api.together.xyz/v1",
+)
 
 TZ = zoneinfo.ZoneInfo("US/Eastern")
 
 class RssFeed:
-    def __init__(self, entries):
+    def __init__(self, entries, top_articles=None):
         self.entries = entries
+        self.top_articles = top_articles if top_articles else []
+        self.__post_init__()
+
+    def __post_init__(self):
+        if not hasattr(self, 'top_articles'):
+            object.__setattr__(self, 'top_articles', [])
+
+    def __setstate__(self, state):
+        object.__setattr__(self, '__dict__', state)
+        self.__post_init__()
+
 
 class RssInfo:
     def __init__(self, logo_url, logo_alt, site_url):
@@ -19,135 +48,142 @@ class RssInfo:
         self.logo_alt = logo_alt
         self.site_url = site_url
 
+PATH = '/run/linuxreport'
+
+
+class Mode(Enum):
+    LINUX_REPORT = 1
+    COVID_REPORT = 2
+    TECHNO_REPORT = 3
+    AI_REPORT = 4
+    PYTHON_REPORT = 5
+    TRUMP_REPORT = 6
+
 EXPIRE_MINUTES = 60 * 5
 EXPIRE_HOUR = 3600
 EXPIRE_DAY = 3600 * 12
 EXPIRE_WEEK = 86400 * 7
 EXPIRE_YEARS = 86400 * 365 * 2
 
-# Constants
-INITIAL_INTERVAL = timedelta(hours=2)  # Query every 2 hours
-MIN_INTERVAL = timedelta(minutes=60)
-MAX_INTERVAL = timedelta(hours=24)
-BUCKET_SIZE_HOURS = 2                 # 12 buckets per day
-HISTORY_WINDOW = 5                    # Track last 5 fetches
-SMOOTHING_FACTOR = 0.7                # Weight for exponential smoothing (0-1)
+MODE = Mode.LINUX_REPORT
 
-class FeedHistory:
-    def __init__(self, data_file: str):
-        self.data_file = Path(data_file)
-        self.lock = threading.RLock()
-        self.data: Dict[str, dict] = self._load_data()
+history = FeedHistory(data_file = f"{PATH}/feed_history{str(MODE)}.pickle")
+
+
+class DiskCacheWrapper:
+    def __init__(self, cache_dir):
+        self.cache = diskcache.Cache(cache_dir)
+
+    def has(self, key):
+        return key in self.cache
+
+    def get(self, key):
+        return self.cache.get(key)
+
+    def put(self, key, value, timeout=None):
+        self.cache.set(key, value, expire=timeout)
+
+    def delete(self, key):
+        self.cache.delete(key)
+
+    def has_feed_expired(self, url):
+        last_fetch = self.get(url + ":last_fetch")
+        if last_fetch is None:
+            return True
+        return history.has_expired(url, last_fetch)
+
+g_c = DiskCacheWrapper(PATH)
+
+BANNED_WORDS = [
+    "tmux",
+    "redox",
+]
+
+modetoprompt2 = {
+    Mode.LINUX_REPORT: f"""Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other
+    distro. Of course anything non-distro-specific is fine, but nothing about the 
+    following topics: {', '.join(BANNED_WORDS)}.\n""",
+    Mode.AI_REPORT : "AI Language Model Researchers. Nothing about AI security.",
+    Mode.COVID_REPORT : "COVID-19 researchers",
+    Mode.TRUMP_REPORT : "Trump's biggest fans",
+}
+
+modetoprompt = {
+    "linux": f"""Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other
+    distro. Of course anything non-distro-specific is fine, but nothing about the 
+    following topics: {', '.join(BANNED_WORDS)}.\n""",
+    "ai": "AI Language Model Researchers. Nothing about AI security.",
+    "covid": "COVID-19 researchers",
+    "trump": "Trump's biggest fans",
+}
+
+PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]} 
+    Please talk over the titles to decide which ones sound interesting.
+    Some headlines will be irrelevant, those are easy to exclude.
+    When you are done discussing the titles, put *** and then list the top 3.
+    """
+
+MAX_PREVIOUS_HEADLINES = 9  # Example: Remember the last 9 headlines (configurable)
+
+
+def get_article_for_title(target_title, articles):
+
+    titles = [article["title"] for article in articles]
+
+    best_title, score, index = process.extractOne(target_title, titles, processor=normalize, scorer=fuzz.ratio)
+    return articles[index]
+
+def ask_ai_top_articles(articles, model):
+    previous_urls = g_c.get("previously_selected_urls", [])
+    if not isinstance(previous_urls, list):
+        previous_urls = []
+
+    filtered_articles = [article for article in articles if article["url"] not in previous_urls]
     
-    def _load_data(self):
-        """Load history from pickle file or initialize empty if it fails or is invalid."""
-        if self.data_file.exists():
-            try:
-                with open(self.data_file, "rb") as f:
-                    loaded = pickle.load(f)
-                # Ensure loaded is a dictionary
-                if not isinstance(loaded, dict):
-                    return {}
-                # If not empty, validate one feed's data has "weekday_buckets"
-                if loaded:
-                    first_value = next(iter(loaded.values()))  # Get first feed's data
-                    if not (isinstance(first_value, dict) and "weekday_buckets" in first_value):
-                        return {}
-                return loaded
-            except Exception:
-                # Loading failed (e.g., file corruption or unpickling error)
-                return {}
-        return {}
+    if not filtered_articles:
+        print("No new articles available after filtering previously selected ones.")
+        return "No new articles to rank."
+
+    prompt_full = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
+    print(prompt_full)
     
-    def _save_data(self):
-        """Save history to pickle file."""
-        with open(self.data_file, "wb") as f:
-            pickle.dump(self.data, f)
+    # Get AI response
+    start = timer()
+    response = client.chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt_full}],
+        max_tokens=3000,
+    )
+    end = timer()
+    print(f"LLM Response: {response.choices[0].message.content} in {end - start:f}.")
+    response_text = response.choices[0].message.content
+    
+    top_titles = extract_top_titles_from_ai(response_text)
+    top_articles = [get_article_for_title(title, filtered_articles) for title in top_titles]
+    
+    new_urls = [article["url"] for article in top_articles if article]
+    updated_urls = previous_urls + new_urls  # Append new selections
+    
+    if len(updated_urls) > MAX_PREVIOUS_HEADLINES:
+        updated_urls = updated_urls[-MAX_PREVIOUS_HEADLINES:]
+    
+    g_c.put("previously_selected_urls", updated_urls)
+    
+    return response_text
+    
+def extract_top_titles_from_ai(text):
+    lines = text.splitlines()
+    titles = []
+    
+    for line in lines:
+        match = re.match(r"^\d+\.\s+(.+)$", line)
+        if match:
+            title = match.group(1).strip("*").strip()
+            titles.append(title)
+            if len(titles) == 3:
+                break
+    
+    return titles
 
-    def update_fetch(self, url: str, new_articles: int):
-        fetch_time = datetime.now(TZ)
-        with self.lock:
-            feed_data = self.data.setdefault(url, {
-                "buckets": {},           # Frequency per time bucket
-                "recent": [],            # Last HISTORY_WINDOW fetches: (time, new_articles)
-                "interval": EXPIRE_HOUR, # Default in seconds
-                "weekday_buckets": set(), # Track fetched weekday bucket numbers
-                "weekend_buckets": set(), # Track fetched weekend bucket numbers
-                "in_initial_phase": True  # Track initial phase
-            })
-
-            # Update recent fetches
-            fetch_entry = (fetch_time, new_articles)
-            feed_data["recent"] = (feed_data["recent"][-HISTORY_WINDOW + 1:] + [fetch_entry])[-HISTORY_WINDOW:]
-
-            # Update bucket frequency
-            bucket = self._get_bucket(fetch_time)
-            old_freq = feed_data["buckets"].get(bucket, 0)
-            new_freq = 1 if new_articles > 0 else 0
-            feed_data["buckets"][bucket] = (SMOOTHING_FACTOR * new_freq + 
-                                           (1 - SMOOTHING_FACTOR) * old_freq)
-
-            # Update bucket coverage
-            is_weekday = fetch_time.weekday() < 5
-            bucket_num = fetch_time.hour // BUCKET_SIZE_HOURS
-            if is_weekday:
-                feed_data["weekday_buckets"].add(bucket_num)
-            else:
-                feed_data["weekend_buckets"].add(bucket_num)
-
-            # Exit initial phase if sufficient data collected
-            if feed_data["in_initial_phase"]:
-                weekday_complete = len(feed_data["weekday_buckets"]) == 12
-                weekend_started = len(feed_data["weekend_buckets"]) > 0
-                now = datetime.now(TZ)
-                is_saturday = now.weekday() == 5  # Saturday
-                after_saturday_6pm = is_saturday and now.hour >= 18
-
-                # Exit initial phase after Monday (weekday complete) and some weekend data,
-                # but re-enter on Saturday morning until 6 PM
-                if weekday_complete and weekend_started and not (is_saturday and now.hour < 18):
-                    feed_data["in_initial_phase"] = False
-                # Ensure we stay in initial phase on Saturday until 6 PM if weekend buckets incomplete
-                elif is_saturday and len(feed_data["weekend_buckets"]) < 12:
-                    feed_data["in_initial_phase"] = True
-
-            # Adjust interval based on recent success and bucket
-            self._adjust_interval(url)
-            self._save_data()
-
-    def _get_bucket(self, dt: datetime) -> str:
-        """Map datetime to a bucket key (e.g., 'weekday-0' for 00:00-02:00)."""
-        is_weekday = dt.weekday() < 5
-        bucket = dt.hour // BUCKET_SIZE_HOURS
-        return f"{'weekday' if is_weekday else 'weekend'}-{bucket}"
-
-    def _adjust_interval(self, url: str):
-        """Dynamically adjust refresh interval."""
-        feed_data = self.data.get(url, {})
-        recent = feed_data.get("recent", [])
-        bucket = self._get_bucket(datetime.now(TZ))
-        freq = feed_data.get("buckets", {}).get(bucket, 0.5)  # Default to neutral
-
-        # Success rate from recent fetches
-        success_rate = sum(1 for _, n in recent if n > 0) / max(len(recent), 1)
-
-        # Base interval: inversely proportional to frequency and success
-        combined_score = (freq + success_rate) / 2  # 0 to 1
-        interval_seconds = (MAX_INTERVAL.total_seconds() * (1 - combined_score) + 
-                           MIN_INTERVAL.total_seconds() * combined_score)
-        interval = max(MIN_INTERVAL.total_seconds(), 
-                      min(MAX_INTERVAL.total_seconds(), interval_seconds))
-        
-        feed_data["interval"] = interval
-
-    def get_interval(self, url: str) -> timedelta:
-        """Get the current refresh interval for a URL."""
-        feed_data = self.data.get(url, {})
-        if feed_data.get("in_initial_phase", True):
-            return INITIAL_INTERVAL
-        return timedelta(seconds=feed_data.get("interval", EXPIRE_HOUR))
-
-    def has_expired(self, url: str, last_fetch: datetime) -> bool:
-        """Check if the feed should be refreshed, respecting the current interval."""
-        interval = self.get_interval(url)
-        return datetime.now(TZ) > last_fetch + interval
+def normalize(text):
+    return text.lower().translate(str.maketrans("", "", string.punctuation)).strip()
