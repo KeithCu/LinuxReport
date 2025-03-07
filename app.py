@@ -28,7 +28,6 @@ sys.path.insert(0, "/srv/http/CovidReport2")
 from feedfilter import prefilter_news, filter_similar_titles, merge_entries
 import shared
 from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES, TZ, MODE, Mode, g_c
-import auto_update
 from seleniumfetch import fetch_site_posts 
 
 
