@@ -111,7 +111,7 @@ modetoprompt2 = {
 }
 
 modetoprompt = {
-    "linux": f"""Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other
+    "linux": f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
     distro. Of course anything non-distro-specific is fine, but nothing about the 
     following topics: {', '.join(BANNED_WORDS)}.\n""",
     "ai": "AI Language Model Researchers. Nothing about AI security.",

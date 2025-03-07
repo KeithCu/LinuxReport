@@ -44,14 +44,21 @@ ALL_URLS = {
     "https://feed.infoq.com/ai-ml-data-eng/" :
     RssInfo("infoq.png",
     "InfoQ AI",
-    "https://www.infoq.com/ai-ml-data-eng/")
+    "https://www.infoq.com/ai-ml-data-eng/"),
+
+    "https://futurism.com/categories/ai-artificial-intelligence/feed" :
+    RssInfo("futurism.svg",
+    "Futurism",
+    "https://futurism.com/categories/ai-artificial-intelligence"),
+
 }
 
 USER_AGENT = "AI Report -- https://aireport.keithcu.com"
 site_urls = [
     "https://www.reddit.com/r/LocalLlama/.rss",
-    "https://feed.infoq.com/ai-ml-data-eng/",
     "https://huggingface.co/blog/feed.xml",
+    "https://futurism.com/categories/ai-artificial-intelligence/feed",
+    "https://feed.infoq.com/ai-ml-data-eng/",
     "https://www.reddit.com/r/Grok/.rss",
     "https://venturebeat.com/category/ai/feed/",
     "https://www.theregister.com/software/ai_ml/headlines.atom",
@@ -67,7 +74,7 @@ LOGO_URL = URL_IMAGES + "aireportfancy.webp"
 WEB_DESCRIPTION = "AI News"
 WEB_TITLE = "AI Report"
 
-ABOVE_HTML_FILE = 'covidreportabove.html'
+ABOVE_HTML_FILE = 'aireportabove.html'
 
 WELCOME_HTML = ('<font size="4">(Displays instantly, refreshes hourly -- See also <b><a target="_blank" href = '
 '"https://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
