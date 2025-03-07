@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import os
+import sys
 import pickle
 import json
 import re
@@ -50,6 +51,7 @@ class RssInfo:
 
 PATH = '/run/linuxreport'
 
+sys.path.insert(0, PATH)
 
 class Mode(Enum):
     LINUX_REPORT = 1
