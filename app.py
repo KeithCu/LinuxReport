@@ -23,6 +23,7 @@ from pathlib import Path
 import diskcache
 
 
+sys.path.insert(0, "/srv/http/CovidReport2")
 
 from feedfilter import prefilter_news, filter_similar_titles, merge_entries
 import shared
@@ -30,13 +31,12 @@ from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPI
 import auto_update
 from seleniumfetch import fetch_site_posts 
 
-sys.path.insert(0, shared.PATH)
 
 g_app = Flask(__name__)
 Mobility(g_app)
 application = g_app
 
-DEBUG = True
+DEBUG = False
 
 if DEBUG or g_app.debug:
     EXPIRE_MINUTES = 1
