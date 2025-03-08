@@ -101,6 +101,12 @@ def fetch_largest_image(url):
         if response is None:
             return None
         response.raise_for_status()
+        
+        content_type = response.headers.get('Content-Type', '').lower()
+        if content_type.startswith('image/'):
+            print(f"URL is an image: {url}")
+            return url
+        
         soup = BeautifulSoup(response.text, 'html.parser')
 
         og_image = soup.find('meta', property='og:image')
@@ -120,7 +126,7 @@ def fetch_largest_image(url):
             image_url = largest_image['src']
 
         absolute_image_url = urljoin(url, image_url)
-        print (f"largest image found {absolute_image_url}")
+        print(f"largest image found {absolute_image_url}")
         return absolute_image_url  # Return the URL instead of content
 
     except Exception as e:
