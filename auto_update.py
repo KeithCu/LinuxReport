@@ -93,6 +93,101 @@ def get_final_response(url, headers, max_redirects=2):
     print("Error: Too many meta refresh redirects")
     return None
 
+def parse_images_from_soup(soup, base_url):
+    candidate_images = []
+
+    # 1. Check meta tags first (typically highest quality for sharing)
+    meta_image_url = get_meta_image(soup)
+    if meta_image_url:
+        absolute_meta_url = urljoin(base_url, meta_image_url)
+        candidate_images.append((absolute_meta_url, 1000000))  # Give high priority to meta images
+        print(f"Found meta image: {absolute_meta_url}")
+    
+    # 2. Check for picture elements with srcset
+    for picture in soup.find_all('picture'):
+        # Find the highest resolution source
+        max_width = 0
+        best_source = None
+        
+        for source in picture.find_all('source'):
+            if source.get('srcset'):
+                best_src, width = parse_best_srcset(source['srcset'])
+                if width > max_width:
+                    max_width = width
+                    best_source = best_src
+        
+        # Also check for img inside picture as fallback
+        img = picture.find('img')
+        if img:
+            if img.get('srcset'):
+                img_best_src, img_width = parse_best_srcset(img['srcset'])
+                if img_width > max_width:
+                    max_width = img_width
+                    best_source = img_best_src
+            elif img.get('src'):
+                best_source = img['src']
+                # Estimate size based on any width attributes
+                if img.get('width'):
+                    try:
+                        max_width = int(img['width'])
+                    except ValueError:
+                        max_width = 500  # Default estimate
+        
+        if best_source:
+            absolute_url = urljoin(base_url, best_source)
+            candidate_images.append((absolute_url, max_width * max_width))  # Square for comparison
+    
+    # 3. Process all img tags (both standard and lazy-loaded)
+    for img in soup.find_all('img'):
+        # Check various attributes for image source
+        src = None
+        for attr in ['src', 'data-src', 'data-lazy-src', 'data-original', 'data-srcset']:
+            if img.get(attr):
+                src = img[attr]
+                break
+        
+        if not src:
+            continue
+            
+        # Handle srcset if available
+        if attr == 'data-srcset' or attr == 'srcset' or 'srcset' in img.attrs:
+            srcset = img.get('srcset', img.get('data-srcset', ''))
+            best_src, _ = parse_best_srcset(srcset)
+            if best_src:
+                src = best_src
+        
+        # Calculate image importance score
+        width = height = 100  # Default estimates
+        
+        # Try to get dimensions
+        try:
+            if img.get('width') and not img['width'] == 'auto':
+                width = int(img['width']) if img['width'].isdigit() else width
+            if img.get('height') and not img['height'] == 'auto':
+                height = int(img['height']) if img['height'].isdigit() else height
+        except (ValueError, KeyError):
+            pass
+            
+        # Check if image is hidden or very small
+        style = img.get('style', '')
+        if 'display:none' in style or 'visibility:hidden' in style:
+            continue
+            
+        # Check for very small images or icons to exclude
+        if (width < 50 or height < 50) and ('icon' in src.lower() or 'logo' in src.lower()):
+            continue
+            
+        # Calculate score based on size and position in the document
+        score = width * height
+        absolute_url = urljoin(base_url, src)
+        
+        # Exclude common patterns for site logos, icons, etc.
+        exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'Linux_opengraph']
+        if not any(pattern in absolute_url.lower() for pattern in exclude_patterns):
+            candidate_images.append((absolute_url, score))
+    
+    return candidate_images
+
 def fetch_largest_image(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0'}
@@ -108,108 +203,14 @@ def fetch_largest_image(url):
         
         soup = BeautifulSoup(response.text, 'html.parser')
         base_url = response.url
-        candidate_images = []
-
-        # 1. Check meta tags first (typically highest quality for sharing)
-        meta_image_url = get_meta_image(soup)
-        if meta_image_url:
-            absolute_meta_url = urljoin(base_url, meta_image_url)
-            candidate_images.append((absolute_meta_url, 1000000))  # Give high priority to meta images
-            print(f"Found meta image: {absolute_meta_url}")
-        
-        # 2. Check for picture elements with srcset
-        for picture in soup.find_all('picture'):
-            # Find the highest resolution source
-            max_width = 0
-            best_source = None
-            
-            for source in picture.find_all('source'):
-                if source.get('srcset'):
-                    best_src, width = parse_best_srcset(source['srcset'])
-                    if width > max_width:
-                        max_width = width
-                        best_source = best_src
-            
-            # Also check for img inside picture as fallback
-            img = picture.find('img')
-            if img:
-                if img.get('srcset'):
-                    img_best_src, img_width = parse_best_srcset(img['srcset'])
-                    if img_width > max_width:
-                        max_width = img_width
-                        best_source = img_best_src
-                elif img.get('src'):
-                    best_source = img['src']
-                    # Estimate size based on any width attributes
-                    if img.get('width'):
-                        try:
-                            max_width = int(img['width'])
-                        except ValueError:
-                            max_width = 500  # Default estimate
-            
-            if best_source:
-                absolute_url = urljoin(base_url, best_source)
-                candidate_images.append((absolute_url, max_width * max_width))  # Square for comparison
-        
-        # 3. Process all img tags (both standard and lazy-loaded)
-        for img in soup.find_all('img'):
-            # Check various attributes for image source
-            src = None
-            for attr in ['src', 'data-src', 'data-lazy-src', 'data-original', 'data-srcset']:
-                if img.get(attr):
-                    src = img[attr]
-                    break
-            
-            if not src:
-                continue
-                
-            # Handle srcset if available
-            if attr == 'data-srcset' or attr == 'srcset' or 'srcset' in img.attrs:
-                srcset = img.get('srcset', img.get('data-srcset', ''))
-                best_src, _ = parse_best_srcset(srcset)
-                if best_src:
-                    src = best_src
-            
-            # Calculate image importance score
-            width = height = 100  # Default estimates
-            
-            # Try to get dimensions
-            try:
-                if img.get('width') and not img['width'] == 'auto':
-                    width = int(img['width']) if img['width'].isdigit() else width
-                if img.get('height') and not img['height'] == 'auto':
-                    height = int(img['height']) if img['height'].isdigit() else height
-            except (ValueError, KeyError):
-                pass
-                
-            # Check if image is hidden or very small
-            style = img.get('style', '')
-            if 'display:none' in style or 'visibility:hidden' in style:
-                continue
-                
-            # Check for very small images or icons to exclude
-            if (width < 50 or height < 50) and ('icon' in src.lower() or 'logo' in src.lower()):
-                continue
-                
-            # Calculate score based on size and position in the document
-            score = width * height
-            absolute_url = urljoin(base_url, src)
-            
-            # Exclude common patterns for site logos, icons, etc.
-            exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'Linux_opengraph']
-            if not any(pattern in absolute_url.lower() for pattern in exclude_patterns):
-                candidate_images.append((absolute_url, score))
+        candidate_images = parse_images_from_soup(soup, base_url)
         
         if not candidate_images:
             print("No suitable images found.")
             return None
             
         # Sort by score (higher is better) and return the best image URL
-        candidate_images.sort(key=lambda x: x[1], reverse=True)
-        best_image_url = candidate_images[0][0]
-        
-        print(f"Best image found: {best_image_url} with score {candidate_images[0][1]}")
-        return best_image_url
+        return process_candidate_images(candidate_images)
 
     except Exception as e:
         print(f"Error fetching image: {e}")
@@ -344,11 +345,79 @@ def extract_domain(url):
 custom_hacks["linuxtoday.com"] =  linuxtoday_custom_fetch
 custom_hacks["citizenfreepress.com"] = citizenfreepress_custom_fetch
 
+def evaluate_image_url(img_url):
+    """Evaluate an image by downloading it and checking its size."""
+    try:
+        with urllib.request.urlopen(img_url) as response:
+            image_data = response.read()
+        image_size = len(image_data)
+        print(f"Image size for {img_url}: {image_size} bytes")
+        return image_size
+    except Exception as e:
+        print(f"Error downloading or measuring {img_url}: {e}")
+        return 0
+
+def process_candidate_images(candidate_images):
+    """Process a list of candidate images and return the best one."""
+    if not candidate_images:
+        print("No suitable images found.")
+        return None
+    
+    # Sort by score (higher is better) and return the best image URL
+    candidate_images.sort(key=lambda x: x[1], reverse=True)
+    best_image_url = candidate_images[0][0]
+    
+    print(f"Best image found: {best_image_url} with score {candidate_images[0][1]}")
+    return best_image_url
+
+def parse_images_from_selenium(driver):
+    candidate_images = []
+    images = driver.find_elements(By.TAG_NAME, 'img')
+    
+    if not images:
+        print("No images found on the page.")
+        return candidate_images
+
+    for img in images:
+        try:
+            img_url = img.get_attribute('src')
+            if not img_url or 'data:' in img_url:  # Skip data URLs or invalid URLs
+                continue
+
+            # Extract width and height attributes for scoring
+            width = height = 100  # Default estimates
+            try:
+                width_attr = img.get_attribute('width')
+                height_attr = img.get_attribute('height')
+                if width_attr and width_attr.isdigit():
+                    width = int(width_attr)
+                if height_attr and height_attr.isdigit():
+                    height = int(height_attr)
+            except Exception:
+                pass
+            
+            # Check if image is too small
+            if width < 50 and height < 50:
+                continue
+            
+            # Calculate initial score based on displayed dimensions
+            initial_score = width * height
+            
+            # For high-scoring candidates, check actual download size
+            if initial_score > 10000:  # Only evaluate promising images
+                image_size = evaluate_image_url(img_url)
+                if image_size > 0:
+                    candidate_images.append((img_url, image_size))
+
+        except Exception as e:
+            print(f"Error processing image element: {e}")
+            continue
+
+    return candidate_images
 
 def fetch_largest_image_selenium(url):
     try:
         driver = create_driver()
-
         driver.get(url)
 
         try:
@@ -360,58 +429,20 @@ def fetch_largest_image_selenium(url):
         except Exception as e:
             print(f"Timeout waiting for Twitter page to load: {e}")
             driver.quit()
-            return (None, 0)
+            return None
 
-        images = driver.find_elements(By.TAG_NAME, 'img')
+        candidate_images = parse_images_from_selenium(driver)
         
-        if not images:
-            print("No images found on the page.")
-            driver.quit()
-            return (None, 0)
-
-        largest_image_url = None
-        largest_size = 0
-
-        for img in images:
-            try:
-                img_url = img.get_attribute('src')
-                if not img_url or 'data:' in img_url:  # Skip data URLs or invalid URLs
-                    continue
-
-                try:
-                    with urllib.request.urlopen(img_url) as response:
-                        image_data = response.read()
-                    
-                    image_size = len(image_data)
-                    
-                    # Update if this image is larger than the current largest
-                    if image_size > largest_size:
-                        largest_size = image_size
-                        largest_image_url = img_url
-
-                except Exception as e:
-                    print(f"Error downloading or measuring {img_url}: {e}")
-                    continue
-
-            except Exception as e:
-                print(f"Error processing image element: {e}")
-                continue
-
         driver.quit()  # Close the browser
-
-        if largest_image_url:
-            print(f"Largest image URL: {largest_image_url}")
-            print(f"Size: {largest_size} bytes")
-            return (largest_image_url, largest_size)
-        else:
-            print("No valid images found.")
-            return (None, 0)
+        
+        # Use shared processing function
+        return process_candidate_images(candidate_images)
 
     except Exception as e:
         print(f"Error accessing the webpage or processing images: {e}")
-        driver.quit()
-        return (None, 0)
-
+        if 'driver' in locals():
+            driver.quit()
+        return None
 
 def fetch_recent_articles():
     global cache    
