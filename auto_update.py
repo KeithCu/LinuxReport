@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+from urllib.parse import urlparse
 from pathlib import Path
 from timeit import default_timer as timer
 import argparse
@@ -30,8 +31,6 @@ from shared import FeedHistory, RssFeed, TZ, Mode, MODE, g_c
 import feedparser
 from shared import DiskCacheWrapper, PATH
 from seleniumfetch import create_driver
-
-
 from openai import OpenAI
 
 # Initialize Together AI client
@@ -40,14 +39,13 @@ client = OpenAI(
     base_url="https://api.together.xyz/v1",
 )
 
-
-base = "/srv/http/"
+BASE = "/srv/http/"
 
 MODE_TO_PATH = {
-    "linux": base + "LinuxReport2",
-    "ai": base + "aireport",
-    "covid": base + "CovidReport2",
-    "trump": base + "trumpreport",
+    "linux": BASE + "LinuxReport2",
+    "ai": BASE + "aireport",
+    "covid": BASE + "CovidReport2",
+    "trump": BASE + "trumpreport",
 }
 
 #Simple schedule for when to do updates. Service calls hourly
@@ -59,8 +57,8 @@ MODE_TO_SCHEDULE = {
 }
 
 cache = DiskCacheWrapper(".")
-
 ALL_URLS = {}
+custom_hacks = {}
 
 def get_final_response(url, headers, max_redirects=2):
     for _ in range(max_redirects):
@@ -132,6 +130,64 @@ def fetch_largest_image(url):
     except Exception as e:
         print(f"Error fetching image: {e}")
         return None
+
+def custom_fetch_largest_image(url):
+    domain = extract_domain(url)
+    if domain in custom_hacks:
+        print(f"Using custom hack for {domain}")
+        return custom_hacks[domain](url)
+    else:
+        return fetch_largest_image(url)
+
+def citizenfreepress_custom_fetch(url):
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        external_link_paragraph = soup.find('p', class_='external-link')
+        if external_link_paragraph:
+            link = external_link_paragraph.find('a')
+            if link and 'href' in link.attrs:
+                underlying_url = link['href']
+                print(f"Found underlying URL: {underlying_url}")
+                return fetch_largest_image(underlying_url)
+        print("No external link found, falling back to original")
+        return fetch_largest_image(url)
+    except Exception as e:
+        print(f"Error in custom fetch for citizenfreepress.com: {e}")
+        return None
+
+def linuxtoday_custom_fetch(url):
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        
+        # Parse the HTML
+        soup = BeautifulSoup(response.text, 'html.parser')
+        link = soup.find('a', class_='action-btn publication_source')
+        
+        if link and 'href' in link.attrs:
+            underlying_url = link['href']
+            print(f"Found underlying URL: {underlying_url}")
+            return fetch_largest_image(underlying_url)
+        else:
+            print("No underlying URL found, falling back to original")
+            return fetch_largest_image(url)
+    except Exception as e:
+        print(f"Error in custom fetch for linuxtoday.com: {e}")
+        return None
+
+def extract_domain(url):
+    parsed = urlparse(url)
+    return parsed.netloc
+
+custom_hacks["linuxtoday.com"] =  linuxtoday_custom_fetch
+custom_hacks["citizenfreepress.com"] = citizenfreepress_custom_fetch
+
 
 def fetch_largest_image_selenium(url):
     try:
@@ -245,7 +301,7 @@ def generate_headlines_html(top_articles, output_file):
     image_article_index = None
     image_url = None
     for i, article in enumerate(top_articles[:3]):
-        potential_image_url = fetch_largest_image(article["url"])
+        potential_image_url = custom_fetch_largest_image(article["url"])
         if potential_image_url:
             image_article_index = i
             image_url = potential_image_url
