@@ -273,7 +273,7 @@ BANNED_WORDS = [
 ]
 
 modetoprompt2 = {
-    Mode.LINUX_REPORT: f"""Arch Linux programmers and enthusiasts. Nothing about Ubuntu or any other
+    Mode.LINUX_REPORT: f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
     distro. Of course anything non-distro-specific is fine, but nothing about the 
     following topics: {', '.join(BANNED_WORDS)}.\n""",
     Mode.AI_REPORT : "AI Language Model Researchers. Nothing about AI security.",
@@ -282,18 +282,16 @@ modetoprompt2 = {
 }
 
 modetoprompt = {
-    "linux": f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
-    distro. Of course anything non-distro-specific is fine, but nothing about the 
-    following topics: {', '.join(BANNED_WORDS)}.\n""",
-    "ai": "AI Language Model Researchers. Nothing about AI security.",
-    "covid": "COVID-19 researchers",
-    "trump": "Trump's biggest fans",
+    "linux": modetoprompt2[Mode.LINUX_REPORT],
+    "ai": modetoprompt2[Mode.AI_REPORT],
+    "covid": modetoprompt2[Mode.COVID_REPORT],
+    "trump": modetoprompt2[Mode.TRUMP_REPORT],
 }
 
 PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]} 
     Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
-    When you are done discussing the titles, put *** and then list the top 3.
+    When you are done discussing the titles, put *** and then list the top 3, using only the titles.
     """
 
 MAX_PREVIOUS_HEADLINES = 9  # Example: Remember the last 9 headlines (configurable)
