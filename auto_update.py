@@ -7,15 +7,23 @@ import argparse
 import importlib.util
 import string
 import datetime
+import string
 
 from jinja2 import Template
 from rapidfuzz import process, fuzz
 from openai import OpenAI
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+import nltk
 
-from shared import TZ, Mode, MODE, g_c
-from shared import DiskCacheWrapper, PATH
-
+from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK
 from auto_update_utils import custom_fetch_largest_image
+
+if not nltk.find('corpora/stopwords'):
+    nltk.download('stopwords')
+
+stop_words = set(stopwords.words('english'))
+stemmer = PorterStemmer()
 
 # Initialize Together AI client
 client = OpenAI(
@@ -130,22 +138,53 @@ def get_article_for_title(target_title, articles):
     best_title, score, index = process.extractOne(target_title, titles, processor=normalize, scorer=fuzz.ratio)
     return articles[index]
 
-def ask_ai_top_articles(articles, model):
-    previous_urls = g_c.get("previously_selected_urls")
-    if not isinstance(previous_urls, list):
-        previous_urls = []
 
-    print (f"Previous URLs: {previous_urls}")
-    filtered_articles = [article for article in articles if article["url"] not in previous_urls]
+def get_significant_words(title):
+    """Extract significant words from a title."""
+    title = title.lower()
+    title = title.translate(str.maketrans("", "", string.punctuation))
+    words = title.split()
+    significant_words = [stemmer.stem(word) for word in words if word not in stop_words]
+    return set(significant_words)
+
+def overlap_coefficient(set1, set2):
+    """Compute overlap coefficient between two sets."""
+    intersection = len(set1 & set2)
+    min_size = min(len(set1), len(set2))
+    return intersection / min_size if min_size != 0 else 0
+
+def ask_ai_top_articles(articles, model):
+    # Retrieve previous selections
+    previous_selections = g_c.get("previously_selected_selections 2")
+    previous_urls = [sel["url"] for sel in previous_selections]
+    previous_word_sets = [set(sel["word_set"]) for sel in previous_selections]
+
+    print(f"Previous URLs: {previous_urls}")
+    
+    # Filter articles
+    filtered_articles = []
+    for article in articles:
+        if article["url"] in previous_urls:
+            continue
+        
+        new_word_set = get_significant_words(article["title"])
+        similarities = [overlap_coefficient(new_word_set, prev_word_set) 
+                       for prev_word_set in previous_word_sets]
+        
+        if not previous_word_sets or max(similarities, default=0) <= 0.8:
+            filtered_articles.append(article)
+        else:
+            print(f"Filtered out article: {article['title']}")
     
     if not filtered_articles:
         print("No new articles available after filtering previously selected ones.")
         return "No new articles to rank."
 
-    prompt_full = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
+    # AI ranking
+    prompt_full = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}" 
+                                              for i, article in enumerate(filtered_articles, 1))
     print(prompt_full)
     
-    # Get AI response
     start = timer()
     response = client.chat.completions.create(
         model=model,
@@ -160,16 +199,20 @@ def ask_ai_top_articles(articles, model):
     top_titles = extract_top_titles_from_ai(response_text)
     top_articles = [get_article_for_title(title, filtered_articles) for title in top_titles]
     
-    new_urls = [article["url"] for article in top_articles if article]
-    updated_urls = previous_urls + new_urls  # Append new selections
+    # Update selections
+    new_selections = [
+        {"url": article["url"], "title": article["title"], 
+         "word_set": list(get_significant_words(article["title"]))}
+        for article in top_articles if article
+    ]
+    updated_selections = previous_selections + new_selections
+    if len(updated_selections) > MAX_PREVIOUS_HEADLINES:
+        updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
+    g_c.put("previously_selected_selections 2", updated_selections, timeout=EXPIRE_WEEK)
     
-    if len(updated_urls) > MAX_PREVIOUS_HEADLINES:
-        updated_urls = updated_urls[-MAX_PREVIOUS_HEADLINES:]
-
-    print (f"Updated URLs: {updated_urls}")
-    g_c.put("previously_selected_urls", updated_urls)
-    
+    print(f"Updated selections stored with {len(updated_selections)} entries")
     return response_text
+
     
 def extract_top_titles_from_ai(text):
     lines = text.splitlines()
