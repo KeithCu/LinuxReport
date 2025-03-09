@@ -178,8 +178,9 @@ def ask_ai_top_articles(articles, model):
     # Filter articles
     filtered_articles = []
     for article in articles:
-        if article["url"] in previous_urls:
-            continue
+        #FIXME: Based only on title for now to see how it works
+        #if article["url"] in previous_urls:
+        #    continue
         
         new_word_set = get_significant_words(article["title"])
         similarities = [overlap_coefficient(new_word_set, prev_word_set) 
