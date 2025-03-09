@@ -54,12 +54,12 @@ def get_meta_image(soup):
     og_image = soup.find('meta', property='og:image')
     if og_image and og_image.get('content'):
         return og_image['content']
-        
+
     # Check Twitter card
     twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
     if twitter_image and twitter_image.get('content'):
         return twitter_image['content']
-        
+
     # Check Schema.org image in JSON-LD
     for script in soup.find_all('script', type='application/ld+json'):
         try:
@@ -69,29 +69,29 @@ def get_meta_image(soup):
                     return data['image'] if isinstance(data['image'], str) else data['image'][0]
         except:
             pass
-            
+
     return None
 
 def parse_best_srcset(srcset):
     """Parse srcset attribute and return the best (largest) image URL"""
     if not srcset:
         return None, 0
-        
+
     best_width = 0
     best_url = None
-    
+
     # Handle space-separated srcset format
     parts = srcset.strip().split(',')
-    
+
     for part in parts:
         part = part.strip()
         if not part:
             continue
-            
+
         # Split URL and descriptor
         subparts = part.split(' ')
         url = subparts[0].strip()
-        
+
         if len(subparts) > 1:
             # Try to extract width descriptor (e.g., "800w")
             width_match = re.search(r'(\d+)w', part)
@@ -101,7 +101,7 @@ def parse_best_srcset(srcset):
                     best_width = width
                     best_url = url
                     continue
-            
+
             # Try to extract pixel density descriptor (e.g., "2x")
             density_match = re.search(r'(\d+(\.\d+)?)x', part)
             if density_match:
@@ -116,7 +116,7 @@ def parse_best_srcset(srcset):
             if best_url is None:
                 best_url = url
                 best_width = 1
-    
+
     return best_url, best_width
 
 def parse_images_from_soup(soup, base_url):
@@ -128,20 +128,20 @@ def parse_images_from_soup(soup, base_url):
         absolute_meta_url = urljoin(base_url, meta_image_url)
         candidate_images.append((absolute_meta_url, 1000000))  # Give high priority to meta images
         print(f"Found meta image: {absolute_meta_url}")
-    
+
     # 2. Check for picture elements with srcset
     for picture in soup.find_all('picture'):
         # Find the highest resolution source
         max_width = 0
         best_source = None
-        
+
         for source in picture.find_all('source'):
             if source.get('srcset'):
                 best_src, width = parse_best_srcset(source['srcset'])
                 if width > max_width:
                     max_width = width
                     best_source = best_src
-        
+
         # Also check for img inside picture as fallback
         img = picture.find('img')
         if img:
@@ -158,11 +158,11 @@ def parse_images_from_soup(soup, base_url):
                         max_width = int(img['width'])
                     except ValueError:
                         max_width = 500  # Default estimate
-        
+
         if best_source:
             absolute_url = urljoin(base_url, best_source)
             candidate_images.append((absolute_url, max_width * max_width))  # Square for comparison
-    
+
     # 3. Process all img tags (both standard and lazy-loaded)
     for img in soup.find_all('img'):
         # Check various attributes for image source
@@ -171,20 +171,20 @@ def parse_images_from_soup(soup, base_url):
             if img.get(attr):
                 src = img[attr]
                 break
-        
+
         if not src:
             continue
-            
+
         # Handle srcset if available
         if attr == 'data-srcset' or attr == 'srcset' or 'srcset' in img.attrs:
             srcset = img.get('srcset', img.get('data-srcset', ''))
             best_src, _ = parse_best_srcset(srcset)
             if best_src:
                 src = best_src
-        
+
         # Calculate image importance score
         width = height = 100  # Default estimates
-        
+
         # Try to get dimensions
         try:
             if img.get('width') and not img['width'] == 'auto':
@@ -193,25 +193,25 @@ def parse_images_from_soup(soup, base_url):
                 height = int(img['height']) if img['height'].isdigit() else height
         except (ValueError, KeyError):
             pass
-            
+
         # Check if image is hidden or very small
         style = img.get('style', '')
         if 'display:none' in style or 'visibility:hidden' in style:
             continue
-            
+
         # Check for very small images or icons to exclude
         if (width < 50 or height < 50) and ('icon' in src.lower() or 'logo' in src.lower()):
             continue
-            
+
         # Calculate score based on size and position in the document
         score = width * height
         absolute_url = urljoin(base_url, src)
-        
+
         # Exclude common patterns for site logos, icons, etc.
         exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'Linux_opengraph']
         if not any(pattern in absolute_url.lower() for pattern in exclude_patterns):
             candidate_images.append((absolute_url, score))
-    
+
     return candidate_images
 
 def process_candidate_images(candidate_images):
@@ -219,11 +219,11 @@ def process_candidate_images(candidate_images):
     if not candidate_images:
         print("No suitable images found.")
         return None
-    
+
     # Sort by score (higher is better) and return the best image URL
     candidate_images.sort(key=lambda x: x[1], reverse=True)
     best_image_url = candidate_images[0][0]
-    
+
     print(f"Best image found: {best_image_url} with score {candidate_images[0][1]}")
     return best_image_url
 
@@ -248,20 +248,20 @@ def fetch_largest_image(url):
         if response is None:
             return None
         response.raise_for_status()
-        
+
         content_type = response.headers.get('Content-Type', '').lower()
         if content_type.startswith('image/'):
             print(f"URL is an image: {url}")
             return url
-        
+
         soup = BeautifulSoup(response.text, 'html.parser')
         base_url = response.url
         candidate_images = parse_images_from_soup(soup, base_url)
-        
+
         if not candidate_images:
             print("No suitable images found.")
             return None
-            
+
         # Sort by score (higher is better) and return the best image URL
         return process_candidate_images(candidate_images)
 
@@ -280,12 +280,12 @@ def extract_underlying_url(url, selector_func):
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
-        
+
         underlying_url = selector_func(soup)
         if underlying_url:
             print(f"Found underlying URL: {underlying_url}")
             return underlying_url
-        
+
         print("No underlying URL found, falling back to original")
         return None
     except Exception as e:
@@ -332,7 +332,7 @@ def custom_fetch_largest_image(url):
 def parse_images_from_selenium(driver):
     candidate_images = []
     images = driver.find_elements(By.TAG_NAME, 'img')
-    
+
     if not images:
         print("No images found on the page.")
         return candidate_images
@@ -354,14 +354,14 @@ def parse_images_from_selenium(driver):
                     height = int(height_attr)
             except Exception:
                 pass
-            
+
             # Check if image is too small
             if width < 50 and height < 50:
                 continue
-            
+
             # Calculate initial score based on displayed dimensions
             initial_score = width * height
-            
+
             # For high-scoring candidates, check actual download size
             if initial_score > 10000:  # Only evaluate promising images
                 image_size = evaluate_image_url(img_url)
@@ -391,9 +391,9 @@ def fetch_largest_image_selenium(url):
             return None
 
         candidate_images = parse_images_from_selenium(driver)
-        
+
         driver.quit()  # Close the browser
-        
+
         # Use shared processing function
         return process_candidate_images(candidate_images)
 
