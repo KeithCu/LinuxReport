@@ -138,11 +138,22 @@ def get_article_for_title(target_title, articles):
     best_title, score, index = process.extractOne(target_title, titles, processor=normalize, scorer=fuzz.ratio)
     return articles[index]
 
+def preprocess_title(title):
+    # Replace en dash with space
+    title = title.replace('–', ' ')
+    # Replace em dash with space
+    title = title.replace('—', ' ')
+    return title
+
+def clean_title(title):
+    # Keep letters, digits, spaces, hyphens, and apostrophes
+    pattern = r'[^a-zA-Z0-9 -\']'
+    cleaned = re.sub(pattern, '', title)
+    return cleaned
 
 def get_significant_words(title):
-    """Extract significant words from a title."""
-    title = title.lower()
-    title = title.translate(str.maketrans("", "", string.punctuation))
+    title = preprocess_title(title)
+    title = clean_title(title).lower()
     words = title.split()
     significant_words = [stemmer.stem(word) for word in words if word not in stop_words]
     return set(significant_words)
