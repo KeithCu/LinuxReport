@@ -543,8 +543,7 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     When you are done discussing the titles, put *** and then list the top 3, using only the titles.
     """
 
-MAX_PREVIOUS_HEADLINES = 9  # Example: Remember the last 9 headlines (configurable)
-
+MAX_PREVIOUS_HEADLINES = 30
 
 def get_article_for_title(target_title, articles):
 
