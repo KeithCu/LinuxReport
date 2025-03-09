@@ -83,20 +83,20 @@ class FeedHistory:
             now = datetime.now(TZ)
             is_weekday = now.weekday() < 5
             current_bucket = now.hour // BUCKET_SIZE_HOURS
-            
+
             # Get the set of buckets for the current day type
             relevant_buckets = feed_data["weekday_buckets"] if is_weekday else feed_data["weekend_buckets"]
-            
+
             # Check if any buckets ahead of the current time are missing
             future_buckets_missing = False
             for future_bucket in range(current_bucket + 1, 12):  # Check buckets ahead of current time
                 if future_bucket not in relevant_buckets:
                     future_buckets_missing = True
                     break
-                    
+
             # Only stay in initial phase if missing buckets are in the future
             feed_data["in_initial_phase"] = future_buckets_missing
-            
+
             # Adjust interval based on recent success and bucket
             self._adjust_interval(url)
             self._save_data()
