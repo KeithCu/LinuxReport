@@ -558,6 +558,7 @@ def ask_ai_top_articles(articles, model):
     if not isinstance(previous_urls, list):
         previous_urls = []
 
+    print (f"Previous URLs: {previous_urls}")
     filtered_articles = [article for article in articles if article["url"] not in previous_urls]
     
     if not filtered_articles:
@@ -575,6 +576,7 @@ def ask_ai_top_articles(articles, model):
         max_tokens=3000,
     )
     end = timer()
+
     print(f"LLM Response: {response.choices[0].message.content} in {end - start:f}.")
     response_text = response.choices[0].message.content
     
@@ -586,7 +588,8 @@ def ask_ai_top_articles(articles, model):
     
     if len(updated_urls) > MAX_PREVIOUS_HEADLINES:
         updated_urls = updated_urls[-MAX_PREVIOUS_HEADLINES:]
-    
+
+    print (f"Updated URLs: {updated_urls}")
     g_c.put("previously_selected_urls", updated_urls)
     
     return response_text
