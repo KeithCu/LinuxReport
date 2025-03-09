@@ -208,7 +208,7 @@ def parse_images_from_soup(soup, base_url):
         absolute_url = urljoin(base_url, src)
 
         # Exclude common patterns for site logos, icons, etc.
-        exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'Linux_opengraph']
+        exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'Linux_opengraph']
         if not any(pattern in absolute_url.lower() for pattern in exclude_patterns):
             candidate_images.append((absolute_url, score))
 

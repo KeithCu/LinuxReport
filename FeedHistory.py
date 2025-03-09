@@ -7,9 +7,10 @@ import zoneinfo
 
 #FIXME: duplicate from shared, but we don't want circular dependencies.
 TZ = zoneinfo.ZoneInfo("US/Eastern")
-EXPIRE_HOUR = 3600
 
 # Constants
+
+EXPIRE_HOUR = 3600
 INITIAL_INTERVAL = timedelta(hours=2)  # Query every 2 hours
 MIN_INTERVAL = timedelta(minutes=60)
 MAX_INTERVAL = timedelta(hours=24)
