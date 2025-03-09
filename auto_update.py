@@ -109,7 +109,7 @@ BANNED_WORDS = [
 
 modetoprompt2 = {
     Mode.LINUX_REPORT: f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
-    distro. Of course anything non-distro-specific is fine, but nothing about the 
+    distro. Of course anything non-distro-specific is fine, but nothing about the
     following topics: {', '.join(BANNED_WORDS)}.\n""",
     Mode.AI_REPORT : "AI Language Model Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",
@@ -123,7 +123,7 @@ modetoprompt = {
     "trump": modetoprompt2[Mode.TRUMP_REPORT],
 }
 
-PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]} 
+PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
     When you are done discussing the titles, put *** and then list the top 3, using only the titles.
@@ -174,32 +174,32 @@ def ask_ai_top_articles(articles, model):
     previous_word_sets = [set(sel["word_set"]) for sel in previous_selections]
 
     print(f"Previous Headliines: {previous_selections}")
-    
+
     # Filter articles
     filtered_articles = []
     for article in articles:
         #FIXME: Based only on title for now to see how it works
         #if article["url"] in previous_urls:
         #    continue
-        
+
         new_word_set = get_significant_words(article["title"])
-        similarities = [overlap_coefficient(new_word_set, prev_word_set) 
+        similarities = [overlap_coefficient(new_word_set, prev_word_set)
                        for prev_word_set in previous_word_sets]
-        
+
         if not previous_word_sets or max(similarities, default=0) <= 0.8:
             filtered_articles.append(article)
         else:
             print(f"Filtered out article: {article['title']}")
-    
+
     if not filtered_articles:
         print("No new articles available after filtering previously selected ones.")
         return "No new articles to rank."
 
     # AI ranking
-    prompt_full = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}" 
+    prompt_full = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}"
                                               for i, article in enumerate(filtered_articles, 1))
     print(prompt_full)
-    
+
     start = timer()
     response = client.chat.completions.create(
         model=model,
@@ -210,13 +210,13 @@ def ask_ai_top_articles(articles, model):
 
     print(f"LLM Response: {response.choices[0].message.content} in {end - start:f}.")
     response_text = response.choices[0].message.content
-    
+
     top_titles = extract_top_titles_from_ai(response_text)
     top_articles = [get_article_for_title(title, filtered_articles) for title in top_titles]
-    
+
     # Update selections
     new_selections = [
-        {"url": article["url"], "title": article["title"], 
+        {"url": article["url"], "title": article["title"],
          "word_set": list(get_significant_words(article["title"]))}
         for article in top_articles if article
     ]
@@ -224,15 +224,15 @@ def ask_ai_top_articles(articles, model):
     if len(updated_selections) > MAX_PREVIOUS_HEADLINES:
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
     g_c.put("previously_selected_selections 2", updated_selections, timeout=EXPIRE_WEEK)
-    
-    print(f"Updated selections stored with {updated_selections}.")
+
+    #print(f"Updated selections stored with {updated_selections}.")
     return response_text
 
-    
+
 def extract_top_titles_from_ai(text):
     lines = text.splitlines()
     titles = []
-    
+
     for line in lines:
         match = re.match(r"^\d+\.\s+(.+)$", line)
         if match:
@@ -240,7 +240,7 @@ def extract_top_titles_from_ai(text):
             titles.append(title)
             if len(titles) == 3:
                 break
-    
+
     return titles
 
 def normalize(text):
