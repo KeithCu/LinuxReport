@@ -156,10 +156,13 @@ def overlap_coefficient(set1, set2):
 def ask_ai_top_articles(articles, model):
     # Retrieve previous selections
     previous_selections = g_c.get("previously_selected_selections 2")
+    if previous_selections is None:
+        previous_selections = []
+
     previous_urls = [sel["url"] for sel in previous_selections]
     previous_word_sets = [set(sel["word_set"]) for sel in previous_selections]
 
-    print(f"Previous URLs: {previous_urls}")
+    print(f"Previous Headliines: {previous_selections}")
     
     # Filter articles
     filtered_articles = []
@@ -210,7 +213,7 @@ def ask_ai_top_articles(articles, model):
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
     g_c.put("previously_selected_selections 2", updated_selections, timeout=EXPIRE_WEEK)
     
-    print(f"Updated selections stored with {len(updated_selections)} entries")
+    print(f"Updated selections stored with {updated_selections}.")
     return response_text
 
     
