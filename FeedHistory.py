@@ -22,7 +22,7 @@ class FeedHistory:
         self.data_file = Path(data_file)
         self.lock = threading.RLock()
         self.data: Dict[str, dict] = self._load_data()
-    
+
     def _load_data(self):
         """Load history from pickle file or initialize empty if it fails or is invalid."""
         if self.data_file.exists():
@@ -42,7 +42,7 @@ class FeedHistory:
                 # Loading failed (e.g., file corruption or unpickling error)
                 return {}
         return {}
-    
+
     def _save_data(self):
         """Save history to pickle file."""
         with open(self.data_file, "wb") as f:
@@ -68,7 +68,7 @@ class FeedHistory:
             bucket = self._get_bucket(fetch_time)
             old_freq = feed_data["buckets"].get(bucket, 0)
             new_freq = 1 if new_articles > 0 else 0
-            feed_data["buckets"][bucket] = (SMOOTHING_FACTOR * new_freq + 
+            feed_data["buckets"][bucket] = (SMOOTHING_FACTOR * new_freq +
                                            (1 - SMOOTHING_FACTOR) * old_freq)
 
             # Update bucket coverage
@@ -79,20 +79,24 @@ class FeedHistory:
             else:
                 feed_data["weekend_buckets"].add(bucket_num)
 
-            # Determine initial phase status based on current day type and relevant bucket completeness
+            # Determine initial phase status based on current day type and future bucket completeness
             now = datetime.now(TZ)
             is_weekday = now.weekday() < 5
-            weekday_buckets_complete = len(feed_data["weekday_buckets"]) == 12
-            weekend_buckets_complete = len(feed_data["weekend_buckets"]) == 12
+            current_bucket = now.hour // BUCKET_SIZE_HOURS
             
-            # Set initial phase status based on current day type:
-            # - On weekdays: require weekday buckets to be complete
-            # - On weekends: require weekend buckets to be complete
-            if is_weekday:
-                feed_data["in_initial_phase"] = not weekday_buckets_complete
-            else:
-                feed_data["in_initial_phase"] = not weekend_buckets_complete
-
+            # Get the set of buckets for the current day type
+            relevant_buckets = feed_data["weekday_buckets"] if is_weekday else feed_data["weekend_buckets"]
+            
+            # Check if any buckets ahead of the current time are missing
+            future_buckets_missing = False
+            for future_bucket in range(current_bucket + 1, 12):  # Check buckets ahead of current time
+                if future_bucket not in relevant_buckets:
+                    future_buckets_missing = True
+                    break
+                    
+            # Only stay in initial phase if missing buckets are in the future
+            feed_data["in_initial_phase"] = future_buckets_missing
+            
             # Adjust interval based on recent success and bucket
             self._adjust_interval(url)
             self._save_data()
@@ -115,11 +119,11 @@ class FeedHistory:
 
         # Base interval: inversely proportional to frequency and success
         combined_score = (freq + success_rate) / 2  # 0 to 1
-        interval_seconds = (MAX_INTERVAL.total_seconds() * (1 - combined_score) + 
+        interval_seconds = (MAX_INTERVAL.total_seconds() * (1 - combined_score) +
                            MIN_INTERVAL.total_seconds() * combined_score)
-        interval = max(MIN_INTERVAL.total_seconds(), 
+        interval = max(MIN_INTERVAL.total_seconds(),
                       min(MAX_INTERVAL.total_seconds(), interval_seconds))
-        
+
         feed_data["interval"] = interval
 
     def get_interval(self, url: str) -> timedelta:
