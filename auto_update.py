@@ -42,10 +42,10 @@ MODE_TO_PATH = {
 
 #Simple schedule for when to do updates. Service calls hourly
 MODE_TO_SCHEDULE = {
-    "linux": [8, 12, 16],
-    "ai": [8, 16],
-    "covid": [8, 16],
-    "trump": [4, 8, 10, 12, 14, 16, 20],
+    "linux": [0, 8, 12, 16, 20],
+    "ai": [8, 16, 20],
+    "covid": [8, 16, 20],
+    "trump": [4, 8, 10, 12, 14, 16, 20, 23],
 }
 
 cache = DiskCacheWrapper(".")
