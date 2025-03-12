@@ -297,13 +297,16 @@ def main(mode):
         sys.exit(1)
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Generate report (if scheduled) with optional force update')
+    parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
+    args = parser.parse_args()
 
     cwd = os.getcwd()
     for mode in MODE_TO_PATH.keys():
         if mode.lower() in cwd.lower():
             hours = MODE_TO_SCHEDULE[mode]
             current_hour = datetime.datetime.now(TZ).hour
-            if current_hour in hours:
+            if args.force or current_hour in hours:
                 main(mode)
                 break
 
