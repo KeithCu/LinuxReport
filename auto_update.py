@@ -111,7 +111,7 @@ modetoprompt2 = {
     Mode.LINUX_REPORT: f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
     distro. Of course anything non-distro-specific is fine, but nothing about the
     following topics: {', '.join(BANNED_WORDS)}.\n""",
-    Mode.AI_REPORT : "AI Language Model Researchers. Nothing about AI security.",
+    Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",
     Mode.TRUMP_REPORT : "Trump's biggest fans",
 }
@@ -170,10 +170,9 @@ def ask_ai_top_articles(articles, model):
     if previous_selections is None:
         previous_selections = []
 
-    previous_urls = [sel["url"] for sel in previous_selections]
     previous_word_sets = [set(sel["word_set"]) for sel in previous_selections]
 
-    print(f"Previous Headliines: {previous_selections}")
+    print(f"Previous Headlines: {previous_selections}")
 
     # Filter articles
     filtered_articles = []
@@ -225,7 +224,6 @@ def ask_ai_top_articles(articles, model):
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
     g_c.put("previously_selected_selections 2", updated_selections, timeout=EXPIRE_WEEK)
 
-    #print(f"Updated selections stored with {updated_selections}.")
     return response_text
 
 
