@@ -16,6 +16,12 @@ from seleniumfetch import create_driver
 
 custom_hacks = {}
 
+DEBUG_LOGGING = True
+
+def debug_print(message):
+    if DEBUG_LOGGING:
+        print(f"[DEBUG] {message}")
+
 def get_final_response(url, headers, max_redirects=2):
     for _ in range(max_redirects):
         try:
@@ -36,7 +42,7 @@ def get_final_response(url, headers, max_redirects=2):
         target_url = None
         for part in parts:
             if part.strip().lower().startswith('url='):
-                target_url = part.strip()[4:].strip()  # Extract the URL after 'url='
+                target_url = part.strip()[4:].strip()
                 break
 
         if target_url:
@@ -52,12 +58,12 @@ def get_meta_image(soup):
     """Extract image URL from various meta tags"""
     # Check OpenGraph image (highest priority)
     og_image = soup.find('meta', property='og:image')
-    if og_image and og_image.get('content'):
+    if (og_image and og_image.get('content')):
         return og_image['content']
 
     # Check Twitter card
     twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
-    if twitter_image and twitter_image.get('content'):
+    if (twitter_image and twitter_image.get('content')):
         return twitter_image['content']
 
     # Check Schema.org image in JSON-LD
@@ -126,7 +132,7 @@ def parse_images_from_soup(soup, base_url):
     meta_image_url = get_meta_image(soup)
     if meta_image_url:
         absolute_meta_url = urljoin(base_url, meta_image_url)
-        candidate_images.append((absolute_meta_url, 1000000))  # Give high priority to meta images
+        candidate_images.append((absolute_meta_url, 2000000)) # Very high score for meta images
         print(f"Found meta image: {absolute_meta_url}")
 
     # 2. Check for picture elements with srcset
@@ -200,7 +206,7 @@ def parse_images_from_soup(soup, base_url):
             continue
 
         # Check for very small images or icons to exclude
-        if (width < 50 or height < 50) and ('icon' in src.lower() or 'logo' in src.lower()):
+        if (width < 50 or height < 50):
             continue
 
         # Calculate score based on size and position in the document
@@ -217,16 +223,21 @@ def parse_images_from_soup(soup, base_url):
 def process_candidate_images(candidate_images):
     """Process a list of candidate images and return the best one."""
     if not candidate_images:
+        debug_print("No candidate images available for processing.")
         print("No suitable images found.")
         return None
 
-    # Sort by score (higher is better) and return the best image URL
-    candidate_images.sort(key=lambda x: x[1], reverse=True)
-    best_image_url = candidate_images[0][0]
+    debug_print("Candidate images before sorting:")
+    for url, score in candidate_images:
+        debug_print(f"Image URL: {url}, Score: {score}")
 
+    debug_print("Sorting candidate images based on score (higher is better).")
+    candidate_images.sort(key=lambda x: x[1], reverse=True)
+    
+    best_image_url = candidate_images[0][0]
+    debug_print(f"Chose best image: {best_image_url} with score {candidate_images[0][1]}")
     print(f"Best image found: {best_image_url} with score {candidate_images[0][1]}")
     return best_image_url
-
 
 def evaluate_image_url(img_url):
     """Evaluate an image by downloading it and checking its size."""
@@ -240,32 +251,36 @@ def evaluate_image_url(img_url):
         print(f"Error downloading or measuring {img_url}: {e}")
         return 0
 
-
 def fetch_largest_image(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0'}
         response = get_final_response(url, headers)
         if response is None:
+            debug_print("No response received from get_final_response.")
             return None
         response.raise_for_status()
 
         content_type = response.headers.get('Content-Type', '').lower()
         if content_type.startswith('image/'):
+            debug_print(f"URL is directly an image: {url}")
             print(f"URL is an image: {url}")
             return url
 
         soup = BeautifulSoup(response.text, 'html.parser')
+        debug_print("Parsed HTML into BeautifulSoup successfully.")
         base_url = response.url
         candidate_images = parse_images_from_soup(soup, base_url)
 
         if not candidate_images:
+            debug_print("No candidate images were extracted from the HTML.")
             print("No suitable images found.")
             return None
 
-        # Sort by score (higher is better) and return the best image URL
+        debug_print("Proceeding to select the largest image among candidates.")
         return process_candidate_images(candidate_images)
 
     except Exception as e:
+        debug_print(f"Error fetching image: {e}")
         print(f"Error fetching image: {e}")
         return None
 
@@ -292,7 +307,6 @@ def extract_underlying_url(url, selector_func):
         print(f"Error extracting underlying URL: {e}")
         return None
 
-
 def citizenfreepress_selector(soup):
     external_link_paragraph = soup.find('p', class_='external-link')
     if external_link_paragraph:
@@ -316,7 +330,6 @@ def citizenfreepress_custom_fetch(url):
 
 def linuxtoday_custom_fetch(url):
     return generic_custom_fetch(url, linuxtoday_selector)
-
 
 custom_hacks["linuxtoday.com"] =  linuxtoday_custom_fetch
 custom_hacks["citizenfreepress.com"] = citizenfreepress_custom_fetch
@@ -402,3 +415,16 @@ def fetch_largest_image_selenium(url):
         if 'driver' in locals():
             driver.quit()
         return None
+
+if __name__ == '__main__':
+    import sys
+    if len(sys.argv) > 1:
+        test_url = sys.argv[1]
+        print(f"Testing custom_fetch_largest_image with URL: {test_url}")
+        result = custom_fetch_largest_image(test_url)
+        if result:
+            print(f"Result: {result}")
+        else:
+            print("No image found or an error occurred.")
+    else:
+        print("Usage: python auto_update_utils.py <URL>")
