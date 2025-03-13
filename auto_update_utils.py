@@ -286,7 +286,10 @@ def fetch_largest_image(url):
 
 def extract_domain(url):
     parsed = urlparse(url)
-    return parsed.netloc
+    netloc = parsed.netloc
+    if netloc.startswith("www."):
+        return netloc[4:]
+    return netloc
 
 def extract_underlying_url(url, selector_func):
     """Common function to extract an underlying URL from a webpage."""
