@@ -7,23 +7,17 @@ import argparse
 import importlib.util
 import string
 import datetime
-import string
 
 from jinja2 import Template
 from rapidfuzz import process, fuzz
 from openai import OpenAI
-from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer
-import nltk
+from sentence_transformers import SentenceTransformer, util
 
 from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK
 from auto_update_utils import custom_fetch_largest_image
 
-if not nltk.find('corpora/stopwords'):
-    nltk.download('stopwords')
-
-stop_words = set(stopwords.words('english'))
-stemmer = PorterStemmer()
+MAX_PREVIOUS_HEADLINES = 100
+THRESHOLD = 0.8
 
 # Initialize Together AI client
 client = OpenAI(
@@ -69,6 +63,25 @@ headline_template = Template("""
 <br/>
 """)
 
+def fetch_recent_articles():
+    articles = []
+    for url, _ in ALL_URLS.items():
+        feed = cache.get(url)
+        if feed is None:
+            print (f"No data found for {url}")
+            continue
+
+        count = 0
+        for entry in feed.entries:
+            title = entry["title"]
+            articles.append({"title": title, "url": entry["link"]})
+            count += 1
+            if count == 5:
+                break
+
+    return articles
+
+
 def generate_headlines_html(top_articles, output_file):
     # Step 1: Find the first article with an available image
     image_article_index = None
@@ -102,6 +115,27 @@ def generate_headlines_html(top_articles, output_file):
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(full_html)
 
+
+def extract_top_titles_from_ai(text):
+    """Extracts top titles from AI-generated text after the first '***' marker."""
+    marker_index = text.find('***')
+    if (marker_index != -1):
+        # Use the content after the first '***'
+        text = text[marker_index + 3:]
+    lines = text.splitlines()
+    titles = []
+
+    for line in lines:
+        match = re.match(r"^\s*\d+\.\s+(.+)$", line)
+        if match:
+            title = match.group(1).strip("*").strip()
+            titles.append(title)
+            if len(titles) == 3:
+                break
+
+    return titles
+
+
 BANNED_WORDS = [
     "tmux",
     "redox",
@@ -129,159 +163,137 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     When you are done discussing the titles, put *** and then list the top 3, using only the titles.
     """
 
-MAX_PREVIOUS_HEADLINES = 200
+# Load the SentenceTransformer model once
+EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
+embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
 
-def get_article_for_title(target_title, articles):
+def get_embedding(text):
+    """Compute and return the embedding for a given text."""
+    return embedder.encode(text, convert_to_tensor=True)
 
-    titles = [article["title"] for article in articles]
+def are_titles_similar_emb(title1, title2, threshold=0.8):
+    """
+    Compare two headlines by computing the cosine similarity of their embeddings.
+    Returns True if similarity is above the threshold.
+    """
+    emb1 = get_embedding(title1)
+    emb2 = get_embedding(title2)
+    cosine_score = util.cos_sim(emb1, emb2)
+    return cosine_score.item() >= threshold
 
-    best_title, score, index = process.extractOne(target_title, titles, processor=normalize, scorer=fuzz.ratio)
-    return articles[index]
+def deduplicate_articles_with_embeddings(articles, threshold=THRESHOLD):
+    """
+    Given a list of articles (each article is a dict with a 'title' key), return a new list
+    where headlines with cosine similarity (computed via embeddings) above the threshold
+    are filtered out.
+    """
+    unique_articles = []
+    embeddings = []  # Cache embeddings for articles already added
 
-def preprocess_title(title):
-    # Replace en dash with space
-    title = title.replace('–', ' ')
-    # Replace em dash with space
-    title = title.replace('—', ' ')
-    return title
+    for article in articles:
+        title = article["title"]
+        current_emb = get_embedding(title)
+        duplicate_found = False
+        for emb in embeddings:
+            cosine_score = util.cos_sim(current_emb, emb)
+            if cosine_score.item() >= threshold:
+                duplicate_found = True
+                print(f"Filtered duplicate (embeddings): {title}")
+                break
+        if not duplicate_found:
+            unique_articles.append(article)
+            embeddings.append(current_emb)
+    return unique_articles
 
-def clean_title(title):
-    # Keep letters, digits, spaces, hyphens, and apostrophes
-    pattern = r'[^a-zA-Z0-9 -\']'
-    cleaned = re.sub(pattern, '', title)
-    return cleaned
-
-def get_significant_words(title):
-    title = preprocess_title(title)
-    title = clean_title(title).lower()
-    words = title.split()
-    significant_words = [stemmer.stem(word) for word in words if word not in stop_words]
-    return set(significant_words)
-
-def overlap_coefficient(set1, set2):
-    """Compute overlap coefficient between two sets."""
-    intersection = len(set1 & set2)
-    min_size = min(len(set1), len(set2))
-    return intersection / min_size if min_size != 0 else 0
-
+# --- Modified ask_ai_top_articles using embeddings for deduplication ---
 def ask_ai_top_articles(articles, model):
-    # Retrieve previous selections
-    previous_selections = g_c.get("previously_selected_selections 2")
+    """
+    Filters out articles whose headlines are semantically similar (using embeddings)
+    to previously selected headlines and within the current batch.
+    Then, constructs the prompt and queries the AI ranking system.
+    """
+    # Retrieve previous selections (assume these are stored as a list of dicts)
+    previous_selections = g_c.get("previously_selected_selections_2")
     if previous_selections is None:
         previous_selections = []
 
-    previous_word_sets = [set(sel["word_set"]) for sel in previous_selections]
+    # Filter out articles that are similar to previous selections using embeddings.
+    if previous_selections:
+        previous_titles = [sel["title"] for sel in previous_selections]
+        previous_urls = [sel["url"] for sel in previous_selections]
+        filtered_articles = []
+        for article in articles:
+            if article["url"] in previous_urls:
+                continue
 
-    print(f"Previous Headlines: {previous_selections}")
+            is_duplicate = any(are_titles_similar_emb(article["title"], prev_title)
+                               for prev_title in previous_titles)
+            if not is_duplicate:
+                filtered_articles.append(article)
+            else:
+                print(f"Filtered out due to previous selection: {article['title']}")
+    else:
+        filtered_articles = articles
 
-    # Filter articles
-    filtered_articles = []
-    for article in articles:
-        #FIXME: Based only on title for now to see how it works
-        #if article["url"] in previous_urls:
-        #    continue
-
-        new_word_set = get_significant_words(article["title"])
-        similarities = [overlap_coefficient(new_word_set, prev_word_set)
-                       for prev_word_set in previous_word_sets]
-
-        sim = max(similarities, default=0)
-        if not previous_word_sets or sim <= 0.5:
-            filtered_articles.append(article)
-        else:
-            if sim <= 0.99:
-                print(f"Filtered out close article: {article['title']}")
+    # Further deduplicate among the current articles using embeddings.
+    filtered_articles = deduplicate_articles_with_embeddings(filtered_articles, threshold=0.8)
 
     if not filtered_articles:
-        print("No new articles available after filtering previously selected ones.")
+        print("No new articles available after deduplication.")
         return "No new articles to rank."
 
-    # AI ranking
-    prompt_full = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}"
-                                              for i, article in enumerate(filtered_articles, 1))
-    print(prompt_full)
+    # Build the prompt for the AI ranking system.
+    prompt = f"""Rank these article titles by relevance to {modetoprompt2[MODE]}
+Please discuss the titles and then list the top 3 titles after '***'.
+"""
+    prompt += "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
+    print("Constructed Prompt:")
+    print(prompt)
 
     start = timer()
     response = client.chat.completions.create(
         model=model,
-        messages=[{"role": "user", "content": prompt_full}],
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=3000,
     )
     end = timer()
-
-    print(f"LLM Response: {response.choices[0].message.content} in {end - start:f}.")
+    print(f"LLM Response in {end - start:.3f} seconds:")
     response_text = response.choices[0].message.content
+    print(response_text)
 
     top_titles = extract_top_titles_from_ai(response_text)
-    top_articles = [get_article_for_title(title, filtered_articles) for title in top_titles]
+    top_articles = []
+    # Match each returned title to an article using the embedding similarity check.
+    for title in top_titles:
+        for article in filtered_articles:
+            if are_titles_similar_emb(title, article["title"]):
+                top_articles.append(article)
+                break
 
-    # Update selections
-    new_selections = [
-        {"url": article["url"], "title": article["title"],
-         "word_set": list(get_significant_words(article["title"]))}
-        for article in top_articles if article
-    ]
+    # Update previous selections for future deduplication.
+    new_selections = [{"url": art["url"], "title": art["title"]}
+                      for art in top_articles if art]
     updated_selections = previous_selections + new_selections
     if len(updated_selections) > MAX_PREVIOUS_HEADLINES:
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
-    g_c.put("previously_selected_selections 2", updated_selections, timeout=EXPIRE_WEEK)
+    g_c.put("previously_selected_selections_2", updated_selections, timeout=EXPIRE_WEEK)
 
     return response_text
 
-
-def extract_top_titles_from_ai(text):
-    lines = text.splitlines()
-    titles = []
-
-    for line in lines:
-        match = re.match(r"^\d+\.\s+(.+)$", line)
-        if match:
-            title = match.group(1).strip("*").strip()
-            titles.append(title)
-            if len(titles) == 3:
-                break
-
-    return titles
-
-def normalize(text):
-    return text.lower().translate(str.maketrans("", "", string.punctuation)).strip()
-
-def fetch_recent_articles():
-    articles = []
-    for url, _ in ALL_URLS.items():
-        feed = cache.get(url)
-        if feed is None:
-            print (f"No data found for {url}")
-            continue
-
-        count = 0
-        for entry in feed.entries:
-            title = entry["title"]
-            articles.append({"title": title, "url": entry["link"]})
-            count += 1
-            if count == 5:
-                break
-
-    return articles
-
+# --- Integration into the main pipeline ---
 def main(mode):
     global ALL_URLS
 
     module_path = f"{mode}_report_settings.py"
-
     if not os.path.isfile(module_path):
         raise FileNotFoundError(f"Module file not found: {module_path}")
 
     spec = importlib.util.spec_from_file_location("module_name", module_path)
-
-    # Load the module
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-
     ALL_URLS = module.ALL_URLS
 
     html_file = f"{mode}reportabove.html"
-
     model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
     try:
@@ -292,14 +304,19 @@ def main(mode):
 
         full_response = ask_ai_top_articles(articles, model)
         top_3 = extract_top_titles_from_ai(full_response)
-        top_3_articles = [get_article_for_title(title, articles) for title in top_3]
+        top_3_articles = []
+        for title in top_3:
+            for article in articles:
+                if are_titles_similar_emb(title, article["title"]):
+                    top_3_articles.append(article)
+                    break
         generate_headlines_html(top_3_articles, html_file)
     except Exception as e:
         print(f"Error in mode {mode}: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Generate report (if scheduled) with optional force update')
+    parser = argparse.ArgumentParser(description='Generate report with optional force update')
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     args = parser.parse_args()
 
@@ -311,4 +328,3 @@ if __name__ == "__main__":
             if args.force or current_hour in hours:
                 main(mode)
                 break
-
