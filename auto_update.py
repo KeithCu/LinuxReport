@@ -129,7 +129,7 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     When you are done discussing the titles, put *** and then list the top 3, using only the titles.
     """
 
-MAX_PREVIOUS_HEADLINES = 30
+MAX_PREVIOUS_HEADLINES = 200
 
 def get_article_for_title(target_title, articles):
 
@@ -185,10 +185,12 @@ def ask_ai_top_articles(articles, model):
         similarities = [overlap_coefficient(new_word_set, prev_word_set)
                        for prev_word_set in previous_word_sets]
 
-        if not previous_word_sets or max(similarities, default=0) <= 0.8:
+        sim = max(similarities, default=0):
+        if not previous_word_sets or sim <= 0.5:
             filtered_articles.append(article)
         else:
-            print(f"Filtered out article: {article['title']}")
+            if sim <= 0.99:
+                print(f"Filtered out close article: {article['title']}")
 
     if not filtered_articles:
         print("No new articles available after filtering previously selected ones.")
