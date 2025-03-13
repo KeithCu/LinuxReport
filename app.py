@@ -2,34 +2,25 @@
 import os
 import time
 import json
-import socket
-import random
 import threading
 import itertools
 import concurrent.futures
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from timeit import default_timer as timer
-import difflib
-import zoneinfo
 
 import feedparser
 from flask import Flask, render_template, request, g
 from flask_mobility import Mobility
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators
 from markupsafe import Markup
-from autoscraper import AutoScraper
-
-from pathlib import Path
-import diskcache
 
 
 sys.path.insert(0, "/srv/http/CovidReport2")
 
 from feedfilter import prefilter_news, filter_similar_titles, merge_entries
 import shared
-from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_MINUTES, TZ, MODE, Mode, g_c
+from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_HOUR, EXPIRE_MINUTES, TZ, MODE, Mode, g_c
 from seleniumfetch import fetch_site_posts 
-
 
 g_app = Flask(__name__)
 Mobility(g_app)
@@ -51,7 +42,6 @@ URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {}
 
-
 if MODE == Mode.LINUX_REPORT:
     from linux_report_settings import *
 elif MODE == Mode.COVID_REPORT:
@@ -64,7 +54,6 @@ elif MODE == Mode.TRUMP_REPORT:
     from trump_report_settings import *
 
 feedparser.USER_AGENT = USER_AGENT
-
 
 def load_url_worker(url):
     rss_info = ALL_URLS[url]
@@ -116,25 +105,7 @@ def load_url_worker(url):
             previous_top_5 = set(e['link'] for e in old_feed.entries[:5])
             current_top_5 = set(e['link'] for e in entries[:5])
             if previous_top_5 == current_top_5:
-                top_articles = old_feed.top_articles        
-
-        # OpenAI's code doesn't work with sub-interpreters so disable for now.
-        # if len(top_articles) == 0:
-        #     prompt = shared.modetoprompt2[MODE]
-        #     articles = [{"title": e["title"], "url": e["link"]} for e in entries[:5]]
-        #     model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-        #     ai_response = shared.ask_ai_top_articles(articles, model)
-        #     top_titles = shared.extract_top_titles_from_ai(ai_response)
-        #     for title in top_titles:
-        #         for article in articles:
-        #             if shared.normalize(title) == shared.normalize(article["title"]):
-        #                 image_url = auto_update.fetch_largest_image(article["url"])
-        #                 top_articles.append({
-        #                     "title": article["title"],
-        #                     "url": article["url"],
-        #                     "image_url": image_url
-        #                 })
-        #                 break
+                top_articles = old_feed.top_articles
 
         rssfeed = RssFeed(entries, top_articles=top_articles)
 
