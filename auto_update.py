@@ -19,12 +19,15 @@ MAX_PREVIOUS_HEADLINES = 100
 
 # Similarity threshold for deduplication
 THRESHOLD = 0.75
-THRESHOLD_SAME = 0.95
+
 # Initialize Together AI client
 client = OpenAI(
     api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
     base_url="https://api.together.xyz/v1",
 )
+
+MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+
 
 BASE = "/srv/http/"
 
@@ -173,6 +176,7 @@ def get_embedding(text):
     return embedder.encode(text, convert_to_tensor=True)
 
 def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
+    """Deduplicate articles based on their embeddings, excluding similar ones."""
     unique_articles = []
     do_not_select_similar = excluded_embeddings.copy()  # Start with embeddings of previous selections
 
@@ -191,19 +195,20 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
 
     return unique_articles
 
-def get_best_matching_article(target_title, articles, threshold=THRESHOLD_SAME):
+def get_best_matching_article(target_title, articles):
+    """Finds the article with the highest similarity score to the target title."""
     target_emb = get_embedding(target_title)
     best_match = None
     best_score = 0.0
     for article in articles:
         score = util.cos_sim(target_emb, get_embedding(article["title"])).item()
-        if score > best_score and score >= threshold:
+        if score > best_score:
             best_score = score
             best_match = article
     return best_match
 
 # --- Modified ask_ai_top_articles using embeddings for deduplication ---
-def ask_ai_top_articles(articles, model):
+def ask_ai_top_articles(articles):
     """
     Filters out articles whose headlines are semantically similar (using embeddings)
     to previously selected headlines and within the current batch.
@@ -231,7 +236,7 @@ def ask_ai_top_articles(articles, model):
 
     start = timer()
     response = client.chat.completions.create(
-        model=model,
+        model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=3000,
     )
@@ -271,7 +276,6 @@ def main(mode):
     ALL_URLS = module.ALL_URLS
 
     html_file = f"{mode}reportabove.html"
-    model = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
     try:
         articles = fetch_recent_articles()
@@ -279,7 +283,7 @@ def main(mode):
             print(f"No articles found for mode: {mode}")
             sys.exit(1)
 
-        full_response = ask_ai_top_articles(articles, model)
+        full_response = ask_ai_top_articles(articles)
         top_3 = extract_top_titles_from_ai(full_response)
         top_3_articles = []
         for title in top_3:
