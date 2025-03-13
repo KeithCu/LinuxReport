@@ -19,7 +19,7 @@ MAX_PREVIOUS_HEADLINES = 100
 
 # Similarity threshold for deduplication
 THRESHOLD = 0.75
-
+THRESHOLD_SAME = 0.95
 # Initialize Together AI client
 client = OpenAI(
     api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
@@ -191,6 +191,17 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
 
     return unique_articles
 
+def get_best_matching_article(target_title, articles, threshold=THRESHOLD_SAME):
+    target_emb = get_embedding(target_title)
+    best_match = None
+    best_score = 0.0
+    for article in articles:
+        score = util.cos_sim(target_emb, get_embedding(article["title"])).item()
+        if score > best_score and score >= threshold:
+            best_score = score
+            best_match = article
+    return best_match
+
 # --- Modified ask_ai_top_articles using embeddings for deduplication ---
 def ask_ai_top_articles(articles, model):
     """
@@ -231,12 +242,10 @@ def ask_ai_top_articles(articles, model):
 
     top_titles = extract_top_titles_from_ai(response_text)
     top_articles = []
-    # Match each returned title to an article using the embedding similarity check.
     for title in top_titles:
-        for article in filtered_articles:
-            if are_titles_similar_emb(title, article["title"]):
-                top_articles.append(article)
-                break
+        best_match = get_best_matching_article(title, filtered_articles)
+        if best_match:
+            top_articles.append(best_match)
 
     # Update previous selections for future deduplication.
     new_selections = [{"url": art["url"], "title": art["title"]}
@@ -274,10 +283,9 @@ def main(mode):
         top_3 = extract_top_titles_from_ai(full_response)
         top_3_articles = []
         for title in top_3:
-            for article in articles:
-                if are_titles_similar_emb(title, article["title"]):
-                    top_3_articles.append(article)
-                    break
+            best_match = get_best_matching_article(title, articles)
+            if best_match:
+                top_3_articles.append(best_match)
         generate_headlines_html(top_3_articles, html_file)
     except Exception as e:
         print(f"Error in mode {mode}: {e}")
