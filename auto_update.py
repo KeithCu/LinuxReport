@@ -185,7 +185,7 @@ def ask_ai_top_articles(articles, model):
         similarities = [overlap_coefficient(new_word_set, prev_word_set)
                        for prev_word_set in previous_word_sets]
 
-        sim = max(similarities, default=0):
+        sim = max(similarities, default=0)
         if not previous_word_sets or sim <= 0.5:
             filtered_articles.append(article)
         else:
