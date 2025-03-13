@@ -15,7 +15,7 @@ from sentence_transformers import SentenceTransformer, util
 from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK
 from auto_update_utils import custom_fetch_largest_image
 
-MAX_PREVIOUS_HEADLINES = 100
+MAX_PREVIOUS_HEADLINES = 200
 
 # Similarity threshold for deduplication
 THRESHOLD = 0.75
@@ -27,7 +27,6 @@ client = OpenAI(
 )
 
 MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-
 
 BASE = "/srv/http/"
 
@@ -147,8 +146,8 @@ BANNED_WORDS = [
 
 modetoprompt2 = {
     Mode.LINUX_REPORT: f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
-    distro. Of course anything non-distro-specific is fine, but nothing about the
-    following topics: {', '.join(BANNED_WORDS)}.\n""",
+    distro. Of course anything non-distro-specific is fine, but nothing about the following topics:
+    {', '.join(BANNED_WORDS)}.\n""",
     Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",
     Mode.TRUMP_REPORT : "Trump's biggest fans",
@@ -209,9 +208,7 @@ def get_best_matching_article(target_title, articles):
 
 # --- Modified ask_ai_top_articles using embeddings for deduplication ---
 def ask_ai_top_articles(articles):
-    """
-    Filters out articles whose headlines are semantically similar (using embeddings)
-    to previously selected headlines and within the current batch.
+    """Filters out articles whose headlines are semantically similar (using embeddings)
     Then, constructs the prompt and queries the AI ranking system.
     """
     previous_selections = g_c.get("previously_selected_selections_2")
