@@ -9,7 +9,6 @@ import string
 import datetime
 
 from jinja2 import Template
-from rapidfuzz import process, fuzz
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer, util
 
@@ -17,7 +16,9 @@ from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK
 from auto_update_utils import custom_fetch_largest_image
 
 MAX_PREVIOUS_HEADLINES = 100
-THRESHOLD = 0.8
+
+# Similarity threshold for deduplication
+THRESHOLD = 0.75
 
 # Initialize Together AI client
 client = OpenAI(
@@ -171,38 +172,23 @@ def get_embedding(text):
     """Compute and return the embedding for a given text."""
     return embedder.encode(text, convert_to_tensor=True)
 
-def are_titles_similar_emb(title1, title2, threshold=0.8):
-    """
-    Compare two headlines by computing the cosine similarity of their embeddings.
-    Returns True if similarity is above the threshold.
-    """
-    emb1 = get_embedding(title1)
-    emb2 = get_embedding(title2)
-    cosine_score = util.cos_sim(emb1, emb2)
-    return cosine_score.item() >= threshold
-
-def deduplicate_articles_with_embeddings(articles, threshold=THRESHOLD):
-    """
-    Given a list of articles (each article is a dict with a 'title' key), return a new list
-    where headlines with cosine similarity (computed via embeddings) above the threshold
-    are filtered out.
-    """
+def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
     unique_articles = []
-    embeddings = []  # Cache embeddings for articles already added
+    do_not_select_similar = excluded_embeddings.copy()  # Start with embeddings of previous selections
 
     for article in articles:
         title = article["title"]
-        current_emb = get_embedding(title)
-        duplicate_found = False
-        for emb in embeddings:
-            cosine_score = util.cos_sim(current_emb, emb)
-            if cosine_score.item() >= threshold:
-                duplicate_found = True
-                print(f"Filtered duplicate (embeddings): {title}")
-                break
-        if not duplicate_found:
+        current_emb = get_embedding(title)  # Compute embedding for the article's title
+        
+        # Check if the article is too similar to any in do_not_select_similar
+        is_similar = any(util.cos_sim(current_emb, emb).item() >= threshold for emb in do_not_select_similar)
+        
+        if not is_similar:
             unique_articles.append(article)
-            embeddings.append(current_emb)
+            do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
+        else:
+            print(f"Filtered duplicate (embeddings): {title}")
+
     return unique_articles
 
 # --- Modified ask_ai_top_articles using embeddings for deduplication ---
@@ -212,41 +198,23 @@ def ask_ai_top_articles(articles, model):
     to previously selected headlines and within the current batch.
     Then, constructs the prompt and queries the AI ranking system.
     """
-    # Retrieve previous selections (assume these are stored as a list of dicts)
     previous_selections = g_c.get("previously_selected_selections_2")
     if previous_selections is None:
         previous_selections = []
 
-    # Filter out articles that are similar to previous selections using embeddings.
-    if previous_selections:
-        previous_titles = [sel["title"] for sel in previous_selections]
-        previous_urls = [sel["url"] for sel in previous_selections]
-        filtered_articles = []
-        for article in articles:
-            if article["url"] in previous_urls:
-                continue
+    previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
+    previous_urls = [sel["url"] for sel in previous_selections]
 
-            is_duplicate = any(are_titles_similar_emb(article["title"], prev_title)
-                               for prev_title in previous_titles)
-            if not is_duplicate:
-                filtered_articles.append(article)
-            else:
-                print(f"Filtered out due to previous selection: {article['title']}")
-    else:
-        filtered_articles = articles
+    articles = [article for article in articles if article["url"] not in previous_urls]
 
-    # Further deduplicate among the current articles using embeddings.
-    filtered_articles = deduplicate_articles_with_embeddings(filtered_articles, threshold=0.8)
+    filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
 
     if not filtered_articles:
         print("No new articles available after deduplication.")
         return "No new articles to rank."
-
+    
     # Build the prompt for the AI ranking system.
-    prompt = f"""Rank these article titles by relevance to {modetoprompt2[MODE]}
-Please discuss the titles and then list the top 3 titles after '***'.
-"""
-    prompt += "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
+    prompt = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
     print("Constructed Prompt:")
     print(prompt)
 
