@@ -52,6 +52,8 @@ elif MODE == Mode.AI_REPORT:
     from ai_report_settings import *
 elif MODE == Mode.TRUMP_REPORT:
     from trump_report_settings import *
+elif MODE == Mode.SPACE_REPORT:
+    from space_report_settings import *
 
 feedparser.USER_AGENT = USER_AGENT
 
@@ -246,10 +248,12 @@ def index():
         template = g_c.get(rss_info.site_url)
         if DEBUG or template is None:
             feed = g_c.get(url)
+            last_fetch = g_c.get(url + ":last_fetch")
+            last_fetch_str = shared.format_last_updated(last_fetch, TZ)
             entries = feed.entries
             top_images = {article['url']: article['image_url'] for article in feed.top_articles if article['image_url']}
             template = render_template('sitebox.html', top_images=top_images, entries=entries, logo=URL_IMAGES + rss_info.logo_url,
-                                       alt_tag=rss_info.logo_alt, link=rss_info.site_url, feed_id = rss_info.site_url)
+                                       alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url)
 
             g_c.put(rss_info.site_url, template, timeout=EXPIRE_HOUR * 12)
 

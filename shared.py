@@ -1,6 +1,7 @@
 import diskcache
 from enum import Enum
 import zoneinfo
+import datetime
 
 from FeedHistory import FeedHistory
 
@@ -36,6 +37,7 @@ class Mode(Enum):
     AI_REPORT = 4
     PYTHON_REPORT = 5
     TRUMP_REPORT = 6
+    SPACE_REPORT = 7
 
 EXPIRE_MINUTES = 60 * 5
 EXPIRE_HOUR = 3600
@@ -71,3 +73,22 @@ class DiskCacheWrapper:
 
 g_c = DiskCacheWrapper(PATH)
 
+
+def format_last_updated(last_fetch, timezone):
+    """Format the last fetch time as 'X minutes ago' or 'X hours ago'.
+    """
+    if not last_fetch:
+        return "Unknown"
+    
+    now = datetime.datetime.now(timezone)
+    delta = now - last_fetch
+    total_minutes = delta.total_seconds() / 60.0
+    
+    if total_minutes < 60:
+        rounded_minutes = round(total_minutes / 5.0) * 5
+        return f"{int(rounded_minutes)} minutes ago"
+    else:
+        rounded_hours = round(total_minutes / 60.0)
+        if rounded_hours == 1:
+            return "1 hour ago"
+        return f"{int(rounded_hours)} hours ago"

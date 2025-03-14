@@ -1,5 +1,8 @@
 <div class="box" id="feed-{{ feed_id }}">
   <center><a target="_blank" href="{{ link }}"><img src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height:100px;"/></a></center>
+  <center>
+  <small>Last updated: {{ last_fetch }}</small>
+  </center>
   <div class="pagination-controls" data-feed-id="feed-{{ feed_id }}">
     <button class="prev-btn" disabled><</button>
     <button class="next-btn">></button>
