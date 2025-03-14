@@ -141,7 +141,7 @@ def wait_and_set_fetch_mode():
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5 if DEBUG == False else 1) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10 if DEBUG == False else 1) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
         for future in concurrent.futures.as_completed(future_to_url):

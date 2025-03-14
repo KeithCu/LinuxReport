@@ -26,7 +26,7 @@ client = OpenAI(
     base_url="https://api.together.xyz/v1",
 )
 
-MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
 BASE = "/srv/http/"
 
