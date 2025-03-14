@@ -75,6 +75,12 @@ g_c = DiskCacheWrapper(PATH)
 
 
 def format_last_updated(last_fetch, timezone):
+    """Format the last fetch time as 'HH:MM' in the given timezone."""
+    if not last_fetch:
+        return "Unknown"
+    return last_fetch.strftime("%I:%M %p")
+
+def format_last_updated_fancy(last_fetch, timezone):
     """Format the last fetch time as 'X minutes ago' or 'X hours ago'.
     """
     if not last_fetch:
