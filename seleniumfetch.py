@@ -1,5 +1,8 @@
 from datetime import datetime, timezone
 import sys
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -31,10 +34,43 @@ class FeedParserDict(dict):
         except KeyError:
             raise AttributeError(f"No attribute '{key}'")
 
+# New helper function to extract post data
+def extract_post_data(post, config, url, use_selenium):
+    try:
+        if use_selenium:
+            title_element = post.find_element(By.CSS_SELECTOR, config["title_selector"])
+            title = title_element.text.strip()
+        else:
+            title_element = post.select_one(config["title_selector"])
+            if not title_element:
+                return None
+            title = title_element.text.strip()
+    except Exception:
+        return None
+    if len(title.split()) < 2:
+        return None
+    try:
+        if use_selenium:
+            link_element = post.find_element(By.CSS_SELECTOR, config["link_selector"])
+            link = link_element.get_attribute(config["link_attr"])
+        else:
+            link_element = post.select_one(config["link_selector"])
+            if not link_element:
+                return None
+            link = link_element.get(config["link_attr"])
+            if link and link.startswith('/'):
+                link = urljoin(url, link)
+    except Exception:
+        return None
+    filter_pattern = config.get("filter_pattern", "")
+    if filter_pattern and filter_pattern not in link:
+        return None
+    return {"title": title, "link": link, "id": link, "summary": title}
 
 # Site configurations
 site_configs = {
     "https://patriots.win": {
+        "needs_selenium": True,
         "post_container": ".post-item",
         "title_selector": ".title a",
         "link_selector": ".preview-parent",
@@ -42,6 +78,7 @@ site_configs = {
         "filter_pattern": ""  # No filter needed for Patriots.win
     },
     "https://breitbart.com/tech/": {
+        "needs_selenium": False,
         "post_container": "article",
         "title_selector": "h2 a",
         "link_selector": "h2 a",
@@ -51,6 +88,7 @@ site_configs = {
     },
 
     "https://revolver.news": {
+        "needs_selenium": False,
         "post_container": "article.item",
         "title_selector": "h2.title a",
         "link_selector": "h2.title a",
@@ -69,66 +107,63 @@ def fetch_site_posts(site):
     # Extract configuration values
     url = site
     post_container = config["post_container"]
-    title_selector = config["title_selector"]
-    link_selector = config["link_selector"]
-    link_attr = config["link_attr"]
-    published_selector = config.get("published_selector")  # Optional
     filter_pattern = config.get("filter_pattern", "")  # Optional, defaults to empty string
+    needs_selenium = config.get("needs_selenium", True)  # Default to using Selenium
 
-    # Initialize caching variables (placeholders, as Selenium doesn’t provide these natively)
+    # Initialize caching variables
     etag = ""
     modified = datetime.now(timezone.utc)
-
-    # Set up Selenium
-    driver = create_driver()
-    driver.get(url)
-
-    # Wait for posts to load
-    try:
-        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, post_container)))
-        print(f"Posts loaded successfully for {site}")
-    except:
-        print(f"Timeout waiting for posts to load on {site}")
-
-    # Find all post containers
-    posts = driver.find_elements(By.CSS_SELECTOR, post_container)
-
+    
     # Build entries in feedparser-like format
     entries = []
-    for post in posts:
+    
+    if needs_selenium:
+        # Use Selenium approach
+        driver = create_driver()
+        driver.get(url)
+
+        # Wait for posts to load
         try:
-            # Extract title
-            title_element = post.find_element(By.CSS_SELECTOR, title_selector)
-            title = title_element.text.strip()
+            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, post_container)))
+            print(f"Posts loaded successfully for {site}")
+        except:
+            print(f"Timeout waiting for posts to load on {site}")
 
-            # Skip posts with titles shorter than 2 words (as in original code)
-            if len(title.split()) < 2:
-                continue
+        # Find all post containers
+        posts = driver.find_elements(By.CSS_SELECTOR, post_container)
 
-            # Extract link
-            link_element = post.find_element(By.CSS_SELECTOR, link_selector)
-            link = link_element.get_attribute(link_attr)
+        # Process posts with Selenium
+        for post in posts:
+            entry = extract_post_data(post, config, url, use_selenium=True)
+            if entry:
+                entries.append(entry)
 
-            # Apply filter if specified
-            if filter_pattern and filter_pattern not in link:
-                continue
-
-            # Create entry dictionary mimicking feedparser
-            entry = {
-                "title": title,
-                "link": link,
-                "id": link,  # Use the link as the unique ID for simplicity
-                "summary": title  # Use title as summary, consistent with original
-            }
-            entries.append(entry)
+        # Clean up Selenium
+        driver.quit()
+        
+    else:
+        # Use BeautifulSoup approach
+        print(f"Fetching {site} using requests (no Selenium)")
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+            posts = soup.select(post_container)
+            
+            # Process posts with BeautifulSoup (similar logic to Selenium)
+            for post in posts:
+                entry = extract_post_data(post, config, url, use_selenium=False)
+                if entry:
+                    entries.append(entry)
+                    
+            # Get ETag if available
+            etag = response.headers.get('ETag', '')
+            
         except Exception as e:
-            print(f"Error extracting post: {e}")
-            continue
-
-    # Clean up Selenium
-    driver.quit()
-
-    # Construct feedparser-like result as a plain dict
+            print(f"Error fetching {site} with requests: {e}")
+    
+    # Construct feedparser-like result as a plain dict (same for both methods)
     result = {
         'entries': entries,
         'etag': etag,
