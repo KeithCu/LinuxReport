@@ -15,7 +15,7 @@ CONFIG = {
         "https://conservativereview.com/feeds/feed.rss": RssInfo("conservativereview.webp", "Conservative Review", "https://conservativereview.com"),
         "https://townhall.com/feed/": RssInfo("logo-townhall.svg", "Townhall", "https://townhall.com"),
     },
-    "USER_AGENT": "AI Report -- https://trumpreport.info",
+    "USER_AGENT": "Trump Report -- https://trumpreport.info",
     "site_urls": [
         "https://feeds.feedburner.com/breitbart",
         "https://patriots.win/fakefeed",
