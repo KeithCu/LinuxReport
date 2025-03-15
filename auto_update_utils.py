@@ -183,7 +183,7 @@ def parse_images_from_soup(soup, base_url):
     meta_image_url = soup.find('meta', property='og:image')
     if meta_image_url and meta_image_url.get('content'):
         absolute_meta_url = urljoin(base_url, meta_image_url['content'])
-        candidate_images.append((absolute_meta_url, {'score': 2000000}))
+        candidate_images.append((absolute_meta_url, {'score': 4000000}))
         print(f"Found meta image: {absolute_meta_url}")
 
     twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
