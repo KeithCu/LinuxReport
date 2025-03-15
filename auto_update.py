@@ -179,8 +179,8 @@ BANNED_WORDS = [
 ]
 
 modetoprompt2 = {
-    Mode.LINUX_REPORT: f"""Arch Linux programmers and experienced users. Nothing about Ubuntu or any other
-    distro. Of course anything non-distro-specific is fine, but nothing about the following topics:
+    Mode.LINUX_REPORT: f"""Arch and Debian Linux programmers and experienced users. Nothing about Ubuntu or any other
+    distro. Anything non-distro-specific is fine, but nothing about the following topics:
     {', '.join(BANNED_WORDS)}.\n""",
     Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",

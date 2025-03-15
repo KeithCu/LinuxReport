@@ -20,7 +20,7 @@ sys.path.insert(0, "/srv/http/CovidReport2")
 from feedfilter import prefilter_news, filter_similar_titles, merge_entries
 import shared
 from shared import RssFeed, RssInfo, EXPIRE_YEARS, EXPIRE_WEEK, EXPIRE_HOUR, EXPIRE_MINUTES, TZ, MODE, Mode, g_c
-from seleniumfetch import fetch_site_posts 
+from seleniumfetch import fetch_site_posts
 
 g_app = Flask(__name__)
 Mobility(g_app)
@@ -42,18 +42,37 @@ URLS_COOKIE_VERSION = "1"
 
 ALL_URLS = {}
 
+config_settings = {}
+
 if MODE == Mode.LINUX_REPORT:
-    from linux_report_settings import *
+    import linux_report_settings
+    config_settings = linux_report_settings.CONFIG
 elif MODE == Mode.COVID_REPORT:
-    from covid_report_settings import *
+    import covid_report_settings
+    config_settings = covid_report_settings.CONFIG
 elif MODE == Mode.TECHNO_REPORT:
-    from techno_report_settings import *
+    import techno_report_settings
+    config_settings = techno_report_settings.CONFIG
 elif MODE == Mode.AI_REPORT:
-    from ai_report_settings import *
+    import ai_report_settings
+    config_settings = ai_report_settings.CONFIG
 elif MODE == Mode.TRUMP_REPORT:
-    from trump_report_settings import *
+    import trump_report_settings
+    config_settings = trump_report_settings.CONFIG
 elif MODE == Mode.SPACE_REPORT:
-    from space_report_settings import *
+    import space_report_settings
+    config_settings = space_report_settings.CONFIG
+
+ALL_URLS = config_settings["ALL_URLS"]
+site_urls = config_settings["site_urls"]
+USER_AGENT = config_settings["USER_AGENT"]
+URL_IMAGES = config_settings["URL_IMAGES"]
+FAVICON = config_settings["FAVICON"]
+LOGO_URL = config_settings["LOGO_URL"]
+WEB_DESCRIPTION = config_settings["WEB_DESCRIPTION"]
+WEB_TITLE = config_settings["WEB_TITLE"]
+ABOVE_HTML_FILE = config_settings["ABOVE_HTML_FILE"]
+WELCOME_HTML = config_settings["WELCOME_HTML"]
 
 feedparser.USER_AGENT = USER_AGENT
 
@@ -61,7 +80,7 @@ def load_url_worker(url):
     rss_info = ALL_URLS[url]
 
     feedpid = None
-    
+
     #This FETCHPID logic is to prevent race conditions of
     #multiple Python processes fetching an expired RSS feed.
     #This isn't as useful anymore given the FETCHMODE.
@@ -174,15 +193,15 @@ def index():
 
     # socket.setdefaulttimeout(RSS_TIMEOUT)
 
-    dark_mode = request.cookies.get('DarkMode') 
-    no_underlines = (request.cookies.get("NoUnderlines", "1") == "1") 
-    sans_serif = (request.cookies.get("SansSerif", "1") == "1") 
+    dark_mode = request.cookies.get('DarkMode')
+    no_underlines = request.cookies.get("NoUnderlines", "1") == "1"
+    sans_serif = request.cookies.get("SansSerif", "1") == "1"
 
     page_order = None
     if request.cookies.get('UrlsVer') == URLS_COOKIE_VERSION:
         page_order = request.cookies.get('RssUrls')
         if page_order is not None:
-                page_order = json.loads(page_order)
+            page_order = json.loads(page_order)
 
     if page_order is None:
         page_order = site_urls
@@ -239,7 +258,7 @@ def index():
         start = timer()
         fetch_urls_parallel(needed_urls)
         end = timer()
-        print("Fetched %d feeds in %f sec." % (len(needed_urls), end - start))
+        print(f"Fetched {len(needed_urls)} feeds in {end - start} sec.")
 
     #2. Now we've got all the data, go through again to build the page
     for url in page_order:
