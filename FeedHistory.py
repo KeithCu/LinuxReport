@@ -120,8 +120,10 @@ class FeedHistory:
 
         # Base interval: inversely proportional to frequency and success
         combined_score = (freq + success_rate) / 2  # 0 to 1
-        interval_seconds = (MAX_INTERVAL.total_seconds() * (1 - combined_score) +
-                           MIN_INTERVAL.total_seconds() * combined_score)
+        
+        interval_seconds = (MIN_INTERVAL.total_seconds() * combined_score +
+                           MAX_INTERVAL.total_seconds() * (1 - combined_score))
+        
         interval = max(MIN_INTERVAL.total_seconds(),
                       min(MAX_INTERVAL.total_seconds(), interval_seconds))
 
@@ -135,6 +137,8 @@ class FeedHistory:
         return timedelta(seconds=feed_data.get("interval", EXPIRE_HOUR))
 
     def has_expired(self, url: str, last_fetch: datetime) -> bool:
-        """Check if the feed should be refreshed, respecting the current interval."""
+        """Check if the feed should be refreshed, respecting the current interval and MAX_INTERVAL."""
         interval = self.get_interval(url)
-        return datetime.now(TZ) > last_fetch + interval
+        # Clamp the interval to the current MAX_INTERVAL
+        clamped_interval = min(interval, MAX_INTERVAL)
+        return datetime.now(TZ) > last_fetch + clamped_interval
