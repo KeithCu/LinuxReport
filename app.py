@@ -35,10 +35,10 @@ if DEBUG or g_app.debug:
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = shared.EXPIRE_WEEK
 
 MAX_ITEMS = 40
-RSS_TIMEOUT = 15
+RSS_TIMEOUT = 30
 
-#Mechanism to throw away old cookies.
-URLS_COOKIE_VERSION = "1"
+#Mechanism to throw away old URL cookies if the feeds change.
+URLS_COOKIE_VERSION = "2"
 
 ALL_URLS = {}
 
@@ -77,6 +77,7 @@ WELCOME_HTML = config_settings["WELCOME_HTML"]
 feedparser.USER_AGENT = USER_AGENT
 
 def load_url_worker(url):
+    """Background worker to fetch a URL. Handles """
     rss_info = ALL_URLS[url]
 
     feedpid = None
@@ -162,7 +163,7 @@ def wait_and_set_fetch_mode():
 def fetch_urls_parallel(urls):
     wait_and_set_fetch_mode()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10 if DEBUG == False else 1) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10 if not DEBUG else 1) as executor:
         future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
         for future in concurrent.futures.as_completed(future_to_url):
