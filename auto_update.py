@@ -9,7 +9,7 @@ import datetime
 
 from jinja2 import Template
 
-from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK
+from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK, EXPIRE_DAY
 from auto_update_utils import custom_fetch_largest_image
 
 MAX_PREVIOUS_HEADLINES = 200
@@ -17,11 +17,11 @@ MAX_PREVIOUS_HEADLINES = 200
 # Similarity threshold for deduplication
 THRESHOLD = 0.75
 
-# Initialize Together AI client
+# Initialize the https://together.ai/ client only if needed because it takes 2 seconds.
 openai_client = None
 def get_openai_client():
     global openai_client
-    if openai_client is None:
+    if (openai_client is None):
         from openai import OpenAI
         openai_client = OpenAI(
             api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
@@ -29,7 +29,38 @@ def get_openai_client():
         )
     return openai_client
 
-MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+# Model configuration with primary and fallback options
+PRIMARY_MODEL  = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+FALLBACK_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+MODEL_CACHE_DURATION = EXPIRE_DAY * 7
+
+def get_current_model():
+    """Get the current working model, with fallback mechanism."""
+    # Check if we have a cached working model
+    cached_model = g_c.get("working_llm_model")
+    if cached_model:
+        return cached_model
+    
+    # Default to PRIMARY_MODEL if no cached info
+    return PRIMARY_MODEL
+
+def update_model_cache(model):
+    """Update the cache with the currently working model."""
+    g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+
+def _try_call_model(model, prompt, max_tokens):
+    """Helper function to call a specific model and return its response."""
+    start = timer()
+    response = get_openai_client().chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens,
+    )
+    end = timer()
+    response_text = response.choices[0].message.content
+    print(f"LLM Response with {model} in {end - start:.3f} seconds:")
+    print(response_text)
+    return response_text
 
 BASE = "/srv/http/"
 
@@ -169,10 +200,9 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     When you are done discussing the titles, put *** and then list the top 3, using only the titles.
     """
 
-# Load the SentenceTransformer model once - lazy initialization variables
 EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
 embedder = None  # Lazy initialization
-st_util = None   # Lazy load for sentence_transformers.util
+st_util = None
 
 def get_embedding(text):
     global embedder, st_util
@@ -191,7 +221,6 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
         title = article["title"]
         current_emb = get_embedding(title)  # Compute embedding for the article's title
         
-        # Use lazy-loaded st_util for cosine similarity
         is_similar = any(st_util.cos_sim(current_emb, emb).item() >= threshold for emb in do_not_select_similar)
         
         if not is_similar:
@@ -212,10 +241,11 @@ def get_best_matching_article(target_title, articles):
 #        print (f"Score for {target_title} to {article['title']}: {score}")
         if score > best_score:
             best_match = article
+            if score == 1.0:
+                return best_match
             best_score = score
     return best_match
 
-# --- Modified ask_ai_top_articles using embeddings for deduplication ---
 def ask_ai_top_articles(articles):
     """Filters out articles whose headlines are semantically similar (using embeddings)
     Then, constructs the prompt and queries the AI ranking system.
@@ -240,16 +270,29 @@ def ask_ai_top_articles(articles):
     print("Constructed Prompt:")
     print(prompt)
 
-    start = timer()
-    response = get_openai_client().chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=3000,
-    )
-    end = timer()
-    print(f"LLM Response in {end - start:.3f} seconds:")
-    response_text = response.choices[0].message.content
-    print(response_text)
+    # Get current model and implement fallback mechanism
+    current_model = get_current_model()
+    response_text = None
+    
+    try:
+        # Try the current model first
+        response_text = _try_call_model(current_model, prompt, 3000)
+        
+    except Exception as e:
+        print(f"Error with model {current_model}: {str(e)}")        
+        print(f"Primary model failed. Trying fallback model: {FALLBACK_MODEL}")
+        try:
+            response_text = _try_call_model(FALLBACK_MODEL, prompt, 3000)
+            
+            # Update the model cache to use the fallback model
+            update_model_cache(FALLBACK_MODEL)
+            
+        except Exception as fallback_error:
+            print(f"Fallback model also failed: {str(fallback_error)}")
+            return "LLM models are currently unavailable."
+    
+    if response_text is None or response_text.startswith("LLM models are currently unavailable"):
+        return "No response from LLM models."
 
     top_titles = extract_top_titles_from_ai(response_text)
     top_articles = []
