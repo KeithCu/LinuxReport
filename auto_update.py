@@ -293,6 +293,7 @@ def main(mode):
         for title in top_3:
             print (title)
             best_match = get_best_matching_article(title, articles)
+            print (f"Best match for {title}: {best_match}")
             if best_match:
                 top_3_articles.append(best_match)
         generate_headlines_html(top_3_articles, html_file)
