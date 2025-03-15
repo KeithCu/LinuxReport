@@ -1,15 +1,15 @@
 from shared import RssInfo, EXPIRE_HOUR, EXPIRE_DAY
 
 ALL_URLS = {
-    "https://revolver.news/feed" :
+    "https://revolver.news/fakefeed" :
     RssInfo("revolvernews.png",
     "Revolver News",
-    "https://revolver.news/"),
+    "https://revolver.news"),
 
     "https://justthenews.com/rss.xml" :
     RssInfo("justthenewslogo.svg",
     "Just The News",
-    "https://justthenews.com/"),
+    "https://justthenews.com"),
 
     "https://citizenfreepress.com/feed/" :
     RssInfo("citizenfreepress.webp",
@@ -24,7 +24,7 @@ ALL_URLS = {
     "https://thefederalist.com/feed/" :
     RssInfo("federalist.webp",
     "The Federalist",
-    "https://thefederalist.com/"),
+    "https://thefederalist.com"),
 
     "http://bonginoreport.com/index.rss" :
     RssInfo("bonginoreport.png",
@@ -69,7 +69,7 @@ USER_AGENT = "AI Report -- https://trumpreport.info"
 site_urls = [
     "https://feeds.feedburner.com/breitbart",
     "https://patriots.win/fakefeed",
-    "https://revolver.news/feed",
+    "https://revolver.news/fakefeed",
     "https://nypost.com/politics/feed/",
     "https://justthenews.com/rss.xml",
     "https://thefederalist.com/feed/",

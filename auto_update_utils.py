@@ -1,4 +1,4 @@
-#!/usr/bin
+#!/usr/bin/python3
 from urllib.parse import urlparse, urljoin
 import re
 import json

@@ -48,7 +48,15 @@ site_configs = {
         "link_attr": "href",
         "published_selector": ".header_byline time",
         "filter_pattern": "/tech/"  # Ensure only tech articles are included
-    }
+    },
+
+    "https://revolver.news": {
+        "post_container": "article.item",
+        "title_selector": "h2.title a",
+        "link_selector": "h2.title a",
+        "link_attr": "href",
+        "filter_pattern": ""
+    },
 }
 
 def fetch_site_posts(site):
