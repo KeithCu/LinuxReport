@@ -5,11 +5,9 @@ from timeit import default_timer as timer
 import re
 import argparse
 import importlib.util
-import string
 import datetime
 
 from jinja2 import Template
-from openai import OpenAI
 from sentence_transformers import SentenceTransformer, util
 
 from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK
@@ -25,6 +23,7 @@ openai_client = None
 def get_openai_client():
     global openai_client
     if openai_client is None:
+        from openai import OpenAI
         openai_client = OpenAI(
             api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
             base_url="https://api.together.xyz/v1",
