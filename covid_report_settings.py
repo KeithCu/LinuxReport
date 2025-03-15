@@ -25,8 +25,4 @@ CONFIG = {
     "WEB_DESCRIPTION": "COVID-19 and Infectious Disease News",
     "WEB_TITLE": "COVID-19 Report",
     "ABOVE_HTML_FILE": "/srv/http/CovidReport2/covidreportabove.html",
-    "WELCOME_HTML": ('<font size="4">(Refreshes hourly -- See also <b><a target="_blank" href = '
-                     '"https://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
-                     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
-                     'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')
 }

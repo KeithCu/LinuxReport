@@ -72,7 +72,12 @@ LOGO_URL = config_settings["LOGO_URL"]
 WEB_DESCRIPTION = config_settings["WEB_DESCRIPTION"]
 WEB_TITLE = config_settings["WEB_TITLE"]
 ABOVE_HTML_FILE = config_settings["ABOVE_HTML_FILE"]
-WELCOME_HTML = config_settings["WELCOME_HTML"]
+WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
+                     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
+                     'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a><a target="_blank"'
+                     'href = "https://keithcu.com/wordpress/?page_id=407/">About Me</a></font>')
+
+
 
 feedparser.USER_AGENT = USER_AGENT
 

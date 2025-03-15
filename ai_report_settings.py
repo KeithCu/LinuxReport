@@ -32,8 +32,4 @@ CONFIG = {
     "WEB_DESCRIPTION": "AI News",
     "WEB_TITLE": "AI Report",
     "ABOVE_HTML_FILE": "/srv/http/aireport/aireportabove.html",
-    "WELCOME_HTML": ('<font size="4">(Displays instantly, refreshes hourly -- See also <b><a target="_blank" href = '
-                     '"https://linuxreport.net/">LinuxReport</a></b>) - Fork me on <a target="_blank"'
-                     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
-                     'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a></font>')
 }

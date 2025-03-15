@@ -37,9 +37,4 @@ CONFIG = {
     "WEB_DESCRIPTION": "Trump Report",
     "WEB_TITLE": "TrumpReport",
     "ABOVE_HTML_FILE": "/srv/http/trumpreport/trumpreportabove.html",
-    "WELCOME_HTML": ('<font size="4">(Displays instantly, refreshes hourly -- See also <b><a target="_blank" href = '
-                     '"https://linuxreport.net/">LinuxReport</a></b> or <b><a target="_blank" href = '
-                     '"https://aireport.keithcu.com">AI Report</a></b>) - Fork me on <a target="_blank"'
-                     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
-                     'href = "https://gitlab.com/keithcu/linuxreport">GitLab.</a><br/><b>Note:</b> You can turn off underlines and courier in the Config dialog. Enjoy! -<a target="_blank" href = "https://keithcu.com/wordpress/?page_id=407/">Keith</a>. </font>')
 }
