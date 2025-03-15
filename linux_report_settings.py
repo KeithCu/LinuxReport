@@ -28,7 +28,7 @@ CONFIG = {
     ],
     "URL_IMAGES": "https://linuxreport.net/static/images/",
     "FAVICON": "https://linuxreport.net/static/images/linuxreport192.ico",
-    "LOGO_URL": "https://linuxreport.net/static/images/LinuxReport2.webp",
+    "LOGO_URL": "https://linuxreport.net/static/images/linuxreportfancy.webp",
     "WEB_TITLE": "Linux Report",
     "WEB_DESCRIPTION": "Linux News",
     "ABOVE_HTML_FILE": "linuxreportabove.html",
