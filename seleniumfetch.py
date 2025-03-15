@@ -115,6 +115,7 @@ def fetch_site_posts(site):
     
     # Build entries in feedparser-like format
     entries = []
+    driver = None
     
     if needs_selenium:
         driver = create_driver()
@@ -125,7 +126,6 @@ def fetch_site_posts(site):
         except Exception as e:
             print(f"Timeout waiting for posts to load on {site}")
         posts = driver.find_elements(By.CSS_SELECTOR, post_container)
-        driver.quit()
     else:
         print(f"Fetching {site} using requests (no Selenium)")
         try:
@@ -141,6 +141,10 @@ def fetch_site_posts(site):
         entry = extract_post_data(post, config, url, use_selenium=needs_selenium)
         if entry:
             entries.append(entry)
+
+    if driver:
+        driver.quit()
+
     
     # Construct feedparser-like result as a plain dict (same for both methods)
     result = {
