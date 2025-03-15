@@ -21,10 +21,15 @@ MAX_PREVIOUS_HEADLINES = 200
 THRESHOLD = 0.75
 
 # Initialize Together AI client
-client = OpenAI(
-    api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
-    base_url="https://api.together.xyz/v1",
-)
+openai_client = None
+def get_openai_client():
+    global openai_client
+    if openai_client is None:
+        openai_client = OpenAI(
+            api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
+            base_url="https://api.together.xyz/v1",
+        )
+    return openai_client
 
 MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 
@@ -234,7 +239,7 @@ def ask_ai_top_articles(articles):
     print(prompt)
 
     start = timer()
-    response = client.chat.completions.create(
+    response = get_openai_client().chat.completions.create(
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         max_tokens=3000,
