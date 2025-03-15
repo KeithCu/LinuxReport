@@ -111,16 +111,18 @@
   </head>
   <body style="background-color:{{ back_color }}">
     <center>
-    <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-block; font-size: small;">
-      <a href="https://linuxreport.net" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Linux</a>
-      <a href="https://covidreport.org" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Covid</a>
-      <a href="https://aireport.keithcu.com" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">AI</a>
-      <a href="https://trumpreport.info" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Truth</a>
-      <a href="https://news.spaceelevatorwiki.com" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Space</a>
-      <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Me</a>
-    </div>
-  </center>
-    <div style="text-align:right"><button type="save" name="save" onclick="redirect()">Config...</button></div>
+      <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
+        <div>
+          <a href="https://linuxreport.net" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Linux</a>
+          <a href="https://covidreport.org" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Covid</a>
+          <a href="https://aireport.keithcu.com" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">AI</a>
+          <a href="https://trumpreport.info" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Truth</a>
+          <a href="https://news.spaceelevatorwiki.com" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Space</a>
+          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Me</a>
+        </div>
+        <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
+      </div>
+    </center>
     <center>{{ above_html }}</center>
     <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:175px;"></center>
     <center><small>{{ welcome_html }}</small></center>
