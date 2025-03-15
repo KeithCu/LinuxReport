@@ -209,6 +209,7 @@ def get_best_matching_article(target_title, articles):
     best_score = 0.0
     for article in articles:
         score = st_util.cos_sim(target_emb, get_embedding(article["title"])).item()
+        print (f"Score for {target_title} to {article['title']}: {score}")
         if score > best_score:
             best_match = article
     return best_match
