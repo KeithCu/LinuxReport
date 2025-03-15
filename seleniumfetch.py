@@ -107,7 +107,6 @@ def fetch_site_posts(site):
     # Extract configuration values
     url = site
     post_container = config["post_container"]
-    filter_pattern = config.get("filter_pattern", "")  # Optional, defaults to empty string
     needs_selenium = config.get("needs_selenium", True)  # Default to using Selenium
 
     # Initialize caching variables
@@ -118,50 +117,30 @@ def fetch_site_posts(site):
     entries = []
     
     if needs_selenium:
-        # Use Selenium approach
         driver = create_driver()
         driver.get(url)
-
-        # Wait for posts to load
         try:
             WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, post_container)))
             print(f"Posts loaded successfully for {site}")
-        except:
+        except Exception as e:
             print(f"Timeout waiting for posts to load on {site}")
-
-        # Find all post containers
         posts = driver.find_elements(By.CSS_SELECTOR, post_container)
-
-        # Process posts with Selenium
-        for post in posts:
-            entry = extract_post_data(post, config, url, use_selenium=True)
-            if entry:
-                entries.append(entry)
-
-        # Clean up Selenium
         driver.quit()
-        
     else:
-        # Use BeautifulSoup approach
         print(f"Fetching {site} using requests (no Selenium)")
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
-            
             soup = BeautifulSoup(response.text, 'html.parser')
             posts = soup.select(post_container)
-            
-            # Process posts with BeautifulSoup (similar logic to Selenium)
-            for post in posts:
-                entry = extract_post_data(post, config, url, use_selenium=False)
-                if entry:
-                    entries.append(entry)
-                    
-            # Get ETag if available
-            etag = response.headers.get('ETag', '')
-            
         except Exception as e:
             print(f"Error fetching {site} with requests: {e}")
+            posts = []
+    # Process posts with shared logic
+    for post in posts:
+        entry = extract_post_data(post, config, url, use_selenium=needs_selenium)
+        if entry:
+            entries.append(entry)
     
     # Construct feedparser-like result as a plain dict (same for both methods)
     result = {
