@@ -5,7 +5,6 @@ import threading
 from typing import Dict
 import zoneinfo
 
-#FIXME: duplicate from shared, but we don't want circular dependencies.
 TZ = zoneinfo.ZoneInfo("US/Eastern")
 
 # Constants

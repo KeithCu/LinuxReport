@@ -1,11 +1,9 @@
-import diskcache
 from enum import Enum
-import zoneinfo
 import datetime
+import diskcache
+import FeedHistory
 
-from FeedHistory import FeedHistory
-
-TZ = zoneinfo.ZoneInfo("US/Eastern")
+TZ = FeedHistory.TZ
 
 class RssFeed:
     def __init__(self, entries, top_articles=None):
@@ -45,9 +43,9 @@ EXPIRE_DAY = 3600 * 12
 EXPIRE_WEEK = 86400 * 7
 EXPIRE_YEARS = 86400 * 365 * 2
 
-MODE = Mode.LINUX_REPORT
+MODE = Mode.TRUMP_REPORT
 
-history = FeedHistory(data_file = f"{PATH}/feed_history{str(MODE)}.pickle")
+history = FeedHistory.FeedHistory(data_file = f"{PATH}/feed_history{str(MODE)}.pickle")
 
 class DiskCacheWrapper:
     def __init__(self, cache_dir):
@@ -85,11 +83,11 @@ def format_last_updated_fancy(last_fetch, timezone):
     """
     if not last_fetch:
         return "Unknown"
-    
+
     now = datetime.datetime.now(timezone)
     delta = now - last_fetch
     total_minutes = delta.total_seconds() / 60.0
-    
+
     if total_minutes < 60:
         rounded_minutes = round(total_minutes / 5.0) * 5
         return f"{int(rounded_minutes)} minutes ago"
