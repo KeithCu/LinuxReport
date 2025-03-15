@@ -291,6 +291,7 @@ def main(mode):
         top_3 = extract_top_titles_from_ai(full_response)
         top_3_articles = []
         for title in top_3:
+            print (title)
             best_match = get_best_matching_article(title, articles)
             if best_match:
                 top_3_articles.append(best_match)
