@@ -168,10 +168,12 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
 
 # Load the SentenceTransformer model once
 EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
-embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
+embedder = None  # Lazy initialization
 
 def get_embedding(text):
-    """Compute and return the embedding for a given text."""
+    global embedder
+    if embedder is None:
+        embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
     return embedder.encode(text, convert_to_tensor=True)
 
 def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
