@@ -13,7 +13,7 @@ TZ = zoneinfo.ZoneInfo("US/Eastern")
 EXPIRE_HOUR = 3600
 INITIAL_INTERVAL = timedelta(hours=2)  # Query every 2 hours
 MIN_INTERVAL = timedelta(minutes=60)
-MAX_INTERVAL = timedelta(hours=24)
+MAX_INTERVAL = timedelta(hours=12)
 BUCKET_SIZE_HOURS = 2                 # 12 buckets per day
 HISTORY_WINDOW = 5                    # Track last 5 fetches
 SMOOTHING_FACTOR = 0.7                # Weight for exponential smoothing (0-1)
