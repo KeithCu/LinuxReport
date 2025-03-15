@@ -8,7 +8,6 @@ import importlib.util
 import datetime
 
 from jinja2 import Template
-from sentence_transformers import SentenceTransformer, util
 
 from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK
 from auto_update_utils import custom_fetch_largest_image
@@ -170,14 +169,17 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     When you are done discussing the titles, put *** and then list the top 3, using only the titles.
     """
 
-# Load the SentenceTransformer model once
+# Load the SentenceTransformer model once - lazy initialization variables
 EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
 embedder = None  # Lazy initialization
+st_util = None   # Lazy load for sentence_transformers.util
 
 def get_embedding(text):
-    global embedder
+    global embedder, st_util
     if embedder is None:
+        from sentence_transformers import SentenceTransformer, util
         embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
+        st_util = util
     return embedder.encode(text, convert_to_tensor=True)
 
 def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
@@ -189,8 +191,8 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
         title = article["title"]
         current_emb = get_embedding(title)  # Compute embedding for the article's title
         
-        # Check if the article is too similar to any in do_not_select_similar
-        is_similar = any(util.cos_sim(current_emb, emb).item() >= threshold for emb in do_not_select_similar)
+        # Use lazy-loaded st_util for cosine similarity
+        is_similar = any(st_util.cos_sim(current_emb, emb).item() >= threshold for emb in do_not_select_similar)
         
         if not is_similar:
             unique_articles.append(article)
@@ -206,9 +208,8 @@ def get_best_matching_article(target_title, articles):
     best_match = None
     best_score = 0.0
     for article in articles:
-        score = util.cos_sim(target_emb, get_embedding(article["title"])).item()
+        score = st_util.cos_sim(target_emb, get_embedding(article["title"])).item()
         if score > best_score:
-            best_score = score
             best_match = article
     return best_match
 
