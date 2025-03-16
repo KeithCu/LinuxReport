@@ -74,9 +74,9 @@ MODE_TO_PATH = {
 #Simple schedule for when to do updates. Service calls hourly
 MODE_TO_SCHEDULE = {
     "linux": [0, 8, 12, 16, 20],
-    "ai": [8, 16, 20],
-    "covid": [8, 16, 20],
-    "trump": [4, 8, 10, 12, 14, 16, 20, 23],
+    "ai": [7, 11, 15, 19, 23],
+    "covid": [7, 11, 15, 19, 23],
+    "trump": [0, 4, 8, 10, 12, 14, 16, 20],
 }
 
 cache = DiskCacheWrapper(".")
@@ -338,7 +338,7 @@ def main(mode):
         for title in top_3:
             print (title)
             best_match = get_best_matching_article(title, articles)
-            print (f"Best match for {title}: {best_match}")
+            print(f"Best match for {title}: {best_match}")
             if best_match:
                 top_3_articles.append(best_match)
         generate_headlines_html(top_3_articles, html_file)
