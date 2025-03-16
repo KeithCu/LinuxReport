@@ -110,6 +110,9 @@
     </script>
   </head>
   <body style="background-color:{{ back_color }}">
+    <center>{{ above_html }}</center>
+    <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:175px;"></center>
+    <center><small>{{ welcome_html }}</small></center>
     <center>
       <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
         <div>
@@ -123,9 +126,7 @@
         <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
       </div>
     </center>
-    <center>{{ above_html }}</center>
-    <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:175px;"></center>
-    <center><small>{{ welcome_html }}</small></center>
+
     <div class="row">
       <div class="column">{{ columns[0] }}</div>
       {%- if not g.is_mobile %}
