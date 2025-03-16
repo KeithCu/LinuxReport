@@ -71,7 +71,7 @@ FAVICON = config_settings.FAVICON
 LOGO_URL = config_settings.LOGO_URL
 WEB_DESCRIPTION = config_settings.WEB_DESCRIPTION
 WEB_TITLE = config_settings.WEB_TITLE
-ABOVE_HTML_FILE = config_settings["ABOVE_HTML_FILE"]
+ABOVE_HTML_FILE = config_settings.ABOVE_HTML_FILE
 WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
                      'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
                      'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>')
