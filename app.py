@@ -63,14 +63,14 @@ elif MODE == Mode.SPACE_REPORT:
     import space_report_settings
     config_settings = space_report_settings.CONFIG
 
-ALL_URLS = config_settings["ALL_URLS"]
-site_urls = config_settings["site_urls"]
-USER_AGENT = config_settings["USER_AGENT"]
-URL_IMAGES = config_settings["URL_IMAGES"]
-FAVICON = config_settings["FAVICON"]
-LOGO_URL = config_settings["LOGO_URL"]
-WEB_DESCRIPTION = config_settings["WEB_DESCRIPTION"]
-WEB_TITLE = config_settings["WEB_TITLE"]
+ALL_URLS = config_settings.ALL_URLS
+site_urls = config_settings.site_urls
+USER_AGENT = config_settings.USER_AGENT
+URL_IMAGES = config_settings.URL_IMAGES
+FAVICON = config_settings.FAVICON
+LOGO_URL = config_settings.LOGO_URL
+WEB_DESCRIPTION = config_settings.WEB_DESCRIPTION
+WEB_TITLE = config_settings.WEB_TITLE
 ABOVE_HTML_FILE = config_settings["ABOVE_HTML_FILE"]
 WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
                      'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
@@ -189,7 +189,7 @@ def fetch_urls_thread():
     t.daemon = True #It's okay to kill this thread when the process is trying to exit.
     t.start()
 
-g_standard_order_s = str(site_urls)
+STANDARD_ORDER_STR = str(site_urls)
 
 #The main page
 @g_app.route('/')
@@ -325,7 +325,7 @@ def index():
                            text_font_style=text_font_style, above_html=Markup(above_html))
 
     # Only cache standard order
-    if page_order_s == g_standard_order_s:
+    if page_order_s == STANDARD_ORDER_STR:
 
         expire = EXPIRE_MINUTES
         if need_fetch:

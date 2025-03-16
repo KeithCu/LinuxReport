@@ -1,9 +1,24 @@
+from dataclasses import dataclass
 from enum import Enum
 import datetime
 import diskcache
 import FeedHistory
+from typing import List, Dict
 
 TZ = FeedHistory.TZ
+
+# Convert SiteConfig to a dataclass for attribute-style access.
+@dataclass
+class SiteConfig:
+    ALL_URLS: Dict[str, "RssInfo"]
+    USER_AGENT: str
+    site_urls: List[str]
+    URL_IMAGES: str
+    FAVICON: str
+    LOGO_URL: str
+    WEB_DESCRIPTION: str
+    WEB_TITLE: str
+    ABOVE_HTML_FILE: str
 
 class RssFeed:
     def __init__(self, entries, top_articles=None):
@@ -79,8 +94,7 @@ def format_last_updated(last_fetch, timezone):
     return last_fetch.strftime("%I:%M %p")
 
 def format_last_updated_fancy(last_fetch, timezone):
-    """Format the last fetch time as 'X minutes ago' or 'X hours ago'.
-    """
+    """Format the last fetch time as 'X minutes ago' or 'X hours ago'."""
     if not last_fetch:
         return "Unknown"
 
