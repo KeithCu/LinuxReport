@@ -54,7 +54,6 @@ class FeedHistory:
             feed_data = self.data.setdefault(url, {
                 "buckets": {},           # Frequency per time bucket
                 "recent": [],            # Last HISTORY_WINDOW fetches: (time, new_articles)
-                "interval": EXPIRE_HOUR, # Default in seconds
                 "weekday_buckets": set(), # Track fetched weekday bucket numbers
                 "weekend_buckets": set(), # Track fetched weekend bucket numbers
                 "in_initial_phase": True  # Track initial phase
@@ -97,8 +96,6 @@ class FeedHistory:
             # Only stay in initial phase if missing buckets are in the future
             feed_data["in_initial_phase"] = future_buckets_missing
 
-            # Adjust interval based on recent success and bucket
-            self._adjust_interval(url)
             self._save_data()
 
     def _get_bucket(self, dt: datetime) -> str:
@@ -107,33 +104,29 @@ class FeedHistory:
         bucket = dt.hour // BUCKET_SIZE_HOURS
         return f"{'weekday' if is_weekday else 'weekend'}-{bucket}"
 
-    def _adjust_interval(self, url: str):
-        """Dynamically adjust refresh interval."""
-        feed_data = self.data.get(url, {})
-        recent = feed_data.get("recent", [])
-        bucket = self._get_bucket(datetime.now(TZ))
-        freq = feed_data.get("buckets", {}).get(bucket, 0.5)  # Default to neutral
-
-        # Success rate from recent fetches
-        success_rate = sum(1 for _, n in recent if n > 0) / max(len(recent), 1)
-
-        # Base interval: inversely proportional to frequency and success
-        combined_score = (freq + success_rate) / 2  # 0 to 1
-        
-        interval_seconds = (MIN_INTERVAL.total_seconds() * combined_score +
-                           MAX_INTERVAL.total_seconds() * (1 - combined_score))
-        
-        interval = max(MIN_INTERVAL.total_seconds(),
-                      min(MAX_INTERVAL.total_seconds(), interval_seconds))
-
-        feed_data["interval"] = interval
-
     def get_interval(self, url: str) -> timedelta:
         """Get the current refresh interval for a URL."""
         feed_data = self.data.get(url, {})
+        
         if feed_data.get("in_initial_phase", True):
             return INITIAL_INTERVAL
-        return timedelta(seconds=feed_data.get("interval", EXPIRE_HOUR))
+        
+        current_bucket = self._get_bucket(datetime.now(TZ))
+        recent = feed_data.get("recent", [])
+        
+        current_freq = feed_data.get("buckets", {}).get(current_bucket, 0.5)  # Default to neutral
+        
+        success_rate = sum(1 for _, n in recent if n > 0) / max(len(recent), 1)
+        
+        combined_score = (current_freq + success_rate) / 2  # 0 to 1
+        
+        interval_seconds = (MIN_INTERVAL.total_seconds() * combined_score +
+                        MAX_INTERVAL.total_seconds() * (1 - combined_score))
+        
+        interval = max(MIN_INTERVAL.total_seconds(),
+                    min(MAX_INTERVAL.total_seconds(), interval_seconds))
+        
+        return timedelta(seconds=interval)
 
     def has_expired(self, url: str, last_fetch: datetime) -> bool:
         """Check if the feed should be refreshed, respecting the current interval and MAX_INTERVAL."""
