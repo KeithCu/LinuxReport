@@ -322,7 +322,7 @@ def main(mode):
     spec = importlib.util.spec_from_file_location("module_name", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    ALL_URLS = module.CONFIG["ALL_URLS"]
+    ALL_URLS = module.CONFIG.ALL_URLS
 
     html_file = f"{mode}reportabove.html"
 
