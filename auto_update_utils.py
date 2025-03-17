@@ -199,7 +199,7 @@ def get_image_dimensions_from_attributes(img_tag):
                 width_str = img_tag['width'].strip().rstrip('px')
                 if width_str.isdigit():
                     width = int(width_str)
-        
+
         if img_tag.get('height'):
             if img_tag['height'].isdigit():
                 height = int(img_tag['height'])
@@ -209,7 +209,7 @@ def get_image_dimensions_from_attributes(img_tag):
                     height = int(height_str)
     except (ValueError, KeyError):
         pass
-        
+
     # Check for dimensions in style attribute
     if (width == 0 or height == 0) and img_tag.get('style'):
         style = img_tag['style']
@@ -219,7 +219,7 @@ def get_image_dimensions_from_attributes(img_tag):
         height_match = re.search(r'height:\s*(\d+)px', style)
         if height_match:
             height = int(height_match.group(1))
-            
+
     return width, height
 
 def process_candidate_images(candidate_images):
@@ -250,7 +250,7 @@ def process_candidate_images(candidate_images):
 
     top_candidates = sorted(candidate_images, key=lambda item: item[1].get('score', 0), reverse=True)[:5]
     enhanced_candidates = []
-    
+
     # Process each candidate with detailed logging.
     for url, metadata in candidate_images:
         debug_print(f"Processing candidate {url} initial metadata: {metadata}")
@@ -276,7 +276,7 @@ def process_candidate_images(candidate_images):
                 width, height = actual_width, actual_height
 
         score = metadata.get('score', 0)
-        
+
         if width > 0 and height > 0:
             dimension_score = width * height * 1.5
             score = max(score, dimension_score)
@@ -285,30 +285,30 @@ def process_candidate_images(candidate_images):
             srcset_score = srcset_width * srcset_width
             score = max(score, srcset_score)
             debug_print(f"Srcset score for {url}: {srcset_score}")
-        
+
         if metadata.get('filesize', 0) > 10000:
             bonus = metadata['filesize'] * 0.01
             score += bonus
             debug_print(f"Bonus for filesize for {url}: {bonus}")
-            
+
         if (width > 0 and height > 0) and (width < 100 and height < 100):
-            score = score * 0.5
-            debug_print(f"Reduced score for small dimensions for {url}: new score {score}")
-            
+            debug_print(f"Ignoring image of small dimensions for {url}")
+            continue
+
         if width > 0 and height > 0:
             aspect = width / height
             if 0.5 <= aspect <= 2.5:  # Reasonable range for content images
                 score = score * 1.2
                 debug_print(f"Increased score for reasonable aspect ratio for {url}: new score {score}")
-                
+
         metadata['final_score'] = score
         debug_print(f"Final score for {url}: {score} with metadata: {metadata}")
         enhanced_candidates.append((url, metadata))
-    
+
     if not enhanced_candidates:
         print("No suitable images found after enhancement.")
         return None
-        
+
     enhanced_candidates.sort(key=lambda item: item[1].get('final_score', 0), reverse=True)
     best_image_url = enhanced_candidates[0][0]
     print(f"Best image found: {best_image_url} with score {enhanced_candidates[0][1].get('final_score')}")
@@ -400,7 +400,7 @@ def parse_images_from_soup(soup, base_url):
 
         # Don't skip images just because they have no dimensions
         # Only skip very small images that we're sure about
-        if width > 0 and height > 0 and width < 50 and height < 50:
+        if width > 0 and height > 0 and width < 75 and height < 75:
             continue
 
         absolute_url = urljoin(base_url, src)
@@ -411,7 +411,7 @@ def parse_images_from_soup(soup, base_url):
             metadata['height'] = height
         if srcset_width > 0:
             metadata['srcset_width'] = srcset_width
-            
+
         # Assign reasonable default score even without dimensions
         if width > 0 and height > 0:
             metadata['score'] = width * height
@@ -438,7 +438,7 @@ def fetch_largest_image(url):
             print("No suitable images found in local file.")
             return None
         return process_candidate_images(candidate_images)
-    
+
     try:
         response = get_final_response(url, HEADERS)
         if response is None:
@@ -538,14 +538,14 @@ def parse_images_from_selenium(driver):
             img_url = img.get_attribute('src')
             if not img_url or 'data:' in img_url:  # Skip data URLs or invalid URLs
                 continue
-                
+
             # Get natural dimensions as reported by the browser
             try:
                 natural_width = driver.execute_script("return arguments[0].naturalWidth;", img)
                 natural_height = driver.execute_script("return arguments[0].naturalHeight;", img)
             except:
                 natural_width = natural_height = 0
-                
+
             # Get display dimensions
             try:
                 display_width = driver.execute_script("return arguments[0].clientWidth;", img)
@@ -564,13 +564,13 @@ def parse_images_from_selenium(driver):
                     height = int(height_attr)
             except Exception:
                 pass
-                
+
             # Use the best available dimensions
             if natural_width > 0 and natural_height > 0:
                 width, height = natural_width, natural_height
             elif display_width > 0 and display_height > 0:
                 width, height = display_width, display_height
-                
+
             # Check if visible in viewport
             try:
                 is_visible = driver.execute_script(
@@ -583,21 +583,21 @@ def parse_images_from_selenium(driver):
                     continue
             except:
                 pass  # If we can't determine visibility, continue with the image
-                
+
             # Don't skip images just because they're small - use dimensions for scoring later
-            
+
             metadata = {
                 'width': width,
                 'height': height,
                 'score': width * height if width > 0 and height > 0 else 640 * 480  # Default reasonable score
             }
-            
+
             # Fetch image size for promising candidates
             if metadata['score'] > 10000 or (natural_width > 200 and natural_height > 200):
                 file_size = evaluate_image_url(img_url)
                 if file_size > 0:
                     metadata['filesize'] = file_size
-                    
+
             exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'advertisement']
             if not any(pattern in img_url.lower() for pattern in exclude_patterns):
                 candidate_images.append((img_url, metadata))
