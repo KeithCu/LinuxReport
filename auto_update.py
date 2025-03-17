@@ -12,11 +12,6 @@ from jinja2 import Template
 from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK, EXPIRE_DAY
 from auto_update_utils import custom_fetch_largest_image
 
-MAX_PREVIOUS_HEADLINES = 200
-
-# Similarity threshold for deduplication
-THRESHOLD = 0.75
-
 # Initialize the https://together.ai/ client only if needed because it takes 2 seconds.
 openai_client = None
 def get_openai_client():
@@ -29,38 +24,15 @@ def get_openai_client():
         )
     return openai_client
 
+MAX_PREVIOUS_HEADLINES = 200
+
+# Similarity threshold for deduplication
+THRESHOLD = 0.75
+
 # Model configuration with primary and fallback options
 PRIMARY_MODEL  = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 FALLBACK_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
-
-def get_current_model():
-    """Get the current working model, with fallback mechanism."""
-    # Check if we have a cached working model
-    cached_model = g_c.get("working_llm_model")
-    if cached_model:
-        return cached_model
-    
-    # Default to PRIMARY_MODEL if no cached info
-    return PRIMARY_MODEL
-
-def update_model_cache(model):
-    """Update the cache with the currently working model."""
-    g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
-
-def _try_call_model(model, prompt, max_tokens):
-    """Helper function to call a specific model and return its response."""
-    start = timer()
-    response = get_openai_client().chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=max_tokens,
-    )
-    end = timer()
-    response_text = response.choices[0].message.content
-    print(f"LLM Response with {model} in {end - start:.3f} seconds:")
-    print(response_text)
-    return response_text
 
 BASE = "/srv/http/"
 
@@ -99,6 +71,38 @@ headline_template = Template("""
 </center>
 <br/>
 """)
+
+def get_current_model():
+    """Get the current working model, with fallback mechanism."""
+    # Check if we have a cached working model
+    cached_model = g_c.get("working_llm_model")
+    if cached_model:
+        return cached_model
+    
+    # Default to PRIMARY_MODEL if no cached info
+    return PRIMARY_MODEL
+
+def update_model_cache(model):
+    """Update the cache with the currently working model if it's different."""
+    current_model = g_c.get("working_llm_model")
+    if current_model == model:
+        return
+    g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+
+def _try_call_model(model, prompt, max_tokens):
+    """Helper function to call a specific model and return its response."""
+    start = timer()
+    response = get_openai_client().chat.completions.create(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=max_tokens,
+    )
+    end = timer()
+    response_text = response.choices[0].message.content
+    print(f"LLM Response with {model} in {end - start:.3f} seconds:")
+    print(response_text)
+    return response_text
+
 
 def fetch_recent_articles():
     articles = []
@@ -207,6 +211,7 @@ st_util = None
 def get_embedding(text):
     global embedder, st_util
     if embedder is None:
+        # Lazy initialization of SentenceTransformer since it takes 5 seconds.
         from sentence_transformers import SentenceTransformer, util
         embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
         st_util = util

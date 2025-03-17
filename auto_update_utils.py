@@ -90,6 +90,13 @@ def get_actual_image_dimensions(img_url):
         response = requests.get(img_url, headers=headers_with_referer, timeout=10)
         response.raise_for_status()
         content_type = response.headers.get('Content-Type', '').lower()
+        
+        # Use content-length as a quick check for valid images
+        content_length = int(response.headers.get('Content-Length', 0))
+        if content_length < 100:  # Skip very small images that are likely icons
+            debug_print(f"Skipping small image ({content_length} bytes): {img_url}")
+            return 0, 0
+            
         if 'svg' in content_type:
             debug_print(f"SVG image detected for {img_url}, attempting to parse dimensions")
             try:
@@ -97,14 +104,26 @@ def get_actual_image_dimensions(img_url):
                 svg = ET.fromstring(response.content)
                 width = svg.attrib.get('width')
                 height = svg.attrib.get('height')
+                
+                # Improved SVG dimension parsing with unit handling
+                def parse_dimension(value):
+                    if not value:
+                        return 0
+                    if value.isdigit():
+                        return int(value)
+                    # Handle px, em, pt, etc.
+                    numeric_part = re.match(r'^(\d+(\.\d+)?)', value)
+                    if numeric_part:
+                        return float(numeric_part.group(1))
+                    return 0
+                    
                 if width and height:
-                    try:
-                        width = float(width.rstrip('px'))
-                        height = float(height.rstrip('px'))
-                        debug_print(f"Parsed SVG dimensions from attributes for {img_url}: {int(width)}x{int(height)}")
-                        return int(width), int(height)
-                    except Exception:
-                        pass
+                    width_val = parse_dimension(width)
+                    height_val = parse_dimension(height)
+                    if width_val > 0 and height_val > 0:
+                        debug_print(f"Parsed SVG dimensions from attributes for {img_url}: {int(width_val)}x{int(height_val)}")
+                        return int(width_val), int(height_val)
+                        
                 viewBox = svg.attrib.get('viewBox')
                 if viewBox:
                     parts = viewBox.split()
@@ -116,17 +135,24 @@ def get_actual_image_dimensions(img_url):
                             return int(width), int(height)
                         except Exception:
                             pass
-                # Fallback: approximate dimensions based on file size heuristic
-                fallback_dim = int(len(response.content) ** 0.5)
+                            
+                # More realistic fallback based on SVG content complexity
+                fallback_dim = min(max(int(len(response.content) ** 0.4), 200), 800)
                 debug_print(f"Fallback SVG dimensions based on file size for {img_url}: {fallback_dim}x{fallback_dim}")
                 return fallback_dim, fallback_dim
             except Exception as e:
                 debug_print(f"Error parsing SVG for {img_url}: {e}")
                 return 640, 480  # Default fallback dimensions
-        img = Image.open(BytesIO(response.content))
-        width, height = img.size
-        debug_print(f"Got actual dimensions for {img_url}: {width}x{height}")
-        return width, height
+        
+        # More efficient image dimension detection using image header only
+        try:
+            with Image.open(BytesIO(response.content)) as img:
+                width, height = img.size
+                debug_print(f"Got actual dimensions for {img_url}: {width}x{height}")
+                return width, height
+        except Exception as e:
+            debug_print(f"Error reading image dimensions: {e}")
+            return 0, 0
     except Exception as e:
         debug_print(f"Error getting dimensions for {img_url}: {e}")
         return 0, 0
@@ -242,186 +268,324 @@ def process_candidate_images(candidate_images):
             debug_print(f"Normalized candidate: {url} with metadata: {normalized_candidates[-1][1]}")
     candidate_images = normalized_candidates
 
-    # Immediately select high priority meta images.
+    # First pass: filter out obviously bad candidates and categorize images
+    meta_images = []
+    content_images = []
+    other_images = []
+    
     for url, metadata in candidate_images:
+        # Immediately exclude disqualified images
+        if any(pattern in url.lower() for pattern in ['logo', 'icon', 'avatar', 'banner', 'emoji', 'advertisement']):
+            debug_print(f"Skipping excluded pattern image: {url}")
+            continue
+            
+        # Check file extension for common image types
+        if re.search(r'\.(jpe?g|png|webp|gif|svg)([?#].*)?$', url.lower()):
+            # Good - it's a known image type
+            pass
+        elif not re.search(r'\.(bmp|tiff?|avif|ico)([?#].*)?$', url.lower()):
+            # Not a typical image extension, check if URL seems to be an API or script
+            if re.search(r'(\.php|\.aspx?|\.cgi|\?|\=)', url.lower()):
+                debug_print(f"Skipping potential non-image URL: {url}")
+                continue
+    
+        # Categorize by priority
         if metadata.get('score', 0) > 500000:
-            debug_print(f"High-priority meta image selected: {url} with score {metadata.get('score', 0)}")
-            return url
-
-    top_candidates = sorted(candidate_images, key=lambda item: item[1].get('score', 0), reverse=True)[:5]
+            meta_images.append((url, metadata))
+        elif metadata.get('width', 0) > 200 and metadata.get('height', 0) > 200:
+            content_images.append((url, metadata))
+        else:
+            other_images.append((url, metadata))
+    
+    # If we have meta images, prioritize them
+    if meta_images:
+        debug_print(f"Using meta images priority: {len(meta_images)} candidates")
+        top_candidates = meta_images
+    else:
+        # Combine remaining categories
+        top_candidates = content_images + other_images
+        
+    if not top_candidates:
+        print("No suitable images found after filtering.")
+        return None
+    
+    # Second pass: get dimensions and calculate scores
     enhanced_candidates = []
-
-    # Process each candidate with detailed logging.
-    for url, metadata in candidate_images:
-        debug_print(f"Processing candidate {url} initial metadata: {metadata}")
+    # Get top 5 for dimension fetching
+    initial_top = sorted(top_candidates, key=lambda item: item[1].get('score', 0), reverse=True)[:5]
+    
+    for url, metadata in top_candidates:
         width = metadata.get('width', 0)
         height = metadata.get('height', 0)
         srcset_width = metadata.get('srcset_width', 0)
 
-        if width > 0 and height == 0:
-            height = int(width * 0.75)  # Assume 4:3 aspect ratio
-            metadata['height'] = height
-            debug_print(f"Assuming 4:3 aspect ratio for {url}: width {width}, height {height}")
-        elif height > 0 and width == 0:
-            width = int(height * 1.33)  # Assume 4:3 aspect ratio
-            metadata['width'] = width
-            debug_print(f"Assuming 4:3 aspect ratio for {url}: height {height}, width {width}")
-
-        if (width == 0 or height == 0) and (url, metadata) in top_candidates:
+        # If it's a top candidate and we don't have dimensions, fetch them
+        if (width == 0 or height == 0) and (url, metadata) in initial_top:
             actual_width, actual_height = get_actual_image_dimensions(url)
-            debug_print(f"Fetched actual dimensions for {url}: {actual_width}x{actual_height}")
             if actual_width > 0 and actual_height > 0:
                 metadata['width'] = actual_width
                 metadata['height'] = actual_height
                 width, height = actual_width, actual_height
 
-        score = metadata.get('score', 0)
-
+        # Calculate final score with improved weighting
+        base_score = metadata.get('score', 0)
+        filesize = metadata.get('filesize', 0)
+        
+        # Calculate dimension score
+        dimension_score = 0
         if width > 0 and height > 0:
-            dimension_score = width * height * 1.5
-            score = max(score, dimension_score)
-            debug_print(f"Dimension score for {url}: {dimension_score}")
+            # Reward larger images but with diminishing returns
+            area = width * height
+            if area > 0:
+                dimension_score = min(area / 1000, 5000)  # Cap at 5000 to avoid huge images dominating
+                
+                # Adjust for reasonable aspect ratios
+                aspect = width / height
+                if 0.5 <= aspect <= 2.5:  # Reasonable range for content images
+                    dimension_score *= 1.3
+                    
+                # Penalize extreme aspect ratios
+                elif aspect < 0.2 or aspect > 5:
+                    dimension_score *= 0.5
         elif srcset_width > 0:
-            srcset_score = srcset_width * srcset_width
-            score = max(score, srcset_score)
-            debug_print(f"Srcset score for {url}: {srcset_score}")
-
-        if metadata.get('filesize', 0) > 10000:
-            bonus = metadata['filesize'] * 0.01
-            score += bonus
-            debug_print(f"Bonus for filesize for {url}: {bonus}")
-
-        if (width > 0 and height > 0) and (width < 100 and height < 100):
-            debug_print(f"Ignoring image of small dimensions for {url}")
-            continue
-
-        if width > 0 and height > 0:
-            aspect = width / height
-            if 0.5 <= aspect <= 2.5:  # Reasonable range for content images
-                score = score * 1.2
-                debug_print(f"Increased score for reasonable aspect ratio for {url}: new score {score}")
-
-        metadata['final_score'] = score
-        debug_print(f"Final score for {url}: {score} with metadata: {metadata}")
+            # If we only have srcset width, estimate a score
+            dimension_score = srcset_width * 2
+            
+        # Filesize can be an indicator of quality
+        filesize_score = 0
+        if filesize > 0:
+            filesize_kb = filesize / 1024
+            # Reward larger files up to a point (8MB)
+            if filesize_kb < 8192:
+                filesize_score = min(filesize_kb / 10, 500)
+            else:
+                # Penalize excessively large files
+                filesize_score = 500 - min((filesize_kb - 8192) / 100, 400)
+        
+        # Combine scores with appropriate weights
+        final_score = base_score
+        if dimension_score > 0:
+            final_score = max(final_score, dimension_score * 1.5)
+        if filesize_score > 0:
+            final_score += filesize_score
+            
+        # Small images don't provide value
+        if width > 0 and height > 0 and width < 100 and height < 100:
+            final_score = final_score * 0.1  # Heavily penalize tiny images
+            
+        metadata['final_score'] = final_score
+        debug_print(f"Final score for {url}: {final_score} (dimensions: {width}x{height})")
         enhanced_candidates.append((url, metadata))
 
     if not enhanced_candidates:
-        print("No suitable images found after enhancement.")
+        print("No suitable images found after scoring.")
         return None
 
+    # Sort by final score
     enhanced_candidates.sort(key=lambda item: item[1].get('final_score', 0), reverse=True)
     best_image_url = enhanced_candidates[0][0]
     print(f"Best image found: {best_image_url} with score {enhanced_candidates[0][1].get('final_score')}")
-    debug_print(f"Enhanced candidates: {enhanced_candidates}")
+    
+    if DEBUG_LOGGING and len(enhanced_candidates) > 1:
+        debug_print(f"Runner-up: {enhanced_candidates[1][0]} with score {enhanced_candidates[1][1].get('final_score')}")
+        
     return best_image_url
 
 def parse_images_from_soup(soup, base_url):
+    """Extract image candidates from HTML using BeautifulSoup with improved handling."""
     candidate_images = []
+    
+    # Track processed URLs to avoid duplicates
+    processed_urls = set()
 
-    # 1. Check meta tags (score remains high but we'll rely more on actual dimensions later)
-    meta_image_url = soup.find('meta', property='og:image')
-    if meta_image_url and meta_image_url.get('content'):
-        absolute_meta_url = urljoin(base_url, meta_image_url['content'])
-        candidate_images.append((absolute_meta_url, {'score': 4000000}))
-        print(f"Found meta image: {absolute_meta_url}")
+    # 1. Get meta tag images (high priority)
+    meta_tags = [
+        ('meta[property="og:image"]', 'content', 4000000),
+        ('meta[name="twitter:image"]', 'content', 1500000),
+        ('meta[name="twitter:image:src"]', 'content', 1500000),
+        ('meta[property="og:image:secure_url"]', 'content', 4000000),
+        ('meta[itemprop="image"]', 'content', 1000000),
+    ]
+    
+    for selector, attr, score in meta_tags:
+        for tag in soup.select(selector):
+            if tag.get(attr):
+                url = urljoin(base_url, tag[attr])
+                if url not in processed_urls:
+                    processed_urls.add(url)
+                    candidate_images.append((url, {'score': score}))
+                    print(f"Found meta image ({selector}): {url}")
 
-    twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
-    if twitter_image and twitter_image.get('content'):
-        absolute_twitter_url = urljoin(base_url, twitter_image['content'])
-        candidate_images.append((absolute_twitter_url, {'score': 1500000})) # Slightly lower score
-        print(f"Found Twitter image: {absolute_twitter_url}")
-
+    # 2. Check Schema.org image in JSON-LD
     for script in soup.find_all('script', type='application/ld+json'):
         try:
             data = json.loads(script.string)
-            if isinstance(data, dict) and 'image' in data:
-                image_url = data['image'] if isinstance(data['image'], str) else data['image'][0]
-                absolute_schema_url = urljoin(base_url, image_url)
-                candidate_images.append((absolute_schema_url, {'score': 1000000})) # Even lower score
-                print(f"Found Schema.org image: {absolute_schema_url}")
-        except:
-            pass
+            if isinstance(data, dict):
+                # Handle different schema formats
+                image_candidates = []
+                
+                if 'image' in data:
+                    if isinstance(data['image'], str):
+                        image_candidates.append(data['image'])
+                    elif isinstance(data['image'], list):
+                        image_candidates.extend(data['image'])
+                    elif isinstance(data['image'], dict) and 'url' in data['image']:
+                        image_candidates.append(data['image']['url'])
+                        
+                # Handle nested images in Graph schemas        
+                if '@graph' in data and isinstance(data['@graph'], list):
+                    for item in data['@graph']:
+                        if isinstance(item, dict) and 'image' in item:
+                            if isinstance(item['image'], str):
+                                image_candidates.append(item['image'])
+                            elif isinstance(item['image'], list):
+                                image_candidates.extend(x for x in item['image'] if isinstance(x, str))
+                
+                for img_url in image_candidates:
+                    if isinstance(img_url, str):
+                        url = urljoin(base_url, img_url)
+                        if url not in processed_urls:
+                            processed_urls.add(url)
+                            candidate_images.append((url, {'score': 1000000}))
+                            print(f"Found Schema.org image: {url}")
+        except Exception as e:
+            debug_print(f"Error parsing JSON-LD: {e}")
 
-    # 2. Check for picture elements with srcset
+    # 3. Process <picture> elements
     for picture in soup.find_all('picture'):
         max_width = 0
         best_source = None
 
+        # Check <source> elements
         for source in picture.find_all('source'):
             if source.get('srcset'):
                 best_src, width = parse_best_srcset(source['srcset'])
-                if width > max_width:
+                if best_src and width > max_width:
                     max_width = width
                     best_source = best_src
+            # Also check src attribute
+            elif source.get('src'):
+                if max_width == 0:
+                    best_source = source['src']
 
+        # Check the <img> inside picture as fallback
         img = picture.find('img')
         if img:
-            img_best_src, img_width = (None, 0)
             if img.get('srcset'):
                 img_best_src, img_width = parse_best_srcset(img['srcset'])
-                if img_width > max_width:
+                if img_best_src and img_width > max_width:
                     max_width = img_width
                     best_source = img_best_src
-            elif img.get('src'):
-                if max_width == 0: # Use img src if no better source in <picture>
-                    best_source = img['src']
-                    width_attr, height_attr = get_image_dimensions_from_attributes(img)
-                    max_width = width_attr # Use width as a proxy if available
+            elif img.get('src') and not best_source:
+                best_source = img['src']
+                width, height = get_image_dimensions_from_attributes(img)
+                if width > 0:
+                    max_width = width
 
         if best_source:
             absolute_url = urljoin(base_url, best_source)
-            candidate_images.append((absolute_url, {'srcset_width': max_width}))
+            if absolute_url not in processed_urls:
+                processed_urls.add(absolute_url)
+                metadata = {'srcset_width': max_width, 'score': max_width * 2}
+                candidate_images.append((absolute_url, metadata))
 
-    # 3. Process all img tags
-    for img in soup.find_all('img'):
-        src = None
-        srcset_url = None
-        srcset_width = 0
-
-        for attr in ['src', 'data-src', 'data-lazy-src', 'data-original']:
+    # 4. Handle special data attributes for lazy-loaded images
+    lazy_img_selectors = [
+        ('img[data-src]', 'data-src'),
+        ('img[data-lazy-src]', 'data-lazy-src'),
+        ('img[data-lazy]', 'data-lazy'),
+        ('img[data-original]', 'data-original'),
+        ('img[data-srcset]', 'data-srcset'),
+        ('img[loading="lazy"]', 'src'),
+        ('img.lazyload', 'src')
+    ]
+    
+    for selector, attr in lazy_img_selectors:
+        for img in soup.select(selector):
             if img.get(attr):
-                src = img[attr]
-                break
+                # For srcset, parse it to get the best URL
+                if attr.endswith('srcset'):
+                    best_src, width = parse_best_srcset(img[attr])
+                    if best_src:
+                        url = urljoin(base_url, best_src)
+                        if url not in processed_urls:
+                            processed_urls.add(url)
+                            metadata = {'srcset_width': width}
+                            width_attr, height_attr = get_image_dimensions_from_attributes(img)
+                            if width_attr > 0:
+                                metadata['width'] = width_attr
+                            if height_attr > 0:
+                                metadata['height'] = height_attr
+                            candidate_images.append((url, metadata))
+                else:
+                    url = urljoin(base_url, img[attr])
+                    if url not in processed_urls:
+                        processed_urls.add(url)
+                        width, height = get_image_dimensions_from_attributes(img)
+                        metadata = {}
+                        if width > 0:
+                            metadata['width'] = width
+                        if height > 0:
+                            metadata['height'] = height
+                        candidate_images.append((url, metadata))
 
-        if 'srcset' in img.attrs or 'data-srcset' in img.attrs:
-            srcset = img.get('srcset', img.get('data-srcset', ''))
-            srcset_url, srcset_width = parse_best_srcset(srcset)
-            if srcset_url:
-                src = srcset_url
+    # 5. Process standard img tags
+    for img in soup.find_all('img'):
+        if img.get('src'):
+            src = img['src']
+            
+            # Skip data URLs and very small images
+            if src.startswith('data:'):
+                continue
+                
+            # Check if image should be excluded based on classes or styling
+            classes = img.get('class', [])
+            if isinstance(classes, list) and any(c.lower() in ['logo', 'icon', 'avatar'] for c in classes):
+                continue
+                
+            style = img.get('style', '')
+            if 'display:none' in style or 'visibility:hidden' in style:
+                continue
 
-        if not src:
-            continue
-
-        width, height = get_image_dimensions_from_attributes(img)
-
-        style = img.get('style', '')
-        if 'display:none' in style or 'visibility:hidden' in style:
-            continue
-
-        # Don't skip images just because they have no dimensions
-        # Only skip very small images that we're sure about
-        if width > 0 and height > 0 and width < 75 and height < 75:
-            continue
-
-        absolute_url = urljoin(base_url, src)
-        metadata = {}
-        if width > 0:
-            metadata['width'] = width
-        if height > 0:
-            metadata['height'] = height
-        if srcset_width > 0:
-            metadata['srcset_width'] = srcset_width
-
-        # Assign reasonable default score even without dimensions
-        if width > 0 and height > 0:
-            metadata['score'] = width * height
-        else:
-            # Default score for images without dimensions
-            metadata['score'] = 640 * 480  # Common web image size as default
-
-        exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'Linux_opengraph', 'advertisement']
-        if not any(pattern in absolute_url.lower() for pattern in exclude_patterns):
-            candidate_images.append((absolute_url, metadata))
+            # Check srcset first for better quality images
+            srcset_url = None
+            srcset_width = 0
+            if img.get('srcset'):
+                srcset_url, srcset_width = parse_best_srcset(img['srcset'])
+            
+            # Use srcset URL if available, otherwise fall back to src
+            url = urljoin(base_url, srcset_url if srcset_url else src)
+            if url in processed_urls:
+                continue
+                
+            processed_urls.add(url)
+            
+            # Get dimensions and calculate score
+            width, height = get_image_dimensions_from_attributes(img)
+            alt_text = img.get('alt', '')
+            
+            metadata = {}
+            if width > 0:
+                metadata['width'] = width
+            if height > 0:
+                metadata['height'] = height
+            if srcset_width > 0:
+                metadata['srcset_width'] = srcset_width
+                
+            # Calculate initial score based on dimensions
+            if width > 0 and height > 0:
+                metadata['score'] = width * height
+            elif srcset_width > 0:
+                metadata['score'] = srcset_width * srcset_width
+            else:
+                # Default score for images without dimensions
+                metadata['score'] = 640 * 480
+                
+            # Boost score for content images based on meaningful alt text
+            if alt_text and len(alt_text) > 10:
+                metadata['score'] = metadata['score'] * 1.2
+                
+            candidate_images.append((url, metadata))
 
     return candidate_images
 
@@ -440,17 +604,28 @@ def fetch_largest_image(url):
         return process_candidate_images(candidate_images)
 
     try:
+        # Handle URLs that are already images
+        if re.search(r'\.(jpe?g|png|webp|gif|svg)([?#].*)?$', url.lower()):
+            print(f"URL appears to be an image: {url}")
+            # Validate that it's actually an image
+            response = requests.head(url, headers=HEADERS, timeout=5)
+            content_type = response.headers.get('Content-Type', '').lower()
+            if 'image/' in content_type:
+                return url
+        
+        # Standard HTML page fetch
         response = get_final_response(url, HEADERS)
         if response is None:
             print("No response received.")
             return None
-        response.raise_for_status()
-
+            
+        # Check if the URL is a direct image
         content_type = response.headers.get('Content-Type', '').lower()
         if content_type.startswith('image/'):
             print(f"URL is an image: {url}")
             return url
-
+            
+        # Parse HTML and look for images
         soup = BeautifulSoup(response.text, 'html.parser')
         base_url = response.url
         candidate_images = parse_images_from_soup(soup, base_url)
