@@ -107,25 +107,23 @@ class FeedHistory:
     def get_interval(self, url: str) -> timedelta:
         """Get the current refresh interval for a URL."""
         feed_data = self.data.get(url, {})
-        
+
         if feed_data.get("in_initial_phase", True):
             return INITIAL_INTERVAL
-        
+
         current_bucket = self._get_bucket(datetime.now(TZ))
         recent = feed_data.get("recent", [])
-        
+
         current_freq = feed_data.get("buckets", {}).get(current_bucket, 0.5)  # Default to neutral
-        
         success_rate = sum(1 for _, n in recent if n > 0) / max(len(recent), 1)
-        
         combined_score = (current_freq + success_rate) / 2  # 0 to 1
-        
+
         interval_seconds = (MIN_INTERVAL.total_seconds() * combined_score +
                         MAX_INTERVAL.total_seconds() * (1 - combined_score))
-        
+
         interval = max(MIN_INTERVAL.total_seconds(),
                     min(MAX_INTERVAL.total_seconds(), interval_seconds))
-        
+
         return timedelta(seconds=interval)
 
     def has_expired(self, url: str, last_fetch: datetime) -> bool:
