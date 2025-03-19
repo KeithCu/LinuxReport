@@ -49,6 +49,9 @@ FAKE_API = True  # Fake Weather API calls
 DEFAULT_WEATHER_LAT = "37.7749"
 DEFAULT_WEATHER_LON = "-122.4194"
 
+#Reddit has blocked my user agent so follow their advice and make a new one.
+USER_AGENT_REDDIT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0"
+
 ALL_URLS = {}
 config_settings = {}
 
@@ -85,7 +88,6 @@ WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - For
                      'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>')
 
 
-feedparser.USER_AGENT = USER_AGENT
 
 def load_url_worker(url):
     """Background worker to fetch a URL. Handles """
@@ -109,6 +111,10 @@ def load_url_worker(url):
         if "fakefeed" in url:
             res = fetch_site_posts(rss_info.site_url)
         else:
+            if "reddit" in url:
+                feedparser.USER_AGENT = USER_AGENT_REDDIT
+            else:
+                feedparser.USER_AGENT = USER_AGENT
             res = feedparser.parse(url)
 
         new_entries = prefilter_news(url, res)
