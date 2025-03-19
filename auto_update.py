@@ -180,6 +180,7 @@ def extract_top_titles_from_ai(text):
 BANNED_WORDS = [
     "tmux",
     "redox",
+    "java",
 ]
 
 modetoprompt2 = {
