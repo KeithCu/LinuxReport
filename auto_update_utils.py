@@ -371,7 +371,7 @@ def process_candidate_images(candidate_images):
             
         # Small images don't provide value
         if width > 0 and height > 0 and width < 100 and height < 100:
-            final_score = final_score * 0.1  # Heavily penalize tiny images
+            continue
             
         metadata['final_score'] = final_score
         debug_print(f"Final score for {url}: {final_score} (dimensions: {width}x{height})")

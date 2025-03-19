@@ -1,6 +1,7 @@
 ﻿import sys
 import os
 import time
+import requests
 import json
 import threading
 import itertools
@@ -9,11 +10,11 @@ from datetime import datetime
 from timeit import default_timer as timer
 
 import feedparser
-from flask import Flask, render_template, request, g
+from flask import Flask, render_template, request, g, jsonify
+
 from flask_mobility import Mobility
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators
 from markupsafe import Markup
-
 
 sys.path.insert(0, "/srv/http/CovidReport2")
 
@@ -40,8 +41,15 @@ RSS_TIMEOUT = 30
 #Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
 
-ALL_URLS = {}
+WEATHER_API_KEY = "YOUR_WEATHER_API_KEY"  # Replace with your actual API key
+WEATHER_CACHE_TIMEOUT = 3600 * 12  # 12 hours in seconds
+FAKE_API = True  # Fake Weather API calls
 
+# Add default coordinates for weather (e.g., San Francisco)
+DEFAULT_WEATHER_LAT = "37.7749"
+DEFAULT_WEATHER_LON = "-122.4194"
+
+ALL_URLS = {}
 config_settings = {}
 
 if MODE == Mode.LINUX_REPORT:
@@ -77,7 +85,6 @@ WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - For
                      'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>')
 
 
-
 feedparser.USER_AGENT = USER_AGENT
 
 def load_url_worker(url):
@@ -106,6 +113,9 @@ def load_url_worker(url):
 
         new_entries = prefilter_news(url, res)
         new_entries = filter_similar_titles(url, new_entries)
+
+        if len(new_entries) == 0:
+            print (f"No entries found for {url}.")
         #Trim the entries to the limit before compare so it doesn't find 500 new entries.
         new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
 
@@ -318,11 +328,13 @@ def index():
     if not single_column:
         above_html = above_html.replace("<hr/>", "")
 
+#    weather_html = get_weather_html()
+
     page = render_template('page.html', columns=result, text_color=text_color,
                            logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE,
                            description=WEB_DESCRIPTION, favicon=FAVICON,
                            welcome_html=Markup(WELCOME_HTML), a_text_decoration=text_decoration,
-                           text_font_style=text_font_style, above_html=Markup(above_html))
+                           text_font_style=text_font_style, above_html=Markup(above_html)) #, weather_html = Markup(weather_html))
 
     # Only cache standard order
     if page_order_s == STANDARD_ORDER_STR:
@@ -451,3 +463,127 @@ def config():
         resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_YEARS)
 
         return resp
+
+@g_app.route('/api/weather')
+def get_weather():
+    lat = request.args.get('lat')
+    lon = request.args.get('lon')
+    
+    if not lat or not lon:
+        return jsonify({"error": "Missing latitude or longitude"}), 400
+    
+    cache_key = f"weather:{lat}:{lon}"
+    
+    # Check if we have cached weather data
+    cached_weather = g_c.get(cache_key)
+    if cached_weather:
+        return jsonify(cached_weather)
+    
+    # If using fake API data 
+    if FAKE_API:
+        fake_data = {
+            "daily": [
+                {
+                    "dt": int(datetime.now().timestamp()) + i * 86400,
+                    "temp_min": 10 + i,
+                    "temp_max": 20 + i,
+                    "precipitation": 5 * i,
+                    "weather": "Clear" if i % 2 == 0 else "Cloudy",
+                    "weather_icon": "01d" if i % 2 == 0 else "02d"
+                } for i in range(5)
+            ]
+        }
+        g_c.put(cache_key, fake_data, timeout=WEATHER_CACHE_TIMEOUT)
+        return jsonify(fake_data)
+    
+    # If not in cache, fetch from weather API
+    try:
+        # Using OpenWeatherMap API for 5-day forecast
+        # You can replace this with your preferred weather API
+        url = f"https://api.openweathermap.org/data/2.5/onecall?lat={lat}&lon={lon}&exclude=current,minutely,hourly,alerts&units=metric&appid={WEATHER_API_KEY}"
+        response = requests.get(url, timeout=10)
+        weather_data = response.json()
+        
+        # Process and simplify the data
+        processed_data = {
+            "daily": []
+        }
+        
+        for day in weather_data.get("daily", [])[:5]:  # 5 days forecast
+            processed_data["daily"].append({
+                "dt": day.get("dt"),
+                "temp_min": day.get("temp", {}).get("min"),
+                "temp_max": day.get("temp", {}).get("max"),
+                "precipitation": day.get("pop", 0) * 100,  # Convert to percentage
+                "weather": day.get("weather", [{}])[0].get("main"),
+                "weather_icon": day.get("weather", [{}])[0].get("icon")
+            })
+        
+        # Cache the processed weather data
+        g_c.put(cache_key, processed_data, timeout=WEATHER_CACHE_TIMEOUT)
+        
+        return jsonify(processed_data)
+    
+    except Exception as e:
+        print(f"Error fetching weather data: {e}")
+        return jsonify({"error": "Failed to fetch weather data"}), 500
+
+# Add this function to check if we need to add weather HTML to the page
+def get_weather_html():
+    default_lat = DEFAULT_WEATHER_LAT
+    default_lon = DEFAULT_WEATHER_LON
+    cache_key = f"weather:{default_lat}:{default_lon}"
+
+        # If using fake API data 
+    if FAKE_API:
+        fake_data = {
+            "daily": [
+                {
+                    "dt": int(datetime.now().timestamp()) + i * 86400,
+                    "temp_min": 10 + i,
+                    "temp_max": 20 + i,
+                    "precipitation": 5 * i,
+                    "weather": "Clear" if i % 2 == 0 else "Cloudy",
+                    "weather_icon": "01d" if i % 2 == 0 else "02d"
+                } for i in range(5)
+            ]
+        }
+        g_c.put(cache_key, fake_data, timeout=WEATHER_CACHE_TIMEOUT)
+        weather_data = fake_data
+    else:
+        weather_data = g_c.get(cache_key)
+
+    if weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
+        forecast_html = '<div id="weather-forecast" class="weather-forecast">'
+        for day in weather_data["daily"]:
+            d = datetime.fromtimestamp(day["dt"])
+            day_name = "Today" if d.date() == datetime.now().date() else d.strftime("%a")
+            forecast_html += f'''
+                <div class="weather-day">
+                    <div class="weather-day-name">{day_name}</div>
+                    <img class="weather-icon" src="https://openweathermap.org/img/wn/{day["weather_icon"]}.png" alt="{day["weather"]}">
+                    <div class="weather-temp">
+                        <span class="temp-max">{round(day["temp_max"])}°</span> / 
+                        <span class="temp-min">{round(day["temp_min"])}°</span>
+                    </div>
+                    <div class="weather-precip">{round(day["precipitation"])}% precip</div>
+                </div>
+            '''
+        forecast_html += '</div>'
+        return f'''
+        <div id="weather-container" class="weather-container">
+            <h3>5-Day Weather</h3>
+            {forecast_html}
+        </div>
+        '''
+    else:
+        # Fallback: client-side JS will fetch real data via geolocation.
+        return """
+        <div id="weather-container" class="weather-container">
+            <h3>5-Day Weather</h3>
+            <div id="weather-loading">Loading weather data...</div>
+            <div id="weather-error" style="display: none; color: red;">Failed to load weather data</div>
+            <div id="weather-forecast" style="display: none;"></div>
+        </div>
+        """
+
