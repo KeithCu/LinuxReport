@@ -282,14 +282,14 @@ def process_candidate_images(candidate_images):
             continue
             
         # Check file extension for common image types
-        if re.search(r'\.(jpe?g|png|webp|gif|svg)([?#].*)?$', url.lower()):
-            # Good - it's a known image type
-            pass
-        elif not re.search(r'\.(bmp|tiff?|avif|ico)([?#].*)?$', url.lower()):
-            # Not a typical image extension, check if URL seems to be an API or script
-            if re.search(r'(\.php|\.aspx?|\.cgi|\?|\=)', url.lower()):
-                debug_print(f"Skipping potential non-image URL: {url}")
-                continue
+        # if re.search(r'\.(jpe?g|png|webp|gif|svg)([?#].*)?$', url.lower()):
+        #     # Good - it's a known image type
+        #     pass
+        # elif not re.search(r'\.(bmp|tiff?|avif|ico)([?#].*)?$', url.lower()):
+        #     # Not a typical image extension, check if URL seems to be an API or script
+        #     if re.search(r'(\.php|\.aspx?|\.cgi|\?|\=)', url.lower()):
+        #         debug_print(f"Skipping potential non-image URL: {url}")
+        #         continue
     
         # Categorize by priority
         if metadata.get('score', 0) > 500000:
