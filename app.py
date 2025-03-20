@@ -113,10 +113,10 @@ def load_url_worker(url):
             res = fetch_site_posts(rss_info.site_url)
         else:
             if "reddit" in url:
-                feedparser.USER_AGENT = USER_AGENT_REDDIT
+                user_agent = USER_AGENT_REDDIT
             else:
-                feedparser.USER_AGENT = USER_AGENT
-            res = feedparser.parse(url)
+                user_agent = USER_AGENT
+            res = feedparser.parse(url, agent=user_agent)
 
         new_entries = prefilter_news(url, res)
         new_entries = filter_similar_titles(url, new_entries)
