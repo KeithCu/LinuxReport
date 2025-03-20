@@ -317,6 +317,44 @@ def ask_ai_top_articles(articles):
 
     return response_text
 
+def extract_articles_from_html(html_file):
+    """Extract article URLs and titles from the HTML file."""
+    if not os.path.exists(html_file):
+        print(f"No existing HTML file found at {html_file}")
+        return []
+        
+    # Read the existing file
+    with open(html_file, "r", encoding="utf-8") as f:
+        current_html = f.read()
+    
+    articles = []
+    pattern = r'<a\s+[^>]*href="([^"]+)"[^>]*>\s*<font[^>]*>\s*<b[^>]*>([^<]+)</b>'
+    matches = re.finditer(pattern, current_html)
+    
+    for match in matches:
+        url, title = match.groups()
+        articles.append({"url": url, "title": title})
+    
+    return articles
+
+def refresh_images_only(mode):
+    """Refresh only the images in the HTML file without changing the articles."""
+    html_file = f"{mode}reportabove.html"
+    
+    # Extract the articles from the HTML
+    articles = extract_articles_from_html(html_file)
+    
+    if not articles:
+        print(f"No articles found in existing HTML file {html_file}")
+        return False
+    
+    print(f"Found {len(articles)} articles in {html_file}, refreshing images...")
+    
+    # Now generate a new HTML with fresh images
+    generate_headlines_html(articles, html_file)
+    print(f"Successfully refreshed images in {html_file}")
+    return True
+
 # --- Integration into the main pipeline ---
 def main(mode):
     global ALL_URLS
@@ -355,13 +393,17 @@ def main(mode):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate report with optional force update')
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
+    parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     args = parser.parse_args()
 
     cwd = os.getcwd()
     for mode in MODE_TO_PATH.keys():
         if mode.lower() in cwd.lower():
-            hours = MODE_TO_SCHEDULE[mode]
-            current_hour = datetime.datetime.now(TZ).hour
-            if args.force or current_hour in hours:
-                main(mode)
-                break
+            if args.forceimage:
+                refresh_images_only(mode)
+            else:
+                hours = MODE_TO_SCHEDULE[mode]
+                current_hour = datetime.datetime.now(TZ).hour
+                if args.force or current_hour in hours:
+                    main(mode)
+            break
