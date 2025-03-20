@@ -5,7 +5,7 @@ import json
 import urllib.request
 import requests
 from io import BytesIO
-from PIL import Image  # Add Pillow dependency
+from PIL import Image
 
 from bs4 import BeautifulSoup
 
@@ -275,7 +275,7 @@ def process_candidate_images(candidate_images):
     
     for url, metadata in candidate_images:
         # Immediately exclude disqualified images
-        if any(pattern in url.lower() for pattern in ['logo', 'icon', 'avatar', 'banner', 'emoji', 'advertisement']):
+        if any(pattern in url.lower() for pattern in ['logo', 'icon', 'avatar', 'banner', 'emoji', 'advertisement', 'michaellarabel']):
             debug_print(f"Skipping excluded pattern image: {url}")
             continue
             
@@ -400,11 +400,11 @@ def parse_images_from_soup(soup, base_url):
 
     # 1. Get meta tag images (high priority)
     meta_tags = [
-        ('meta[property="og:image"]', 'content', 4000000),
-        ('meta[name="twitter:image"]', 'content', 1500000),
-        ('meta[name="twitter:image:src"]', 'content', 1500000),
-        ('meta[property="og:image:secure_url"]', 'content', 4000000),
-        ('meta[itemprop="image"]', 'content', 1000000),
+        ('meta[property="og:image"]', 'content', 4000000),  # Open Graph protocol image tag used by Facebook and most social media platforms
+        ('meta[name="twitter:image"]', 'content', 1500000),  # Twitter Card tag for preview images on Twitter
+        ('meta[name="twitter:image:src"]', 'content', 1500000),  # Alternative Twitter Card image source tag
+        ('meta[property="og:image:secure_url"]', 'content', 4000000),  # Secure (https) version of the Open Graph image
+        ('meta[itemprop="image"]', 'content', 1000000),  # Schema.org structured data image property used by search engines
     ]
     
     for selector, attr, score in meta_tags:
