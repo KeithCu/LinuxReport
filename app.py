@@ -49,8 +49,9 @@ FAKE_API = True  # Fake Weather API calls
 DEFAULT_WEATHER_LAT = "37.7749"
 DEFAULT_WEATHER_LON = "-122.4194"
 
-#Reddit has blocked my user agent so follow their advice and make a new one.
-USER_AGENT_REDDIT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0"
+#Reddit has permanently blocked all my user agents even though I was making 
+# few requests per hour(!), so follow their advice and make a new one.
+USER_AGENT_REDDIT = "aireport.keithcu.com (and friends) /1.0 (by /u/keithcu)"
 
 ALL_URLS = {}
 config_settings = {}
