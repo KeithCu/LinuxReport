@@ -22,6 +22,8 @@ DEBUG_LOGGING = True
 
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'}
 
+EXCLUDED_PATTERNS = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'css', 'advertisement', 'michaellarabel']
+
 def debug_print(message):
     if DEBUG_LOGGING:
         print(f"[DEBUG] {message}")
@@ -275,7 +277,7 @@ def process_candidate_images(candidate_images):
     
     for url, metadata in candidate_images:
         # Immediately exclude disqualified images
-        if any(pattern in url.lower() for pattern in ['logo', 'icon', 'avatar', 'banner', 'emoji', 'advertisement', 'michaellarabel']):
+        if any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS):
             debug_print(f"Skipping excluded pattern image: {url}")
             continue
             
@@ -540,7 +542,7 @@ def parse_images_from_soup(soup, base_url):
                 
             # Check if image should be excluded based on classes or styling
             classes = img.get('class', [])
-            if isinstance(classes, list) and any(c.lower() in ['logo', 'icon', 'avatar'] for c in classes):
+            if isinstance(classes, list) and any(c.lower() in EXCLUDED_PATTERNS for c in classes):
                 continue
                 
             style = img.get('style', '')
@@ -773,8 +775,7 @@ def parse_images_from_selenium(driver):
                 if file_size > 0:
                     metadata['filesize'] = file_size
 
-            exclude_patterns = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'advertisement']
-            if not any(pattern in img_url.lower() for pattern in exclude_patterns):
+            if not any(pattern in img_url.lower() for pattern in EXCLUDED_PATTERNS):
                 candidate_images.append((img_url, metadata))
 
         except Exception as e:
