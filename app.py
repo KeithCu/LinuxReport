@@ -126,7 +126,7 @@ def load_url_worker(url):
         if "fakefeed" in url:
             res = fetch_site_posts(rss_info.site_url)
         else:
-            if "reddit" in url:
+            if True or "reddit" in url:
                 user_agent = USER_AGENT_REDDIT
                 tor_proxy_handler = get_tor_proxy_handler()
                 # Pass the opener as a handler to feedparser
