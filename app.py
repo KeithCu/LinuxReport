@@ -10,6 +10,7 @@ from datetime import datetime
 from timeit import default_timer as timer
 
 import feedparser
+import urllib.request
 from flask import Flask, render_template, request, g, jsonify
 
 from flask_mobility import Mobility
@@ -49,9 +50,15 @@ FAKE_API = True  # Fake Weather API calls
 DEFAULT_WEATHER_LAT = "37.7749"
 DEFAULT_WEATHER_LON = "-122.4194"
 
-#Reddit has permanently blocked all my user agents even though I was making 
-# few requests per hour(!), so follow their advice and make a new one.
-USER_AGENT_REDDIT = "aireport.keithcu.com (and friends) /1.0 (by /u/keithcu)"
+#Reddit has permanently blocked my IP address even though I was only make a few requests per hour
+#far below their rate limits. 
+# So use a user agent that looks like a Firefox browser and route the requests through Tor.
+USER_AGENT_REDDIT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0"
+
+
+proxies = {
+    'https': 'socks5h://127.0.0.1:9050'
+}
 
 ALL_URLS = {}
 config_settings = {}
@@ -90,6 +97,16 @@ WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - For
 
 
 
+def get_tor_opener():
+    # Create a SOCKS proxy handler for Tor (localhost:9050)
+    proxy_support = urllib.request.ProxyHandler({
+        "https": "socks5h://127.0.0.1:9050"
+    })
+    # Build an opener with the proxy and custom user agent
+    opener = urllib.request.build_opener(proxy_support)
+    opener.addheaders = [("User-Agent", USER_AGENT_REDDIT)]
+    return opener
+
 def load_url_worker(url):
     """Background worker to fetch a URL. Handles """
     rss_info = ALL_URLS[url]
@@ -114,9 +131,12 @@ def load_url_worker(url):
         else:
             if "reddit" in url:
                 user_agent = USER_AGENT_REDDIT
+                tor_opener = get_tor_opener()
+                # Pass the opener as a handler to feedparser
+                res = feedparser.parse(url, handlers=[tor_opener])
             else:
                 user_agent = USER_AGENT
-            res = feedparser.parse(url, agent=user_agent)
+                res = feedparser.parse(url, agent=user_agent)
 
         new_entries = prefilter_news(url, res)
         new_entries = filter_similar_titles(url, new_entries)
