@@ -130,7 +130,7 @@ def load_url_worker(url):
                 user_agent = USER_AGENT_REDDIT
                 tor_proxy_handler = get_tor_proxy_handler()
                 # Pass the opener as a handler to feedparser
-                res = feedparser.parse(url, handlers=[tor_proxy_handler])
+                res = feedparser.parse(url, handlers=[tor_proxy_handler], agent=user_agent)
             else:
                 user_agent = USER_AGENT
                 res = feedparser.parse(url, agent=user_agent)
