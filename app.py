@@ -97,15 +97,12 @@ WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - For
 
 
 
-def get_tor_opener():
-    # Create a SOCKS proxy handler for Tor (localhost:9050)
-    proxy_support = urllib.request.ProxyHandler({
+def get_tor_proxy_handler():
+    # Create a ProxyHandler for Tor
+    proxy_handler = urllib.request.ProxyHandler({
         "https": "socks5h://127.0.0.1:9050"
     })
-    # Build an opener with the proxy and custom user agent
-    opener = urllib.request.build_opener(proxy_support)
-    opener.addheaders = [("User-Agent", USER_AGENT_REDDIT)]
-    return opener
+    return proxy_handler
 
 def load_url_worker(url):
     """Background worker to fetch a URL. Handles """
@@ -131,9 +128,9 @@ def load_url_worker(url):
         else:
             if "reddit" in url:
                 user_agent = USER_AGENT_REDDIT
-                tor_opener = get_tor_opener()
+                tor_proxy_handler = get_tor_proxy_handler()
                 # Pass the opener as a handler to feedparser
-                res = feedparser.parse(url, handlers=[tor_opener])
+                res = feedparser.parse(url, handlers=[tor_proxy_handler])
             else:
                 user_agent = USER_AGENT
                 res = feedparser.parse(url, agent=user_agent)
