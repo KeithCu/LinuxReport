@@ -8,6 +8,8 @@ import argparse
 import urllib.request
 import time
 import feedparser
+import socket
+import socks
 
 # Default Reddit user agent that appears like a normal Firefox browser
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0"
@@ -29,15 +31,15 @@ def fetch_feed(url, use_tor=True, verbose=False):
     
     try:
         if use_tor:
-            tor_proxy_handler = get_tor_proxy_handler()
-            if verbose:
-                print("Using Tor proxy handler")
-            result = feedparser.parse(url, handlers=[tor_proxy_handler], agent=USER_AGENT)
-        else:
-            if verbose:
-                print("Using direct connection")
-            result = feedparser.parse(url, agent=USER_AGENT)
-        
+            original_socket = socket.socket
+            socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
+            socket.socket = socks.socksocket
+            try:
+                if verbose:
+                    print("Using Tor via SOCKS proxy")
+                result = feedparser.parse(url, agent=USER_AGENT)
+            finally:
+                socket.socket = original_socket        
         elapsed = time.time() - start_time
         
         if verbose:
