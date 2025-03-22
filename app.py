@@ -175,11 +175,13 @@ def load_url_worker(url):
             if "reddit" in url:
                 if entry.get('underlying_url'):
                     entry['link'] = entry['underlying_url']
+                    del entry['underlying_url']
                 else:
                     import re
                     m = re.search(r'href=["\'](.*?)["\']', entry.get('html_content', ''))
                     if m:
                         entry['link'] = m.group(1)
+                        del entry['html_content'] 
 
         # Added detailed logging when no entries are found
         if len(new_entries) == 0:
