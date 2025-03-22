@@ -96,9 +96,8 @@ ABOVE_HTML_FILE = config_settings.ABOVE_HTML_FILE
 WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
                      'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
                      'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>'
-                     '<br/>The Reddit Woke mafia had blocked my IP address for political reasons, (I was making max a few requests per hour) '
-                     'so I am using Tor to fetch Reddit feeds. Checkmate, bitches!')
-
+                     '<br/>The Reddit Woke mafia had blocked my IP address for political reasons, (I was making max a few requests per hour!!) '
+                     'so I have picked a random USER_AGENT and using <a href = "https://www.torproject.org/">TOR</a> to fetch Reddit feeds until they expire their stupid IP block. Checkmate, bitches!')
 
 
 def get_tor_proxy_handler():
