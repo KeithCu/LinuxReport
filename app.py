@@ -317,7 +317,7 @@ def load_url_worker(url):
                     # Filter out reddit links:
                     links = [lnk for lnk in links if 'reddit' not in lnk]
                     if links:
-                        # For example, pick the first match:
+                        #Pick the first match for now
                         entry['link'] = links[0]
                         print (entry['link'])
 

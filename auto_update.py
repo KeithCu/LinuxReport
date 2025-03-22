@@ -56,6 +56,7 @@ ALL_URLS = {}
 
 # Define the Jinja2 template for a single headline
 headline_template = Template("""
+<div class="linkclass">
 <center>
 <code>
 <a href="{{ url }}" target="_blank">
@@ -69,6 +70,7 @@ headline_template = Template("""
 </a>
 {% endif %}
 </center>
+</div>
 <br/>
 """)
 
