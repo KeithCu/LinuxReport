@@ -29,14 +29,14 @@ def fetch_feed(url, use_tor=True, verbose=False):
         print(f"Fetching feed: {url}")
         print(f"Using Tor: {use_tor}")
     
-    # Add a small delay to avoid rate limiting
     time.sleep(2)  # Wait 2 seconds before the request
     
     try:
-        # Define headers to match curl
         headers = {
-            "User-Agent": USER_AGENT,
-            "Accept": "*/*"
+            "User-Agent": USER_AGENT,  # Matches curl, fix typo if needed
+            "Accept": "*/*",
+            "Host": "www.reddit.com",
+            "Connection": "keep-alive"  # Mimic curl's default
         }
         
         if use_tor:
@@ -46,9 +46,16 @@ def fetch_feed(url, use_tor=True, verbose=False):
             try:
                 if verbose:
                     print("Using Tor via SOCKS proxy")
+                # Pass headers and disable HTTP/2 explicitly
+                opener = urllib.request.build_opener()
+                opener.addheaders = [(k, v) for k, v in headers.items()]
+                urllib.request.install_opener(opener)
                 result = feedparser.parse(url, request_headers=headers)
+                if hasattr(result, 'status') and result.status != 200 and verbose:
+                    print(f"Raw response: {result.get('content', 'No content available')}")
             finally:
                 socket.socket = original_socket
+                urllib.request.install_opener(None)  # Reset opener
         else:
             if verbose:
                 print("Using direct connection")
@@ -67,7 +74,7 @@ def fetch_feed(url, use_tor=True, verbose=False):
     except Exception as e:
         print(f"Error fetching feed: {e}")
         return None
-    
+            
 def main():
     parser = argparse.ArgumentParser(description='Test RSS feed fetching through Tor.')
     parser.add_argument('--url', default='https://www.reddit.com/r/linux/.rss',
