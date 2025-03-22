@@ -3,6 +3,7 @@ import os
 import time
 import requests
 import json
+import re
 import threading
 import itertools
 import concurrent.futures
@@ -55,7 +56,8 @@ DEFAULT_WEATHER_LON = "-122.4194"
 #Reddit has permanently blocked my IP address even though I was only make a few requests per hour
 #far below their rate limits. 
 # So use a user agent that looks like a Firefox browser and route the requests through Tor.
-USER_AGENT_REDDIT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0"
+# Note: Using the exact spelling from working curl command (Geko not Gecko)
+USER_AGENT_REDDIT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Geko/20100101 Firefox/113.0"
 
 
 proxies = {
@@ -116,6 +118,108 @@ HEADERS = {
     "Host": "www.reddit.com",
     "Connection": "keep-alive"
 }
+
+def fetch_via_pysocks(url):
+    """Fetch Reddit RSS feeds using PySocks for TOR routing."""
+    print(f"Using PySocks TOR method for: {url}")
+    original_socket = socket.socket
+    result = None
+    
+    try:
+        # Use PROXY_TYPE_SOCKS5_HOSTNAME to resolve hostnames through the proxy
+        socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5_HOSTNAME, "127.0.0.1", 9050)
+        socket.socket = socks.socksocket
+        
+        # Build opener with our headers
+        opener = urllib.request.build_opener()
+        opener.addheaders = [(k, v) for k, v in HEADERS.items()]
+        urllib.request.install_opener(opener)
+        
+        print(f"Making request through TOR with headers: {HEADERS}")
+        start_time = timer()
+        
+        result = feedparser.parse(url, request_headers=HEADERS)
+        elapsed = timer() - start_time
+        
+        # Log response details
+        status = result.get('status', 'unknown') if hasattr(result, 'get') else 'unknown'
+        entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
+        
+        print(f"TOR PySocks request completed in {elapsed:.2f}s - Status: {status}, Entries: {entries_count}")
+        
+        if entries_count == 0:
+            raise Exception("No entries found with PySocks method")
+            
+    except Exception as e:
+        print(f"PySocks TOR method failed: {str(e)}")
+        result = None
+    finally:
+        # Always restore original socket
+        socket.socket = original_socket
+        urllib.request.install_opener(None)  # Reset opener
+        print("TOR socket and opener reset to defaults")
+        
+    return result
+
+def fetch_via_curl(url):
+    """Fetch Reddit RSS feeds using curl subprocess through TOR."""
+    print(f"Using curl TOR method for: {url}")
+    result = None
+    
+    try:
+        import subprocess
+        
+        cmd = [
+            "curl", "-s",
+            "--socks5-hostname", "127.0.0.1:9050",
+            "-A", USER_AGENT_REDDIT,
+            "-H", "Accept: */*",
+            url
+        ]
+        
+        print(f"Executing curl command: {' '.join(cmd)}")
+        start_time = timer()
+        
+        process_result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        elapsed = timer() - start_time
+        
+        if process_result.returncode == 0 and process_result.stdout:
+            print(f"Curl succeeded in {elapsed:.2f}s, content length: {len(process_result.stdout)}")
+            # Parse the XML content returned by curl
+            import io
+            result = feedparser.parse(io.StringIO(process_result.stdout))
+            entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
+            print(f"Parsed {entries_count} entries from curl result")
+            
+            if entries_count == 0:
+                print("No entries found in curl result")
+                result = None
+        else:
+            print(f"Curl failed with error: {process_result.stderr}")
+            result = None
+            
+    except Exception as e:
+        print(f"Curl TOR method failed: {str(e)}")
+        result = None
+        
+    return result
+
+def fetch_via_tor(url):
+    """Fetch Reddit RSS using TOR with multiple fallback methods."""
+    # Try primary method first
+    result = fetch_via_pysocks(url)
+    
+    # If primary method fails, try fallback
+    if result is None or len(result.get('entries', [])) == 0:
+        print("Primary TOR method failed, trying curl fallback...")
+        result = fetch_via_curl(url)
+    
+    # If all methods fail, return empty result
+    if result is None:
+        print("All TOR methods failed, returning empty result")
+        result = {'entries': [], 'status': 'failed', 'bozo_exception': 'All TOR methods failed'}
+        
+    return result
     
 def load_url_worker(url):
     """Background worker to fetch a URL. Handles """
@@ -140,22 +244,13 @@ def load_url_worker(url):
             res = fetch_site_posts(rss_info.site_url)
         else:
             if USE_TOR and "reddit" in url:
-                original_socket = socket.socket
-                socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
-                socket.socket = socks.socksocket
-                try:
-                    # Pass headers and disable HTTP/2 explicitly
-                    opener = urllib.request.build_opener()
-                    opener.addheaders = [(k, v) for k, v in HEADERS.items()]
-                    urllib.request.install_opener(opener)
-                    res = feedparser.parse(url, request_headers=HEADERS)
-                finally:
-                    socket.socket = original_socket
-                    urllib.request.install_opener(None)  # Reset opener
+                print(f"Using TOR proxy for Reddit URL: {url}")
+                res = fetch_via_tor(url)
             else:
                 user_agent = USER_AGENT
                 if "reddit" in url:
                     user_agent = USER_AGENT_REDDIT
+                    print(f"Using Reddit user agent (without TOR) for URL: {url}")
                 res = feedparser.parse(url, agent=user_agent)
 
         new_entries = prefilter_news(url, res)
@@ -164,6 +259,12 @@ def load_url_worker(url):
         #Trim the entries to the limit before compare so it doesn't find 500 new entries.
         new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
         
+        # Added detailed logging when no entries are found
+        if len(new_entries) == 0:
+            http_status = res.get("status", "unknown") if hasattr(res, "get") else "unknown"
+            bozo_exception = res.get("bozo_exception", "None") if hasattr(res, "get") else "None"
+            print(f"No entries found for {url}. HTTP status: {http_status}. Bozo exception: {bozo_exception}")
+
         for entry in new_entries:
             entry['underlying_url'] = entry.get('origin_link', entry.get('link', ''))
             if 'content' in entry and entry['content']:
@@ -175,22 +276,12 @@ def load_url_worker(url):
             if "reddit" in url:
                 if entry.get('underlying_url'):
                     entry['link'] = entry['underlying_url']
-                    del entry['underlying_url']
+                    del entry['origin_link']
                 else:
-                    import re
                     m = re.search(r'href=["\'](.*?)["\']', entry.get('html_content', ''))
                     if m:
                         entry['link'] = m.group(1)
-                        del entry['html_content'] 
-
-        # Added detailed logging when no entries are found
-        if len(new_entries) == 0:
-            http_status = res.get("status", "unknown") if hasattr(res, "get") else "unknown"
-            bozo_exception = res.get("bozo_exception", "None") if hasattr(res, "get") else "None"
-            print(f"No entries found for {url}. HTTP status: {http_status}. Bozo exception: {bozo_exception}")
-
-        #Trim the entries to the limit before compare so it doesn't find 500 new entries.
-        new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
+                        del entry['html_content']
 
         # Merge with cached entries (if any) to retain history.
         old_feed = g_c.get(url)
