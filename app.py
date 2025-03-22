@@ -314,12 +314,12 @@ def load_url_worker(url):
             if "reddit" in url:
                 if entry.get('underlying_url'):
                     entry['link'] = entry['underlying_url']
-                    del entry['origin_link']
+                    #del entry['origin_link']
                 else:
                     m = re.search(r'href=["\'](.*?)["\']', entry.get('html_content', ''))
                     if m:
                         entry['link'] = m.group(1)
-                        del entry['html_content']
+                        #del entry['html_content']
 
         # Merge with cached entries (if any) to retain history.
         old_feed = g_c.get(url)
