@@ -702,7 +702,6 @@ def custom_fetch_largest_image(url, underlying_link=None, html_content=None):
         url = underlying_link
     # Otherwise, if html_content is provided, parse it to find the first link
     elif html_content:
-        from bs4 import BeautifulSoup
         soup = BeautifulSoup(html_content, "html.parser")
         first_link = soup.find("a")
         if first_link and first_link.get("href"):
