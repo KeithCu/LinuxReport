@@ -30,6 +30,12 @@ def fetch_feed(url, use_tor=True, verbose=False):
         print(f"Using Tor: {use_tor}")
     
     try:
+        # Define headers to match curl
+        headers = {
+            "User-Agent": USER_AGENT,
+            "Accept": "*/*"
+        }
+        
         if use_tor:
             original_socket = socket.socket
             socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
@@ -37,19 +43,27 @@ def fetch_feed(url, use_tor=True, verbose=False):
             try:
                 if verbose:
                     print("Using Tor via SOCKS proxy")
-                result = feedparser.parse(url, agent=USER_AGENT)
+                # Pass headers explicitly to feedparser
+                result = feedparser.parse(url, agent=USER_AGENT, request_headers=headers)
             finally:
-                socket.socket = original_socket        
+                socket.socket = original_socket
+        else:
+            if verbose:
+                print("Using direct connection")
+            result = feedparser.parse(url, agent=USER_AGENT, request_headers=headers)
+        
         elapsed = time.time() - start_time
         
         if verbose:
             print(f"Request completed in {elapsed:.2f} seconds")
+            if hasattr(result, 'status'):
+                print(f"HTTP Status: {result.status}")
         
         return result
     except Exception as e:
         print(f"Error fetching feed: {e}")
         return None
-
+    
 def main():
     parser = argparse.ArgumentParser(description='Test RSS feed fetching through Tor.')
     parser.add_argument('--url', default='https://www.reddit.com/r/linux/.rss',
