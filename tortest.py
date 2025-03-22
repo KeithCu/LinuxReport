@@ -29,6 +29,9 @@ def fetch_feed(url, use_tor=True, verbose=False):
         print(f"Fetching feed: {url}")
         print(f"Using Tor: {use_tor}")
     
+    # Add a small delay to avoid rate limiting
+    time.sleep(2)  # Wait 2 seconds before the request
+    
     try:
         # Define headers to match curl
         headers = {
@@ -43,14 +46,13 @@ def fetch_feed(url, use_tor=True, verbose=False):
             try:
                 if verbose:
                     print("Using Tor via SOCKS proxy")
-                # Pass headers explicitly to feedparser
-                result = feedparser.parse(url, agent=USER_AGENT, request_headers=headers)
+                result = feedparser.parse(url, request_headers=headers)
             finally:
                 socket.socket = original_socket
         else:
             if verbose:
                 print("Using direct connection")
-            result = feedparser.parse(url, agent=USER_AGENT, request_headers=headers)
+            result = feedparser.parse(url, request_headers=headers)
         
         elapsed = time.time() - start_time
         
@@ -58,6 +60,8 @@ def fetch_feed(url, use_tor=True, verbose=False):
             print(f"Request completed in {elapsed:.2f} seconds")
             if hasattr(result, 'status'):
                 print(f"HTTP Status: {result.status}")
+            if hasattr(result, 'headers'):
+                print(f"Response Headers: {dict(result.headers)}")
         
         return result
     except Exception as e:
