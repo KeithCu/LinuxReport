@@ -10,6 +10,8 @@ from datetime import datetime
 from timeit import default_timer as timer
 
 import feedparser
+import socket
+import socks
 import urllib.request
 from flask import Flask, render_template, request, g, jsonify
 
@@ -98,12 +100,20 @@ WELCOME_HTML =     ('<font size="4">(Displays instantly, refreshes hourly) - For
 
 
 def get_tor_proxy_handler():
-    # Create a ProxyHandler for Tor
+    """Create a ProxyHandler for Tor"""
     proxy_handler = urllib.request.ProxyHandler({
         "https": "socks5h://127.0.0.1:9050"
     })
     return proxy_handler
 
+
+HEADERS = {
+    "User-Agent": USER_AGENT,
+    "Accept": "*/*",
+    "Host": "www.reddit.com",
+    "Connection": "keep-alive"
+}
+    
 def load_url_worker(url):
     """Background worker to fetch a URL. Handles """
     rss_info = ALL_URLS[url]
@@ -127,10 +137,18 @@ def load_url_worker(url):
             res = fetch_site_posts(rss_info.site_url)
         else:
             if "reddit" in url:
-                user_agent = USER_AGENT_REDDIT
-                tor_proxy_handler = get_tor_proxy_handler()
-                # Pass the opener as a handler to feedparser
-                res = feedparser.parse(url, handlers=[tor_proxy_handler], agent=user_agent)
+                original_socket = socket.socket
+                socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
+                socket.socket = socks.socksocket
+                try:
+                    # Pass headers and disable HTTP/2 explicitly
+                    opener = urllib.request.build_opener()
+                    opener.addheaders = [(k, v) for k, v in HEADERS.items()]
+                    urllib.request.install_opener(opener)
+                    res = feedparser.parse(url, request_headers=HEADERS)
+                finally:
+                    socket.socket = original_socket
+                    urllib.request.install_opener(None)  # Reset opener
             else:
                 user_agent = USER_AGENT
                 res = feedparser.parse(url, agent=user_agent)
