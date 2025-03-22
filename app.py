@@ -213,7 +213,6 @@ def fetch_via_curl(url):
                         print(f"Content appears to be XML/RSS: {'<?xml' in content_str[:100]}")
                         
                         # Last attempt: try using StringIO
-                        import io
                         result = feedparser.parse(io.BytesIO(content_bytes))
                         entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
                         print(f"BytesIO parsing attempt: {entries_count} entries")
@@ -244,9 +243,10 @@ def fetch_via_curl(url):
 
 def fetch_via_tor(url):
     """Fetch Reddit RSS using TOR with multiple fallback methods."""
-    # Try primary method first
-    result = fetch_via_pysocks(url)
+    # This fails with TOR proxy, so use curl fallback directly for now
+    #result = fetch_via_pysocks(url)
     
+    result = None
     # If primary method fails, try fallback
     if result is None or len(result.get('entries', [])) == 0:
         print("Primary TOR method failed, trying curl fallback...")
