@@ -246,7 +246,7 @@ def fetch_via_tor(url):
     result = None
     # If primary method fails, try fallback
     if result is None or len(result.get('entries', [])) == 0:
-        print("Primary TOR method failed, trying curl fallback...")
+        #print("Primary TOR method failed, trying curl fallback...")
         result = fetch_via_curl(url)
     
     # If all methods fail, return empty result
@@ -512,10 +512,6 @@ def index():
         back_color = '#f6f5f4'
         text_color = 'black'
 
-    text_decoration = ""
-    if no_underlines:
-        text_decoration = "text-decoration:none;"
-
     text_font_style = ""
     if sans_serif:
         text_font_style = "font-family: sans-serif;"
@@ -535,7 +531,7 @@ def index():
     page = render_template('page.html', columns=result, text_color=text_color,
                            logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE,
                            description=WEB_DESCRIPTION, favicon=FAVICON,
-                           welcome_html=Markup(WELCOME_HTML), a_text_decoration=text_decoration,
+                           welcome_html=Markup(WELCOME_HTML), no_underlines = no_underlines,
                            text_font_style=text_font_style, above_html=Markup(above_html)) #, weather_html = Markup(weather_html))
 
     # Only cache standard order

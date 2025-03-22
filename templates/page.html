@@ -16,9 +16,6 @@
         color:{{ text_color }};
       }
 
-      a {
-          {{ a_text_decoration }}
-      }
       code {
           {{ text_font_style }}
       }
@@ -100,7 +97,77 @@
         cursor: not-allowed;
       }
 
-    </style>
+    .weather-container {
+      max-width: 100%;
+      margin: 10px auto;
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+  
+    .weather-container h3 {
+      margin-top: 0;
+      margin-bottom: 10px;
+    }
+  
+    .weather-forecast {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+  
+    .weather-day {
+      flex: 1;
+      min-width: 80px;
+      margin: 5px;
+      padding: 8px;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 5px;
+    }
+  
+    .weather-day-name {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+  
+    .weather-icon {
+      width: 40px;
+      height: 40px;
+    }
+  
+    .weather-temp {
+      margin: 5px 0;
+    }
+  
+    .weather-precip {
+      font-size: 0.9em;
+      color: #4682B4;
+    }
+  
+    /* Dark mode adjustments */
+    body[style*="background-color:#1e1e1e"] .weather-container {
+      background-color: rgba(0, 0, 0, 0.2);
+    }
+  
+    body[style*="background-color:#1e1e1e"] .weather-day {
+      background-color: rgba(0, 0, 0, 0.3);
+    }
+  
+    body[style*="background-color:#1e1e1e"] .weather-precip {
+      color: #87CEFA;
+    }
+
+    {% if no_underlines %}
+    .linkclass a {
+        text-decoration: none;
+    }
+    {% endif %}
+
+    
+  </style>
+  
     <script>
       function redirect() {
         window.location = "/config"
@@ -110,18 +177,25 @@
     </script>
   </head>
   <body style="background-color:{{ back_color }}">
+
+<!-- <center>
+  <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
+    <center>{{ weather_html }}</center>
+  </div>
+  </center> -->
+  
     <center>{{ above_html }}</center>
     <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:175px;"></center>
     <center><small>{{ welcome_html }}</small></center>
     <center>
       <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
         <div>
-          <a href="https://linuxreport.net" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Linux</a>
-          <a href="https://covidreport.org" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Covid</a>
-          <a href="https://aireport.keithcu.com" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">AI</a>
-          <a href="https://trumpreport.info" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Truth</a>
-          <a href="https://spaceelevatorwiki.com" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Space-Soon</a>
-          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; text-decoration: none; color: inherit;">Me</a>
+          <a href="https://linuxreport.net" target="_blank" style="margin: 2px; color: inherit;">Linux</a>
+          <a href="https://covidreport.org" target="_blank" style="margin: 2px; color: inherit;">Covid</a>
+          <a href="https://aireport.keithcu.com" target="_blank" style="margin: 2px; color: inherit;">AI</a>
+          <a href="https://trumpreport.info" target="_blank" style="margin: 2px; color: inherit;">Truth</a>
+          <a href="https://spaceelevatorwiki.com" target="_blank" style="margin: 2px; color: inherit;">Space-Soon</a>
+          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; color: inherit;">Me</a>
         </div>
         <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
       </div>
@@ -197,3 +271,107 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 </script>
+
+
+  <!-- <script>
+  document.addEventListener("DOMContentLoaded", function() {
+    // Weather functionality
+    function loadWeather() {
+      const weatherContainer = document.getElementById('weather-container');
+      if (!weatherContainer) return;
+  
+      const weatherLoading = document.getElementById('weather-loading');
+      const weatherError = document.getElementById('weather-error');
+      const weatherForecast = document.getElementById('weather-forecast');
+  
+      // Try to get the user's location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            fetchWeatherData(lat, lon);
+          },
+          function(error) {
+            console.error("Geolocation error:", error);
+            weatherLoading.style.display = "none";
+            weatherError.style.display = "block";
+            weatherError.textContent = "Couldn't determine your location. Please allow location access.";
+          }
+        );
+      } else {
+        weatherLoading.style.display = "none";
+        weatherError.style.display = "block";
+        weatherError.textContent = "Geolocation is not supported by your browser.";
+      }
+    }
+  
+    function fetchWeatherData(lat, lon) {
+      fetch(`/api/weather?lat=${lat}&lon=${lon}`)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          renderWeatherData(data);
+        })
+        .catch(error => {
+          console.error("Error fetching weather:", error);
+          document.getElementById('weather-loading').style.display = "none";
+          document.getElementById('weather-error').style.display = "block";
+        });
+    }
+  
+    function renderWeatherData(data) {
+      const weatherForecast = document.getElementById('weather-forecast');
+      const weatherLoading = document.getElementById('weather-loading');
+      const weatherError = document.getElementById('weather-error');
+  
+      if (!data.daily || data.daily.length === 0) {
+        weatherLoading.style.display = "none";
+        weatherError.style.display = "block";
+        weatherError.textContent = "No weather data available.";
+        return;
+      }
+  
+      weatherForecast.innerHTML = '';
+      weatherForecast.className = 'weather-forecast';
+  
+      // Create a container for the days
+      const daysContainer = document.createElement('div');
+      daysContainer.className = 'weather-forecast';
+  
+      // Process each day's data
+      data.daily.forEach((day, index) => {
+        const dayElement = document.createElement('div');
+        dayElement.className = 'weather-day';
+  
+        // Get day name
+        const date = new Date(day.dt * 1000);
+        const dayName = index === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+  
+        // Create HTML for the day
+        dayElement.innerHTML = `
+          <div class="weather-day-name">${dayName}</div>
+          <img class="weather-icon" src="https://openweathermap.org/img/wn/${day.weather_icon}.png" alt="${day.weather}">
+          <div class="weather-temp">
+            <span class="temp-max">${Math.round(day.temp_max)}°</span> / 
+            <span class="temp-min">${Math.round(day.temp_min)}°</span>
+          </div>
+          <div class="weather-precip">${Math.round(day.precipitation)}% precip</div>
+        `;
+  
+        daysContainer.appendChild(dayElement);
+      });
+  
+      weatherForecast.appendChild(daysContainer);
+      weatherLoading.style.display = "none";
+      weatherForecast.style.display = "block";
+    }
+  
+    // Load weather data after page content is loaded
+    setTimeout(loadWeather, 100);
+  });
+  </script> -->
