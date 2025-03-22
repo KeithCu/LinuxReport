@@ -1,4 +1,5 @@
 ﻿import sys
+import io
 import os
 import time
 import requests
@@ -126,8 +127,8 @@ def fetch_via_pysocks(url):
     result = None
     
     try:
-        # Use PROXY_TYPE_SOCKS5_HOSTNAME to resolve hostnames through the proxy
-        socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5_HOSTNAME, "127.0.0.1", 9050)
+        # Use PROXY_TYPE_SOCKS5 instead of PROXY_TYPE_SOCKS5_HOSTNAME which isn't available in all versions
+        socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
         socket.socket = socks.socksocket
         
         # Build opener with our headers
@@ -184,15 +185,32 @@ def fetch_via_curl(url):
         elapsed = timer() - start_time
         
         if process_result.returncode == 0 and process_result.stdout:
-            print(f"Curl succeeded in {elapsed:.2f}s, content length: {len(process_result.stdout)}")
-            # Parse the XML content returned by curl
-            import io
-            result = feedparser.parse(io.StringIO(process_result.stdout))
-            entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
-            print(f"Parsed {entries_count} entries from curl result")
-            
-            if entries_count == 0:
-                print("No entries found in curl result")
+            content = process_result.stdout
+            content_length = len(content)
+            print(f"Curl succeeded in {elapsed:.2f}s, content length: {content_length}")
+                        
+            try:
+                # Make sure we're working with a proper string
+                if isinstance(content, bytes):
+                    content = content.decode('utf-8')
+                
+                # Feed the content to feedparser
+                result = feedparser.parse(io.StringIO(content))
+                entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
+                print(f"Parsed {entries_count} entries from curl result")
+                
+                if entries_count == 0:
+                    # Try direct parsing without StringIO
+                    result = feedparser.parse(content)
+                    entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
+                    print(f"Second attempt parsing: {entries_count} entries")
+                    
+                    if entries_count == 0 and content_length > 1000:
+                        # We have content but parsing failed - save for debugging
+                        print(f"Failed to parse content. First 500 chars: {content[:500]}")
+                        result = None
+            except Exception as parse_error:
+                print(f"Error parsing curl content: {str(parse_error)}")
                 result = None
         else:
             print(f"Curl failed with error: {process_result.stderr}")
