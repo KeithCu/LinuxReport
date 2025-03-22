@@ -170,6 +170,7 @@ def fetch_via_curl(url):
     try:
         import subprocess
         
+        # Use binary mode instead of text mode to avoid encoding issues
         cmd = [
             "curl", "-s",
             "--socks5-hostname", "127.0.0.1:9050",
@@ -181,39 +182,58 @@ def fetch_via_curl(url):
         print(f"Executing curl command: {' '.join(cmd)}")
         start_time = timer()
         
-        process_result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        # Use text=False to get bytes directly
+        process_result = subprocess.run(cmd, capture_output=True, text=False, timeout=30)
         elapsed = timer() - start_time
         
         if process_result.returncode == 0 and process_result.stdout:
-            content = process_result.stdout
-            content_length = len(content)
+            content_bytes = process_result.stdout
+            content_length = len(content_bytes)
             print(f"Curl succeeded in {elapsed:.2f}s, content length: {content_length}")
                         
             try:
-                # Make sure we're working with a proper string
-                if isinstance(content, bytes):
-                    content = content.decode('utf-8')
-                
-                # Feed the content to feedparser
-                result = feedparser.parse(io.StringIO(content))
+                # First try parsing it as bytes directly
+                result = feedparser.parse(content_bytes)
                 entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
-                print(f"Parsed {entries_count} entries from curl result")
+                print(f"Parsed {entries_count} entries from curl result (bytes mode)")
                 
+                # If no entries, try string conversion
                 if entries_count == 0:
-                    # Try direct parsing without StringIO
-                    result = feedparser.parse(content)
-                    entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
-                    print(f"Second attempt parsing: {entries_count} entries")
+                    # Convert bytes to string with explicit UTF-8 decoding
+                    content_str = content_bytes.decode('utf-8', errors='replace')
                     
+                    # Try parsing as string 
+                    result = feedparser.parse(content_str)
+                    entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
+                    print(f"Parsed {entries_count} entries from curl result (string mode)")
+                    
+                    # If still no entries, save the first part of the content for debugging
                     if entries_count == 0 and content_length > 1000:
-                        # We have content but parsing failed - save for debugging
-                        print(f"Failed to parse content. First 500 chars: {content[:500]}")
-                        result = None
+                        print(f"Failed to parse content. First 200 chars: {content_str[:200]}")
+                        print(f"Content appears to be XML/RSS: {'<?xml' in content_str[:100]}")
+                        
+                        # Last attempt: try using StringIO
+                        import io
+                        result = feedparser.parse(io.BytesIO(content_bytes))
+                        entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
+                        print(f"BytesIO parsing attempt: {entries_count} entries")
+                        
+                        if entries_count == 0:
+                            result = None
             except Exception as parse_error:
                 print(f"Error parsing curl content: {str(parse_error)}")
+                
+                # Print exception type and traceback for better debugging
+                import traceback
+                print(f"Exception type: {type(parse_error).__name__}")
+                traceback.print_exc()
+                
                 result = None
         else:
-            print(f"Curl failed with error: {process_result.stderr}")
+            stderr = process_result.stderr
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode('utf-8', errors='replace')
+            print(f"Curl failed with error: {stderr}")
             result = None
             
     except Exception as e:
