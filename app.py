@@ -65,6 +65,8 @@ proxies = {
 ALL_URLS = {}
 config_settings = {}
 
+USE_TOR = True
+
 if MODE == Mode.LINUX_REPORT:
     import linux_report_settings
     config_settings = linux_report_settings.CONFIG
@@ -137,7 +139,7 @@ def load_url_worker(url):
         if "fakefeed" in url:
             res = fetch_site_posts(rss_info.site_url)
         else:
-            if "reddit" in url:
+            if USE_TOR and "reddit" in url:
                 original_socket = socket.socket
                 socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
                 socket.socket = socks.socksocket
@@ -152,13 +154,39 @@ def load_url_worker(url):
                     urllib.request.install_opener(None)  # Reset opener
             else:
                 user_agent = USER_AGENT
+                if "reddit" in url:
+                    user_agent = USER_AGENT_REDDIT
                 res = feedparser.parse(url, agent=user_agent)
 
         new_entries = prefilter_news(url, res)
         new_entries = filter_similar_titles(url, new_entries)
 
+        #Trim the entries to the limit before compare so it doesn't find 500 new entries.
+        new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
+        
+        for entry in new_entries:
+            entry['underlying_url'] = entry.get('origin_link', entry.get('link', ''))
+            if 'content' in entry and entry['content']:
+                entry['html_content'] = entry['content'][0].get('value', '')
+            else:
+                entry['html_content'] = entry.get('summary', '')
+            
+            # If processing a Reddit feed, override the link
+            if "reddit" in url:
+                if entry.get('underlying_url'):
+                    entry['link'] = entry['underlying_url']
+                else:
+                    import re
+                    m = re.search(r'href=["\'](.*?)["\']', entry.get('html_content', ''))
+                    if m:
+                        entry['link'] = m.group(1)
+
+        # Added detailed logging when no entries are found
         if len(new_entries) == 0:
-            print (f"No entries found for {url}.")
+            http_status = res.get("status", "unknown") if hasattr(res, "get") else "unknown"
+            bozo_exception = res.get("bozo_exception", "None") if hasattr(res, "get") else "None"
+            print(f"No entries found for {url}. HTTP status: {http_status}. Bozo exception: {bozo_exception}")
+
         #Trim the entries to the limit before compare so it doesn't find 500 new entries.
         new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
 

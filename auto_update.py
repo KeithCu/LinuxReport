@@ -128,12 +128,16 @@ def generate_headlines_html(top_articles, output_file):
     image_article_index = None
     image_url = None
     for i, article in enumerate(top_articles[:3]):
-        potential_image_url = custom_fetch_largest_image(article["url"])
+        potential_image_url = custom_fetch_largest_image(
+            article["url"],
+            underlying_link=article.get("underlying_link"),
+            html_content=article.get("html_content")
+        )
         if potential_image_url:
             image_article_index = i
             image_url = potential_image_url
             break  # Stop at the first article with an image
-
+    
     # Step 2: Generate HTML for each of the three headlines
     html_parts = []
     for i, article in enumerate(top_articles[:3]):

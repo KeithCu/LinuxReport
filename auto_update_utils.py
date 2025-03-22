@@ -291,6 +291,7 @@ def process_candidate_images(candidate_images):
         #         debug_print(f"Skipping potential non-image URL: {url}")
         #         continue
     
+    
         # Categorize by priority
         if metadata.get('score', 0) > 500000:
             meta_images.append((url, metadata))
@@ -694,7 +695,19 @@ def linuxtoday_custom_fetch(url):
 custom_hacks["linuxtoday.com"] =  linuxtoday_custom_fetch
 custom_hacks["citizenfreepress.com"] = citizenfreepress_custom_fetch
 
-def custom_fetch_largest_image(url):
+def custom_fetch_largest_image(url, underlying_link=None, html_content=None):
+    # Use underlying_link if provided
+    if underlying_link:
+        print("Using underlying link provided")
+        url = underlying_link
+    # Otherwise, if html_content is provided, parse it to find the first link
+    elif html_content:
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(html_content, "html.parser")
+        first_link = soup.find("a")
+        if first_link and first_link.get("href"):
+            print("Using first link from HTML content")
+            url = first_link["href"]
     domain = extract_domain(url)
     if domain in custom_hacks:
         print(f"Using custom hack for {domain}")
