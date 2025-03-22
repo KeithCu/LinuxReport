@@ -10,6 +10,8 @@ import itertools
 import concurrent.futures
 from datetime import datetime
 from timeit import default_timer as timer
+import traceback
+import subprocess
 
 import feedparser
 import socket
@@ -61,9 +63,7 @@ DEFAULT_WEATHER_LON = "-122.4194"
 USER_AGENT_REDDIT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Geko/20100101 Firefox/113.0"
 
 
-proxies = {
-    'https': 'socks5h://127.0.0.1:9050'
-}
+proxies = { 'https': 'socks5h://127.0.0.1:9050'}
 
 ALL_URLS = {}
 config_settings = {}
@@ -168,7 +168,7 @@ def fetch_via_curl(url):
     result = None
     
     try:
-        import subprocess
+
         
         # Use binary mode instead of text mode to avoid encoding issues
         cmd = [
@@ -220,10 +220,7 @@ def fetch_via_curl(url):
                         if entries_count == 0:
                             result = None
             except Exception as parse_error:
-                print(f"Error parsing curl content: {str(parse_error)}")
-                
-                # Print exception type and traceback for better debugging
-                import traceback
+                print(f"Error parsing curl content: {str(parse_error)}")                
                 print(f"Exception type: {type(parse_error).__name__}")
                 traceback.print_exc()
                 
@@ -312,14 +309,17 @@ def load_url_worker(url):
             
             # If processing a Reddit feed, override the link
             if "reddit" in url:
-                if entry.get('underlying_url'):
+                if "reddit" not in entry.get('underlying_url'):
                     entry['link'] = entry['underlying_url']
                     #del entry['origin_link']
                 else:
-                    m = re.search(r'href=["\'](.*?)["\']', entry.get('html_content', ''))
-                    if m:
-                        entry['link'] = m.group(1)
-                        #del entry['html_content']
+                    links = re.findall(r'href=["\'](.*?)["\']', entry.get('html_content', ''))
+                    # Filter out reddit links:
+                    links = [lnk for lnk in links if 'reddit' not in lnk]
+                    if links:
+                        # For example, pick the first match:
+                        entry['link'] = links[0]
+                        print (entry['link'])
 
         # Merge with cached entries (if any) to retain history.
         old_feed = g_c.get(url)
