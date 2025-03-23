@@ -11,16 +11,16 @@
   <div class="linkclass" data-index="{{ loop.index0 }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
     {% if e.link in top_images %}
     <div class="image-container">
-      <a target="_blank" href="{{ e.link | safe }}">
-        <img src="{{ top_images[e.link] }}" alt="{{ e.title | safe }}"/>
+      <a target="_blank" href="{{ e.link }}">
+        <img src="{{ top_images[e.link] }}" alt="{{ e.title | striptags }}"/>
       </a>
     </div>
     {% endif %}
     <div class="title-container">
       <code>
-        <a target="_blank" href="{{ e.link | safe }}" 
-           title="{{ e.html_content | striptags | truncate(500) | safe if e.html_content else e.summary | striptags | truncate(500) | safe if e.summary else 'No additional information available'}}">
-          {{ e.title | safe }}
+        <a target="_blank" href="{{ e.link }}"
+           title="{{ e.html_content | striptags | truncate(500) if e.html_content else e.summary | striptags | truncate(500) if e.summary else 'No additional information available'}}">
+          {{ e.title | striptags }}
         </a>
       </code>
     </div>
