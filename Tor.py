@@ -13,6 +13,8 @@ import feedparser
 from fake_useragent import UserAgent
 ua = UserAgent()
 
+PASSWORD = "TESTPASSWORD"
+
 USER_AGENT_REDDIT = ua.random
 print (f"User agent for Reddit: {USER_AGENT_REDDIT}")
 
@@ -138,6 +140,25 @@ def fetch_via_curl(url):
         
     return result
 
+def renew_tor_ip():
+    print("Requesting a new TOR IP address...")
+
+    host = "127.0.0.1"
+    port = 9051
+
+    # Create socket and connect
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((host, port))
+        s.send(f'AUTHENTICATE "{PASSWORD}"\r\n'.encode())
+
+        response = s.recv(1024).decode()
+        if "250 OK" not in response:
+            print("Authentication failed:", response)
+            exit(1)
+        s.send(b"SIGNAL NEWNYM\r\n")
+        response = s.recv(1024).decode()
+        print("New circuit requested:", response)
+
 def fetch_via_tor(url):
     """Fetch Reddit RSS using TOR with multiple fallback methods."""
     # This fails with TOR proxy, so use curl fallback directly for now
@@ -147,6 +168,11 @@ def fetch_via_tor(url):
     # If primary method fails, try fallback
     if result is None or len(result.get('entries', [])) == 0:
         #print("Primary TOR method failed, trying curl fallback...")
+        result = fetch_via_curl(url)
+    
+    if result is None:
+        print ("Curl failed, renewing TOR IP and trying again...")
+        renew_tor_ip()
         result = fetch_via_curl(url)
     
     # If all methods fail, return empty result
