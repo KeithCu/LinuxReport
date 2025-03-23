@@ -9,6 +9,8 @@ import itertools
 import concurrent.futures
 from datetime import datetime
 from timeit import default_timer as timer
+from fake_useragent import UserAgent
+
 
 import requests
 import feedparser
@@ -51,10 +53,12 @@ FAKE_API = True  # Fake Weather API calls
 DEFAULT_WEATHER_LAT = "37.7749"
 DEFAULT_WEATHER_LON = "-122.4194"
 
-#Reddit has permanently blocked my IP address even though I was only make a few requests per hour
-#far below their rate limits. 
-# So use a user agent that looks like a Firefox browser and route the requests through Tor.
-USER_AGENT_REDDIT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0"
+'''Reddit has permanently blocked my IP address for political reasons even though I was only making
+a few requests per hour(!), far below their rate limits. So pick a random user agent and use 
+TOR to fetch Reddit feeds.
+'''
+ua = UserAgent()
+USER_AGENT_REDDIT = ua.random
 
 ALL_URLS = {}
 config_settings = {}

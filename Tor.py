@@ -9,7 +9,12 @@ import subprocess
 import socks
 import feedparser
 
-from app import USER_AGENT_REDDIT
+#Generate fake but valid user-agents for Reddit
+from fake_useragent import UserAgent
+ua = UserAgent()
+
+USER_AGENT_REDDIT = ua.random
+print (f"User agent for Reddit: {USER_AGENT_REDDIT}")
 
 HEADERS = {
     "User-Agent": USER_AGENT_REDDIT,
