@@ -140,7 +140,11 @@ def fetch_via_curl(url):
         
     return result
 
+# Generate a new user agent, a new IP address and try again!
 def renew_tor_ip():
+    global USER_AGENT_REDDIT
+    USER_AGENT_REDDIT = ua.random
+
     print("Requesting a new TOR IP address...")
 
     host = "127.0.0.1"
