@@ -8,6 +8,9 @@ import subprocess
 
 import socks
 import feedparser
+import threading
+
+import time
 
 #Generate fake but valid user-agents for Reddit
 from fake_useragent import UserAgent
@@ -24,6 +27,8 @@ HEADERS = {
     "Host": "www.reddit.com",
     "Connection": "keep-alive"
 }
+
+tor_fetch_lock = threading.Lock()
 
 def fetch_via_pysocks(url):
     """Fetch Reddit RSS feeds using PySocks for TOR routing."""
@@ -163,25 +168,29 @@ def renew_tor_ip():
         response = s.recv(1024).decode()
         print("New circuit requested:", response)
 
+    time.sleep(5)
+
 def fetch_via_tor(url):
-    """Fetch Reddit RSS using TOR with multiple fallback methods."""
-    # This fails with TOR proxy, so use curl fallback directly for now
-    #result = fetch_via_pysocks(url)
-    
-    result = None
-    # If primary method fails, try fallback
-    if result is None or len(result.get('entries', [])) == 0:
-        #print("Primary TOR method failed, trying curl fallback...")
-        result = fetch_via_curl(url)
-    
-    if result is None:
-        print ("Curl failed, renewing TOR IP and trying again...")
-        renew_tor_ip()
-        result = fetch_via_curl(url)
-    
-    # If all methods fail, return empty result
-    if result is None:
-        print("All TOR methods failed, returning empty result")
-        result = {'entries': [], 'status': 'failed', 'bozo_exception': 'All TOR methods failed'}
+    with tor_fetch_lock:
+        """Fetch Reddit RSS using TOR with multiple fallback methods."""
+        # This fails with TOR proxy, so use curl fallback directly for now
+        #result = fetch_via_pysocks(url)
         
-    return result
+        result = None
+        # If primary method fails, try fallback
+        if result is None or len(result.get('entries', [])) == 0:
+            #print("Primary TOR method failed, trying curl fallback...")
+            result = fetch_via_curl(url)
+        
+        if result is None:
+            print ("Curl failed, renewing TOR IP and trying again...")
+            renew_tor_ip()
+
+            result = fetch_via_curl(url)
+        
+        # If all methods fail, return empty result
+        if result is None:
+            print("All TOR methods failed, returning empty result")
+            result = {'entries': [], 'status': 'failed', 'bozo_exception': 'All TOR methods failed'}
+            
+        return result
