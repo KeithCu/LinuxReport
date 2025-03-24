@@ -168,7 +168,7 @@ def renew_tor_ip():
         response = s.recv(1024).decode()
         print("New circuit requested:", response)
 
-    time.sleep(5)
+    time.sleep(10)
 
 def fetch_via_tor(url):
     with tor_fetch_lock:
