@@ -1,5 +1,8 @@
 import io
 import socket
+import random
+import threading
+import time
 
 import urllib.request
 from timeit import default_timer as timer
@@ -8,9 +11,6 @@ import subprocess
 
 import socks
 import feedparser
-import threading
-
-import time
 
 #Generate fake but valid user-agents for Reddit
 from fake_useragent import UserAgent
@@ -145,8 +145,8 @@ def fetch_via_curl(url):
         
     return result
 
-# Generate a new user agent, a new IP address and try again!
 def renew_tor_ip():
+    '''Generate a new user agent, a new IP address and try again!'''
     global USER_AGENT_REDDIT
     USER_AGENT_REDDIT = ua.random
 
@@ -168,27 +168,21 @@ def renew_tor_ip():
         response = s.recv(1024).decode()
         print("New circuit requested:", response)
 
-    time.sleep(10)
+    # Wait 20-30 seconds to give time for a circuit to be re-established.
+    time.sleep(random.uniform(20, 30))
 
 def fetch_via_tor(url):
     with tor_fetch_lock:
-        """Fetch Reddit RSS using TOR with multiple fallback methods."""
-        # This fails with TOR proxy, so use curl fallback directly for now
-        #result = fetch_via_pysocks(url)
-        
+        max_attempts = 3  # define how many attempts we try
         result = None
-        # If primary method fails, try fallback
-        if result is None or len(result.get('entries', [])) == 0:
-            #print("Primary TOR method failed, trying curl fallback...")
-            result = fetch_via_curl(url)
         
-        if result is None:
-            print ("Curl failed, renewing TOR IP and trying again...")
+        for attempt in range(max_attempts):
+            result = fetch_via_curl(url)
+            if result is not None:
+                break
+            print(f"Curl attempt {attempt + 1} failed, renewing TOR IP and trying again...")
             renew_tor_ip()
-
-            result = fetch_via_curl(url)
         
-        # If all methods fail, return empty result
         if result is None:
             print("All TOR methods failed, returning empty result")
             result = {'entries': [], 'status': 'failed', 'bozo_exception': 'All TOR methods failed'}
