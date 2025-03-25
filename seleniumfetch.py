@@ -15,8 +15,8 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
 from fake_useragent import UserAgent
+from Tor import renew_tor_ip
 ua = UserAgent()
-USER_AGENT_REDDIT = ua.random
 
 def create_driver(use_tor=False):
     options = Options()
@@ -25,7 +25,7 @@ def create_driver(use_tor=False):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     # Add random but believable user agent
-    options.add_argument(f"--user-agent={USER_AGENT_REDDIT}")
+    options.add_argument(f"--user-agent={ua.random}")
     if use_tor:
         options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
 
@@ -131,7 +131,6 @@ def fetch_site_posts(url):
         return []
 
     # Extract configuration values
-    post_container = config["post_container"]
     needs_selenium = config.get("needs_selenium", True)  # Default to using Selenium
 
     # Initialize caching variables
@@ -140,29 +139,38 @@ def fetch_site_posts(url):
     
     # Build entries in feedparser-like format
     entries = []
+
     driver = None
-    
-    if needs_selenium:
+    if config.get("needs_selenium", True):
+        posts = []
         driver = create_driver(config["needs_tor"])
         driver.get(url)
-        driver.execute_script("window.scrollBy(0, window.innerHeight);")
-        time.sleep(2)
-        try:
-            if site == "https://www.reddit.com":
-                WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
-            else:
-                WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, post_container)))
-            print(f"Posts loaded successfully for {site}")
-        except Exception as e:
-            print(f"Timeout waiting for posts to load on {site}: {e}")
-        posts = driver.find_elements(By.CSS_SELECTOR, post_container)
+
+        max_attempts = 3 if config.get("needs_tor") else 1
+        for attempt in range(max_attempts):
+            driver.execute_script("window.scrollBy(0, window.innerHeight);")
+            time.sleep(5)
+            try:
+                if site == "https://www.reddit.com":
+                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
+                else:
+                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                print(f"Posts loaded successfully on attempt {attempt+1} for {site}")
+            except Exception as e:
+                print(f"Timeout waiting for posts to load on {site} on attempt {attempt+1}: {e}")
+            posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
+            if posts:
+                break
+            if attempt < max_attempts - 1:
+                renew_tor_ip()
+                print(f"Attempt {attempt+1} failed, renewing TOR IP and trying again...")
     else:
         print(f"Fetching {site} using requests (no Selenium)")
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
-            posts = soup.select(post_container)
+            posts = soup.select(config["post_container"])
         except Exception as e:
             print(f"Error fetching {site} with requests: {e}")
             posts = []
@@ -175,7 +183,6 @@ def fetch_site_posts(url):
     if driver:
         driver.quit()
 
-    
     # Construct feedparser-like result as a plain dict (same for both methods)
     result = {
         'entries': entries,
