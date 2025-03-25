@@ -16,16 +16,17 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
 from fake_useragent import UserAgent
+
 from Tor import renew_tor_ip
-ua = UserAgent()
 
 def create_driver(use_tor=False):
+    # Instantiate a new UserAgent to generate a new user agent each time
+    ua = UserAgent()
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    # Add random but believable user agent
     options.add_argument(f"--user-agent={ua.random}")
     if use_tor:
         options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
@@ -144,17 +145,13 @@ def fetch_site_posts(url):
     # Build entries in feedparser-like format
     entries = []
 
-    driver = None
     if config.get("needs_selenium", True):
-        posts = []
-        driver = create_driver(config["needs_tor"])
-        driver.get(url)
-
         max_attempts = 3 if config.get("needs_tor") else 1
         for attempt in range(max_attempts):
-            driver.execute_script("window.scrollBy(0, window.innerHeight);")
-            time.sleep(5)
+            driver = create_driver(config["needs_tor"])
             try:
+                driver.get(url)
+
                 # New logic: Save the current page source for analysis
                 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
                 os.makedirs(log_dir, exist_ok=True)
@@ -170,15 +167,25 @@ def fetch_site_posts(url):
                     #WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
                 else:
                     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
-                print(f"Posts loaded successfully on attempt {attempt+1} for {site}")
+                print(f"Posts loaded successfully on attempt {attempt+1} for {url}")
+
+                posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
+                if not posts:
+                    raise Exception("No posts found")
+                # Extract post data while driver is still active
+                for post in posts:
+                    entry = extract_post_data(post, config, url, use_selenium=True)
+                    if entry:
+                        entries.append(entry)
+                break  # Successful extraction; exit loop.
             except Exception as e:
-                print(f"Timeout waiting for posts to load on {site} on attempt {attempt+1}: {e}")
-            posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
-            if posts:
-                break
-            if attempt < max_attempts - 1:
-                renew_tor_ip()
-                print(f"Attempt {attempt+1} failed, renewing TOR IP and trying again...")
+                print(f"Attempt {attempt+1} error on {url}: {e}")
+                if attempt < max_attempts - 1:
+                    renew_tor_ip()
+                    print(f"Attempt {attempt+1} failed, renewing TOR IP and trying again...")
+                continue
+            finally:
+                driver.quit()
     else:
         print(f"Fetching {site} using requests (no Selenium)")
         try:
@@ -189,14 +196,10 @@ def fetch_site_posts(url):
         except Exception as e:
             print(f"Error fetching {site} with requests: {e}")
             posts = []
-    # Process posts with shared logic
-    for post in posts:
-        entry = extract_post_data(post, config, url, use_selenium=needs_selenium)
-        if entry:
-            entries.append(entry)
-
-    if driver:
-        driver.quit()
+        for post in posts:
+            entry = extract_post_data(post, config, url, use_selenium=False)
+            if entry:
+                entries.append(entry)
 
     # Construct feedparser-like result as a plain dict (same for both methods)
     result = {

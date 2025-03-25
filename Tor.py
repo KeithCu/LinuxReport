@@ -19,7 +19,6 @@ ua = UserAgent()
 PASSWORD = "TESTPASSWORD"
 
 USER_AGENT_REDDIT = ua.random
-print (f"User agent for Reddit: {USER_AGENT_REDDIT}")
 
 HEADERS = {
     "User-Agent": USER_AGENT_REDDIT,
@@ -117,7 +116,7 @@ def fetch_via_curl(url):
                     # If still no entries, save the first part of the content for debugging
                     if entries_count == 0 and content_length > 1000:
                         print(f"Failed to parse content. First 200 chars: {content_str[:200]}")
-                        print(f"Content appears to be XML/RSS: {'<?xml' in content_str[:100]}")
+                        print(f"Content appears to be XML/RSS: {'<?xml' in content_str[:10]}")
                         
                         # Last attempt: try using StringIO
                         result = feedparser.parse(io.BytesIO(content_bytes))
