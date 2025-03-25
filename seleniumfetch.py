@@ -33,6 +33,9 @@ def create_driver(use_tor=False):
     service = Service(ChromeDriverManager(
         chrome_type=ChromeType.CHROMIUM).install())
     driver = webdriver.Chrome(service=service, options=options)
+    # Disable compression by setting Accept-Encoding to identity via CDP
+    driver.execute_cdp_cmd("Network.enable", {})
+    driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {"Accept-Encoding": "identity"}})
     return driver
 
 class FeedParserDict(dict):
