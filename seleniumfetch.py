@@ -135,14 +135,8 @@ def fetch_site_posts(url):
         print(f"Configuration for site '{site}' not found.")
         return []
 
-    # Extract configuration values
-    needs_selenium = config.get("needs_selenium", True)  # Default to using Selenium
-
-    # Initialize caching variables
     etag = ""
     modified = datetime.now(timezone.utc)
-    
-    # Build entries in feedparser-like format
     entries = []
 
     if config.get("needs_selenium", True):
@@ -152,7 +146,6 @@ def fetch_site_posts(url):
             try:
                 driver.get(url)
 
-                # New logic: Save the current page source for analysis
                 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
                 os.makedirs(log_dir, exist_ok=True)
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -164,9 +157,9 @@ def fetch_site_posts(url):
 
                 if site == "https://www.reddit.com":
                     pass
-                    #WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
+                    #WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
                 else:
-                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
                 print(f"Posts loaded successfully on attempt {attempt+1} for {url}")
 
                 posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
