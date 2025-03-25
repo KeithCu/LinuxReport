@@ -39,7 +39,7 @@ if DEBUG or g_app.debug:
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = shared.EXPIRE_WEEK
 
 MAX_ITEMS = 40
-RSS_TIMEOUT = 30
+RSS_TIMEOUT = 120
 
 #Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
@@ -118,7 +118,7 @@ def load_url_worker(url):
 
         rssfeed = g_c.get(url)
 
-        if "fakefeed" in url:
+        if "fakefeed" in url or "reddit" in url:
             res = fetch_site_posts(rss_info.site_url)
         else:
             if USE_TOR and "reddit" in url:
@@ -308,7 +308,7 @@ def index():
         expired_rss = g_c.has_feed_expired(url)
 
         # If don't have template or RSS, have to fetch now
-        if not g_c.has(rss_info.site_url) and expired_rss:
+        if not g_c.has(rss_info.site_url) and expired_rss: # or "reddit" in url: force refresh of a site for debugging
             needed_urls.append(url)
         elif expired_rss:
             need_fetch = True

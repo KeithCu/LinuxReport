@@ -1,8 +1,8 @@
 from datetime import datetime, timezone
-import sys
+import time
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -14,12 +14,20 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
-def create_driver():
+from fake_useragent import UserAgent
+ua = UserAgent()
+USER_AGENT_REDDIT = ua.random
+
+def create_driver(use_tor=False):
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    # Add random but believable user agent
+    options.add_argument(f"--user-agent={USER_AGENT_REDDIT}")
+    if use_tor:
+        options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
 
     service = Service(ChromeDriverManager(
         chrome_type=ChromeType.CHROMIUM).install())
@@ -65,20 +73,22 @@ def extract_post_data(post, config, url, use_selenium):
     filter_pattern = config.get("filter_pattern", "")
     if filter_pattern and filter_pattern not in link:
         return None
-    return {"title": title, "link": link, "id": link, "summary": title}
+    return {"title": title, "link": link, "id": link, "summary": post.text.strip()}
 
 # Site configurations
 site_configs = {
     "https://patriots.win": {
         "needs_selenium": True,
+        "needs_tor": False,
         "post_container": ".post-item",
         "title_selector": ".title a",
         "link_selector": ".preview-parent",
         "link_attr": "href",
         "filter_pattern": ""  # No filter needed for Patriots.win
     },
-    "https://breitbart.com/tech/": {
+    "https://breitbart.com": {
         "needs_selenium": False,
+        "needs_tor": False,
         "post_container": "article",
         "title_selector": "h2 a",
         "link_selector": "h2 a",
@@ -89,15 +99,31 @@ site_configs = {
 
     "https://revolver.news": {
         "needs_selenium": False,
+        "needs_tor": False,
         "post_container": "article.item",
         "title_selector": "h2.title a",
         "link_selector": "h2.title a",
         "link_attr": "href",
         "filter_pattern": ""
     },
+
+    "https://www.reddit.com": {
+        "needs_selenium": True,
+        "needs_tor": True,
+        "post_container": "article",
+        "title_selector": "a[id^='post-title-']",
+        "link_selector": "a[id^='post-title-']",
+        "link_attr": "href",
+        "filter_pattern": ""
+    },
 }
 
-def fetch_site_posts(site):
+def fetch_site_posts(url):
+    # Extract site from full URL
+    parsed = urlparse(url)
+    base_site = f"{parsed.scheme}://{parsed.netloc}"
+    site = base_site
+
     # Retrieve the configuration for the specified site
     config = site_configs.get(site)
     if not config:
@@ -105,7 +131,6 @@ def fetch_site_posts(site):
         return []
 
     # Extract configuration values
-    url = site
     post_container = config["post_container"]
     needs_selenium = config.get("needs_selenium", True)  # Default to using Selenium
 
@@ -118,13 +143,18 @@ def fetch_site_posts(site):
     driver = None
     
     if needs_selenium:
-        driver = create_driver()
+        driver = create_driver(config["needs_tor"])
         driver.get(url)
+        driver.execute_script("window.scrollBy(0, window.innerHeight);")
+        time.sleep(2)
         try:
-            WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, post_container)))
+            if site == "https://www.reddit.com":
+                WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
+            else:
+                WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, post_container)))
             print(f"Posts loaded successfully for {site}")
         except Exception as e:
-            print(f"Timeout waiting for posts to load on {site}")
+            print(f"Timeout waiting for posts to load on {site}: {e}")
         posts = driver.find_elements(By.CSS_SELECTOR, post_container)
     else:
         print(f"Fetching {site} using requests (no Selenium)")
