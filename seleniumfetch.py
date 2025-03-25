@@ -3,6 +3,7 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
+import os
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -156,6 +157,15 @@ def fetch_site_posts(url):
                 else:
                     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
                 print(f"Posts loaded successfully on attempt {attempt+1} for {site}")
+                # New logic: Save the current page source for analysis
+                log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
+                os.makedirs(log_dir, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                safe_site = site.replace("https://", "").replace("http://", "").replace(".", "_")
+                filename = f"{safe_site}_attempt{attempt+1}_{timestamp}.html"
+                filepath_log = os.path.join(log_dir, filename)
+                with open(filepath_log, "w", encoding="utf-8") as log_file:
+                    log_file.write(driver.page_source)
             except Exception as e:
                 print(f"Timeout waiting for posts to load on {site} on attempt {attempt+1}: {e}")
             posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
