@@ -118,7 +118,7 @@ def load_url_worker(url):
 
         rssfeed = g_c.get(url)
 
-        if "fakefeed" in url or "reddit" in url:
+        if "fakefeed" in url:
             res = fetch_site_posts(rss_info.site_url)
         else:
             if USE_TOR and "reddit" in url:
