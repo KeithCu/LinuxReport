@@ -152,11 +152,6 @@ def fetch_site_posts(url):
             driver.execute_script("window.scrollBy(0, window.innerHeight);")
             time.sleep(5)
             try:
-                if site == "https://www.reddit.com":
-                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
-                else:
-                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
-                print(f"Posts loaded successfully on attempt {attempt+1} for {site}")
                 # New logic: Save the current page source for analysis
                 log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
                 os.makedirs(log_dir, exist_ok=True)
@@ -166,6 +161,12 @@ def fetch_site_posts(url):
                 filepath_log = os.path.join(log_dir, filename)
                 with open(filepath_log, "w", encoding="utf-8") as log_file:
                     log_file.write(driver.page_source)
+
+                if site == "https://www.reddit.com":
+                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
+                else:
+                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                print(f"Posts loaded successfully on attempt {attempt+1} for {site}")
             except Exception as e:
                 print(f"Timeout waiting for posts to load on {site} on attempt {attempt+1}: {e}")
             posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
