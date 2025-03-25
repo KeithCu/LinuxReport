@@ -166,7 +166,8 @@ def fetch_site_posts(url):
                     log_file.write(driver.page_source)
 
                 if site == "https://www.reddit.com":
-                    WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
+                    pass
+                    #WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
                 else:
                     WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
                 print(f"Posts loaded successfully on attempt {attempt+1} for {site}")
