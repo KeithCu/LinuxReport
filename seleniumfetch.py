@@ -18,16 +18,15 @@ from webdriver_manager.core.os_manager import ChromeType
 from fake_useragent import UserAgent
 
 from Tor import renew_tor_ip
+ua = UserAgent()
 
-def create_driver(use_tor=False):
-    # Instantiate a new UserAgent to generate a new user agent each time
-    ua = UserAgent()
+def create_driver(use_tor, user_agent):
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument(f"--user-agent={ua.random}")
+    options.add_argument(f"--user-agent={user_agent}")
     if use_tor:
         options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
 
@@ -123,7 +122,7 @@ site_configs = {
     },
 }
 
-def fetch_site_posts(url):
+def fetch_site_posts(url, user_agent):
     # Extract site from full URL
     parsed = urlparse(url)
     base_site = f"{parsed.scheme}://{parsed.netloc}"
@@ -142,7 +141,11 @@ def fetch_site_posts(url):
     if config.get("needs_selenium", True):
         max_attempts = 3 if config.get("needs_tor") else 1
         for attempt in range(max_attempts):
-            driver = create_driver(config["needs_tor"])
+            
+            if "reddit" in site: #For reddit, we always pick a random user agent.
+                user_agent = ua.random
+
+            driver = create_driver(config["needs_tor"], user_agent)
             try:
                 driver.get(url)
 
