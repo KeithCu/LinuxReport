@@ -167,7 +167,7 @@ def fetch_site_posts(url, user_agent):
 
                 posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
                 if not posts:
-                    snippet = driver.page_source[:200]
+                    snippet = driver.page_source[:1000]
                     print("No posts found. Page source snippet:", snippet)
                     raise Exception("No posts found")
                 # Extract post data while driver is still active
