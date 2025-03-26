@@ -131,12 +131,10 @@ site_configs = {
 }
 
 def fetch_site_posts(url, user_agent):
-    # Extract site from full URL
     parsed = urlparse(url)
     base_site = f"{parsed.scheme}://{parsed.netloc}"
     site = base_site
 
-    # Retrieve the configuration for the specified site
     config = site_configs.get(site)
     if not config:
         print(f"Configuration for site '{site}' not found.")
@@ -147,53 +145,30 @@ def fetch_site_posts(url, user_agent):
     entries = []
 
     if config.get("needs_selenium", True):
-        max_attempts = 3 if config.get("needs_tor") else 1
-        for attempt in range(max_attempts):
-            if "reddit" in site:
-                if attempt == 0:
-                    user_agent = g_cache.get("REDDIT_USER_AGENT")
-                else:
-                    user_agent = ua.random
-                    g_cache.put("REDDIT_USER_AGENT", user_agent, timeout=shared.EXPIRE_YEARS)
-            driver = create_driver(config["needs_tor"], user_agent)
-            try:
-                driver.get(url)
-
-                # log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
-                # os.makedirs(log_dir, exist_ok=True)
-                # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                # safe_site = site.replace("https://", "").replace("http://", "").replace(".", "_")
-                # filename = f"{safe_site}_attempt{attempt+1}_{timestamp}.html"
-                # filepath_log = os.path.join(log_dir, filename)
-                # with open(filepath_log, "w", encoding="utf-8") as log_file:
-                #     log_file.write(driver.page_source)
-
-                if site == "https://www.reddit.com":
-                    pass
-                    #WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
-                else:
-                    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
-                print(f"Some content loaded on attempt {attempt+1} for {url} with agent: {user_agent}")
-
-                posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
-                if not posts:
-                    snippet = driver.page_source[:1000]
-                    print("No posts found. Page source snippet:", snippet)
-                    raise Exception("No posts found")
-                # Extract post data while driver is still active
-                for post in posts:
-                    entry = extract_post_data(post, config, url, use_selenium=True)
-                    if entry:
-                        entries.append(entry)
-                break  # Successful extraction; exit loop.
-            except Exception as e:
-                print(f"Attempt {attempt+1} error on {url}: {e}")
-                if attempt < max_attempts - 1:
-                    renew_tor_ip()
-                    print(f"Attempt {attempt+1} failed, renewing TOR IP and trying again...")
-                continue
-            finally:
-                driver.quit()
+        if "reddit" in site:
+            user_agent = g_cache.get("REDDIT_USER_AGENT")
+        driver = create_driver(config["needs_tor"], user_agent)
+        try:
+            driver.get(url)
+            if site == "https://www.reddit.com":
+                pass
+                #WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
+            else:
+                WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+            print(f"Some content loaded for {url} with agent: {user_agent}")
+            posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
+            if not posts:
+                snippet = driver.page_source[:1000]
+                print("No posts found. Page source snippet:", snippet)
+                raise Exception("No posts found")
+            for post in posts:
+                entry = extract_post_data(post, config, url, use_selenium=True)
+                if entry:
+                    entries.append(entry)
+        except Exception as e:
+            print(f"Error on {url}: {e}")
+        finally:
+            driver.quit()
     else:
         print(f"Fetching {site} using requests (no Selenium)")
         try:
@@ -209,7 +184,6 @@ def fetch_site_posts(url, user_agent):
             if entry:
                 entries.append(entry)
 
-    # Construct feedparser-like result as a plain dict (same for both methods)
     result = {
         'entries': entries,
         'etag': etag,

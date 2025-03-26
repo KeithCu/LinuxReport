@@ -118,18 +118,13 @@ def load_url_worker(url):
 
         rssfeed = g_c.get(url)
 
-        if "fakefeed" in url or "reddit" in url:
+        if USE_TOR and "reddit" in url:
+            print(f"Using TOR proxy for Reddit URL: {url}")
+            res = fetch_via_tor(url, rss_info.site_url)
+        else if "fakefeed" in url:
             res = fetch_site_posts(rss_info.site_url, USER_AGENT)
         else:
-            if USE_TOR and "reddit" in url:
-                print(f"Using TOR proxy for Reddit URL: {url}")
-                res = fetch_via_tor(url)
-            else:
-                user_agent = USER_AGENT
-                if "reddit" in url:
-                    user_agent = USER_AGENT_REDDIT
-                    print(f"Using Reddit user agent (without TOR) for URL: {url}")
-                res = feedparser.parse(url, agent=user_agent)
+            res = feedparser.parse(url, agent=USER_AGENT)
 
         new_entries = prefilter_news(url, res)
         new_entries = filter_similar_titles(url, new_entries)

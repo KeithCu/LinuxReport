@@ -12,64 +12,21 @@ import subprocess
 import socks
 import feedparser
 
-#Generate fake but valid user-agents for Reddit
+import shared
+from seleniumfetch import fetch_site_posts
+
+#Generate fake but valid user-agents to make Reddit happy.
 from fake_useragent import UserAgent
 ua = UserAgent()
 
 PASSWORD = "TESTPASSWORD"
 
-USER_AGENT_REDDIT = ua.random
+g_cache = shared.DiskCacheWrapper("/tmp")
 
-HEADERS = {
-    "User-Agent": USER_AGENT_REDDIT,
-    "Accept": "*/*",
-    "Host": "www.reddit.com",
-    "Connection": "keep-alive"
-}
+if not g_cache.has("REDDIT_USER_AGENT"):
+    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
 tor_fetch_lock = threading.Lock()
-
-def fetch_via_pysocks(url):
-    """Fetch Reddit RSS feeds using PySocks for TOR routing."""
-    print(f"Using PySocks TOR method for: {url}")
-    original_socket = socket.socket
-    result = None
-    
-    try:
-        # Use PROXY_TYPE_SOCKS5 instead of PROXY_TYPE_SOCKS5_HOSTNAME which isn't available in all versions
-        socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
-        socket.socket = socks.socksocket
-        
-        # Build opener with our headers
-        opener = urllib.request.build_opener()
-        opener.addheaders = [(k, v) for k, v in HEADERS.items()]
-        urllib.request.install_opener(opener)
-        
-        print(f"Making request through TOR with headers: {HEADERS}")
-        start_time = timer()
-        
-        result = feedparser.parse(url, request_headers=HEADERS)
-        elapsed = timer() - start_time
-        
-        # Log response details
-        status = result.get('status', 'unknown') if hasattr(result, 'get') else 'unknown'
-        entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
-        
-        print(f"TOR PySocks request completed in {elapsed:.2f}s - Status: {status}, Entries: {entries_count}")
-        
-        if entries_count == 0:
-            raise Exception("No entries found with PySocks method")
-            
-    except Exception as e:
-        print(f"PySocks TOR method failed: {str(e)}")
-        result = None
-    finally:
-        # Always restore original socket
-        socket.socket = original_socket
-        urllib.request.install_opener(None)  # Reset opener
-        print("TOR socket and opener reset to defaults")
-        
-    return result
 
 def fetch_via_curl(url):
     """Fetch Reddit RSS feeds using curl subprocess through TOR."""
@@ -79,8 +36,8 @@ def fetch_via_curl(url):
     try:        
         cmd = [
             "curl", "-s",
-            "--socks5-hostname", "127.0.0.1:9050",
-            "-A", USER_AGENT_REDDIT,
+            #"--socks5-hostname", "127.0.0.1:9050",
+            "-A", g_cache.get("REDDIT_USER_AGENT"),
             "-H", "Accept: */*",
             url
         ]
@@ -146,8 +103,7 @@ def fetch_via_curl(url):
 
 def renew_tor_ip():
     '''Generate a new user agent, a new IP address and try again!'''
-    global USER_AGENT_REDDIT
-    USER_AGENT_REDDIT = ua.random
+    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
     print("Requesting a new TOR IP address...")
 
@@ -170,7 +126,7 @@ def renew_tor_ip():
     # Wait 20-30 seconds to give time for a circuit to be re-established.
     time.sleep(random.uniform(20, 30))
 
-def fetch_via_tor(url):
+def fetch_via_tor(url, site_url):
     with tor_fetch_lock:
         max_attempts = 3  # define how many attempts we try
         result = None
@@ -179,7 +135,11 @@ def fetch_via_tor(url):
             result = fetch_via_curl(url)
             if result is not None:
                 break
-            print(f"Curl attempt {attempt + 1} failed, renewing TOR IP and trying again...")
+            print(f"Curl attempt {attempt + 1} failed, trying selenium...")
+            result = fetch_site_posts(site_url, None)
+            if len(result["entries"]) > 0:
+                break
+            print(f"Selenium attempt {attempt + 1} failed, renewing Tor and trying again...")
             renew_tor_ip()
         
         if result is None:
