@@ -7,7 +7,6 @@ from typing import List, Dict
 
 TZ = FeedHistory.TZ
 
-# Convert SiteConfig to a dataclass for attribute-style access.
 @dataclass
 class SiteConfig:
     ALL_URLS: Dict[str, "RssInfo"]

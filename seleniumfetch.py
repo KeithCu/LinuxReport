@@ -158,6 +158,8 @@ def fetch_site_posts(url, user_agent):
             driver = create_driver(config["needs_tor"], user_agent)
             try:
                 driver.get(url)
+                driver.execute_script("window.scrollBy(0, window.innerHeight);")
+                time.sleep(2)
 
                 # log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
                 # os.makedirs(log_dir, exist_ok=True)
