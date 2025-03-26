@@ -20,6 +20,14 @@ from fake_useragent import UserAgent
 from Tor import renew_tor_ip
 ua = UserAgent()
 
+# Use a shared cache to save successful reddit user agents
+# among all instances on the server.
+import shared
+g_cache = shared.DiskCacheWrapper("/tmp")
+
+if not g_cache.has("REDDIT_USER_AGENT"):
+    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
+
 def create_driver(use_tor, user_agent):
     options = Options()
     options.add_argument("--headless")
@@ -141,10 +149,12 @@ def fetch_site_posts(url, user_agent):
     if config.get("needs_selenium", True):
         max_attempts = 3 if config.get("needs_tor") else 1
         for attempt in range(max_attempts):
-            
-            if "reddit" in site: #For reddit, we always pick a random user agent.
-                user_agent = ua.random
-
+            if "reddit" in site:
+                if attempt == 0:
+                    user_agent = g_cache.get("REDDIT_USER_AGENT")
+                else:
+                    user_agent = ua.random
+                    g_cache.put("REDDIT_USER_AGENT", user_agent, timeout=shared.EXPIRE_YEARS)
             driver = create_driver(config["needs_tor"], user_agent)
             try:
                 driver.get(url)
@@ -163,7 +173,7 @@ def fetch_site_posts(url, user_agent):
                     #WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
                 else:
                     WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
-                print(f"Posts loaded successfully on attempt {attempt+1} for {url}")
+                print(f"Some content loaded on attempt {attempt+1} for {url} with agent: {user_agent}")
 
                 posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
                 if not posts:
