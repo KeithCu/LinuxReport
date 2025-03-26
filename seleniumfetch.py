@@ -149,14 +149,14 @@ def fetch_site_posts(url, user_agent):
             try:
                 driver.get(url)
 
-                log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
-                os.makedirs(log_dir, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                safe_site = site.replace("https://", "").replace("http://", "").replace(".", "_")
-                filename = f"{safe_site}_attempt{attempt+1}_{timestamp}.html"
-                filepath_log = os.path.join(log_dir, filename)
-                with open(filepath_log, "w", encoding="utf-8") as log_file:
-                    log_file.write(driver.page_source)
+                # log_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "selenium_fetch_logs")
+                # os.makedirs(log_dir, exist_ok=True)
+                # timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                # safe_site = site.replace("https://", "").replace("http://", "").replace(".", "_")
+                # filename = f"{safe_site}_attempt{attempt+1}_{timestamp}.html"
+                # filepath_log = os.path.join(log_dir, filename)
+                # with open(filepath_log, "w", encoding="utf-8") as log_file:
+                #     log_file.write(driver.page_source)
 
                 if site == "https://www.reddit.com":
                     pass
