@@ -26,6 +26,9 @@ g_cache = shared.DiskCacheWrapper("/tmp")
 if not g_cache.has("REDDIT_USER_AGENT"):
     g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
+if not g_cache.has("REDDIT_METHOD"):
+    g_cache.put("REDDIT_METHOD", "curl", timeout = shared.EXPIRE_YEARS)
+
 tor_fetch_lock = threading.Lock()
 last_success_method = "curl"  # global tracker for last successful method
 
@@ -37,7 +40,7 @@ def fetch_via_curl(url):
     try:        
         cmd = [
             "curl", "-s",
-            #"--socks5-hostname", "127.0.0.1:9050",
+            "--socks5-hostname", "127.0.0.1:9050",
             "-A", g_cache.get("REDDIT_USER_AGENT"),
             "-H", "Accept: */*",
             url
@@ -128,7 +131,9 @@ def renew_tor_ip():
     time.sleep(random.uniform(20, 30))
 
 def fetch_via_tor(url, site_url):
-    global last_success_method
+
+    last_success_method = g_cache.get("REDDIT_LAST_METHOD")
+
     with tor_fetch_lock:
         max_attempts = 3  # define how many attempts we try
         result = None
@@ -142,7 +147,7 @@ def fetch_via_tor(url, site_url):
             else:
                 result_default = fetch_site_posts(site_url, None)
             if result_default is not None and len(result_default.get("entries", [])) > 0:
-                last_success_method = default_method
+                g_cache.put("REDDIT_METHOD", default_method, shared.EXPIRE_YEARS)
                 result = result_default
                 break
             
@@ -153,7 +158,7 @@ def fetch_via_tor(url, site_url):
             else:
                 result_alternative = fetch_site_posts(site_url, None)
             if result_alternative is not None and len(result_alternative.get("entries", [])) > 0:
-                last_success_method = alternative_method
+                g_cache.put("REDDIT_METHOD", alternative_method, shared.EXPIRE_YEARS)
                 result = result_alternative
                 break
             

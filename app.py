@@ -121,7 +121,7 @@ def load_url_worker(url):
         if USE_TOR and "reddit" in url:
             print(f"Using TOR proxy for Reddit URL: {url}")
             res = fetch_via_tor(url, rss_info.site_url)
-        else if "fakefeed" in url:
+        elif "fakefeed" in url:
             res = fetch_site_posts(rss_info.site_url, USER_AGENT)
         else:
             res = feedparser.parse(url, agent=USER_AGENT)

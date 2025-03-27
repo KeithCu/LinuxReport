@@ -15,18 +15,8 @@ from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
-from fake_useragent import UserAgent
-
-from Tor import renew_tor_ip
-ua = UserAgent()
-
-# Use a shared cache to save successful reddit user agents
-# among all instances on the server.
 import shared
 g_cache = shared.DiskCacheWrapper("/tmp")
-
-if not g_cache.has("REDDIT_USER_AGENT"):
-    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
 def create_driver(use_tor, user_agent):
     options = Options()
