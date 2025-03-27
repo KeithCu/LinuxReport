@@ -8,9 +8,11 @@ import urllib.request
 from timeit import default_timer as timer
 import traceback
 import subprocess
-
 import socks
 import feedparser
+from fake_useragent import UserAgent
+
+import shared
 
 import shared
 from seleniumfetch import fetch_site_posts
@@ -22,7 +24,6 @@ ua = UserAgent()
 PASSWORD = "TESTPASSWORD"
 
 g_cache = shared.DiskCacheWrapper("/tmp")
-
 if not g_cache.has("REDDIT_USER_AGENT"):
     g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
@@ -30,7 +31,6 @@ if not g_cache.has("REDDIT_METHOD"):
     g_cache.put("REDDIT_METHOD", "curl", timeout = shared.EXPIRE_YEARS)
 
 tor_fetch_lock = threading.Lock()
-last_success_method = "curl"  # global tracker for last successful method
 
 def fetch_via_curl(url):
     """Fetch Reddit RSS feeds using curl subprocess through TOR."""

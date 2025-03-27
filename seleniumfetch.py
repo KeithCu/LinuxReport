@@ -135,6 +135,7 @@ def fetch_site_posts(url, user_agent):
     entries = []
 
     if config.get("needs_selenium", True):
+
         if "reddit" in site:
             user_agent = g_cache.get("REDDIT_USER_AGENT")
         driver = create_driver(config["needs_tor"], user_agent)
