@@ -14,7 +14,11 @@ from fake_useragent import UserAgent
 
 import shared
 
-#Generate fake but valid user-agents for Reddit
+import shared
+from seleniumfetch import fetch_site_posts
+
+#Generate fake but valid user-agents to make Reddit happy.
+from fake_useragent import UserAgent
 ua = UserAgent()
 
 PASSWORD = "TESTPASSWORD"
@@ -23,56 +27,10 @@ g_cache = shared.DiskCacheWrapper("/tmp")
 if not g_cache.has("REDDIT_USER_AGENT"):
     g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
+if not g_cache.has("REDDIT_METHOD"):
+    g_cache.put("REDDIT_METHOD", "curl", timeout = shared.EXPIRE_YEARS)
+
 tor_fetch_lock = threading.Lock()
-
-def fetch_via_pysocks(url):
-    headers = {
-        "User-Agent": g_cache.get("REDDIT_USER_AGENT"),
-        "Accept": "*/*",
-        "Host": "www.reddit.com",
-        "Connection": "keep-alive"
-    }
-
-    """Fetch Reddit RSS feeds using PySocks for TOR routing."""
-    print(f"Using PySocks TOR method for: {url}")
-    original_socket = socket.socket
-    result = None
-    
-    try:
-        # Use PROXY_TYPE_SOCKS5 instead of PROXY_TYPE_SOCKS5_HOSTNAME which isn't available in all versions
-        socks.setdefaultproxy(socks.PROXY_TYPE_SOCKS5, "127.0.0.1", 9050)
-        socket.socket = socks.socksocket
-        
-        # Build opener with our headers
-        opener = urllib.request.build_opener()
-        opener.addheaders = [(k, v) for k, v in headers.items()]
-        urllib.request.install_opener(opener)
-        
-        print(f"Making request through TOR with headers: {headers}")
-        start_time = timer()
-        
-        result = feedparser.parse(url, request_headers=headers)
-        elapsed = timer() - start_time
-        
-        # Log response details
-        status = result.get('status', 'unknown') if hasattr(result, 'get') else 'unknown'
-        entries_count = len(result.get('entries', [])) if hasattr(result, 'get') else 0
-        
-        print(f"TOR PySocks request completed in {elapsed:.2f}s - Status: {status}, Entries: {entries_count}")
-        
-        if entries_count == 0:
-            raise Exception("No entries found with PySocks method")
-            
-    except Exception as e:
-        print(f"PySocks TOR method failed: {str(e)}")
-        result = None
-    finally:
-        # Always restore original socket
-        socket.socket = original_socket
-        urllib.request.install_opener(None)  # Reset opener
-        print("TOR socket and opener reset to defaults")
-        
-    return result
 
 def fetch_via_curl(url):
     """Fetch Reddit RSS feeds using curl subprocess through TOR."""
@@ -149,7 +107,7 @@ def fetch_via_curl(url):
 
 def renew_tor_ip():
     '''Generate a new user agent, a new IP address and try again!'''
-    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout=shared.EXPIRE_YEARS)
+    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
     print("Requesting a new TOR IP address...")
 
@@ -172,20 +130,42 @@ def renew_tor_ip():
     # Wait 20-30 seconds to give time for a circuit to be re-established.
     time.sleep(random.uniform(20, 30))
 
-def fetch_via_tor(url):
+def fetch_via_tor(url, site_url):
+
+    last_success_method = g_cache.get("REDDIT_LAST_METHOD")
+
     with tor_fetch_lock:
         max_attempts = 3  # define how many attempts we try
         result = None
         
         for attempt in range(max_attempts):
-            result = fetch_via_curl(url)
-            if result is not None:
+            # On first try use last_success_method, otherwise start with selenium after renew_tor_ip.
+            default_method = last_success_method if (attempt == 0 and last_success_method) else "selenium"
+            
+            if default_method == "curl":
+                result_default = fetch_via_curl(url)
+            else:
+                result_default = fetch_site_posts(site_url, None)
+            if result_default is not None and len(result_default.get("entries", [])) > 0:
+                g_cache.put("REDDIT_METHOD", default_method, shared.EXPIRE_YEARS)
+                result = result_default
                 break
-            print(f"Curl attempt {attempt + 1} failed, renewing TOR IP and trying again...")
+            
+            # Try alternative method
+            alternative_method = "selenium" if default_method == "curl" else "curl"
+            if alternative_method == "curl":
+                result_alternative = fetch_via_curl(url)
+            else:
+                result_alternative = fetch_site_posts(site_url, None)
+            if result_alternative is not None and len(result_alternative.get("entries", [])) > 0:
+                g_cache.put("REDDIT_METHOD", alternative_method, shared.EXPIRE_YEARS)
+                result = result_alternative
+                break
+            
+            print(f"Attempt {attempt + 1} failed, renewing TOR and trying again...")
             renew_tor_ip()
         
         if result is None:
             print("All TOR methods failed, returning empty result")
             result = {'entries': [], 'status': 'failed', 'bozo_exception': 'All TOR methods failed'}
-            
         return result
