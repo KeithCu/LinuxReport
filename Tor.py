@@ -27,6 +27,7 @@ if not g_cache.has("REDDIT_USER_AGENT"):
     g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
 tor_fetch_lock = threading.Lock()
+last_success_method = "curl"  # global tracker for last successful method
 
 def fetch_via_curl(url):
     """Fetch Reddit RSS feeds using curl subprocess through TOR."""
@@ -127,23 +128,39 @@ def renew_tor_ip():
     time.sleep(random.uniform(20, 30))
 
 def fetch_via_tor(url, site_url):
+    global last_success_method
     with tor_fetch_lock:
         max_attempts = 3  # define how many attempts we try
         result = None
         
         for attempt in range(max_attempts):
-            result = fetch_via_curl(url)
-            if result is not None:
+            # On first try use last_success_method, otherwise start with selenium after renew_tor_ip.
+            default_method = last_success_method if (attempt == 0 and last_success_method) else "selenium"
+            
+            if default_method == "curl":
+                result_default = fetch_via_curl(url)
+            else:
+                result_default = fetch_site_posts(site_url, None)
+            if result_default is not None and len(result_default.get("entries", [])) > 0:
+                last_success_method = default_method
+                result = result_default
                 break
-            print(f"Curl attempt {attempt + 1} failed, trying selenium...")
-            result = fetch_site_posts(site_url, None)
-            if len(result["entries"]) > 0:
+            
+            # Try alternative method
+            alternative_method = "selenium" if default_method == "curl" else "curl"
+            if alternative_method == "curl":
+                result_alternative = fetch_via_curl(url)
+            else:
+                result_alternative = fetch_site_posts(site_url, None)
+            if result_alternative is not None and len(result_alternative.get("entries", [])) > 0:
+                last_success_method = alternative_method
+                result = result_alternative
                 break
-            print(f"Selenium attempt {attempt + 1} failed, renewing Tor and trying again...")
+            
+            print(f"Attempt {attempt + 1} failed, renewing TOR and trying again...")
             renew_tor_ip()
         
         if result is None:
             print("All TOR methods failed, returning empty result")
             result = {'entries': [], 'status': 'failed', 'bozo_exception': 'All TOR methods failed'}
-            
         return result
