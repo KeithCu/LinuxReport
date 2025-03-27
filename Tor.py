@@ -8,28 +8,31 @@ import urllib.request
 from timeit import default_timer as timer
 import traceback
 import subprocess
-
 import socks
 import feedparser
+from fake_useragent import UserAgent
+
+import shared
 
 #Generate fake but valid user-agents for Reddit
-from fake_useragent import UserAgent
 ua = UserAgent()
 
 PASSWORD = "TESTPASSWORD"
 
-USER_AGENT_REDDIT = ua.random
-
-HEADERS = {
-    "User-Agent": USER_AGENT_REDDIT,
-    "Accept": "*/*",
-    "Host": "www.reddit.com",
-    "Connection": "keep-alive"
-}
+g_cache = shared.DiskCacheWrapper("/tmp")
+if not g_cache.has("REDDIT_USER_AGENT"):
+    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
 
 tor_fetch_lock = threading.Lock()
 
 def fetch_via_pysocks(url):
+    headers = {
+        "User-Agent": g_cache.get("REDDIT_USER_AGENT"),
+        "Accept": "*/*",
+        "Host": "www.reddit.com",
+        "Connection": "keep-alive"
+    }
+
     """Fetch Reddit RSS feeds using PySocks for TOR routing."""
     print(f"Using PySocks TOR method for: {url}")
     original_socket = socket.socket
@@ -42,13 +45,13 @@ def fetch_via_pysocks(url):
         
         # Build opener with our headers
         opener = urllib.request.build_opener()
-        opener.addheaders = [(k, v) for k, v in HEADERS.items()]
+        opener.addheaders = [(k, v) for k, v in headers.items()]
         urllib.request.install_opener(opener)
         
-        print(f"Making request through TOR with headers: {HEADERS}")
+        print(f"Making request through TOR with headers: {headers}")
         start_time = timer()
         
-        result = feedparser.parse(url, request_headers=HEADERS)
+        result = feedparser.parse(url, request_headers=headers)
         elapsed = timer() - start_time
         
         # Log response details
@@ -80,7 +83,7 @@ def fetch_via_curl(url):
         cmd = [
             "curl", "-s",
             "--socks5-hostname", "127.0.0.1:9050",
-            "-A", USER_AGENT_REDDIT,
+            "-A", g_cache.get("REDDIT_USER_AGENT"),
             "-H", "Accept: */*",
             url
         ]
@@ -146,8 +149,7 @@ def fetch_via_curl(url):
 
 def renew_tor_ip():
     '''Generate a new user agent, a new IP address and try again!'''
-    global USER_AGENT_REDDIT
-    USER_AGENT_REDDIT = ua.random
+    g_cache.put("REDDIT_USER_AGENT", ua.random, timeout=shared.EXPIRE_YEARS)
 
     print("Requesting a new TOR IP address...")
 
