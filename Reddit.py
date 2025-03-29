@@ -231,26 +231,26 @@ def format_reddit_entry(post_wrapper):
 
     # If not a self-post and summary is empty, use the external URL as summary
     if not post_data.get('is_self', False) and not summary:
-         summary = post_data.get('url', '') # Link posts point to external URL here
+        summary = post_data.get('url', '') # Link posts point to external URL here
     entry['summary'] = summary
 
     # feedparser 'content' is often a list of dicts
     entry['content'] = []
     if content_html:
          # Note: Reddit's selftext_html is often HTML-escaped, real feedparser might handle better
-         entry['content'].append({
+        entry['content'].append({
              'type': 'text/html',
              'language': None,
              'base': entry['link'],
              'value': content_html # May need html.unescape() depending on usage
          })
     elif summary and post_data.get('is_self', False): # Only add plain text content for self posts
-         entry['content'].append({
+        entry['content'].append({
              'type': 'text/plain',
              'language': None,
              'base': entry['link'],
              'value': summary
-         })
+        })
 
     # Time parsing - Reddit provides UTC timestamp
     created_utc = post_data.get('created_utc')
@@ -265,11 +265,11 @@ def format_reddit_entry(post_wrapper):
             entry['updated_parsed'] = published_parsed
             entry['updated'] = entry['published']
         except (ValueError, TypeError):
-             print(f"Warning: Could not parse timestamp {created_utc}")
-             entry['published_parsed'] = None
-             entry['published'] = None
-             entry['updated_parsed'] = None
-             entry['updated'] = None
+            print(f"Warning: Could not parse timestamp {created_utc}")
+            entry['published_parsed'] = None
+            entry['published'] = None
+            entry['updated_parsed'] = None
+            entry['updated'] = None
 
     # Add custom Reddit-specific fields, prefixed for clarity
     entry['reddit_score'] = post_data.get('score')
@@ -358,22 +358,22 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         api_data = response.json()
 
     except requests.exceptions.Timeout:
-         msg = f"Request timed out for {api_url}"
-         print(f"Error: {msg}")
-         output['bozo'] = 1
-         output['bozo_exception'] = requests.exceptions.Timeout(msg)
-         return output # Return partial structure with error info
+        msg = f"Request timed out for {api_url}"
+        print(f"Error: {msg}")
+        output['bozo'] = 1
+        output['bozo_exception'] = requests.exceptions.Timeout(msg)
+        return output # Return partial structure with error info
     except requests.exceptions.HTTPError as e:
-         msg = f"HTTP error fetching Reddit API data: {e}"
-         print(f"Error: {msg}")
-         if response:  # Added check to prevent potential error
-             print(f"Response: {response.text[:500]}") # Log part of the response body
-         output['bozo'] = 1
-         output['bozo_exception'] = e
-         # Attempt to parse feed info even on error if possible (e.g. 404)
-         output['feed']['title'] = f"r/{subreddit} - {feed_type} (Error)"
-         output['feed']['link'] = f"https://www.reddit.com/r/{subreddit}/{feed_type}"
-         return output # Return partial structure with error info
+        msg = f"HTTP error fetching Reddit API data: {e}"
+        print(f"Error: {msg}")
+        if response:  # Added check to prevent potential error
+            print(f"Response: {response.text[:500]}") # Log part of the response body
+        output['bozo'] = 1
+        output['bozo_exception'] = e
+        # Attempt to parse feed info even on error if possible (e.g. 404)
+        output['feed']['title'] = f"r/{subreddit} - {feed_type} (Error)"
+        output['feed']['link'] = f"https://www.reddit.com/r/{subreddit}/{feed_type}"
+        return output # Return partial structure with error info
     except requests.exceptions.RequestException as e:
         # Catch other network/request related errors
         msg = f"Network error fetching Reddit API data: {e}"
@@ -382,13 +382,13 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         output['bozo_exception'] = e
         return output # Return partial structure with error info
     except json.JSONDecodeError as e:
-         msg = f"Error decoding JSON response from {api_url}: {e}"
-         print(f"Error: {msg}")
-         if response:  # Add null check here
-             print(f"Response Text: {response.text[:500]}") # Log problematic text
-         output['bozo'] = 1
-         output['bozo_exception'] = e
-         return output # Return partial structure with error info
+        msg = f"Error decoding JSON response from {api_url}: {e}"
+        print(f"Error: {msg}")
+        if response:  # Add null check here
+            print(f"Response Text: {response.text[:500]}") # Log problematic text
+        output['bozo'] = 1
+        output['bozo_exception'] = e
+        return output # Return partial structure with error info
 
     # --- Format the successful output ---
 
@@ -405,15 +405,15 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     data_obj = api_data.get('data', {})
     posts = data_obj.get('children', [])
     if posts:
-         first_post_data = posts[0].get('data', {})
-         created_utc = first_post_data.get('created_utc')
-         if created_utc:
-             try:
-                 updated_parsed = time.gmtime(float(created_utc))
-                 output['feed']['updated_parsed'] = updated_parsed
-                 output['feed']['updated'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', updated_parsed)
-             except (ValueError, TypeError):
-                  pass # Ignore if timestamp is bad
+        first_post_data = posts[0].get('data', {})
+        created_utc = first_post_data.get('created_utc')
+        if created_utc:
+            try:
+                updated_parsed = time.gmtime(float(created_utc))
+                output['feed']['updated_parsed'] = updated_parsed
+                output['feed']['updated'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', updated_parsed)
+            except (ValueError, TypeError):
+                pass # Ignore if timestamp is bad
 
     # Populate entries
     for post_wrapper in posts:
