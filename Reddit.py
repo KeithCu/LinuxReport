@@ -4,168 +4,223 @@ import json
 import time
 import re
 from urllib.parse import urlparse
+import getpass # For securely getting password
 
 # --- Configuration ---
-# FIXME: these values with placeholders before committing to Git
-REDDIT_CLIENT_ID = "your_client_id_here"
-REDDIT_CLIENT_SECRET = "your_client_secret_here"
-REDDIT_USERNAME = "keithcu"
-REDDIT_PASSWORD = "your_reddit_password" # Needed only for initial token fetch
+# Credentials are now handled via the token file or initial prompt
+# REDDIT_CLIENT_ID = "your_client_id_here" # REMOVED
+# REDDIT_CLIENT_SECRET = "your_client_secret_here" # REMOVED
+# REDDIT_USERNAME = "keithcu" # REMOVED
+# REDDIT_PASSWORD = "your_reddit_password" # REMOVED
 
 REDDIT_TOKEN_URL = 'https://www.reddit.com/api/v1/access_token'
 REDDIT_API_BASE_URL = 'https://oauth.reddit.com'
 TOKEN_FILE = 'reddit_token.json' # Simple file storage for tokens
 
-# <platform>:<app ID>:<version string> (by /u/<reddit username>)
-USER_AGENT = f'python:linuxreport.net:v1.0 (by /u/{REDDIT_USERNAME})'
+# --- User Agent Domain Extraction ---
+URL_IMAGES = None  # Should be set from config (or default)
+
+def extract_domain_from_url_images(url_images):
+    if not url_images:
+        return "linuxreport.net"
+    url = url_images
+    if url.startswith('https://'):
+        url = url[len('https://'):]
+    elif url.startswith('http://'):
+        url = url[len('http://'):]
+    if url.endswith('/static/images'):
+        url = url[:-len('/static/images')]
+    url = url.rstrip('/')
+    return url
+
+# USER_AGENT is now constructed dynamically where needed, using the username from token data
 
 # --- Token Handling ---
 
-def get_initial_token():
-    """Gets the very first token using username/password. Run this ONCE."""
-    if not all([REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET, REDDIT_USERNAME, REDDIT_PASSWORD]):
-        raise ValueError("Missing credentials (ID, Secret, Username, Password) for initial token fetch.")
-
-    auth = requests.auth.HTTPBasicAuth(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET)
+def get_initial_token(client_id, client_secret, username, password):
+    """Gets the very first token using user-provided credentials."""
+    auth = requests.auth.HTTPBasicAuth(client_id, client_secret)
     payload = {
         'grant_type': 'password',
-        'username': REDDIT_USERNAME,
-        'password': REDDIT_PASSWORD,
-        'scope': 'read'
+        'username': username,
+        'password': password,
+        'scope': 'read' # Request only necessary permissions
     }
-    headers = {'User-Agent': USER_AGENT}
+    # Construct user agent here for the initial request
+    user_agent = f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{username})'
+    headers = {'User-Agent': user_agent}
 
     print("Attempting to get initial token from Reddit...")
-    response = None  # Initialize response outside try block
+    response = None
     try:
         response = requests.post(REDDIT_TOKEN_URL, auth=auth, data=payload, headers=headers)
         response.raise_for_status()
         token_data = response.json()
-        token_data['retrieved_at'] = time.time() # Store retrieval time
+        token_data['retrieved_at'] = time.time()
+        # Store necessary credentials for refresh alongside tokens
+        token_data['client_id'] = client_id
+        token_data['client_secret'] = client_secret # Consider security implications
+        token_data['username'] = username
         save_token(token_data)
-        print("Successfully retrieved and saved initial token.")
-        # IMPORTANT: Remove REDDIT_PASSWORD from environment/config after this succeeds!
+        print("Successfully retrieved and saved initial token and credentials.")
         return token_data
     except requests.exceptions.RequestException as e:
         print(f"Error getting initial token: {e}")
-        if response:
+        if response is not None:
             print(f"Response status: {response.status_code}")
             print(f"Response body: {response.text}")
         return None
 
 def save_token(token_data):
-    """Saves token data to a file."""
+    """Saves token data (including client ID/secret/username) to a file."""
     try:
+        # Ensure sensitive data like client_secret isn't inadvertently logged
+        # In a real app, consider encrypting TOKEN_FILE or using secure storage
+        print(f"Saving token data for user '{token_data.get('username', 'N/A')}' to {TOKEN_FILE}")
         with open(TOKEN_FILE, 'w') as f:
-            json.dump(token_data, f)
-        # Restrict file permissions (important on Linux/macOS)
+            json.dump(token_data, f, indent=4) # Add indent for readability
         os.chmod(TOKEN_FILE, 0o600) # Read/write only for owner
     except IOError as e:
-        print(f"Error saving token file: {e}")
+        print(f"Error saving token file '{TOKEN_FILE}': {e}")
+    except Exception as e: # Catch other potential errors like permission issues
+        print(f"An unexpected error occurred while saving the token: {e}")
 
 
 def load_token():
-    """Loads token data from a file."""
+    """Loads token data (including client ID/secret/username) from a file."""
     if not os.path.exists(TOKEN_FILE):
         return None
     try:
         with open(TOKEN_FILE, 'r') as f:
-            return json.load(f)
+            token_data = json.load(f)
+            # Basic validation: check for essential keys
+            if not all(k in token_data for k in ['access_token', 'refresh_token', 'client_id', 'client_secret', 'username']):
+                 print(f"Warning: Token file '{TOKEN_FILE}' is missing essential keys. Re-authentication may be required.")
+                 # Optionally return None or handle partial data
+            return token_data
     except (IOError, json.JSONDecodeError) as e:
-        print(f"Error loading token file: {e}")
+        print(f"Error loading or parsing token file '{TOKEN_FILE}': {e}")
+        return None
+    except Exception as e: # Catch other potential errors
+        print(f"An unexpected error occurred while loading the token: {e}")
         return None
 
 def refresh_token(current_token_data):
     """Uses the refresh token to get a new access token."""
-    if 'refresh_token' not in current_token_data:
-        print("Error: No refresh token found. Need to re-authenticate.")
-        return None # Cannot refresh without a refresh token
+    refresh_tok = current_token_data.get('refresh_token')
+    client_id = current_token_data.get('client_id')
+    client_secret = current_token_data.get('client_secret')
+    username = current_token_data.get('username', 'unknown_user') # Get username for user agent
 
-    if not all([REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET]):
-         raise ValueError("Missing client credentials (ID, Secret) for refresh.")
+    if not refresh_tok:
+        print("Error: No refresh token found in stored data. Need to re-authenticate.")
+        return None
+    if not client_id or not client_secret:
+         print("Error: Missing client credentials (ID, Secret) in stored data for refresh.")
+         return None # Cannot refresh without credentials
 
-    auth = requests.auth.HTTPBasicAuth(REDDIT_CLIENT_ID, REDDIT_CLIENT_SECRET)
+    auth = requests.auth.HTTPBasicAuth(client_id, client_secret)
     payload = {
         'grant_type': 'refresh_token',
-        'refresh_token': current_token_data['refresh_token'],
+        'refresh_token': refresh_tok,
     }
-    headers = {'User-Agent': USER_AGENT}
+    # Construct user agent using username from token data
+    user_agent = f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{username})'
+    headers = {'User-Agent': user_agent}
 
     print("Attempting to refresh token...")
-    response = None  # Initialize response outside try block
+    response = None
     try:
         response = requests.post(REDDIT_TOKEN_URL, auth=auth, data=payload, headers=headers)
         response.raise_for_status()
         new_token_data = response.json()
 
-        # Important: Reddit might NOT return a new refresh token.
-        # If it doesn't, reuse the OLD one.
+        # Preserve essential data from the old token if not returned in refresh
         if 'refresh_token' not in new_token_data:
-            new_token_data['refresh_token'] = current_token_data['refresh_token']
-
+            new_token_data['refresh_token'] = refresh_tok # IMPORTANT: Reuse old refresh token
+        new_token_data['client_id'] = client_id
+        new_token_data['client_secret'] = client_secret
+        new_token_data['username'] = username
         new_token_data['retrieved_at'] = time.time()
+
         save_token(new_token_data)
         print("Successfully refreshed and saved token.")
         return new_token_data
     except requests.exceptions.RequestException as e:
         print(f"Error refreshing token: {e}")
-        if response:
-             print(f"Response status: {response.status_code}")
-             print(f"Response body: {response.text}")
-        # If refresh fails (e.g., invalid refresh token), may need full re-auth
-        if response and response.status_code in [400, 401]:
-             print("Refresh token might be invalid. Manual re-authentication required.")
-             # Optionally delete the bad token file here
-             # if os.path.exists(TOKEN_FILE): os.remove(TOKEN_FILE)
+        if response is not None:
+            print(f"Response status: {response.status_code}")
+            print(f"Response body: {response.text}")
+        if response is not None and response.status_code in [400, 401]:
+            print("Refresh token might be invalid or expired. Manual re-authentication required.")
+            # Consider deleting the invalid token file to force re-auth next time
+            # try:
+            #     os.remove(TOKEN_FILE)
+            #     print(f"Removed potentially invalid token file: {TOKEN_FILE}")
+            # except OSError as rm_err:
+            #     print(f"Could not remove token file: {rm_err}")
         return None
 
 def get_valid_token():
-    """Gets a valid access token, refreshing if necessary."""
+    """
+    Gets valid token data (including access_token and username),
+    prompting for initial credentials if needed, or refreshing if expired.
+    Returns:
+        tuple: (access_token, username) or (None, None) on failure.
+    """
     token_data = load_token()
 
     if not token_data:
-        print("No token file found. Attempting initial fetch.")
-        token_data = get_initial_token()
-        if not token_data:
-            return None # Failed initial fetch
+        print(f"No token file found ('{TOKEN_FILE}') or file is invalid.")
+        print("Please provide your Reddit API credentials for initial setup.")
+        try:
+            client_id = input("Enter your Reddit Client ID: ").strip()
+            client_secret = getpass.getpass("Enter your Reddit Client Secret: ").strip()
+            username = input("Enter your Reddit Username: ").strip()
+            password = getpass.getpass("Enter your Reddit Password (only needed once): ").strip()
+
+            if not all([client_id, client_secret, username, password]):
+                print("Error: All credentials must be provided for initial setup.")
+                return None, None
+
+            token_data = get_initial_token(client_id, client_secret, username, password)
+            # Clear password from memory immediately after use
+            del password
+            if not token_data:
+                print("Failed to obtain initial token.")
+                return None, None # Failed initial fetch
+            print("Initial token fetch successful.")
+        except EOFError: # Handle running in non-interactive environment
+             print("\nError: Cannot prompt for credentials in non-interactive mode and no token file found.")
+             return None, None
+        except Exception as e: # Catch other potential input errors
+             print(f"\nAn error occurred during credential input: {e}")
+             return None, None
+
 
     # Check if token is expired or close to expiring (e.g., within 60 seconds)
-    expires_in = token_data.get('expires_in', 3600) # Default to 1 hour if missing
+    expires_in = token_data.get('expires_in', 3600) # Default to 1 hour
     retrieved_at = token_data.get('retrieved_at', 0)
-    if time.time() > retrieved_at + expires_in - 60:
+    current_time = time.time()
+
+    if current_time > retrieved_at + expires_in - 60:
         print("Token expired or nearing expiry, attempting refresh.")
-        token_data = refresh_token(token_data)
+        refreshed_token_data = refresh_token(token_data)
+        if not refreshed_token_data:
+            print("Failed to refresh token. Manual intervention may be required.")
+            # Depending on policy, could delete token file here or just return failure
+            return None, None
+        token_data = refreshed_token_data # Use the new token data
 
-    return token_data.get('access_token') if token_data else None
+    # Return the access token and username from the (potentially refreshed) data
+    access_token = token_data.get('access_token')
+    username = token_data.get('username')
 
-# --- Example API Call ---
+    if not access_token or not username:
+        print("Error: Could not retrieve valid access token or username from token data.")
+        return None, None
 
-def get_subscribed_subreddits(access_token):
-    """Example API call to get user's subscribed subreddits."""
-    if not access_token:
-        print("Cannot make API call: No valid access token.")
-        return None
-
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'User-Agent': USER_AGENT
-    }
-    api_url = f"{REDDIT_API_BASE_URL}/subreddits/mine/subscriber"
-    params = {'limit': 5} # Get first 5
-
-    print(f"Fetching subscribed subreddits from {api_url}...")
-    try:
-        response = requests.get(api_url, headers=headers, params=params)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        print(f"API call failed: {e}")
-        if response:
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
-            if response.status_code == 401:
-                print("API call failed with 401 (Unauthorized). Token might be invalid/revoked even after refresh attempt.")
-        return None
+    return access_token, username
 
 def parse_reddit_url(url):
     """
@@ -289,13 +344,7 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     """
     Fetches data from Reddit API based on an RSS-like URL
     and returns it in a structure similar to feedparser output.
-
-    Args:
-        feed_url (str): The Reddit URL (e.g., "https://www.reddit.com/r/linux/hot/.rss")
-
-    Returns:
-        dict: A dictionary mimicking feedparser structure, or None on critical failure.
-              Contains 'feed' and 'entries' keys. 'bozo' key indicates non-critical errors.
+    Requires a valid token obtained via get_valid_token().
     """
     subreddit, feed_type = parse_reddit_url(feed_url)
 
@@ -311,17 +360,22 @@ def fetch_reddit_feed_as_feedparser(feed_url):
             'href': feed_url
         }
 
-    access_token = get_valid_token() # Assumes this function exists and works
-    if not access_token or access_token == "DUMMY_TOKEN": # Added dummy check for testing
-        print("Error: Could not obtain valid Reddit access token.")
+    # Get token AND username
+    access_token, username = get_valid_token()
+    if not access_token or not username:
+        print("Error: Could not obtain valid Reddit access token and username.")
+        # Return structure indicating auth failure
         return {
             'bozo': 1,
-            'bozo_exception': ConnectionError("Failed to get Reddit access token"),
+            'bozo_exception': ConnectionError("Failed to get Reddit access token/username"),
             'feed': {},
             'entries': [],
             'status': 401, # Indicate auth failure
             'href': feed_url
         }
+
+    # Construct User-Agent using the retrieved username
+    user_agent = f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{username})'
 
     # Construct the API endpoint path
     api_path = f"/r/{subreddit}/{feed_type}"
@@ -329,10 +383,9 @@ def fetch_reddit_feed_as_feedparser(feed_url):
 
     headers = {
         'Authorization': f'Bearer {access_token}',
-        'User-Agent': USER_AGENT
+        'User-Agent': user_agent # Use dynamically generated user agent
     }
-    # Standard Reddit API limit for listings
-    params = {'limit': 25}
+    params = {'limit': 25} # Standard Reddit API limit
 
     print(f"Fetching {feed_type} feed for r/{subreddit} from API: {api_url}")
     output = {
@@ -429,25 +482,27 @@ def fetch_reddit_feed_as_feedparser(feed_url):
 
 # --- Main Execution Logic ---
 if __name__ == '__main__':
-    # Ensure client credentials are set
-    if REDDIT_CLIENT_ID == "your_client_id_here" or REDDIT_CLIENT_SECRET == "your_client_secret_here":
-        print("Error: REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET must be properly configured.")
+    print("Attempting to ensure a valid Reddit token exists...")
+    # This call will handle loading, prompting for initial creds, or refreshing
+    token, user = get_valid_token()
+
+    if token and user:
+        print(f"\nSuccessfully obtained a valid token for user: {user}.")
+        print("You can now use functions like fetch_reddit_feed_as_feedparser.")
+
+        # Example usage (optional):
+        # test_url = "https://www.reddit.com/r/python/hot/.rss"
+        # print(f"\nAttempting to fetch example feed: {test_url}")
+        # feed_data = fetch_reddit_feed_as_feedparser(test_url)
+        # if feed_data and not feed_data.get('bozo'):
+        #     print(f"Successfully fetched {len(feed_data.get('entries', []))} entries.")
+        #     # print(json.dumps(feed_data, indent=2)) # Pretty print result
+        # elif feed_data:
+        #     print(f"Failed to fetch feed. Status: {feed_data.get('status')}, Error: {feed_data.get('bozo_exception')}")
+        # else:
+        #     print("Failed to fetch feed (returned None).")
+
     else:
-        # Get a valid token (loads existing, fetches initial, or refreshes)
-        current_access_token = get_valid_token()
-
-        if current_access_token:
-            print("\nSuccessfully obtained a valid access token.")
-
-            # Now you can use the current_access_token to make API calls
-            subreddits_data = get_subscribed_subreddits(current_access_token)
-
-            if subreddits_data and 'data' in subreddits_data and 'children' in subreddits_data['data']:
-                print("\nFirst few subscribed subreddits:")
-                for sub in subreddits_data['data']['children']:
-                    print(f"- {sub['data']['display_name']}")
-            else:
-                print("\nCould not retrieve subscribed subreddits.")
-        else:
-            print("\nFailed to obtain a valid access token. Cannot proceed.")
-
+        print("\nFailed to obtain a valid Reddit token. Cannot proceed with API calls.")
+        print(f"Check for errors above. If it's the first run, ensure you provide correct credentials when prompted.")
+        print(f"Make sure the token file '{TOKEN_FILE}' is writable if it needs to be created/updated.")
