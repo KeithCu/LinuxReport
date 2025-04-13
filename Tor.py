@@ -4,15 +4,11 @@ import random
 import threading
 import time
 
-import urllib.request
 from timeit import default_timer as timer
 import traceback
 import subprocess
-import socks
 import feedparser
 from fake_useragent import UserAgent
-
-import shared
 
 import shared
 from seleniumfetch import fetch_site_posts

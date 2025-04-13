@@ -1,4 +1,4 @@
-from shared import RssInfo, SiteConfig
+from models import RssInfo, SiteConfig
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={

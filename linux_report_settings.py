@@ -1,7 +1,4 @@
-from shared import RssInfo, SiteConfig
-from typing import List, Dict
-
-# Remove local LinuxReportConfig; now using shared SiteConfig
+from models import RssInfo, SiteConfig
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={

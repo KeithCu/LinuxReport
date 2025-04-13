@@ -1,4 +1,4 @@
-from shared import RssInfo, SiteConfig
+from models import RssInfo, SiteConfig
 from typing import List, Dict
 
 CONFIG: SiteConfig = SiteConfig(

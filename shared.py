@@ -1,3 +1,9 @@
+"""
+shared.py
+
+This module contains shared utilities, classes, and constants for the LinuxReport project.
+"""
+
 from dataclasses import dataclass
 from enum import Enum
 import datetime
@@ -5,44 +11,8 @@ import diskcache
 import FeedHistory
 from typing import List, Dict
 
-TZ = FeedHistory.TZ
-
-@dataclass
-class SiteConfig:
-    ALL_URLS: Dict[str, "RssInfo"]
-    USER_AGENT: str
-    site_urls: List[str]
-    URL_IMAGES: str
-    FAVICON: str
-    LOGO_URL: str
-    WEB_DESCRIPTION: str
-    WEB_TITLE: str
-    ABOVE_HTML_FILE: str
-
-class RssFeed:
-    def __init__(self, entries, top_articles=None):
-        self.entries = entries
-        self.top_articles = top_articles if top_articles else []
-        self.__post_init__()
-
-    def __post_init__(self):
-        if not hasattr(self, 'top_articles'):
-            object.__setattr__(self, 'top_articles', [])
-
-    def __setstate__(self, state):
-        object.__setattr__(self, '__dict__', state)
-        self.__post_init__()
-
-
-class RssInfo:
-    def __init__(self, logo_url, logo_alt, site_url):
-        self.logo_url = logo_url
-        self.logo_alt = logo_alt
-        self.site_url = site_url
-
-PATH = '/run/linuxreport'
-
 class Mode(Enum):
+    """Enumeration for different report modes."""
     LINUX_REPORT = 1
     COVID_REPORT = 2
     TECHNO_REPORT = 3
@@ -51,53 +21,142 @@ class Mode(Enum):
     TRUMP_REPORT = 6
     SPACE_REPORT = 7
 
+# Constants
+DEBUG = True
+
+MODE = Mode.LINUX_REPORT
+
+TZ = FeedHistory.TZ
+PATH = '/run/linuxreport'
 EXPIRE_MINUTES = 60 * 5
 EXPIRE_HOUR = 3600
 EXPIRE_DAY = 3600 * 12
 EXPIRE_WEEK = 86400 * 7
 EXPIRE_YEARS = 86400 * 365 * 2
 
-MODE = Mode.TRUMP_REPORT
+# Moved constants and global variables from app.py to shared.py
+MODE = Mode.LINUX_REPORT
 
-history = FeedHistory.FeedHistory(data_file = f"{PATH}/feed_history{str(MODE)}.pickle")
+# Constants for configuration
+URLS_COOKIE_VERSION = "2"
+USE_TOR = False
+
+# Added definition for RSS_TIMEOUT
+RSS_TIMEOUT = 300  # Timeout value in seconds for RSS feed operations
+
+# Added definition for MAX_ITEMS
+MAX_ITEMS = 40  # Maximum number of items to process in RSS feeds
+
+# Configuration settings (to be dynamically loaded based on mode)
+ALL_URLS = None
+site_urls = None
+USER_AGENT = None
+URL_IMAGES = None
+FAVICON = None
+LOGO_URL = None
+WEB_DESCRIPTION = None
+WEB_TITLE = None
+ABOVE_HTML_FILE = None
+WELCOME_HTML = None
+STANDARD_ORDER_STR = None
+
+# Initialize configuration settings based on the current mode
+if MODE == Mode.LINUX_REPORT:
+    import linux_report_settings as config_settings
+elif MODE == Mode.COVID_REPORT:
+    import covid_report_settings as config_settings
+elif MODE == Mode.TECHNO_REPORT:
+    import techno_report_settings as config_settings
+elif MODE == Mode.AI_REPORT:
+    import ai_report_settings as config_settings
+elif MODE == Mode.TRUMP_REPORT:
+    import trump_report_settings as config_settings
+else:
+    raise ValueError("Invalid mode specified.")
+
+ALL_URLS = config_settings.CONFIG.ALL_URLS
+site_urls = config_settings.CONFIG.site_urls
+USER_AGENT = config_settings.CONFIG.USER_AGENT
+URL_IMAGES = config_settings.CONFIG.URL_IMAGES
+FAVICON = config_settings.CONFIG.FAVICON
+LOGO_URL = config_settings.CONFIG.LOGO_URL
+WEB_DESCRIPTION = config_settings.CONFIG.WEB_DESCRIPTION
+WEB_TITLE = config_settings.CONFIG.WEB_TITLE
+ABOVE_HTML_FILE = config_settings.CONFIG.ABOVE_HTML_FILE
+
+WELCOME_HTML = ('<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
+                'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
+                'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>'
+                '<br/>The Reddit Woke mafia had blocked my user-agent and IP address for political reasons, (I was making max a few requests per hour!!) '
+                '<br/>So, I picked a random USER_AGENT and am using <a href = "https://www.torproject.org/">TOR</a> to fetch Reddit feeds. Checkmate, bitches!')
+STANDARD_ORDER_STR = str(site_urls)
+
+# Moved RssInfo and SiteConfig to a separate module (models.py) to avoid circular imports.
+# Removed the definitions of RssInfo and SiteConfig from this file.
+
+# Classes
+class RssFeed:
+    """Represents an RSS feed with entries and optional top articles."""
+    def __init__(self, entries, top_articles=None):
+        self.entries = entries
+        self.top_articles = top_articles if top_articles else []
+        self.__post_init__()
+
+    def __post_init__(self):
+        """Ensure top_articles attribute is initialized."""
+        if not hasattr(self, 'top_articles'):
+            object.__setattr__(self, 'top_articles', [])
+
+    def __setstate__(self, state):
+        """Restore state and reinitialize attributes."""
+        object.__setattr__(self, '__dict__', state)
+        self.__post_init__()
 
 class DiskCacheWrapper:
+    """Wrapper for diskcache to manage caching operations."""
     def __init__(self, cache_dir):
         self.cache = diskcache.Cache(cache_dir)
 
     def has(self, key):
+        """Check if a key exists in the cache."""
         return key in self.cache
 
     def get(self, key):
+        """Retrieve a value from the cache by key."""
         return self.cache.get(key)
 
     def put(self, key, value, timeout=None):
+        """Store a value in the cache with an optional timeout."""
         self.cache.set(key, value, expire=timeout)
 
     def delete(self, key):
+        """Delete a key from the cache."""
         self.cache.delete(key)
 
     def has_feed_expired(self, url):
+        """Check if a feed has expired based on the last fetch time."""
         last_fetch = self.get(url + ":last_fetch")
         if last_fetch is None:
             return True
         return history.has_expired(url, last_fetch)
 
+# Global Variables
+history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")
 g_c = DiskCacheWrapper(PATH)
 
-
-def format_last_updated(last_fetch, timezone):
-    """Format the last fetch time as 'HH:MM' in the given timezone."""
+# Functions
+def format_last_updated(last_fetch):
+    """Format the last fetch time as 'HH:MM'."""
     if not last_fetch:
         return "Unknown"
     return last_fetch.strftime("%I:%M %p")
 
-def format_last_updated_fancy(last_fetch, timezone):
+def format_last_updated_fancy(last_fetch):
     """Format the last fetch time as 'X minutes ago' or 'X hours ago'."""
     if not last_fetch:
         return "Unknown"
 
-    now = datetime.datetime.now(timezone)
+    now = datetime.datetime.now()
     delta = now - last_fetch
     total_minutes = delta.total_seconds() / 60.0
 
