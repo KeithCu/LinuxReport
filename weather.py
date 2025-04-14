@@ -6,7 +6,7 @@ Provides functions to fetch and cache weather data, including a fake API mode fo
 
 # Standard library imports
 from datetime import datetime, date as date_obj
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 import time
 import math
 import os
@@ -18,6 +18,11 @@ import geoip2.database
 # Local imports
 from shared import SPATH, DiskCacheWrapper, DEBUG
 
+# --- Configurable cache bucketing ---
+WEATHER_BUCKET_PRECISION = 1  # Decimal places for lat/lon rounding (lower = larger area per bucket)
+WEATHER_CACHE_MAX_ENTRIES = 500
+
+# ---
 g_c = DiskCacheWrapper(SPATH)
 
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
@@ -32,11 +37,16 @@ FAKE_API = False  # Fake Weather API calls
 DEFAULT_WEATHER_LAT = "42.3297"
 DEFAULT_WEATHER_LON = "83.0425"
 
-# Configurable proximity threshold (in miles)
-WEATHER_CACHE_DISTANCE_MILES = 30  # Can be overridden as needed
-
 RL_KEY = "weather_api_call_timestamps"
 
+# --- Bucketing helpers ---
+def _round_coord(val, precision=WEATHER_BUCKET_PRECISION):
+    return round(float(val), precision)
+
+def _bucket_key(lat, lon, precision=WEATHER_BUCKET_PRECISION):
+    return f"{_round_coord(lat, lon):.{precision}f},{_round_coord(lon, precision):.{precision}f}"
+
+# --- GeoIP ---
 def _get_geoip_db_path():
     srv_path = os.path.join('/srv/http/LinuxReport2', 'GeoLite2-City.mmdb')
     if os.path.exists(srv_path):
@@ -45,7 +55,6 @@ def _get_geoip_db_path():
 
 GEOIP_DB_PATH = _get_geoip_db_path()
 
-# Helper to get lat/lon from IP address
 _geoip_reader = None
 def get_location_from_ip(ip):
     global _geoip_reader
@@ -80,56 +89,45 @@ def rate_limit_check():
     timestamps.append(time.time())
     g_c.put(RL_KEY, timestamps, timeout=70)
 
-# Helper: Haversine formula to compute distance between two lat/lon points (in miles)
-def haversine(lat1, lon1, lat2, lon2):
-    R = 3958.8  # Earth radius in miles
-    phi1 = math.radians(float(lat1))
-    phi2 = math.radians(float(lat2))
-    dphi = math.radians(float(lat2) - float(lat1))
-    dlambda = math.radians(float(lon2) - float(lon1))
-    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
-
-# Helper: Get all cached weather entries (list of dicts with lat, lon, data, timestamp)
+# --- Weather cache helpers (bucketed) ---
 def get_weather_cache_entries():
+    """Returns an OrderedDict of bucket_key -> entry, sorted by most recent timestamp."""
     entries = g_c.get('weather:cache_entries')
-    if not entries:
-        entries = []
-    # Remove expired entries
+    if not entries or not isinstance(entries, dict):
+        entries = {}
     now = time.time()
-    entries = [e for e in entries if now - e.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT]
-    g_c.put('weather:cache_entries', entries, timeout=WEATHER_CACHE_TIMEOUT)
-    return entries
+    filtered = {k: v for k, v in entries.items() if now - v.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT}
+    sorted_items = sorted(filtered.items(), key=lambda item: item[1].get('timestamp', 0), reverse=True)
+    od = OrderedDict(sorted_items)
+    while len(od) > WEATHER_CACHE_MAX_ENTRIES:
+        od.popitem(last=False)
+    g_c.put('weather:cache_entries', dict(od), timeout=WEATHER_CACHE_TIMEOUT)
+    return od
 
-# Helper: Save a new weather cache entry
 def save_weather_cache_entry(lat, lon, data):
-    """Saves a weather data entry to the cache with timestamp and date."""
+    """Saves a weather data entry to the cache with timestamp and date, using bucketed key."""
     entries = get_weather_cache_entries()
     now = time.time()
-    today_str = date_obj.today().isoformat()  # Use renamed import
-    entries.append({'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str})  # Add date to cache entry
-    # Keep only recent entries (optional: limit size)
-    if len(entries) > 100:
-        entries = entries[-100:]
-    g_c.put('weather:cache_entries', entries, timeout=WEATHER_CACHE_TIMEOUT)
+    today_str = date_obj.today().isoformat()
+    key = _bucket_key(lat, lon)
+    entries[key] = {'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str}
+    # Limit to max entries
+    while len(entries) > WEATHER_CACHE_MAX_ENTRIES:
+        entries.popitem(last=False)
+    g_c.put('weather:cache_entries', dict(entries), timeout=WEATHER_CACHE_TIMEOUT)
 
-# Helper: Find cached weather data within a distance threshold
-def find_nearby_weather_cache(lat, lon, distance_miles=WEATHER_CACHE_DISTANCE_MILES):
-    """Finds a nearby weather cache entry, checking both timeout and date."""
+def get_bucketed_weather_cache(lat, lon):
+    """Returns cached weather data for the bucketed (lat, lon) if present and same day."""
     entries = get_weather_cache_entries()
-    today_str = date_obj.today().isoformat()  # Use renamed import
-    for entry in entries:
-        d = haversine(lat, lon, entry['lat'], entry['lon'])
-        # Check if cache entry is still valid (within timeout AND on the same day)
-        is_recent = time.time() - entry['timestamp'] < WEATHER_CACHE_TIMEOUT
-        is_same_day = entry.get('date') == today_str  # Check if dates match
-
-        if d <= distance_miles and is_recent and is_same_day:
-            return entry['data']
+    key = _bucket_key(lat, lon)
+    entry = entries.get(key)
+    today_str = date_obj.today().isoformat()
+    if entry and entry.get('date') == today_str:
+        return entry['data']
     return None
 
-def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_CACHE_DISTANCE_MILES):
+# ---
+def get_weather_data(lat=None, lon=None, ip=None):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
@@ -140,10 +138,10 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
     if not lat or not lon:
         lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
-    # Proximity-based cache lookup
-    nearby_weather = find_nearby_weather_cache(lat, lon, distance_miles=cache_distance_miles)
-    if nearby_weather:
-        return nearby_weather, 200
+    # Bucketed cache lookup
+    bucketed_weather = get_bucketed_weather_cache(lat, lon)
+    if bucketed_weather:
+        return bucketed_weather, 200
 
     # Use fake data if enabled
     if FAKE_API:
@@ -186,10 +184,8 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
 
             # Prefer earliest icon for today, noon icon for future days
             if is_today:
-                # For today, use the first available entry
                 preferred_entry = entries[0]
             else:
-                # For future days, prefer noon icon
                 preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
 
             weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
@@ -215,6 +211,7 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
         print(f"Error processing weather data: {e}")
         return {"error": "Failed to process weather data"}, 500
 
+# --- HTML rendering 
 def get_weather_html(ip):
     """Returns HTML for displaying the 5-day weather forecast, using cached or fake data if available. If not, returns fallback HTML for client-side JS to fetch weather."""
     weather_data, status_code = get_weather_data(ip=ip)
