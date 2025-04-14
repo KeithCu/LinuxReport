@@ -1,9 +1,19 @@
+"""
+weather.py
 
+Provides functions to fetch and cache weather data, including a fake API mode for testing. Includes HTML rendering for weather forecasts.
+"""
+
+# Standard library imports
+from datetime import datetime
+
+# Third-party imports
 import requests
 from flask import jsonify
-from datetime import datetime
+
+# Local imports
 import shared
-from shared import g_c # Assuming g_c is the cache instance
+from shared import g_c
 
 WEATHER_API_KEY = "YOUR_WEATHER_API_KEY"  # Replace with your actual API key
 WEATHER_CACHE_TIMEOUT = 3600 * 12  # 12 hours in seconds

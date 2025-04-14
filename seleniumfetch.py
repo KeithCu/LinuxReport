@@ -1,20 +1,28 @@
+"""
+seleniumfetch.py
+
+Provides functions to fetch and parse posts from sites requiring JavaScript rendering or special handling, using Selenium and BeautifulSoup. Includes site-specific configurations and helpers.
+"""
+
+# Standard library imports
 from datetime import datetime, timezone
 import time
+import os
+from urllib.parse import urljoin, urlparse
+
+# Third-party imports
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-import os
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
+# Local imports
 import shared
 g_cache = shared.DiskCacheWrapper("/tmp")
 

@@ -1,17 +1,22 @@
+"""
+Reddit.py
+
+Handles Reddit API authentication, token management, and fetching Reddit feeds in a feedparser-compatible format for the LinuxReport project.
+"""
+
+# Standard library imports
 import os
-import requests
 import json
 import time
 import re
 from urllib.parse import urlparse
-import getpass # For securely getting password
+import getpass
+
+# Third-party imports
+import requests
 
 # --- Configuration ---
 # Credentials are now handled via the token file or initial prompt
-# REDDIT_CLIENT_ID = "your_client_id_here" # REMOVED
-# REDDIT_CLIENT_SECRET = "your_client_secret_here" # REMOVED
-# REDDIT_USERNAME = "keithcu" # REMOVED
-# REDDIT_PASSWORD = "your_reddit_password" # REMOVED
 
 REDDIT_TOKEN_URL = 'https://www.reddit.com/api/v1/access_token'
 REDDIT_API_BASE_URL = 'https://oauth.reddit.com'

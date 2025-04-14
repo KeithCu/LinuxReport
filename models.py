@@ -1,3 +1,10 @@
+"""
+models.py
+
+Defines data models and configuration structures for the LinuxReport project.
+"""
+
+# Standard library imports
 from dataclasses import dataclass
 from typing import List, Dict
 

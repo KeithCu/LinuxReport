@@ -1,6 +1,10 @@
-# This file contains WTForms classes for handling user input in forms.
-# Forms include URL management, custom RSS feeds, and configuration settings.
+"""
+forms.py
 
+This file contains WTForms classes for handling user input in forms, including URL management, custom RSS feeds, and configuration settings.
+"""
+
+# Third-party imports
 from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators
 
 # Form for managing individual URLs.

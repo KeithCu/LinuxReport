@@ -1,16 +1,16 @@
-﻿import sys
-import os
-import json
-from datetime import datetime
-from timeit import default_timer as timer
+﻿"""
+app.py
+
+Main entry point for the Flask application. Initializes the Flask app, configures extensions, loads shared settings, and registers routes.
+"""
+
+# Third-party imports
 from flask import Flask
 from flask_mobility import Mobility
 
-# Ensured shared module is correctly imported
+# Local imports
 import shared
-from shared import EXPIRE_WEEK, Mode, g_c, MODE, DEBUG
-from workers import load_url_worker, refresh_thread
-from forms import ConfigForm, UrlForm, CustomRSSForm
+from shared import EXPIRE_WEEK, DEBUG
 
 # Initialize Flask app
 g_app = Flask(__name__)

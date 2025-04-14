@@ -1,15 +1,22 @@
-# This file contains all the Flask route handlers for the application.
-# Routes include the main index page, configuration page, and weather API.
+"""
+routes.py
 
+This file contains all the Flask route handlers for the application, including the main index page, configuration page, and weather API.
+"""
+
+# Third-party imports
 from flask import render_template, request, g, jsonify
+from markupsafe import Markup
+
+# Standard library imports
+import json
+from timeit import default_timer as timer
+
+# Local imports
 from shared import ALL_URLS, URLS_COOKIE_VERSION, site_urls, DEBUG, g_c, STANDARD_ORDER_STR, EXPIRE_MINUTES, URL_IMAGES, LOGO_URL, WEB_TITLE, WEB_DESCRIPTION, FAVICON, WELCOME_HTML, ABOVE_HTML_FILE
 from models import RssInfo
 from forms import ConfigForm, UrlForm, CustomRSSForm
 from weather import get_weather_data
-
-from markupsafe import Markup
-import json
-from timeit import default_timer as timer
 import shared
 from workers import fetch_urls_parallel, fetch_urls_thread
 
