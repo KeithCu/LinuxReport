@@ -25,8 +25,11 @@ class Mode(Enum):
 # Constants
 DEBUG: bool = True
 
-# Use environment variable for PATH, fallback to default
-PATH: str = os.environ.get("LINUXREPORT_PATH", "/run/linuxreport")
+# Path for code and cache
+PATH: str = "/srv/http/LinuxReport2"
+
+# Shared path for weather, etc.
+SPATH: str = "/run/linuxreport"
 TZ = FeedHistory.TZ
 EXPIRE_MINUTES: int = 60 * 5
 EXPIRE_HOUR: int = 3600
@@ -34,31 +37,15 @@ EXPIRE_DAY: int = 3600 * 12
 EXPIRE_WEEK: int = 86400 * 7
 EXPIRE_YEARS: int = 86400 * 365 * 2
 
-# Moved constants and global variables from app.py to shared.py
 MODE = Mode.AI_REPORT
 
 # Constants for configuration
 URLS_COOKIE_VERSION = "2"
 USE_TOR = False
 
-# Added definition for RSS_TIMEOUT
 RSS_TIMEOUT = 300  # Timeout value in seconds for RSS feed operations
 
-# Added definition for MAX_ITEMS
 MAX_ITEMS = 40  # Maximum number of items to process in RSS feeds
-
-# Configuration settings (to be dynamically loaded based on mode)
-ALL_URLS = None
-site_urls = None
-USER_AGENT = None
-URL_IMAGES = None
-FAVICON = None
-LOGO_URL = None
-WEB_DESCRIPTION = None
-WEB_TITLE = None
-ABOVE_HTML_FILE = None
-WELCOME_HTML = None
-STANDARD_ORDER_STR = None
 
 # Mapping for configuration modules
 CONFIG_MODULES = {
