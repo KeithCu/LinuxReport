@@ -5,9 +5,10 @@ Provides functions to fetch and cache weather data, including a fake API mode fo
 """
 
 # Standard library imports
-from datetime import datetime
+from datetime import datetime, date as date_obj  # Renamed import
 import time
 import math
+from collections import defaultdict
 
 # Third-party imports
 import requests
@@ -103,9 +104,11 @@ def get_weather_cache_entries():
 
 # Helper: Save a new weather cache entry
 def save_weather_cache_entry(lat, lon, data):
+    """Saves a weather data entry to the cache with timestamp and date."""
     entries = get_weather_cache_entries()
     now = time.time()
-    entries.append({'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now})
+    today_str = date_obj.today().isoformat()  # Use renamed import
+    entries.append({'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str})  # Add date to cache entry
     # Keep only recent entries (optional: limit size)
     if len(entries) > 100:
         entries = entries[-100:]
@@ -113,10 +116,16 @@ def save_weather_cache_entry(lat, lon, data):
 
 # Helper: Find cached weather data within a distance threshold
 def find_nearby_weather_cache(lat, lon, distance_miles=WEATHER_CACHE_DISTANCE_MILES):
+    """Finds a nearby weather cache entry, checking both timeout and date."""
     entries = get_weather_cache_entries()
+    today_str = date_obj.today().isoformat()  # Use renamed import
     for entry in entries:
         d = haversine(lat, lon, entry['lat'], entry['lon'])
-        if d <= distance_miles:
+        # Check if cache entry is still valid (within timeout AND on the same day)
+        is_recent = time.time() - entry['timestamp'] < WEATHER_CACHE_TIMEOUT
+        is_same_day = entry.get('date') == today_str  # Check if dates match
+
+        if d <= distance_miles and is_recent and is_same_day:
             return entry['data']
     return None
 
@@ -131,17 +140,10 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
     if not lat or not lon:
         lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
-    cache_key = f"weather:{lat}:{lon}"
-
     # Proximity-based cache lookup
     nearby_weather = find_nearby_weather_cache(lat, lon, distance_miles=cache_distance_miles)
     if nearby_weather:
         return nearby_weather, 200
-
-    # Check cache (legacy, exact match)
-    cached_weather = g_c.get(cache_key)
-    if cached_weather:
-        return cached_weather, 200
 
     # Use fake data if enabled
     if FAKE_API:
@@ -167,7 +169,6 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
         response.raise_for_status()
         weather_data = response.json()
 
-        from collections import defaultdict
         daily_data = defaultdict(list)
         for entry in weather_data.get("list", []):
             date_str = entry.get("dt_txt", "")[:10]  # 'YYYY-MM-DD'
@@ -179,10 +180,21 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
             temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
             pops = [e.get("pop", 0) for e in entries]
             rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
-            # Prefer weather at 12:00:00, else first
-            midday = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
-            weather_main = midday["weather"][0]["main"] if midday.get("weather") and len(midday["weather"]) > 0 else "N/A"
-            weather_icon = midday["weather"][0]["icon"] if midday.get("weather") and len(midday["weather"]) > 0 else "01d"
+
+            # Determine if today or future day
+            is_today = datetime.strptime(date, "%Y-%m-%d").date() == datetime.now().date()
+
+            # Prefer earliest icon for today, noon icon for future days
+            if is_today:
+                # For today, use the first available entry
+                preferred_entry = entries[0]
+            else:
+                # For future days, prefer noon icon
+                preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
+
+            weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
+            weather_icon = preferred_entry["weather"][0]["icon"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "01d"
+
             processed_data["daily"].append({
                 "dt": int(datetime.strptime(date, "%Y-%m-%d").timestamp()),
                 "temp_min": min(temp_mins) if temp_mins else None,
@@ -193,7 +205,6 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
                 "weather_icon": weather_icon
             })
 
-        g_c.put(cache_key, processed_data, timeout=WEATHER_CACHE_TIMEOUT)
         save_weather_cache_entry(lat, lon, processed_data)
         return processed_data, 200
 

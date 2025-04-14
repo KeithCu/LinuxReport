@@ -7,7 +7,7 @@ import itertools
 import re
 from timeit import default_timer as timer
 import concurrent.futures
-from shared import ALL_URLS, PATH, g_c, DiskCacheWrapper, RSS_TIMEOUT, MAX_ITEMS, DEBUG, USE_TOR, USER_AGENT, EXPIRE_WEEK
+from shared import ALL_URLS, PATH, g_c, RSS_TIMEOUT, MAX_ITEMS, DEBUG, USE_TOR, USER_AGENT, EXPIRE_WEEK
 from feedfilter import prefilter_news, filter_similar_titles, merge_entries
 from seleniumfetch import fetch_site_posts
 from Tor import fetch_via_tor
