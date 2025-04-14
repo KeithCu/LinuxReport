@@ -15,7 +15,9 @@ import geoip2.database
 import os
 
 # Local imports
-from shared import g_c, DEBUG
+from shared import SPATH, DiskCacheWrapper, DEBUG
+
+g_c = DiskCacheWrapper(SPATH)
 
 WEATHER_API_KEY = "FIXME"  # FIXME: Replace with your actual API key
 if DEBUG:
@@ -32,7 +34,8 @@ DEFAULT_WEATHER_LON = "-122.4194"
 # Configurable proximity threshold (in miles)
 WEATHER_CACHE_DISTANCE_MILES = 30  # Can be overridden as needed
 
-# Path to GeoLite2-City.mmdb (prefer /srv/http/LinuxReport2, fallback to script dir)
+RL_KEY = "weather_api_call_timestamps"
+
 def _get_geoip_db_path():
     srv_path = os.path.join('/srv/http/LinuxReport2', 'GeoLite2-City.mmdb')
     if os.path.exists(srv_path):
@@ -55,9 +58,9 @@ def get_location_from_ip(ip):
     except Exception:
         return None, None
 
+
 def rate_limit_check():
     """Enforces 60 calls/minute and 1 second between calls using g_c (DiskCacheWrapper)."""
-    RL_KEY = "weather_api_call_timestamps"
     now = time.time()
     timestamps = g_c.get(RL_KEY) or []
     # Remove timestamps older than 60 seconds
