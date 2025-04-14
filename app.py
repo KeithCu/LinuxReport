@@ -3,10 +3,13 @@ app.py
 
 Main entry point for the Flask application. Initializes the Flask app, configures extensions, loads shared settings, and registers routes.
 """
+import sys
 
 # Third-party imports
 from flask import Flask
 from flask_mobility import Mobility
+
+sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
 import shared

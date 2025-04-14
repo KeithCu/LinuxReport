@@ -23,7 +23,7 @@ class Mode(Enum):
     SPACE_REPORT = 7
 
 # Constants
-DEBUG: bool = True
+DEBUG: bool = False
 
 # Path for code and cache
 PATH: str = "/srv/http/LinuxReport2"
