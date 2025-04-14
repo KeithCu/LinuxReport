@@ -285,30 +285,12 @@ document.addEventListener("DOMContentLoaded", function () {
       const weatherError = document.getElementById('weather-error');
       const weatherForecast = document.getElementById('weather-forecast');
   
-      // Try to get the user's location
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          function(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            fetchWeatherData(lat, lon);
-          },
-          function(error) {
-            console.error("Geolocation error:", error);
-            weatherLoading.style.display = "none";
-            weatherError.style.display = "block";
-            weatherError.textContent = "Couldn't determine your location. Please allow location access.";
-          }
-        );
-      } else {
-        weatherLoading.style.display = "none";
-        weatherError.style.display = "block";
-        weatherError.textContent = "Geolocation is not supported by your browser.";
-      }
+      // Fetch weather using IP (no geolocation)
+      fetchWeatherData();
     }
   
-    function fetchWeatherData(lat, lon) {
-      fetch(`/api/weather?lat=${lat}&lon=${lon}`)
+    function fetchWeatherData() {
+      fetch(`/api/weather`)
         .then(response => {
           if (!response.ok) {
             throw new Error('Network response was not ok');
