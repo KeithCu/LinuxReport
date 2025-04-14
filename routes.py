@@ -13,12 +13,13 @@ import json
 from timeit import default_timer as timer
 
 # Local imports
-from shared import ALL_URLS, URLS_COOKIE_VERSION, site_urls, DEBUG, g_c, STANDARD_ORDER_STR, EXPIRE_MINUTES, URL_IMAGES, LOGO_URL, WEB_TITLE, WEB_DESCRIPTION, FAVICON, WELCOME_HTML, ABOVE_HTML_FILE
+from shared import ALL_URLS, URLS_COOKIE_VERSION, site_urls, DEBUG, g_c, STANDARD_ORDER_STR, EXPIRE_MINUTES, EXPIRE_WEEK, URL_IMAGES, LOGO_URL, WEB_TITLE, WEB_DESCRIPTION, FAVICON, WELCOME_HTML, ABOVE_HTML_FILE
 from models import RssInfo
 from forms import ConfigForm, UrlForm, CustomRSSForm
 from weather import get_weather_data
 import shared
 from workers import fetch_urls_parallel, fetch_urls_thread
+from weather import get_weather_html
 
 # Function to initialize routes
 app = None
@@ -76,7 +77,7 @@ def init_app(flask_app):
         needed_urls = []
         need_fetch = False
 
-        # Fetch RSS feeds if necessary.
+        # 1. See if we need to fetch any RSS feeds
         for url in page_order:
             rss_info = ALL_URLS.get(url, None)
 
@@ -91,13 +92,14 @@ def init_app(flask_app):
             elif expired_rss:
                 need_fetch = True
 
+        # 2. Fetch any needed feeds
         if len(needed_urls) > 0:
             start = timer()
             fetch_urls_parallel(needed_urls)
             end = timer()
             print(f"Fetched {len(needed_urls)} feeds in {end - start} sec.")
 
-        # Render the RSS feeds into the page layout.
+        # 3. Render the RSS feeds into the page layout.
         for url in page_order:
             rss_info = ALL_URLS[url]
 
@@ -106,10 +108,15 @@ def init_app(flask_app):
                 feed = g_c.get(url)
                 last_fetch = g_c.get(url + ":last_fetch")
                 last_fetch_str = shared.format_last_updated(last_fetch)
-                entries = feed.entries
-                top_images = {article['url']: article['image_url'] for article in feed.top_articles if article['image_url']}
+                if feed is not None:
+                    entries = feed.entries
+                    top_images = {article['url']: article['image_url'] for article in feed.top_articles if article['image_url']}
+                else:
+                    entries = []
+                    top_images = {}
                 template = render_template('sitebox.html', top_images=top_images, entries=entries, logo=URL_IMAGES + rss_info.logo_url,
-                                           alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url)
+                                           alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url,
+                                           error_message=("Feed could not be loaded." if feed is None else None))
 
                 g_c.put(rss_info.site_url, template, timeout=EXPIRE_MINUTES * 12)
 
@@ -147,12 +154,16 @@ def init_app(flask_app):
         if not single_column:
             above_html = above_html.replace("<hr/>", "")
 
+        # Get weather HTML
+        weather_html = get_weather_html()
+
         # Render the final page.
         page = render_template('page.html', columns=result, text_color=text_color,
                                logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE,
                                description=WEB_DESCRIPTION, favicon=FAVICON,
                                welcome_html=Markup(WELCOME_HTML), no_underlines = no_underlines,
-                               text_font_style=text_font_style, above_html=Markup(above_html))
+                               text_font_style=text_font_style, above_html=Markup(above_html),
+                               weather_html=Markup(weather_html))
 
         # Cache the rendered page if appropriate.
         if page_order_s == STANDARD_ORDER_STR:
@@ -162,7 +173,7 @@ def init_app(flask_app):
 
             g_c.put(page_order_s + suffix, page, timeout=expire)
 
-        # Trigger background fetching of RSS feeds if needed.
+        # Trigger background fetching if needed.
         if need_fetch and not g_c.has("FETCHMODE"):
             fetch_urls_thread()
 
@@ -266,14 +277,7 @@ def init_app(flask_app):
 
     @app.route('/api/weather')
     def get_weather():
-
-        # Retrieve latitude and longitude from query parameters.
-        lat = request.args.get('lat')
-        lon = request.args.get('lon')
-
-        if not lat or not lon:
-            return jsonify({"error": "Missing latitude or longitude"}), 400
-
-        # Fetch weather data and return it as JSON.
-        weather_data, status_code = get_weather_data(lat, lon)
+        # Use the user's IP address for weather lookup
+        ip = request.remote_addr
+        weather_data, status_code = get_weather_data(ip=ip)
         return jsonify(weather_data), status_code

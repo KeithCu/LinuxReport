@@ -5,12 +5,12 @@ This module contains shared utilities, classes, and constants for the LinuxRepor
 """
 
 import os
-from dataclasses import dataclass
 from enum import Enum
 import datetime
+from typing import Optional, Any
+
 import diskcache
 import FeedHistory
-from typing import List, Dict, Optional, Any
 
 class Mode(Enum):
     """Enumeration for different report modes."""
