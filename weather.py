@@ -41,10 +41,10 @@ RL_KEY = "weather_api_call_timestamps"
 
 # --- Bucketing helpers ---
 def _round_coord(val, precision=WEATHER_BUCKET_PRECISION):
-    return round(float(val), precision)
+    return round(float(val), int(precision))
 
 def _bucket_key(lat, lon, precision=WEATHER_BUCKET_PRECISION):
-    return f"{_round_coord(lat, lon):.{precision}f},{_round_coord(lon, precision):.{precision}f}"
+    return f"{_round_coord(lat, precision):.{precision}f},{_round_coord(lon, precision):.{precision}f}"
 
 # --- GeoIP ---
 def _get_geoip_db_path():
