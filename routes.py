@@ -155,7 +155,7 @@ def init_app(flask_app):
             above_html = above_html.replace("<hr/>", "")
 
         # Get weather HTML
-        weather_html = get_weather_html()
+        weather_html = get_weather_html(ip=request.remote_addr)
 
         # Render the final page.
         page = render_template('page.html', columns=result, text_color=text_color,

@@ -5,22 +5,22 @@ Provides functions to fetch and cache weather data, including a fake API mode fo
 """
 
 # Standard library imports
-from datetime import datetime, date as date_obj  # Renamed import
+from datetime import datetime, date as date_obj
+from collections import defaultdict
 import time
 import math
-from collections import defaultdict
+import os
 
 # Third-party imports
 import requests
 import geoip2.database
-import os
 
 # Local imports
 from shared import SPATH, DiskCacheWrapper, DEBUG
 
 g_c = DiskCacheWrapper(SPATH)
 
-WEATHER_API_KEY = "FIXME"  # FIXME: Replace with your actual API key
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 if DEBUG:
     WEATHER_CACHE_TIMEOUT = 30
 else:
@@ -28,9 +28,9 @@ else:
 
 FAKE_API = False  # Fake Weather API calls
 
-# Add default coordinates for weather (e.g., San Francisco)
-DEFAULT_WEATHER_LAT = "37.7749"
-DEFAULT_WEATHER_LON = "-122.4194"
+# Add default coordinates for weather (Detroit, MI)
+DEFAULT_WEATHER_LAT = "42.3297"
+DEFAULT_WEATHER_LON = "83.0425"
 
 # Configurable proximity threshold (in miles)
 WEATHER_CACHE_DISTANCE_MILES = 30  # Can be overridden as needed
@@ -215,9 +215,9 @@ def get_weather_data(lat=None, lon=None, ip=None, cache_distance_miles=WEATHER_C
         print(f"Error processing weather data: {e}")
         return {"error": "Failed to process weather data"}, 500
 
-def get_weather_html():
+def get_weather_html(ip):
     """Returns HTML for displaying the 5-day weather forecast, using cached or fake data if available. If not, returns fallback HTML for client-side JS to fetch weather."""
-    weather_data, status_code = get_weather_data(DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON)
+    weather_data, status_code = get_weather_data(ip=ip)
 
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
         forecast_html = '<div id="weather-forecast" class="weather-forecast">'
