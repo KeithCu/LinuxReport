@@ -184,18 +184,22 @@ def get_weather_data(lat=None, lon=None, ip=None):
         for entry in weather_data.get("list", []):
             date_str = entry.get("dt_txt", "")[:10]  # 'YYYY-MM-DD'
             daily_data[date_str].append(entry)
-
+        # print(f"[DEBUG] daily_data keys: {list(daily_data.keys())}")
         processed_data = {"daily": []}
         today_date = datetime.now().date()
         days_added = 0
         added_dates = set()
         for date, entries in sorted(daily_data.items()):
             entry_date = datetime.strptime(date, "%Y-%m-%d").date()
+            # print(f"[DEBUG] Considering date: {date} (entry_date={entry_date}, today_date={today_date})")
             if entry_date < today_date:
+                # print(f"[DEBUG] Skipping {date} because it is before today.")
                 continue
             if entry_date in added_dates:
+                # print(f"[DEBUG] Skipping {date} because it is already in added_dates.")
                 continue
             if days_added >= 5:
+                # print(f"[DEBUG] Already added 5 days, skipping {date}.")
                 break
             temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
             temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
@@ -205,8 +209,10 @@ def get_weather_data(lat=None, lon=None, ip=None):
             # Prefer earliest icon for today, noon icon for future days
             if entry_date == today_date:
                 preferred_entry = entries[0]
+                # print(f"[DEBUG] For today, using earliest entry: {preferred_entry.get('dt_txt', '')}")
             else:
                 preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
+                # print(f"[DEBUG] For {date}, using preferred entry: {preferred_entry.get('dt_txt', '')}")
 
             weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
             weather_icon = preferred_entry["weather"][0]["icon"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "01d"
@@ -220,6 +226,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
                 "weather": weather_main,
                 "weather_icon": weather_icon
             })
+            # print(f"[DEBUG] Added day: {date} (entry_date={entry_date}), days_added={days_added+1}")
             days_added += 1
             added_dates.add(entry_date)
 
@@ -240,10 +247,12 @@ def get_weather_html(ip):
 
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
         forecast_html = '<div id="weather-forecast" class="weather-forecast">'
+        today_date = datetime.now().date()
         for day in weather_data["daily"]:
             try:
                 d = datetime.fromtimestamp(day["dt"])
-                day_name = "Today" if d.date() == datetime.now().date() else d.strftime("%a")
+                # Only label as "Today" if the date matches the system's today
+                day_name = "Today" if d.date() == today_date else d.strftime("%a")
                 temp_max = round(day.get("temp_max", 0))
                 temp_min = round(day.get("temp_min", 0))
                 precipitation = round(day.get("precipitation", 0))
