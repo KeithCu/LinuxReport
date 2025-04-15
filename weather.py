@@ -186,23 +186,22 @@ def get_weather_data(lat=None, lon=None, ip=None):
             daily_data[date_str].append(entry)
 
         processed_data = {"daily": []}
-        added_dates = set()
+        today_date = datetime.now().date()
+        days_added = 0
         for date, entries in sorted(daily_data.items()):
-            if date in added_dates:
-                continue  # skip duplicate dates
-            added_dates.add(date)
-            if len(processed_data["daily"]) >= 5:
+            if days_added >= 5:
                 break
+            # Only add if date is today or in the future
+            entry_date = datetime.strptime(date, "%Y-%m-%d").date()
+            if entry_date < today_date:
+                continue
             temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
             temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
             pops = [e.get("pop", 0) for e in entries]
             rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
 
-            # Determine if today or future day
-            is_today = datetime.strptime(date, "%Y-%m-%d").date() == datetime.now().date()
-
             # Prefer earliest icon for today, noon icon for future days
-            if is_today:
+            if entry_date == today_date:
                 preferred_entry = entries[0]
             else:
                 preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
@@ -219,6 +218,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
                 "weather": weather_main,
                 "weather_icon": weather_icon
             })
+            days_added += 1
 
         save_weather_cache_entry(lat, lon, processed_data)
         return processed_data, 200
