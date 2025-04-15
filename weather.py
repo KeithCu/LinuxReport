@@ -174,6 +174,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
     # Fetch from real API
     try:
         rate_limit_check()  # Enforce rate limiting before API call
+        print(f"Fetching weather from API for lat={lat}, lon={lon}") # Log API request
         url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
