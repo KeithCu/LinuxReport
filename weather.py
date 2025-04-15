@@ -138,16 +138,32 @@ def get_bucketed_weather_cache(lat, lon):
         return entry['data']
     return None
 
+
+
+# Sample Python code for localizing 'Today' (commented out):
+# import locale
+# from datetime import date
+# import babel.dates
+#
+# user_locale = 'fr_FR'  # Example: get from user settings
+# today = date.today()
+# today_label = babel.dates.format_timedelta(
+#     today - today, locale=user_locale, granularity='day', add_direction=True
+# )
+# print(today_label)  # Should print 'aujourd'hui' in French
+
 # ---
 def get_weather_data(lat=None, lon=None, ip=None):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
-    if (lat is None or lon is None) and ip:
+    if ip and (not lat or not lon):
         lat, lon = get_location_from_ip(ip)
+        if not lat or not lon:
+            lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
     if not lat or not lon:
         lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
-    # Check cache for weather data
+    # Always use today's date for cache key
     bucketed_weather = get_bucketed_weather_cache(lat, lon)
     if bucketed_weather:
         return bucketed_weather, 200
@@ -219,7 +235,9 @@ def get_weather_data(lat=None, lon=None, ip=None):
         print(f"Error processing weather data: {e}")
         return {"error": "Failed to process weather data"}, 500
 
-# --- HTML rendering 
+# HTML rendering unused because weather is rendered via JavaScript. 
+# Separate page cache entries would be necessary for server-side rendering.
+# Data is cached on client and server side, so not a priority.
 def get_weather_html(ip):
     weather_data, status_code = get_weather_data(ip=ip)
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:

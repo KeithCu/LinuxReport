@@ -317,7 +317,17 @@ document.addEventListener("DOMContentLoaded", function () {
         const dayElement = document.createElement('div');
         dayElement.className = 'weather-day';
         const date = new Date(day.dt * 1000);
-        const dayName = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+        const userLocale = navigator.language || 'en-US';
+        let dayName;
+        if (i === 0) {
+          if (userLocale.startsWith('en')) {
+            dayName = 'Today';
+          } else {
+            dayName = date.toLocaleDateString(userLocale, { weekday: 'long' });
+          }
+        } else {
+          dayName = date.toLocaleDateString(userLocale, { weekday: 'short' });
+        }
         dayElement.innerHTML = `
           <div class="weather-day-name">${dayName}</div>
           <img class="weather-icon" src="https://openweathermap.org/img/wn/${day.weather_icon}.png" alt="${day.weather}">
