@@ -155,7 +155,14 @@ def init_app(flask_app):
             above_html = above_html.replace("<hr/>", "")
 
         # Get weather HTML
-        weather_html = get_weather_html(ip=request.remote_addr)
+        weather_html = '''
+        <div id="weather-container" class="weather-container">
+            <h3>5-Day Weather</h3>
+            <div id="weather-loading">Loading weather data...</div>
+            <div id="weather-error" style="display: none; color: red;">Could not load weather data.</div>
+            <div id="weather-forecast" style="display: none;"></div>
+        </div>
+        '''
 
         # Render the final page.
         page = render_template('page.html', columns=result, text_color=text_color,
