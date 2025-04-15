@@ -12,7 +12,6 @@ from flask_mobility import Mobility
 sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
-import shared
 from shared import EXPIRE_WEEK, DEBUG
 
 # Initialize Flask app
