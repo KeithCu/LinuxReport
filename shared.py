@@ -41,7 +41,7 @@ MODE = Mode.AI_REPORT
 
 # Constants for configuration
 URLS_COOKIE_VERSION = "2"
-USE_TOR = False
+USE_TOR = True
 
 RSS_TIMEOUT = 300  # Timeout value in seconds for RSS feed operations
 
