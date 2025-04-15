@@ -186,7 +186,13 @@ def get_weather_data(lat=None, lon=None, ip=None):
             daily_data[date_str].append(entry)
 
         processed_data = {"daily": []}
-        for i, (date, entries) in enumerate(sorted(daily_data.items())[:5]):
+        added_dates = set()
+        for date, entries in sorted(daily_data.items()):
+            if date in added_dates:
+                continue  # skip duplicate dates
+            added_dates.add(date)
+            if len(processed_data["daily"]) >= 5:
+                break
             temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
             temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
             pops = [e.get("pop", 0) for e in entries]
