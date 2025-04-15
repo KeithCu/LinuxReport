@@ -74,7 +74,7 @@ def load_url_worker(url):
                     if links:
                         #Pick the first match for now
                         entry['link'] = links[0]
-                        print (entry['link'])
+                        #print (entry['link'])
 
         # Merge with cached entries (if any) to retain history.
         old_feed = g_c.get(url)
