@@ -142,25 +142,21 @@ def get_bucketed_weather_cache(lat, lon):
 def get_weather_data(lat=None, lon=None, ip=None):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
-    if ip and (not lat or not lon):
+    if (lat is None or lon is None) and ip:
         lat, lon = get_location_from_ip(ip)
-        if not lat or not lon:
-            # fallback to default
-            lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
     if not lat or not lon:
         lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
-    # Bucketed cache lookup
+    # Check cache for weather data
     bucketed_weather = get_bucketed_weather_cache(lat, lon)
-    if (bucketed_weather):
+    if bucketed_weather:
         return bucketed_weather, 200
 
-    # Use fake data if enabled
     if FAKE_API:
         fake_data = {
             "daily": [
                 {
-                    "dt": int(datetime.now().timestamp()) + i * 86400,
+                    "dt": int(datetime.now().replace(hour=12, minute=0, second=0, microsecond=0).timestamp()) + i * 86400,
                     "temp_min": 10 + i,
                     "temp_max": 20 + i,
                     "precipitation": 5 * i,
@@ -171,10 +167,8 @@ def get_weather_data(lat=None, lon=None, ip=None):
         }
         return fake_data, 200
 
-    # Fetch from real API
     try:
-        rate_limit_check()  # Enforce rate limiting before API call
-        print(f"Fetching weather from API for lat={lat}, lon={lon}") # Log API request
+        rate_limit_check()
         url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -182,53 +176,38 @@ def get_weather_data(lat=None, lon=None, ip=None):
 
         daily_data = defaultdict(list)
         for entry in weather_data.get("list", []):
-            date_str = entry.get("dt_txt", "")[:10]  # 'YYYY-MM-DD'
+            date_str = entry.get("dt_txt", "")[:10]
             daily_data[date_str].append(entry)
-        # print(f"[DEBUG] daily_data keys: {list(daily_data.keys())}")
+
         processed_data = {"daily": []}
         today_date = datetime.now().date()
         days_added = 0
-        added_dates = set()
         for date, entries in sorted(daily_data.items()):
             entry_date = datetime.strptime(date, "%Y-%m-%d").date()
-            # print(f"[DEBUG] Considering date: {date} (entry_date={entry_date}, today_date={today_date})")
             if entry_date < today_date:
-                # print(f"[DEBUG] Skipping {date} because it is before today.")
-                continue
-            if entry_date in added_dates:
-                # print(f"[DEBUG] Skipping {date} because it is already in added_dates.")
                 continue
             if days_added >= 5:
-                # print(f"[DEBUG] Already added 5 days, skipping {date}.")
                 break
             temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
             temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
             pops = [e.get("pop", 0) for e in entries]
             rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
 
-            # Prefer earliest icon for today, noon icon for future days
-            if entry_date == today_date:
-                preferred_entry = entries[0]
-                # print(f"[DEBUG] For today, using earliest entry: {preferred_entry.get('dt_txt', '')}")
-            else:
-                preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
-                # print(f"[DEBUG] For {date}, using preferred entry: {preferred_entry.get('dt_txt', '')}")
-
+            # Use noon entry if possible, else first
+            preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
             weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
             weather_icon = preferred_entry["weather"][0]["icon"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "01d"
 
             processed_data["daily"].append({
-                "dt": int(datetime.strptime(date, "%Y-%m-%d").timestamp()),
+                "dt": int(datetime.strptime(date, "%Y-%m-%d").replace(hour=12).timestamp()),
                 "temp_min": min(temp_mins) if temp_mins else None,
                 "temp_max": max(temp_maxs) if temp_maxs else None,
-                "precipitation": round(max(pops) * 100) if pops else 0,  # Max pop for the day as percent
+                "precipitation": round(max(pops) * 100) if pops else 0,
                 "rain": round(rain_total, 2),
                 "weather": weather_main,
                 "weather_icon": weather_icon
             })
-            # print(f"[DEBUG] Added day: {date} (entry_date={entry_date}), days_added={days_added+1}")
             days_added += 1
-            added_dates.add(entry_date)
 
         save_weather_cache_entry(lat, lon, processed_data)
         return processed_data, 200
@@ -242,23 +221,19 @@ def get_weather_data(lat=None, lon=None, ip=None):
 
 # --- HTML rendering 
 def get_weather_html(ip):
-    """Returns HTML for displaying the 5-day weather forecast, using cached or fake data if available. If not, returns fallback HTML for client-side JS to fetch weather."""
     weather_data, status_code = get_weather_data(ip=ip)
-
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
         forecast_html = '<div id="weather-forecast" class="weather-forecast">'
         today_date = datetime.now().date()
-        for day in weather_data["daily"]:
+        for i, day in enumerate(weather_data["daily"]):
             try:
                 d = datetime.fromtimestamp(day["dt"])
-                # Only label as "Today" if the date matches the system's today
-                day_name = "Today" if d.date() == today_date else d.strftime("%a")
+                day_name = "Today" if i == 0 else d.strftime("%a")
                 temp_max = round(day.get("temp_max", 0))
                 temp_min = round(day.get("temp_min", 0))
                 precipitation = round(day.get("precipitation", 0))
                 weather_icon = day.get("weather_icon", "01d")
                 weather_desc = day.get("weather", "N/A")
-
                 forecast_html += f'''
                     <div class="weather-day">
                         <div class="weather-day-name">{day_name}</div>
@@ -273,7 +248,6 @@ def get_weather_html(ip):
             except Exception as e:
                 print(f"Error processing weather day data: {e}")
                 forecast_html += '<div class="weather-day error">Error loading day</div>'
-
         forecast_html += '</div>'
         return f'''
         <div id="weather-container" class="weather-container">
@@ -282,7 +256,6 @@ def get_weather_html(ip):
         </div>
         '''
     else:
-        # Always render fallback HTML so JS can fetch and display weather later
         return get_default_weather_html()
 
 def get_default_weather_html():

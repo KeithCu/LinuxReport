@@ -280,81 +280,58 @@ document.addEventListener("DOMContentLoaded", function () {
     function loadWeather() {
       const weatherContainer = document.getElementById('weather-container');
       if (!weatherContainer) return;
-  
       const weatherLoading = document.getElementById('weather-loading');
       const weatherError = document.getElementById('weather-error');
       const weatherForecast = document.getElementById('weather-forecast');
-  
-      // Fetch weather using IP (no geolocation)
       fetchWeatherData();
     }
-  
     function fetchWeatherData() {
-      fetch(`/api/weather`)
+      // Add cache-busting param to avoid browser caching
+      const hour = new Date().getHours();
+      fetch(`/api/weather?_=${hour}`)
         .then(response => {
-          if (!response.ok) {
-            throw new Error('Network response was not ok');
-          }
+          if (!response.ok) throw new Error('Network response was not ok');
           return response.json();
         })
         .then(data => {
           renderWeatherData(data);
         })
         .catch(error => {
-          console.error("Error fetching weather:", error);
           document.getElementById('weather-loading').style.display = "none";
           document.getElementById('weather-error').style.display = "block";
         });
     }
-  
     function renderWeatherData(data) {
       const weatherForecast = document.getElementById('weather-forecast');
       const weatherLoading = document.getElementById('weather-loading');
       const weatherError = document.getElementById('weather-error');
-  
       if (!data.daily || data.daily.length === 0) {
         weatherLoading.style.display = "none";
         weatherError.style.display = "block";
         weatherError.textContent = "No weather data available.";
         return;
       }
-  
       weatherForecast.innerHTML = '';
       weatherForecast.className = 'weather-forecast';
-  
-      // Create a container for the days
-      const daysContainer = document.createElement('div');
-      daysContainer.className = 'weather-forecast';
-  
-      // Process each day's data
-      data.daily.forEach((day, index) => {
+      data.daily.forEach((day, i) => {
         const dayElement = document.createElement('div');
         dayElement.className = 'weather-day';
-  
-        // Get day name
         const date = new Date(day.dt * 1000);
-        const dayName = index === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
-  
-        // Create HTML for the day
+        const dayName = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
         dayElement.innerHTML = `
           <div class="weather-day-name">${dayName}</div>
           <img class="weather-icon" src="https://openweathermap.org/img/wn/${day.weather_icon}.png" alt="${day.weather}">
           <div class="weather-temp">
-            <span class="temp-max">${Math.round(day.temp_max)}°</span> / 
+            <span class="temp-max">${Math.round(day.temp_max)}°</span> /
             <span class="temp-min">${Math.round(day.temp_min)}°</span>
           </div>
           <div class="weather-precip">${Math.round(day.precipitation)}% precip</div>
         `;
-  
-        daysContainer.appendChild(dayElement);
+        weatherForecast.appendChild(dayElement);
       });
-  
-      weatherForecast.appendChild(daysContainer);
       weatherLoading.style.display = "none";
-      weatherForecast.style.display = "block";
+      weatherForecast.style.display = "flex";
     }
-  
-    // Load weather data after page content is loaded
     setTimeout(loadWeather, 100);
   });
-  </script>
+</script>
