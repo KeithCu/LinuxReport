@@ -188,13 +188,15 @@ def get_weather_data(lat=None, lon=None, ip=None):
         processed_data = {"daily": []}
         today_date = datetime.now().date()
         days_added = 0
+        added_dates = set()
         for date, entries in sorted(daily_data.items()):
-            if days_added >= 5:
-                break
-            # Only add if date is today or in the future
             entry_date = datetime.strptime(date, "%Y-%m-%d").date()
             if entry_date < today_date:
                 continue
+            if entry_date in added_dates:
+                continue
+            if days_added >= 5:
+                break
             temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
             temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
             pops = [e.get("pop", 0) for e in entries]
@@ -219,6 +221,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
                 "weather_icon": weather_icon
             })
             days_added += 1
+            added_dates.add(entry_date)
 
         save_weather_cache_entry(lat, lon, processed_data)
         return processed_data, 200
