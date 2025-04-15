@@ -16,10 +16,10 @@ from timeit import default_timer as timer
 from shared import ALL_URLS, URLS_COOKIE_VERSION, site_urls, DEBUG, g_c, STANDARD_ORDER_STR, EXPIRE_MINUTES, EXPIRE_WEEK, URL_IMAGES, LOGO_URL, WEB_TITLE, WEB_DESCRIPTION, FAVICON, WELCOME_HTML, ABOVE_HTML_FILE
 from models import RssInfo
 from forms import ConfigForm, UrlForm, CustomRSSForm
-from weather import get_weather_data
+from weather import get_weather_data, get_default_weather_html
 import shared
 from workers import fetch_urls_parallel, fetch_urls_thread
-from weather import get_weather_html
+
 
 # Function to initialize routes
 app = None
@@ -155,14 +155,7 @@ def init_app(flask_app):
             above_html = above_html.replace("<hr/>", "")
 
         # Get weather HTML
-        weather_html = '''
-        <div id="weather-container" class="weather-container">
-            <h3>5-Day Weather</h3>
-            <div id="weather-loading">Loading weather data...</div>
-            <div id="weather-error" style="display: none; color: red;">Could not load weather data.</div>
-            <div id="weather-forecast" style="display: none;"></div>
-        </div>
-        '''
+        weather_html = get_default_weather_html()
 
         # Render the final page.
         page = render_template('page.html', columns=result, text_color=text_color,

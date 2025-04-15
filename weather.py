@@ -8,7 +8,6 @@ Provides functions to fetch and cache weather data, including a fake API mode fo
 from datetime import datetime, date as date_obj
 from collections import OrderedDict, defaultdict
 import time
-import math
 import os
 
 # Third-party imports
@@ -70,7 +69,7 @@ def get_location_from_ip(ip):
 
 
 def rate_limit_check():
-    """Enforces 60 calls/minute and 1 second between calls using g_c (DiskCacheWrapper)."""
+    """Enforces 60 calls/minute and 1 second between calls."""
     now = time.time()
     timestamps = g_c.get(RL_KEY) or []
     # Remove timestamps older than 60 seconds
@@ -252,11 +251,15 @@ def get_weather_html(ip):
         '''
     else:
         # Always render fallback HTML so JS can fetch and display weather later
-        return """
-        <div id="weather-container" class="weather-container">
-            <h3>5-Day Weather</h3>
-            <div id="weather-loading">Loading weather data...</div>
-            <div id="weather-error" style="display: none; color: red;">Could not load weather data.</div>
-            <div id="weather-forecast" style="display: none;"></div>
-        </div>
-        """
+        return get_default_weather_html()
+
+def get_default_weather_html():
+    """Returns the default HTML for the weather container (loading state)."""
+    return '''
+    <div id="weather-container" class="weather-container">
+        <h3>5-Day Weather</h3>
+        <div id="weather-loading">Loading weather data...</div>
+        <div id="weather-error" style="display: none; color: red;">Could not load weather data.</div>
+        <div id="weather-forecast" style="display: none;"></div>
+    </div>
+    '''
