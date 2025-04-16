@@ -230,6 +230,23 @@ def extract_img_url_from_tag(img_tag, base_url):
             return urljoin(base_url, value)
     return None
 
+def is_excluded(url):
+    return any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS)
+
+def parse_dimension(value):
+    if not value:
+        return 0
+    if str(value).isdigit():
+        return int(value)
+    m = re.match(r'^(\d+(\.\d+)?)', str(value))
+    if m:
+        return float(m.group(1))
+    return 0
+
+def add_candidate(candidate_images, processed_urls, url, metadata):
+    if url and url not in processed_urls and not is_excluded(url):
+        processed_urls.add(url)
+        candidate_images.append((url, metadata))
 
 def parse_images_from_soup(soup, base_url):
     """Extract image candidates from HTML using BeautifulSoup with improved handling."""
@@ -248,9 +265,7 @@ def parse_images_from_soup(soup, base_url):
         for tag in soup.select(selector):
             if tag.get(attr):
                 url = urljoin(base_url, tag[attr])
-                if url not in processed_urls and not any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS):
-                    processed_urls.add(url)
-                    candidate_images.append((url, {'score': score, 'meta': True}))
+                add_candidate(candidate_images, processed_urls, url, {'score': score, 'meta': True})
 
     # 2. Schema.org image in JSON-LD
     for script in soup.find_all('script', type='application/ld+json'):
@@ -275,18 +290,15 @@ def parse_images_from_soup(soup, base_url):
                 for img_url in image_candidates:
                     if isinstance(img_url, str):
                         url = urljoin(base_url, img_url)
-                        if url not in processed_urls and not any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS):
-                            processed_urls.add(url)
-                            candidate_images.append((url, {'score': 8000000, 'meta': True}))
+                        add_candidate(candidate_images, processed_urls, url, {'score': 8000000, 'meta': True})
         except Exception as e:
             debug_print(f"Error parsing JSON-LD: {e}")
 
     # 3. All <img> tags, robust lazy-load and data-* handling
     for img in soup.find_all('img'):
         url = extract_img_url_from_tag(img, base_url)
-        if not url or url in processed_urls or any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS):
+        if not url or is_excluded(url):
             continue
-        processed_urls.add(url)
         width, height = extract_dimensions_from_tag_or_style(img)
         metadata = {}
         if width > 0:
@@ -299,10 +311,9 @@ def parse_images_from_soup(soup, base_url):
         metadata['score'] = area if area > 0 else 307200  # 640x480 default
         if alt_text and len(alt_text) > 10:
             metadata['score'] *= 1.2
-        candidate_images.append((url, metadata))
+        add_candidate(candidate_images, processed_urls, url, metadata)
 
     return candidate_images
-
 
 def process_candidate_images(candidate_images):
     """Process a list of candidate images and return the best one based on a simplified scoring logic."""
