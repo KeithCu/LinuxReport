@@ -22,6 +22,9 @@ DEBUG_LOGGING = True
 HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'}
 
 EXCLUDED_PATTERNS = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'css', 'advertisement', 'michaellarabel']
+EXCLUDED_RE = re.compile(r"(?:" + r"|".join(re.escape(p) for p in EXCLUDED_PATTERNS) + r")", re.IGNORECASE)
+# Precompile regex for common image extensions
+IMAGE_EXT_RE = re.compile(r"\.(jpe?g|png|webp|gif|svg)([?#].*)?$", re.IGNORECASE)
 
 def debug_print(message):
     if DEBUG_LOGGING:
@@ -180,68 +183,56 @@ def parse_best_srcset(srcset):
     if not srcset:
         return None, 0
 
-    best_width = 0
-    best_url = None
-
-    parts = srcset.strip().split(',')
-
-    for part in parts:
+    # Parse each srcset entry to collect (width, url) pairs
+    entries = []
+    for part in srcset.split(','):
         part = part.strip()
         if not part:
             continue
-
-        subparts = part.split()
-        url = subparts[0].strip()
+        tokens = part.split()
+        url = tokens[0]
         width = 0
-
-        for subpart in subparts[1:]:
-            width_match = re.search(r'(\d+)w', subpart)
-            if width_match:
-                width = int(width_match.group(1))
+        for descriptor in tokens[1:]:
+            if descriptor.endswith('w') and descriptor[:-1].isdigit():
+                width = int(descriptor[:-1])
                 break
-            density_match = re.search(r'(\d+(\.\d+)?)x', subpart)
-            if density_match:
-                # Estimate width based on pixel density (assuming a base width of 1000 for 1x)
-                width = int(1000 * float(density_match.group(1)))
-                break
-
-        if width > best_width:
-            best_width = width
-            best_url = url
-        elif best_width == 0 and best_url is None:
-            best_url = url
-            best_width = 1 # Assign a default width if no descriptor is found
-
+            if descriptor.endswith('x'):
+                try:
+                    width = int(1000 * float(descriptor[:-1]))
+                    break
+                except ValueError:
+                    pass
+        entries.append((width, url))
+    if not entries:
+        return None, 0
+    # Choose the entry with the maximum width
+    best_width, best_url = max(entries, key=lambda x: x[0])
     return best_url, best_width
 
 def extract_img_url_from_tag(img_tag, base_url):
     """Extract the best image URL from an <img> tag, considering src, srcset, and data-* attributes."""
-    # Check srcset first
-    if img_tag.get('srcset'):
-        best_src, _ = parse_best_srcset(img_tag['srcset'])
-        if best_src:
-            return urljoin(base_url, best_src)
-    # Check src
-    if img_tag.get('src') and not img_tag['src'].startswith('data:'):
-        return urljoin(base_url, img_tag['src'])
-    # Check any data-* attribute that looks like an image URL
-    for attr, value in img_tag.attrs.items():
-        if attr.startswith('data-') and isinstance(value, str) and (value.endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg')) or value.startswith('http')):
+    srcset = img_tag.get('srcset')
+    if srcset:
+        best, _ = parse_best_srcset(srcset)
+        if best:
+            return urljoin(base_url, best)
+    src = img_tag.get('src', '')
+    if src and not src.startswith('data:'):
+        return urljoin(base_url, src)
+    # Fallback: any attribute value that looks like an image URL
+    ext = ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg')
+    for value in img_tag.attrs.values():
+        if isinstance(value, str) and (value.startswith('http') or value.lower().endswith(ext)):
             return urljoin(base_url, value)
     return None
 
 def is_excluded(url):
-    return any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS)
+    return bool(EXCLUDED_RE.search(url))
 
 def parse_dimension(value):
-    if not value:
-        return 0
-    if str(value).isdigit():
-        return int(value)
-    m = re.match(r'^(\d+(\.\d+)?)', str(value))
-    if m:
-        return float(m.group(1))
-    return 0
+    # Extract leading numeric value (int or float)
+    m = re.match(r'^\s*(\d+(?:\.\d+)?)', str(value))
+    return float(m.group(1)) if m else 0
 
 def add_candidate(candidate_images, processed_urls, url, metadata):
     if url and url not in processed_urls and not is_excluded(url):
@@ -376,7 +367,7 @@ def fetch_largest_image(url):
     try:
         is_direct_image = False
         # Handle URLs that might be direct images (check extension first)
-        if re.search(r'\.(jpe?g|png|webp|gif|svg)([?#].*)?$', url.lower()):
+        if IMAGE_EXT_RE.search(url):
             debug_print(f"URL appears to be an image by extension: {url}")
             try:
                 response = requests.head(url, headers=HEADERS, timeout=5, allow_redirects=True)
@@ -539,7 +530,8 @@ def parse_images_from_selenium(driver):
     for img in images:
         try:
             img_url = img.get_attribute('src')
-            if not img_url or 'data:' in img_url or any(pattern in img_url.lower() for pattern in EXCLUDED_PATTERNS):
+            # Skip missing, data URIs, or excluded URLs
+            if not img_url or img_url.startswith('data:') or is_excluded(img_url):
                 continue
 
             # Get natural dimensions as reported by the browser
