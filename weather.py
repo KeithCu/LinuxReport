@@ -108,19 +108,6 @@ def get_bucketed_weather_cache(lat, lon):
     return None
 
 
-
-# Sample Python code for localizing 'Today' (commented out):
-# import locale
-# from datetime import date
-# import babel.dates
-#
-# user_locale = 'fr_FR'  # Example: get from user settings
-# today = date.today()
-# today_label = babel.dates.format_timedelta(
-#     today - today, locale=user_locale, granularity='day', add_direction=True
-# )
-# print(today_label)  # Should print 'aujourd'hui' in French
-
 def get_weather_data(lat=None, lon=None, ip=None):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
@@ -158,6 +145,9 @@ def get_weather_data(lat=None, lon=None, ip=None):
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         weather_data = response.json()
+        # Log the city name for better context
+        city_name = weather_data.get("city", {}).get("name", "Unknown location")
+        print(f"Fetched weather data for city: {city_name} (lat: {lat}, lon: {lon})")
 
         daily_data = defaultdict(list)
         for entry in weather_data.get("list", []):
@@ -203,6 +193,20 @@ def get_weather_data(lat=None, lon=None, ip=None):
     except Exception as e:
         print(f"Error processing weather data: {e}")
         return {"error": "Failed to process weather data"}, 500
+
+
+
+# Sample Python code for localizing 'Today' (commented out):
+# import locale
+# from datetime import date
+# import babel.dates
+#
+# user_locale = 'fr_FR'  # Example: get from user settings
+# today = date.today()
+# today_label = babel.dates.format_timedelta(
+#     today - today, locale=user_locale, granularity='day', add_direction=True
+# )
+# print(today_label)  # Should print 'aujourd'hui' in French
 
 # HTML rendering unused because weather is rendered via JavaScript. 
 # Separate page cache entries would be necessary for server-side rendering.
