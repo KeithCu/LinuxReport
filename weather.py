@@ -140,14 +140,12 @@ def get_weather_data(lat=None, lon=None, ip=None):
 
     try:
         rate_limit_check()
-        print (f"Fetching weather data from API for lat: {lat}, lon: {lon}")
         url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
         weather_data = response.json()
-        # Log the city name for better context
+        # Determine city name for logging
         city_name = weather_data.get("city", {}).get("name", "Unknown location")
-        print(f"Fetched weather data for city: {city_name} (lat: {lat}, lon: {lon})")
 
         daily_data = defaultdict(list)
         for entry in weather_data.get("list", []):
@@ -185,13 +183,22 @@ def get_weather_data(lat=None, lon=None, ip=None):
             days_added += 1
 
         save_weather_cache_entry(lat, lon, processed_data)
+        # Single log: print city and current temperature
+        try:
+            today_entry = processed_data["daily"][0]
+            current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
+        except Exception:
+            current_temp = "N/A"
+        print(f"Weather API result: city: {city_name}, temp: {current_temp}°F")
         return processed_data, 200
 
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching weather data: {e}")
+        # Always log error result
+        print(f"Weather API error: Failed to fetch weather data from API")
         return {"error": "Failed to fetch weather data from API"}, 500
     except Exception as e:
-        print(f"Error processing weather data: {e}")
+        # Always log error result
+        print(f"Weather API error: Failed to process weather data")
         return {"error": "Failed to process weather data"}, 500
 
 
