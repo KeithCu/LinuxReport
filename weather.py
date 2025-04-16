@@ -185,6 +185,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
 
     try:
         rate_limit_check()
+        print (f"Fetching weather data from API for lat: {lat}, lon: {lon}")
         url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
         response = requests.get(url, timeout=10)
         response.raise_for_status()
@@ -286,3 +287,19 @@ def get_default_weather_html():
         <div id="weather-forecast" style="display: none;"></div>
     </div>
     '''
+
+def test_weather_api_with_ips():
+    """Test get_location_from_ip and get_weather_data for a list of IP addresses."""
+    test_ips = [
+        "100.19.21.35",
+        "102.218.61.15",
+    ]
+    for ip in test_ips:
+        # lat, lon = get_location_from_ip(ip)
+        # print(f"IP: {ip} => lat: {lat}, lon: {lon}")
+        data, status = get_weather_data(ip=ip)
+        print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}\n")
+
+if __name__ == "__main__":
+    print("Running weather API tests with test IP addresses...")
+    test_weather_api_with_ips()
