@@ -6,7 +6,7 @@ Provides functions to fetch and cache weather data, including a fake API mode fo
 
 # Standard library imports
 from datetime import datetime, date as date_obj
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 import time
 import os
 
@@ -19,7 +19,6 @@ from shared import SPATH, DiskCacheWrapper, DEBUG
 
 # --- Configurable cache bucketing ---
 WEATHER_BUCKET_PRECISION = 1  # Decimal places for lat/lon rounding (lower = larger area per bucket)
-WEATHER_CACHE_MAX_ENTRIES = 500
 
 g_c = DiskCacheWrapper(SPATH)
 
@@ -27,7 +26,7 @@ WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 if DEBUG:
     WEATHER_CACHE_TIMEOUT = 30
 else:
-    WEATHER_CACHE_TIMEOUT = 3600 * 4  # 4 hours in seconds
+    WEATHER_CACHE_TIMEOUT = 3600 * 4  # 4 hours
 
 FAKE_API = False  # Fake Weather API calls
 
@@ -89,27 +88,6 @@ def rate_limit_check():
 
 # --- Weather cache helpers (bucketed) ---
 CACHE_ENTRY_PREFIX = 'weather:cache_entry:'
-CACHE_KEYS_KEY = 'weather:cache_entry_keys'
-
-def get_weather_cache_entries():
-    """Returns an OrderedDict of bucket_key -> entry, sorted by most recent timestamp."""
-    keys = g_c.get(CACHE_KEYS_KEY) or []
-    now = time.time()
-    entries = {}
-    for key in keys:
-        entry = g_c.get(CACHE_ENTRY_PREFIX + key)
-        if entry and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
-            entries[key] = entry
-    # Sort by most recent timestamp
-    sorted_items = sorted(entries.items(), key=lambda item: item[1].get('timestamp', 0), reverse=True)
-    od = OrderedDict(sorted_items)
-    # Prune if too many
-    while len(od) > WEATHER_CACHE_MAX_ENTRIES:
-        oldest_key, _ = od.popitem(last=False)
-        g_c.delete(CACHE_ENTRY_PREFIX + oldest_key)
-        keys.remove(oldest_key)
-    g_c.put(CACHE_KEYS_KEY, list(od.keys()), timeout=WEATHER_CACHE_TIMEOUT)
-    return od
 
 def save_weather_cache_entry(lat, lon, data):
     """Saves a weather data entry to the cache with timestamp and date, using bucketed key."""
@@ -118,15 +96,6 @@ def save_weather_cache_entry(lat, lon, data):
     today_str = date_obj.today().isoformat()
     entry = {'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str}
     g_c.put(CACHE_ENTRY_PREFIX + key, entry, timeout=WEATHER_CACHE_TIMEOUT)
-    keys = g_c.get(CACHE_KEYS_KEY) or []
-    if key in keys:
-        keys.remove(key)
-    keys.append(key)
-    # Prune if too many
-    while len(keys) > WEATHER_CACHE_MAX_ENTRIES:
-        oldest_key = keys.pop(0)
-        g_c.delete(CACHE_ENTRY_PREFIX + oldest_key)
-    g_c.put(CACHE_KEYS_KEY, keys, timeout=WEATHER_CACHE_TIMEOUT)
 
 def get_bucketed_weather_cache(lat, lon):
     """Returns cached weather data for the bucketed (lat, lon) if present and same day."""
@@ -152,7 +121,6 @@ def get_bucketed_weather_cache(lat, lon):
 # )
 # print(today_label)  # Should print 'aujourd'hui' in French
 
-# ---
 def get_weather_data(lat=None, lon=None, ip=None):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
@@ -238,7 +206,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
 
 # HTML rendering unused because weather is rendered via JavaScript. 
 # Separate page cache entries would be necessary for server-side rendering.
-# Data is cached on client and server side, so not a priority.
+# Data is cached on client and server, so not a priority.
 def get_weather_html(ip):
     weather_data, status_code = get_weather_data(ip=ip)
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
@@ -295,8 +263,8 @@ def test_weather_api_with_ips():
         "102.218.61.15",
     ]
     for ip in test_ips:
-        # lat, lon = get_location_from_ip(ip)
-        # print(f"IP: {ip} => lat: {lat}, lon: {lon}")
+        lat, lon = get_location_from_ip(ip)
+        print(f"IP: {ip} => lat: {lat}, lon: {lon}")
         data, status = get_weather_data(ip=ip)
         print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}\n")
 
