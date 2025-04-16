@@ -59,29 +59,35 @@ def get_final_response(url, headers, max_redirects=2):
     print("Error: Too many meta refresh redirects")
     return None
 
-def get_meta_image(soup):
-    """Extract image URL from various meta tags"""
-    # Check OpenGraph image (highest priority)
-    og_image = soup.find('meta', property='og:image')
-    if (og_image and og_image.get('content')):
-        return og_image['content']
-
-    # Check Twitter card
-    twitter_image = soup.find('meta', attrs={'name': 'twitter:image'})
-    if (twitter_image and twitter_image.get('content')):
-        return twitter_image['content']
-
-    # Check Schema.org image in JSON-LD
-    for script in soup.find_all('script', type='application/ld+json'):
-        try:
-            data = json.loads(script.string)
-            if isinstance(data, dict):
-                if 'image' in data:
-                    return data['image'] if isinstance(data['image'], str) else data['image'][0]
-        except:
-            pass
-
-    return None
+# --- Centralized image dimension extraction ---
+def extract_dimensions_from_tag_or_style(tag):
+    width = 0
+    height = 0
+    try:
+        if tag.get('width'):
+            w = tag['width']
+            if isinstance(w, str) and w.strip().endswith('px'):
+                w = w.strip().rstrip('px')
+            if str(w).isdigit():
+                width = int(w)
+        if tag.get('height'):
+            h = tag['height']
+            if isinstance(h, str) and h.strip().endswith('px'):
+                h = h.strip().rstrip('px')
+            if str(h).isdigit():
+                height = int(h)
+    except (ValueError, KeyError):
+        pass
+    # Check for dimensions in style attribute
+    if (width == 0 or height == 0) and tag.get('style'):
+        style = tag['style']
+        width_match = re.search(r'width:\s*(\d+)px', style)
+        if width_match:
+            width = int(width_match.group(1))
+        height_match = re.search(r'height:\s*(\d+)px', style)
+        if height_match:
+            height = int(height_match.group(1))
+    return width, height
 
 def get_actual_image_dimensions(img_url):
     """Fetch an image and get its actual dimensions. Special handling for SVG images with approximate dimensions."""
@@ -156,29 +162,18 @@ def get_actual_image_dimensions(img_url):
                 width, height = img.size
                 debug_print(f"Got actual dimensions for {img_url}: {width}x{height}")
                 return width, height
-        except Exception as e:
-            debug_print(f"Error reading image dimensions: {e}")
+        except Image.UnidentifiedImageError:
+            debug_print(f"Could not identify image file: {img_url}")
             return 0, 0
-    except Exception as e:
-        debug_print(f"Error getting dimensions for {img_url}: {e}")
+        except Exception as e:
+            debug_print(f"Error reading image dimensions with PIL for {img_url}: {e}")
+            return 0, 0
+    except requests.exceptions.RequestException as e:
+        debug_print(f"Request error getting dimensions for {img_url}: {e}")
         return 0, 0
-
-def evaluate_image_url(img_url):
-    """Evaluate an image by downloading it and checking its size."""
-    try:
-        req_headers = {
-            "User-Agent": HEADERS.get("User-Agent"),
-            "Referer": img_url  # Added Referer header
-        }
-        req = urllib.request.Request(img_url, headers=req_headers)
-        with urllib.request.urlopen(req) as response:
-            image_data = response.read()
-        image_size = len(image_data)
-        print(f"Image size for {img_url}: {image_size} bytes")
-        return image_size
     except Exception as e:
-        print(f"Error downloading or measuring {img_url}: {e}")
-        return 0
+        debug_print(f"Generic error getting dimensions for {img_url}: {e}")
+        return 0, 0
 
 def parse_best_srcset(srcset):
     """Parse srcset attribute and return the best (largest) image URL and its estimated width."""
@@ -219,41 +214,6 @@ def parse_best_srcset(srcset):
 
     return best_url, best_width
 
-def get_image_dimensions_from_attributes(img_tag):
-    """Extract width and height from an <img> tag's attributes."""
-    width = 0
-    height = 0
-    try:
-        if img_tag.get('width'):
-            if img_tag['width'].isdigit():
-                width = int(img_tag['width'])
-            elif isinstance(img_tag['width'], str) and img_tag['width'].strip().endswith('px'):
-                width_str = img_tag['width'].strip().rstrip('px')
-                if width_str.isdigit():
-                    width = int(width_str)
-
-        if img_tag.get('height'):
-            if img_tag['height'].isdigit():
-                height = int(img_tag['height'])
-            elif isinstance(img_tag['height'], str) and img_tag['height'].strip().endswith('px'):
-                height_str = img_tag['height'].strip().rstrip('px')
-                if height_str.isdigit():
-                    height = int(height_str)
-    except (ValueError, KeyError):
-        pass
-
-    # Check for dimensions in style attribute
-    if (width == 0 or height == 0) and img_tag.get('style'):
-        style = img_tag['style']
-        width_match = re.search(r'width:\s*(\d+)px', style)
-        if width_match:
-            width = int(width_match.group(1))
-        height_match = re.search(r'height:\s*(\d+)px', style)
-        if height_match:
-            height = int(height_match.group(1))
-
-    return width, height
-
 def extract_img_url_from_tag(img_tag, base_url):
     """Extract the best image URL from an <img> tag, considering src, srcset, and data-* attributes."""
     # Check srcset first
@@ -288,7 +248,7 @@ def parse_images_from_soup(soup, base_url):
         for tag in soup.select(selector):
             if tag.get(attr):
                 url = urljoin(base_url, tag[attr])
-                if url not in processed_urls:
+                if url not in processed_urls and not any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS):
                     processed_urls.add(url)
                     candidate_images.append((url, {'score': score, 'meta': True}))
 
@@ -315,7 +275,7 @@ def parse_images_from_soup(soup, base_url):
                 for img_url in image_candidates:
                     if isinstance(img_url, str):
                         url = urljoin(base_url, img_url)
-                        if url not in processed_urls:
+                        if url not in processed_urls and not any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS):
                             processed_urls.add(url)
                             candidate_images.append((url, {'score': 8000000, 'meta': True}))
         except Exception as e:
@@ -324,10 +284,10 @@ def parse_images_from_soup(soup, base_url):
     # 3. All <img> tags, robust lazy-load and data-* handling
     for img in soup.find_all('img'):
         url = extract_img_url_from_tag(img, base_url)
-        if not url or url in processed_urls:
+        if not url or url in processed_urls or any(pattern in url.lower() for pattern in EXCLUDED_PATTERNS):
             continue
         processed_urls.add(url)
-        width, height = get_image_dimensions_from_attributes(img)
+        width, height = extract_dimensions_from_tag_or_style(img)
         metadata = {}
         if width > 0:
             metadata['width'] = width
@@ -370,6 +330,12 @@ def process_candidate_images(candidate_images):
 
     # 3. Resort by area (width*height)
     top_candidates.sort(key=lambda item: item[1].get('width', 0) * item[1].get('height', 0), reverse=True)
+
+    # Ensure we still have candidates after filtering/sorting
+    if not top_candidates:
+        print("No suitable candidates remain after processing.")
+        return None
+
     # 4. Fallback: if no dimensions, use original score
     best = top_candidates[0]
     best_url = best[0]
@@ -397,44 +363,58 @@ def fetch_largest_image(url):
         return process_candidate_images(candidate_images)
 
     try:
-        # Handle URLs that are already images (by extension)
+        is_direct_image = False
+        # Handle URLs that might be direct images (check extension first)
         if re.search(r'\.(jpe?g|png|webp|gif|svg)([?#].*)?$', url.lower()):
             debug_print(f"URL appears to be an image by extension: {url}")
-            # Validate that it's actually an image
-            response = requests.head(url, headers=HEADERS, timeout=5)
-            content_type = response.headers.get('Content-Type', '').lower()
-            debug_print(f"HEAD Content-Type for {url}: {content_type}")
-            if 'image/' in content_type:
-                width, height = get_actual_image_dimensions(url)
-                debug_print(f"Fetched dimensions for {url}: {width}x{height}")
-                if width > 0 and height > 0:
-                    debug_print(f"Accepting image URL {url} with size {width}x{height}")
-                    return url
+            try:
+                response = requests.head(url, headers=HEADERS, timeout=5, allow_redirects=True)
+                response.raise_for_status()
+                content_type = response.headers.get('Content-Type', '').lower()
+                debug_print(f"HEAD Content-Type for {url}: {content_type}")
+                if 'image/' in content_type:
+                    is_direct_image = True
                 else:
-                    debug_print(f"Rejected image URL {url} due to invalid size {width}x{height}")
+                    debug_print(f"Rejected image URL {url} based on HEAD Content-Type: {content_type}")
+            except requests.exceptions.RequestException as e:
+                debug_print(f"HEAD request failed for {url}: {e}, will proceed with GET")
+
+        # If it looks like a direct image, get dimensions and return if valid
+        if is_direct_image:
+            width, height = get_actual_image_dimensions(url)
+            debug_print(f"Fetched dimensions for direct image {url}: {width}x{height}")
+            if width > 100 and height > 100: # Use a threshold like in process_candidate_images
+                debug_print(f"Accepting direct image URL {url} with size {width}x{height}")
+                return url
             else:
-                debug_print(f"Rejected image URL {url} due to Content-Type: {content_type}")
-        
-        # Standard HTML page fetch
+                debug_print(f"Rejected direct image URL {url} due to insufficient size {width}x{height}")
+                # Don't return None yet, maybe the page it links *from* has a better image via meta tags
+
+        # Standard HTML page fetch (or if direct image check failed/was rejected)
         response = get_final_response(url, HEADERS)
         if response is None:
-            print("No response received.")
+            print(f"No valid response received for {url}.")
             return None
-            
-        # Check if the URL is a direct image (by Content-Type)
+
+        # Check Content-Type again after GET, in case HEAD failed or it wasn't checked by extension
         content_type = response.headers.get('Content-Type', '').lower()
-        debug_print(f"Fetched Content-Type for {url}: {content_type}")
-        if content_type.startswith('image/'):
-            debug_print(f"URL is an image by Content-Type: {url}")
-            width, height = get_actual_image_dimensions(url)
+        debug_print(f"GET Content-Type for {url}: {content_type}")
+        if content_type.startswith('image/') and not is_direct_image: # Check only if not already identified as image
+            debug_print(f"URL is an image by GET Content-Type: {url}")
+            width, height = get_actual_image_dimensions(url) # Re-fetch might be redundant but ensures consistency
             debug_print(f"Fetched dimensions for {url}: {width}x{height}")
-            if width > 0 and height > 0:
+            if width > 100 and height > 100:
                 debug_print(f"Accepting image URL {url} with size {width}x{height}")
                 return url
             else:
                 debug_print(f"Rejected image URL {url} due to invalid size {width}x{height}")
-                return None
-            
+                return None # If it IS an image but too small, stop here.
+
+        # If not an image content type, parse HTML
+        if 'html' not in content_type:
+            debug_print(f"Content-Type ({content_type}) is not HTML or image, skipping image parsing for {url}")
+            return None
+
         # Parse HTML and look for images
         soup = BeautifulSoup(response.text, 'html.parser')
         base_url = response.url
@@ -529,24 +509,42 @@ def parse_images_from_selenium(driver):
         print("No images found on the page.")
         return candidate_images
 
+    def evaluate_image_url(img_url):
+        try:
+            req_headers = {
+                "User-Agent": HEADERS.get("User-Agent"),
+                "Referer": img_url
+            }
+            req = urllib.request.Request(img_url, headers=req_headers)
+            with urllib.request.urlopen(req) as response:
+                image_data = response.read()
+            image_size = len(image_data)
+            debug_print(f"Image size for {img_url}: {image_size} bytes")
+            return image_size
+        except Exception as e:
+            debug_print(f"Error downloading or measuring {img_url}: {e}")
+            return 0
+
     for img in images:
         try:
             img_url = img.get_attribute('src')
-            if not img_url or 'data:' in img_url:  # Skip data URLs or invalid URLs
+            if not img_url or 'data:' in img_url or any(pattern in img_url.lower() for pattern in EXCLUDED_PATTERNS):
                 continue
 
             # Get natural dimensions as reported by the browser
             try:
                 natural_width = driver.execute_script("return arguments[0].naturalWidth;", img)
                 natural_height = driver.execute_script("return arguments[0].naturalHeight;", img)
-            except:
+            except Exception as e:
+                debug_print(f"Could not get natural dimensions: {e}")
                 natural_width = natural_height = 0
 
             # Get display dimensions
             try:
                 display_width = driver.execute_script("return arguments[0].clientWidth;", img)
                 display_height = driver.execute_script("return arguments[0].clientHeight;", img)
-            except:
+            except Exception as e:
+                debug_print(f"Could not get client dimensions: {e}")
                 display_width = display_height = 0
 
             # Extract width and height attributes for scoring
@@ -578,27 +576,23 @@ def parse_images_from_selenium(driver):
                 if not is_visible:
                     continue
             except:
-                pass  # If we can't determine visibility, continue with the image
-
-            # Don't skip images just because they're small - use dimensions for scoring later
+                pass
 
             metadata = {
                 'width': width,
                 'height': height,
-                'score': width * height if width > 0 and height > 0 else 640 * 480  # Default reasonable score
+                'score': width * height if width > 0 and height > 0 else 640 * 480
             }
 
-            # Fetch image size for promising candidates
             if metadata['score'] > 10000 or (natural_width > 200 and natural_height > 200):
                 file_size = evaluate_image_url(img_url)
                 if file_size > 0:
                     metadata['filesize'] = file_size
 
-            if not any(pattern in img_url.lower() for pattern in EXCLUDED_PATTERNS):
-                candidate_images.append((img_url, metadata))
+            candidate_images.append((img_url, metadata))
 
         except Exception as e:
-            print(f"Error processing image element: {e}")
+            debug_print(f"Error processing image element: {e}")
             continue
 
     return candidate_images
