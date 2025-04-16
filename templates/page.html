@@ -313,13 +313,21 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       weatherForecast.innerHTML = '';
       weatherForecast.className = 'weather-forecast';
+      const today = new Date();
+      const todayYear = today.getFullYear();
+      const todayMonth = today.getMonth();
+      const todayDate = today.getDate();
       data.daily.forEach((day, i) => {
         const dayElement = document.createElement('div');
         dayElement.className = 'weather-day';
         const date = new Date(day.dt * 1000);
         const userLocale = navigator.language || 'en-US';
         let dayName;
-        if (i === 0) {
+        if (
+          date.getFullYear() === todayYear &&
+          date.getMonth() === todayMonth &&
+          date.getDate() === todayDate
+        ) {
           if (userLocale.startsWith('en')) {
             dayName = 'Today';
           } else {
