@@ -13,7 +13,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-#from shared import FeedHistory, RssFeed, TZ, Mode, MODE, g_c
 from seleniumfetch import create_driver
 
 custom_hacks = {}
@@ -93,12 +92,17 @@ def get_actual_image_dimensions(img_url):
         response.raise_for_status()
         content_type = response.headers.get('Content-Type', '').lower()
         
-        # Use content-length as a quick check for valid images
-        content_length = int(response.headers.get('Content-Length', 0))
-        if content_length < 100:  # Skip very small images that are likely icons
-            debug_print(f"Skipping small image ({content_length} bytes): {img_url}")
-            return 0, 0
-            
+        # Use content-length as a quick check for valid images, but only skip if present and small
+        content_length_header = response.headers.get('Content-Length')
+        if content_length_header is not None:
+            try:
+                content_length = int(content_length_header)
+                if content_length < 100:  # Skip very small images that are likely icons
+                    debug_print(f"Skipping small image ({content_length} bytes): {img_url}")
+                    return 0, 0
+            except Exception:
+                pass
+        
         if 'svg' in content_type:
             debug_print(f"SVG image detected for {img_url}, attempting to parse dimensions")
             try:
@@ -369,7 +373,13 @@ def process_candidate_images(candidate_images):
     # 4. Fallback: if no dimensions, use original score
     best = top_candidates[0]
     best_url = best[0]
-    print(f"Best image found: {best_url} (score: {best[1].get('score')}, size: {best[1].get('width', 0)}x{best[1].get('height', 0)})")
+    best_width = best[1].get('width', 0)
+    best_height = best[1].get('height', 0)
+    min_size = 100  # Minimum width and height for a valid image
+    if best_width < min_size or best_height < min_size:
+        print("No suitable images found (all images too small).")
+        return None
+    print(f"Best image found: {best_url} (score: {best[1].get('score')}, size: {best_width}x{best_height})")
     return best_url
 
 def fetch_largest_image(url):
@@ -387,14 +397,23 @@ def fetch_largest_image(url):
         return process_candidate_images(candidate_images)
 
     try:
-        # Handle URLs that are already images
+        # Handle URLs that are already images (by extension)
         if re.search(r'\.(jpe?g|png|webp|gif|svg)([?#].*)?$', url.lower()):
-            print(f"URL appears to be an image: {url}")
+            debug_print(f"URL appears to be an image by extension: {url}")
             # Validate that it's actually an image
             response = requests.head(url, headers=HEADERS, timeout=5)
             content_type = response.headers.get('Content-Type', '').lower()
+            debug_print(f"HEAD Content-Type for {url}: {content_type}")
             if 'image/' in content_type:
-                return url
+                width, height = get_actual_image_dimensions(url)
+                debug_print(f"Fetched dimensions for {url}: {width}x{height}")
+                if width > 0 and height > 0:
+                    debug_print(f"Accepting image URL {url} with size {width}x{height}")
+                    return url
+                else:
+                    debug_print(f"Rejected image URL {url} due to invalid size {width}x{height}")
+            else:
+                debug_print(f"Rejected image URL {url} due to Content-Type: {content_type}")
         
         # Standard HTML page fetch
         response = get_final_response(url, HEADERS)
@@ -402,11 +421,19 @@ def fetch_largest_image(url):
             print("No response received.")
             return None
             
-        # Check if the URL is a direct image
+        # Check if the URL is a direct image (by Content-Type)
         content_type = response.headers.get('Content-Type', '').lower()
+        debug_print(f"Fetched Content-Type for {url}: {content_type}")
         if content_type.startswith('image/'):
-            print(f"URL is an image: {url}")
-            return url
+            debug_print(f"URL is an image by Content-Type: {url}")
+            width, height = get_actual_image_dimensions(url)
+            debug_print(f"Fetched dimensions for {url}: {width}x{height}")
+            if width > 0 and height > 0:
+                debug_print(f"Accepting image URL {url} with size {width}x{height}")
+                return url
+            else:
+                debug_print(f"Rejected image URL {url} due to invalid size {width}x{height}")
+                return None
             
         # Parse HTML and look for images
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -607,7 +634,21 @@ def fetch_largest_image_selenium(url):
 
 if __name__ == '__main__':
     import sys
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 1 and sys.argv[1] == '--test-urls':
+        test_urls = [
+            'https://justthenews.com/government/congress/watch-live-marjorie-taylor-greene-holds-town-hall-georgia',
+            'https://www.miragenews.com/new-bat-cell-lines-advance-hantavirus-1445117/',
+            'https://lwn.net/',
+            'https://www.phoronix.com/news/GCC-15.1-Last-Minute-Znver5-Bit',
+            'https://www.cnbc.com/2025/04/15/nvidia-says-it-will-record-5point5-billion-quarterly-charge-tied-to-h20-processors-exported-to-china.html'
+        ]
+        print("Running test mode on sample URLs:\n")
+        for url in test_urls:
+            print(f"Testing: {url}")
+            result = custom_fetch_largest_image(url)
+            print(f"  Result: {result}\n")
+        print("Test mode complete.")
+    elif len(sys.argv) > 1:
         test_url = sys.argv[1]
         print(f"Testing custom_fetch_largest_image with URL: {test_url}")
         result = custom_fetch_largest_image(test_url)
@@ -616,4 +657,4 @@ if __name__ == '__main__':
         else:
             print("No image found or an error occurred.")
     else:
-        print("Usage: python auto_update_utils.py <URL>")
+        print("Usage: python auto_update_utils.py <URL> or --test-urls")
