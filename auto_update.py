@@ -12,17 +12,13 @@ from jinja2 import Template
 from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK, EXPIRE_DAY
 from auto_update_utils import custom_fetch_largest_image
 
-# Initialize the https://together.ai/ client only if needed because it takes 2 seconds.
-openai_client = None
-def get_openai_client():
-    global openai_client
-    if (openai_client is None):
-        from openai import OpenAI
-        openai_client = OpenAI(
-            api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
-            base_url="https://api.together.xyz/v1",
-        )
-    return openai_client
+# --- Configuration and Prompt Constants ---
+
+BANNED_WORDS = [
+    "tmux",
+    "redox",
+    "java",
+]
 
 MAX_PREVIOUS_HEADLINES = 200
 
@@ -32,6 +28,8 @@ THRESHOLD = 0.75
 # Model configuration with primary and fallback options
 PRIMARY_MODEL  = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 FALLBACK_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
+
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
 BASE = "/srv/http/"
@@ -51,10 +49,37 @@ MODE_TO_SCHEDULE = {
     "trump": [0, 4, 8, 10, 12, 14, 16, 20],
 }
 
+modetoprompt2 = {
+    Mode.LINUX_REPORT: f"""Arch and Debian Linux programmers and experienced users. Nothing about Ubuntu or any other
+    distro. Anything non-distro-specific is fine, but nothing about the following topics:
+    {', '.join(BANNED_WORDS)}.\n""",
+    Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
+    Mode.COVID_REPORT : "COVID-19 researchers",
+    Mode.TRUMP_REPORT : "Trump's biggest fans",
+}
+
+modetoprompt = {
+    "linux": modetoprompt2[Mode.LINUX_REPORT],
+    "ai": modetoprompt2[Mode.AI_REPORT],
+    "covid": modetoprompt2[Mode.COVID_REPORT],
+    "trump": modetoprompt2[Mode.TRUMP_REPORT],
+}
+
+PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
+    Please talk over the titles to decide which ones sound interesting.
+    Some headlines will be irrelevant, those are easy to exclude.
+    Do not select headlines that are very similar or nearly duplicates; pick only distinct headlines.
+    When you are done discussing the titles, put *** and then list the top 3, using only the titles.
+    """
+
+# --- End Configuration and Prompt Constants ---
+
+# --- Global Variables ---
+openai_client = None
 cache = DiskCacheWrapper(".")
 ALL_URLS = {}
-
-# Define the Jinja2 template for a single headline
+embedder = None  # Lazy initialization
+st_util = None
 headline_template = Template("""
 <div class="linkclass">
 <center>
@@ -73,6 +98,18 @@ headline_template = Template("""
 </div>
 <br/>
 """)
+# --- End Global Variables ---
+
+# Initialize the https://together.ai/ client only if needed because it takes 2 seconds.
+def get_openai_client():
+    global openai_client
+    if (openai_client is None):
+        from openai import OpenAI
+        openai_client = OpenAI(
+            api_key=os.environ.get("TOGETHER_API_KEY_LINUXREPORT"),
+            base_url="https://api.together.xyz/v1",
+        )
+    return openai_client
 
 def get_current_model():
     """Get the current working model, with fallback mechanism."""
@@ -157,7 +194,7 @@ def generate_headlines_html(top_articles, output_file):
 
     # Step 3: Write to the output file
     output_dir = os.path.dirname(output_file)
-    if output_dir:
+    if (output_dir):
         os.makedirs(output_dir, exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(full_html)
@@ -181,39 +218,6 @@ def extract_top_titles_from_ai(text):
                 break
 
     return titles
-
-
-BANNED_WORDS = [
-    "tmux",
-    "redox",
-    "java",
-]
-
-modetoprompt2 = {
-    Mode.LINUX_REPORT: f"""Arch and Debian Linux programmers and experienced users. Nothing about Ubuntu or any other
-    distro. Anything non-distro-specific is fine, but nothing about the following topics:
-    {', '.join(BANNED_WORDS)}.\n""",
-    Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
-    Mode.COVID_REPORT : "COVID-19 researchers",
-    Mode.TRUMP_REPORT : "Trump's biggest fans",
-}
-
-modetoprompt = {
-    "linux": modetoprompt2[Mode.LINUX_REPORT],
-    "ai": modetoprompt2[Mode.AI_REPORT],
-    "covid": modetoprompt2[Mode.COVID_REPORT],
-    "trump": modetoprompt2[Mode.TRUMP_REPORT],
-}
-
-PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
-    Please talk over the titles to decide which ones sound interesting.
-    Some headlines will be irrelevant, those are easy to exclude.
-    When you are done discussing the titles, put *** and then list the top 3, using only the titles.
-    """
-
-EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
-embedder = None  # Lazy initialization
-st_util = None
 
 def get_embedding(text):
     global embedder, st_util
