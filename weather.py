@@ -119,7 +119,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
-        lat, lon = get_location_from_ip(ip)
+        #lat, lon = get_location_from_ip(ip)
         if not lat or not lon:
             lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
     if not lat or not lon:
