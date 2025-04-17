@@ -4,10 +4,9 @@ shared.py
 This module contains shared utilities, classes, and constants for the LinuxReport project.
 """
 
-import os
 from enum import Enum
 import datetime
-from typing import Optional, Any
+from typing import Optional, Any, cast
 
 import diskcache
 import FeedHistory
@@ -43,7 +42,7 @@ MODE = Mode.AI_REPORT
 URLS_COOKIE_VERSION = "2"
 USE_TOR = True
 
-RSS_TIMEOUT = 300  # Timeout value in seconds for RSS feed operations
+RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process in RSS feeds
 
@@ -126,6 +125,39 @@ class DiskCacheWrapper:
         if last_fetch is None:
             return True
         return history.has_expired(url, last_fetch)
+
+    # Feed cache accessors for clarity
+    def get_feed(self, url: str) -> Optional[RssFeed]:
+        """Retrieve a raw RSS feed from cache."""
+        value = self.get(url)
+        return cast(Optional[RssFeed], value)
+
+    def set_feed(self, url: str, feed: RssFeed, timeout: Optional[int] = None) -> None:
+        """Cache a raw RSS feed with optional timeout."""
+        if not isinstance(feed, RssFeed):
+            raise TypeError(f"set_feed expects RssFeed, got {type(feed).__name__}")
+        self.put(url, feed, timeout)
+
+    def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
+        """Get the last fetch timestamp for a feed."""
+        value = self.get(url + ":last_fetch")
+        return cast(Optional[datetime.datetime], value)
+
+    def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
+        """Cache the last fetch timestamp for a feed."""
+        self.put(url + ":last_fetch", timestamp, timeout)
+
+    # Template cache accessors for clarity
+    def get_template(self, site_key: str) -> Optional[str]:
+        """Retrieve a rendered template from cache."""
+        value = self.get(site_key)
+        return cast(Optional[str], value)
+
+    def set_template(self, site_key: str, template: str, timeout: Optional[int] = None) -> None:
+        """Cache a rendered template with optional timeout."""
+        if not isinstance(template, str):
+            raise TypeError(f"set_template expects str, got {type(template).__name__}")
+        self.put(site_key, template, timeout)
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")

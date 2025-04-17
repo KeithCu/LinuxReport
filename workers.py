@@ -33,7 +33,7 @@ def load_url_worker(url):
     if feedpid == os.getpid():
         start = timer()
         rssfeed = None
-        rssfeed = g_c.get(url)
+        rssfeed = g_c.get_feed(url)
 
         if USE_TOR and "reddit" in url:
             print(f"Using TOR proxy for Reddit URL: {url}")
@@ -77,7 +77,7 @@ def load_url_worker(url):
                         #print (entry['link'])
 
         # Merge with cached entries (if any) to retain history.
-        old_feed = g_c.get(url)
+        old_feed = g_c.get_feed(url)
         new_count = len(new_entries)
         if old_feed and old_feed.entries:
             new_count = len(set(e.get('link') for e in new_entries) - set(e.get('link') for e in old_feed.entries))
@@ -98,8 +98,8 @@ def load_url_worker(url):
                 top_articles = old_feed.top_articles
 
         rssfeed = RssFeed(entries, top_articles=top_articles)
-        g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
-        g_c.put(url + ":last_fetch", datetime.now(TZ), timeout=EXPIRE_WEEK)
+        g_c.set_feed(url, rssfeed, timeout=EXPIRE_WEEK)
+        g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
             g_c.delete(rss_info.site_url)

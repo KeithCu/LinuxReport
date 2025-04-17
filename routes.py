@@ -89,10 +89,10 @@ def init_app(flask_app):
         for url in page_order:
             rss_info = ALL_URLS[url]
 
-            template = g_c.get(rss_info.site_url)
+            template = g_c.get_template(rss_info.site_url)
             if DEBUG or template is None:
-                feed = g_c.get(url)
-                last_fetch = g_c.get(url + ":last_fetch")
+                feed = g_c.get_feed(url)
+                last_fetch = g_c.get_last_fetch(url)
                 last_fetch_str = shared.format_last_updated(last_fetch)
                 if feed is not None:
                     entries = feed.entries
@@ -104,7 +104,7 @@ def init_app(flask_app):
                                            alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url,
                                            error_message=("Feed could not be loaded." if feed is None else None))
 
-                g_c.put(rss_info.site_url, template, timeout=EXPIRE_MINUTES * 12)
+                g_c.set_template(rss_info.site_url, template, timeout=EXPIRE_MINUTES * 12)
 
             result[cur_col].append(template)
 
