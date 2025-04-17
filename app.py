@@ -1,4 +1,4 @@
-﻿"""
+"""
 app.py
 
 Main entry point for the Flask application. Initializes the Flask app, configures extensions, loads shared settings, and registers routes.
