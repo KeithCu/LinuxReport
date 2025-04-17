@@ -8,12 +8,18 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{{title}}</title>
     <style>
+      /* Theme definitions */
+      body.theme-light { --bg:#ffffff; --text:#000000; --link:#1a0dab; --btn-bg:#f6f6f6; --btn-border:#092236; --btn-text:#3b5971; }
+      body.theme-dark { --bg:#1e1e1e; --text:#f0f0f0; --link:#8ab4f8; --btn-bg:#333333; --btn-border:#ffffff; --btn-text:#ffffff; }
+      body.theme-solarized { --bg:#fdf6e3; --text:#657b83; --link:#268bd2; --btn-bg:#eee8d5; --btn-border:#586e75; --btn-text:#586e75; }
+
       * {
         box-sizing: border-box;
       }
 
       body {
-        color:{{ text_color }};
+        color: var(--text);
+        background-color: var(--bg);
       }
 
       code {
@@ -167,7 +173,7 @@
 
     
   </style>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
+  <!-- theme CSS now inlined above; external themes.css removed -->
   
     <script>
       function redirect() {
@@ -177,7 +183,7 @@
         function autoRefresh(){self.location.reload();}
     </script>
   </head>
-  <body class="theme-{{ THEME }}" style="background-color:{{ back_color }}">
+  <body class="theme-{{ THEME }}">
 
 <center>
   <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
