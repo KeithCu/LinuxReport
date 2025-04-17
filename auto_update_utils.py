@@ -1,17 +1,16 @@
 #!/usr/bin/python3
-from urllib.parse import urlparse, urljoin
-import re
 import json
+import re
 import urllib.request
-import requests
 from io import BytesIO
-from PIL import Image
+from urllib.parse import urljoin, urlparse
 
+import requests
 from bs4 import BeautifulSoup
-
+from PIL import Image
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
 
 from seleniumfetch import create_driver
 
@@ -352,6 +351,7 @@ def process_candidate_images(candidate_images):
 
 def fetch_largest_image(url):
     import os
+
     # Debug feature: if the provided URL is a local file, load its content
     if os.path.exists(url):
         with open(url, 'r', encoding='utf-8') as f:

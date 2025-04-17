@@ -3,12 +3,13 @@
 A simple command-line tool to test fetching RSS feeds through Tor using feedparser.
 """
 
-import sys
 import argparse
-import urllib.request
-import time
-import feedparser
 import socket
+import sys
+import time
+import urllib.request
+
+import feedparser
 import socks
 
 # Default Reddit user agent that appears like a normal Firefox browser

@@ -12,7 +12,7 @@ from flask_mobility import Mobility
 sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
-from shared import EXPIRE_WEEK, DEBUG
+from shared import DEBUG, EXPIRE_WEEK
 
 # Initialize Flask app
 g_app = Flask(__name__)
@@ -34,4 +34,5 @@ THEME_CHOICES = ['light', 'dark', 'solarized', 'futuristic', 'steampunk', 'cyber
 
 # Import routes and pass the app instance
 import routes
+
 routes.init_app(g_app)

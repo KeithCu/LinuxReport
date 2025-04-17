@@ -4,12 +4,14 @@ shared.py
 This module contains shared utilities, classes, and constants for the LinuxReport project.
 """
 
-from enum import Enum
 import datetime
-from typing import Optional, Any, cast
+from enum import Enum
+from typing import Any, Optional, cast
 
 import diskcache
+
 import FeedHistory
+
 
 class Mode(Enum):
     """Enumeration for different report modes."""

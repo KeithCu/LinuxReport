@@ -4,19 +4,20 @@ weather.py
 Provides functions to fetch and cache weather data, including a fake API mode for testing. Includes HTML rendering for weather forecasts.
 """
 
-# Standard library imports
-from datetime import datetime, date as date_obj
-from collections import defaultdict
-import time
 import os
+import time
+from collections import defaultdict
+# Standard library imports
+from datetime import date as date_obj
+from datetime import datetime
 
+import geoip2.database
 # Third-party imports
 import requests
-import geoip2.database
 from geoip2.errors import GeoIP2Error
 
 # Local imports
-from shared import SPATH, DiskCacheWrapper, DEBUG
+from shared import DEBUG, SPATH, DiskCacheWrapper
 
 # --- Configurable cache bucketing ---
 WEATHER_BUCKET_PRECISION = 1  # Decimal places for lat/lon rounding (lower = larger area per bucket)

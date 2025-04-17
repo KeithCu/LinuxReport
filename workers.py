@@ -1,21 +1,27 @@
 # This file contains worker functions for fetching and processing RSS feeds.
 # Functions include parallel fetching, thread management, and feed processing.
 
-import os
-import time
-import itertools
-import re
-from timeit import default_timer as timer
 import concurrent.futures
-from shared import ALL_URLS, PATH, g_c, RSS_TIMEOUT, MAX_ITEMS, DEBUG, USE_TOR, USER_AGENT, EXPIRE_WEEK
-from feedfilter import prefilter_news, filter_similar_titles, merge_entries
-from seleniumfetch import fetch_site_posts
-from Tor import fetch_via_tor
-from shared import RssFeed, TZ
-from datetime import datetime
-import feedparser
+import itertools
+# Standard library imports
+import os
+import re
 import threading
+import time
+from timeit import default_timer as timer
+
+# Third-party imports
+import feedparser
+
 import shared
+from feedfilter import filter_similar_titles, merge_entries, prefilter_news
+from seleniumfetch import fetch_site_posts
+# Local application imports
+from shared import (ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, RSS_TIMEOUT, TZ,
+                    USE_TOR, USER_AGENT, RssFeed, g_c)
+from Tor import fetch_via_tor
+
+LINK_REGEX = re.compile(r'href=["\'](.*?)["\']')
 
 # Worker function to fetch and process a single RSS feed.
 def load_url_worker(url):
@@ -68,7 +74,7 @@ def load_url_worker(url):
                     entry['link'] = entry['underlying_url']
                     #del entry['origin_link']
                 else:
-                    links = re.findall(r'href=["\'](.*?)["\']', entry.get('html_content', ''))
+                    links = LINK_REGEX.findall(entry.get('html_content', ''))
                     # Filter out reddit links:
                     links = [lnk for lnk in links if 'reddit' not in lnk]
                     if links:

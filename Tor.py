@@ -1,20 +1,19 @@
 import io
-import socket
 import random
+import socket
+import subprocess
 import threading
 import time
-
-from timeit import default_timer as timer
 import traceback
-import subprocess
+from timeit import default_timer as timer
+
 import feedparser
+#Generate fake but valid user-agents to make Reddit happy.
 from fake_useragent import UserAgent
 
 import shared
 from seleniumfetch import fetch_site_posts
 
-#Generate fake but valid user-agents to make Reddit happy.
-from fake_useragent import UserAgent
 ua = UserAgent()
 
 PASSWORD = "TESTPASSWORD"

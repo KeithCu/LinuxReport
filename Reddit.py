@@ -4,13 +4,13 @@ Reddit.py
 Handles Reddit API authentication, token management, and fetching Reddit feeds in a feedparser-compatible format for the LinuxReport project.
 """
 
+import getpass
+import json
 # Standard library imports
 import os
-import json
-import time
 import re
+import time
 from urllib.parse import urlparse
-import getpass
 
 # Third-party imports
 import requests

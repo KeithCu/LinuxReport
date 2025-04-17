@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
+import argparse
+import datetime
+import importlib.util
 import os
+import re
 import sys
 from timeit import default_timer as timer
-import re
-import argparse
-import importlib.util
-import datetime
 
 from jinja2 import Template
 
-from shared import TZ, Mode, MODE, g_c, DiskCacheWrapper, EXPIRE_WEEK, EXPIRE_DAY
 from auto_update_utils import custom_fetch_largest_image
+from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, DiskCacheWrapper, Mode,
+                    g_c)
 
 # --- Configuration and Prompt Constants ---
 
@@ -98,7 +99,6 @@ headline_template = Template("""
 </div>
 <br/>
 """)
-# --- End Global Variables ---
 
 # Initialize the https://together.ai/ client only if needed because it takes 2 seconds.
 def get_openai_client():

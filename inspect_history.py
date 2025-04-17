@@ -1,6 +1,8 @@
 import argparse
 import json
+
 from shared import FeedHistory
+
 
 def set_serializer(obj):
     """Custom serializer to convert sets to lists for JSON."""

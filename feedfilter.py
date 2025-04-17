@@ -1,5 +1,7 @@
 import difflib
+
 from shared import g_c
+
 
 # Google boosts CNN and other fake news, so filter it:
 # https://www.rt.com/usa/459233-google-liberal-bias-news-study/
