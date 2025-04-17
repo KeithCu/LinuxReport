@@ -19,7 +19,7 @@ from forms import ConfigForm, UrlForm, CustomRSSForm
 from weather import get_weather_data, get_default_weather_html
 import shared
 from workers import fetch_urls_parallel, fetch_urls_thread
-from app import THEME  # default theme for config form
+THEME = 'dark'
 
 
 # Function to initialize routes
