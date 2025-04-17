@@ -29,7 +29,10 @@ URLS_COOKIE_VERSION = "2"
 
 USE_TOR = True
 
-# Theme choice: global variable
+# Available theme choices
+THEME_CHOICES = ['light', 'dark', 'solarized']
+
+# Theme choice: global variable (choose one from THEME_CHOICES)
 THEME = 'light'
 g_app.jinja_env.globals['THEME'] = THEME
 
