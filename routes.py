@@ -19,7 +19,7 @@ from models import RssInfo
 from shared import (ABOVE_HTML_FILE, ALL_URLS, DEBUG, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, PATH, format_last_updated)
+                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, MODE, PATH, format_last_updated)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -266,7 +266,7 @@ def init_app(flask_app):
             Mode.AI_REPORT: 'ai',
             Mode.TRUMP_REPORT: 'trump',
         }
-        mode_str = mode_map.get(Mode)
+        mode_str = mode_map.get(MODE)
         archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
         headlines = []
         try:
