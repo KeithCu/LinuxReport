@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="icon" type="image/png" href="{{ favicon }}">
+    <meta name="description" content="{{ description }}">
+    <style>
+        body {
+            background: var(--bg, #fff);
+            color: var(--text, #222);
+            margin: 0;
+            font-family: sans-serif;
+        }
+        .headline-archive-container {
+            max-width: 700px;
+            margin: 2em auto;
+            background: var(--btn-bg, #f6f6f6);
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+            padding: 2em 1.5em;
+        }
+        .headline-entry {
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+            border-bottom: 1px solid #ddd;
+        }
+        .headline-entry:last-child {
+            border-bottom: none;
+        }
+        .headline-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 0.2em;
+        }
+        .headline-image {
+            max-width: 100%;
+            margin: 0.5em 0;
+            border-radius: 6px;
+        }
+        .headline-timestamp {
+            color: #888;
+            font-size: 0.95em;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1.5em;
+            color: var(--link, #1a0dab);
+            text-decoration: underline;
+            font-size: 1.1em;
+        }
+    </style>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
+        var theme = match ? match[1] : 'light';
+        document.body.classList.add('theme-' + theme);
+      });
+    </script>
+</head>
+<body>
+    <div class="headline-archive-container">
+        <a href="/" class="back-link">&larr; Back to Main Page</a>
+        <h2>Old Headlines ({{ mode.title() }}Report)</h2>
+        {% if headlines %}
+            {% for h in headlines %}
+                <div class="headline-entry">
+                    <div class="headline-title">
+                        <a href="{{ h.url }}" target="_blank">{{ h.title }}</a>
+                    </div>
+                    {% if h.image_url %}
+                        <img src="{{ h.image_url }}" class="headline-image" alt="headline image">
+                    {% endif %}
+                    <div class="headline-timestamp">
+                        {{ h.timestamp[:19].replace('T', ' ') if h.timestamp }}
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No old headlines found for this report.</p>
+        {% endif %}
+    </div>
+</body>
+</html>

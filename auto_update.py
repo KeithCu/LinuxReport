@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from timeit import default_timer as timer
+import json
 
 from jinja2 import Template
 
@@ -365,6 +366,47 @@ def refresh_images_only(mode):
     print(f"Successfully refreshed images in {html_file}")
     return True
 
+MAX_ARCHIVE_HEADLINES = 50
+
+def append_to_archive(mode, top_articles):
+    """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
+    archive_file = f"{mode}report_archive.jsonl"
+    timestamp = datetime.datetime.now(TZ).isoformat()
+    # Find image for these articles (same logic as generate_headlines_html)
+    image_article_index = None
+    image_url = None
+    for i, article in enumerate(top_articles[:3]):
+        potential_image_url = custom_fetch_largest_image(
+            article["url"],
+            underlying_link=article.get("underlying_link"),
+            html_content=article.get("html_content")
+        )
+        if potential_image_url:
+            image_article_index = i
+            image_url = potential_image_url
+            break
+    # Write each article as a JSON line
+    new_entries = []
+    for i, article in enumerate(top_articles[:3]):
+        entry = {
+            "title": article["title"],
+            "url": article["url"],
+            "timestamp": timestamp,
+            "image_url": image_url if i == image_article_index else None
+        }
+        new_entries.append(entry)
+    # Read old entries, append new, and trim to limit
+    try:
+        with open(archive_file, "r", encoding="utf-8") as f:
+            old_entries = [json.loads(line) for line in f if line.strip()]
+    except FileNotFoundError:
+        old_entries = []
+    all_entries = new_entries + old_entries
+    all_entries = all_entries[:MAX_ARCHIVE_HEADLINES]
+    with open(archive_file, "w", encoding="utf-8") as f:
+        for entry in all_entries:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
 # --- Integration into the main pipeline ---
 def main(mode):
     global ALL_URLS
@@ -396,6 +438,7 @@ def main(mode):
             if best_match:
                 top_3_articles.append(best_match)
         generate_headlines_html(top_3_articles, html_file)
+        append_to_archive(mode, top_3_articles)  # <-- Archive the headlines
     except Exception as e:
         print(f"Error in mode {mode}: {e}")
         sys.exit(1)

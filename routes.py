@@ -256,3 +256,37 @@ def init_app(flask_app):
         ip = request.remote_addr
         weather_data, status_code = get_weather_data(ip=ip)
         return jsonify(weather_data), status_code
+
+    @flask_app.route('/old_headlines')
+    def old_headlines():
+        from shared import MODE
+        mode_map = {
+            MODE.LINUX_REPORT: 'linux',
+            MODE.COVID_REPORT: 'covid',
+            MODE.TECHNO_REPORT: 'techno',
+            MODE.AI_REPORT: 'ai',
+            MODE.TRUMP_REPORT: 'trump',
+        }
+        mode_str = mode_map.get(MODE, 'linux')
+        archive_file = f"{mode_str}report_archive.jsonl"
+        headlines = []
+        try:
+            with open(archive_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line)
+                        headlines.append(entry)
+                    except Exception:
+                        continue
+        except FileNotFoundError:
+            pass
+        headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return render_template(
+            'old_headlines.html',
+            headlines=headlines,
+            mode=mode_str,
+            title=f"Old Headlines - {mode_str.title()}Report",
+            favicon=FAVICON,
+            logo_url=LOGO_URL,
+            description=WEB_DESCRIPTION
+        )
