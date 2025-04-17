@@ -19,7 +19,7 @@ from models import RssInfo
 from shared import (ABOVE_HTML_FILE, ALL_URLS, DEBUG, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, PATH)
+                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, PATH, format_last_updated)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -96,7 +96,7 @@ def init_app(flask_app):
             if DEBUG or template is None:
                 feed = g_c.get_feed(url)
                 last_fetch = g_c.get_last_fetch(url)
-                last_fetch_str = shared.format_last_updated(last_fetch)
+                last_fetch_str = format_last_updated(last_fetch)
                 if feed is not None:
                     entries = feed.entries
                     top_images = {article['url']: article['image_url'] for article in feed.top_articles if article['image_url']}
