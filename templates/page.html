@@ -167,6 +167,7 @@
 
     
   </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/themes.css') }}">
   
     <script>
       function redirect() {
@@ -176,7 +177,7 @@
         function autoRefresh(){self.location.reload();}
     </script>
   </head>
-  <body style="background-color:{{ back_color }}">
+  <body class="theme-{{ THEME }}" style="background-color:{{ back_color }}">
 
 <center>
   <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">

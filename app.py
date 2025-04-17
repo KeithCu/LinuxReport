@@ -29,6 +29,13 @@ URLS_COOKIE_VERSION = "2"
 
 USE_TOR = True
 
+# Default theme choice: options are 'light', 'dark', 'solarized'
+g_app.config.setdefault('THEME', 'light')
+
+@g_app.context_processor
+def inject_theme():
+    return dict(THEME=g_app.config.get('THEME'))
+
 # Import routes and pass the app instance
 import routes
 routes.init_app(g_app)
