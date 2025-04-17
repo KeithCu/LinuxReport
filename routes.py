@@ -19,20 +19,15 @@ from forms import ConfigForm, UrlForm, CustomRSSForm
 from weather import get_weather_data, get_default_weather_html
 import shared
 from workers import fetch_urls_parallel, fetch_urls_thread
+from app import THEME  # default theme for config form
 
 
 # Function to initialize routes
-app = None
 def init_app(flask_app):
-    global app
-    app = flask_app
-
-    @app.route('/')
+     
+    @flask_app.route('/')
     def index():
-        # Retrieve user preferences from cookies.
-        dark_mode = request.cookies.get('DarkMode')
-        no_underlines = request.cookies.get("NoUnderlines", "1") == "1"
-        sans_serif = request.cookies.get("SansSerif", "1") == "1"
+        # removed server-side theme and style reading; client JS applies these dynamically
 
         # Determine the order of RSS feeds to display.
         page_order = None
@@ -52,16 +47,8 @@ def init_app(flask_app):
 
         if g.is_mobile:
             suffix = ":MOBILE"
-            single_column = True
 
-        if dark_mode:
-            suffix = suffix + ":DARK"
-        if no_underlines:
-            suffix = suffix + ":NOUND"
-        if sans_serif:
-            suffix = suffix + ":SANS"
-
-        # Check if a cached version of the page exists.
+        # Try full page cache using only page order and mobile flag
         full_page = g_c.get(page_order_s + suffix)
         if not DEBUG and full_page is not None:
             return full_page
@@ -132,17 +119,7 @@ def init_app(flask_app):
             result[1] = Markup(''.join(result[1]))
             result[2] = Markup(''.join(result[2]))
 
-        # Set page colors and styles based on user preferences.
-        if dark_mode:
-            back_color = '#1e1e1e'
-            text_color = '#d4d4d4'
-        else:
-            back_color = '#f6f5f4'
-            text_color = 'black'
-
-        text_font_style = ""
-        if sans_serif:
-            text_font_style = "font-family: sans-serif;"
+        # removed server-side text_color and text_font_style; handled in CSS variables and JS
 
         # Include additional HTML content if available.
         try:
@@ -158,19 +135,18 @@ def init_app(flask_app):
         weather_html = get_default_weather_html()
 
         # Render the final page.
-        page = render_template('page.html', columns=result, text_color=text_color,
-                               logo_url=LOGO_URL, back_color=back_color, title=WEB_TITLE,
+        page = render_template('page.html', columns=result,
+                               logo_url=LOGO_URL, title=WEB_TITLE,
                                description=WEB_DESCRIPTION, favicon=FAVICON,
-                               welcome_html=Markup(WELCOME_HTML), no_underlines = no_underlines,
-                               text_font_style=text_font_style, above_html=Markup(above_html),
+                               welcome_html=Markup(WELCOME_HTML),
+                               above_html=Markup(above_html),
                                weather_html=Markup(weather_html))
 
-        # Cache the rendered page if appropriate.
+        # Store full page cache
         if page_order_s == STANDARD_ORDER_STR:
             expire = EXPIRE_MINUTES
             if need_fetch:
                 expire = 30
-
             g_c.put(page_order_s + suffix, page, timeout=expire)
 
         # Trigger background fetching if needed.
@@ -179,16 +155,15 @@ def init_app(flask_app):
 
         return page
 
-    @app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
+    @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
     def config():
 
         if request.method == 'GET':
             # Render the configuration form with current settings.
             form = ConfigForm()
 
-            dark_mode = request.cookies.get('DarkMode')
-            if dark_mode:
-                form.dark_mode.data = True
+            # Load theme preference
+            form.theme.data = request.cookies.get('Theme', THEME)
 
             no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
             form.no_underlines.data = no_underlines_cookie == "1"
@@ -230,9 +205,9 @@ def init_app(flask_app):
             form = ConfigForm(request.form)
             if form.delete_cookie.data:
                 template = render_template('configdone.html', message="Deleted cookies.")
-                resp = app.make_response(template)
+                resp = flask_app.make_response(template)
                 resp.delete_cookie('RssUrls')
-                resp.delete_cookie('DarkMode')
+                resp.delete_cookie('Theme')
                 resp.delete_cookie('NoUnderlines')
                 resp.delete_cookie('SansSerif')
                 return resp
@@ -255,7 +230,7 @@ def init_app(flask_app):
                     page_order.append(urlf.url.data)
 
             template = render_template('configdone.html', message="Cookies saved for later.")
-            resp = app.make_response(template)
+            resp = flask_app.make_response(template)
 
             if page_order != site_urls:
                 cookie_str = json.dumps(page_order)
@@ -265,17 +240,15 @@ def init_app(flask_app):
                 resp.delete_cookie('RssUrls')
                 resp.delete_cookie('UrlsVer')
 
-            if form.dark_mode.data:
-                resp.set_cookie('DarkMode', "1", max_age=EXPIRE_MINUTES)
-            else:
-                resp.delete_cookie('DarkMode')
+            # Save theme preference
+            resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_MINUTES)
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_MINUTES)
             resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_MINUTES)
 
             return resp
 
-    @app.route('/api/weather')
+    @flask_app.route('/api/weather')
     def get_weather():
         # Use the user's IP address for weather lookup
         ip = request.remote_addr

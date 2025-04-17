@@ -9,9 +9,23 @@
     <title>{{title}}</title>
     <style>
       /* Theme definitions */
-      body.theme-light { --bg:#ffffff; --text:#000000; --link:#1a0dab; --btn-bg:#f6f6f6; --btn-border:#092236; --btn-text:#3b5971; }
-      body.theme-dark { --bg:#1e1e1e; --text:#f0f0f0; --link:#8ab4f8; --btn-bg:#333333; --btn-border:#ffffff; --btn-text:#ffffff; }
-      body.theme-solarized { --bg:#fdf6e3; --text:#657b83; --link:#268bd2; --btn-bg:#eee8d5; --btn-border:#586e75; --btn-text:#586e75; }
+      body.theme-light { --bg:#ffffff; --text:#000000; --link:#1a0dab; --btn-bg:#f6f6f6; --btn-border:#092236; --btn-text:#3b5971; --btn-hover-bg:#0078D7; --btn-hover-text:#ffffff; }
+      body.theme-dark { --bg:#1e1e1e; --text:#f0f0f0; --link:#8ab4f8; --btn-bg:#333333; --btn-border:#ffffff; --btn-text:#ffffff; --btn-hover-bg:#505050; --btn-hover-text:#ffffff; }
+      body.theme-solarized { --bg:#fdf6e3; --text:#657b83; --link:#268bd2; --btn-bg:#eee8d5; --btn-border:#586e75; --btn-text:#586e75; --btn-hover-bg:#b58900; --btn-hover-text:#fdf6e3; }
+
+      /* New custom themes */
+      body.theme-futuristic { --bg:#0f0f0f; --text:#0ff; --link:#0f0; --btn-bg:#111; --btn-border:#0ff; --btn-text:#0ff; --btn-hover-bg:#0f0; --btn-hover-text:#000; }
+      body.theme-steampunk { --bg:#2b1b0e; --text:#d5c1a1; --link:#a67c52; --btn-bg:#3e2c1c; --btn-border:#a67c52; --btn-text:#d5c1a1; --btn-hover-bg:#a67c52; --btn-hover-text:#2b1b0e; }
+      body.theme-cyberpunk { --bg:#1e001f; --text:#ff00ff; --link:#00ffff; --btn-bg:#330033; --btn-border:#ff00ff; --btn-text:#ff00ff; --btn-hover-bg:#00ffff; --btn-hover-text:#1e001f; }
+
+      /* Additional custom themes */
+      body.theme-silver  { --bg:#C0C0C0; --text:#000000; --link:#333333; --btn-bg:#EFEFEF; --btn-border:#888888; --btn-text:#000000; --btn-hover-bg:#C0C0C0; --btn-hover-text:#FFFFFF; }
+      body.theme-pastelle{ --bg:#FFEFD5; --text:#4B3621; --link:#FFB6C1; --btn-bg:#FFDAB9; --btn-border:#DEB887; --btn-text:#4B3621; --btn-hover-bg:#FFA07A; --btn-hover-text:#FFFFFF; }
+      body.theme-sepia   { --bg:#704214; --text:#FFF8E7; --link:#B8860B; --btn-bg:#C19A6B; --btn-border:#8B4513; --btn-text:#FFF8E7; --btn-hover-bg:#8B4513; --btn-hover-text:#FFF8E7; }
+      body.theme-forest  { --bg:#2E4A2E; --text:#E0EBD8; --link:#A3B18A; --btn-bg:#4A6F4A; --btn-border:#A3B18A; --btn-text:#E0EBD8; --btn-hover-bg:#A3B18A; --btn-hover-text:#2E4A2E; }
+
+      /* Client-side dynamic sans-serif font */
+      body.sans-serif { font-family: sans-serif; }
 
       * {
         box-sizing: border-box;
@@ -22,12 +36,8 @@
         background-color: var(--bg);
       }
 
-      code {
-          {{ text_font_style }}
-      }
-      
       a:link, a:visited, a:hover, a:active {
-        color:{{ text_color }};
+        color: var(--link);
       }
 
       img {
@@ -38,6 +48,9 @@
         margin-bottom: .6em;
         font-size: large
       }
+
+      /* Client-side dynamic link underlines */
+      body.no-underlines a { text-decoration: none; }
 
       {%- if not g.is_mobile %}
       /* Create three equal columns that floats next to each other */
@@ -79,10 +92,10 @@
 
       .pagination-controls button {
         padding: 5px 15px;
-        border: 2px solid #092236;
+        border: 2px solid var(--btn-border);
         border-radius: 5px;
-        background-color: #f6f6f6;
-        color: #3b5971;
+        background-color: var(--btn-bg);
+        color: var(--btn-text);
         font-size: 14px;
         font-weight: bold;
         cursor: pointer;
@@ -91,8 +104,8 @@
       }
 
       .pagination-controls button:hover:not(:disabled) {
-        background-color: #0078D7;
-        color: white;
+        background-color: var(--btn-hover-bg);
+        color: var(--btn-hover-text);
         transform: scale(1.05);
         box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
       }
@@ -107,9 +120,9 @@
       max-width: 100%;
       margin: 10px auto;
       padding: 10px;
-      background-color: rgba(255, 255, 255, 0.15);
+      background-color: var(--btn-bg);
+      color: var(--text);
       border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       text-align: center;
     }
   
@@ -129,7 +142,8 @@
       min-width: 80px;
       margin: 5px;
       padding: 8px;
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: var(--btn-bg);
+      border: 1px solid var(--btn-border);
       border-radius: 5px;
     }
   
@@ -149,50 +163,57 @@
   
     .weather-precip {
       font-size: 0.9em;
-      color: #4682B4;
+      color: var(--link);
     }
   
-    /* Dark mode adjustments */
-    body[style*="background-color:#1e1e1e"] .weather-container {
-      background-color: rgba(0, 0, 0, 0.2);
-    }
-  
-    body[style*="background-color:#1e1e1e"] .weather-day {
-      background-color: rgba(0, 0, 0, 0.3);
-    }
-  
-    body[style*="background-color:#1e1e1e"] .weather-precip {
-      color: #87CEFA;
-    }
-
-    {% if no_underlines %}
-    .linkclass a {
-        text-decoration: none;
-    }
-    {% endif %}
+    /* Remove static dark-mode overrides; variables handle all themes */
 
     
   </style>
-  <!-- theme CSS now inlined above; external themes.css removed -->
-  
-    <script>
+  <!-- Apply theme based on 'Theme' cookie and set dropdown selection -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Read theme cookie or default
+      var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
+      var theme = match ? match[1] : 'light';
+      // Apply theme class to body
+      document.body.classList.add('theme-' + theme);
+      // Set dropdown to current theme
+      var select = document.getElementById('theme-select');
+      if (select) select.value = theme;
+      // Apply no-underlines setting (default OFF)
+      var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
+      if (nu && nu[1] === '1') document.body.classList.add('no-underlines');
+      // Apply sans-serif setting (default OFF)
+      var ss = document.cookie.match(/(?:^|; )SansSerif=([^;]+)/);
+      if (ss && ss[1] === '1') document.body.classList.add('sans-serif');
+    });
+  </script>
+  <script>
       function redirect() {
         window.location = "/config"
       }
       var timer = setInterval("autoRefresh()", 3601 * 1000);
         function autoRefresh(){self.location.reload();}
     </script>
+    <script>
+      // Change theme via cookie and reload
+      function setTheme(theme) {
+        document.cookie = 'Theme=' + theme + ';path=/';
+        window.location.reload();
+      }
+    </script>
   </head>
-  <body class="theme-{{ THEME }}">
+  <body>
 
 <center>
-  <div style="border: 1px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
+  <div style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
     <center>{{ weather_html }}</center>
   </div>
   </center>
   
   <center>
-    <div style="border: 2px solid gray; padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: large;">
+    <div style="border: 2px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: large;">
       <div>
         <a href="https://linuxreport.net" target="_blank" style="margin: 2px; color: inherit;">Linux</a>
         <a href="https://covidreport.org" target="_blank" style="margin: 2px; color: inherit;">Covid</a>
@@ -201,6 +222,18 @@
         <a href="https://spaceelevatorwiki.com" target="_blank" style="margin: 2px; color: inherit;">Space-Soon</a>
         <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; color: inherit;">Me</a>
       </div>
+      <select id="theme-select" onchange="setTheme(this.value)" style="margin-left:20px; padding:5px;">
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="solarized">Solarized</option>
+        <option value="futuristic">Futuristic</option>
+        <option value="steampunk">Steampunk</option>
+        <option value="cyberpunk">Cyberpunk</option>
+        <option value="silver">Silver</option>
+        <option value="pastelle">Pastelle</option>
+        <option value="sepia">Sepia</option>
+        <option value="forest">Forest</option>
+      </select>
       <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
     </div>
   </center>

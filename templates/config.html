@@ -19,14 +19,14 @@
   <title>Customize</title>
   <style>
     body {
-      background-color: {% if form.dark_mode.data %}#1e1e1e{% else %}#f6f5f4{% endif %};
-      color: {% if form.dark_mode.data %}#d4d4d4{% else %}black{% endif %};
+      background-color: {% if form.theme.data=='dark' %}#1e1e1e{% elif form.theme.data=='solarized' %}#fdf6e3{% else %}#f6f5f4{% endif %};
+      color: {% if form.theme.data=='dark' %}#d4d4d4{% elif form.theme.data=='solarized' %}#657b83{% else %}black{% endif %};
     }
     .config-container {
       max-width: 800px;
       margin: 20px auto;
       padding: 20px;
-      background-color: {% if form.dark_mode.data %}#2e2e2e{% else %}#fff{% endif %};
+      background-color: {% if form.theme.data=='dark' %}#2e2e2e{% elif form.theme.data=='solarized' %}#eee8d5{% else %}#fff{% endif %};
       border-radius: 8px;
       box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
@@ -82,8 +82,8 @@
       {{ form.delete_cookie }}
     </div>
     <div class="form-group">
-      <label for="dark_mode">Dark Mode:</label>
-      {{ form.dark_mode }}
+      <label for="theme">Theme:</label>
+      {{ form.theme }}
     </div>
     <div class="form-group">
       <label for="no_underlines">No Underlines:</label>

@@ -5,7 +5,7 @@ This file contains WTForms classes for handling user input in forms, including U
 """
 
 # Third-party imports
-from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, validators
+from wtforms import Form, BooleanField, FormField, FieldList, StringField, IntegerField, SelectField, validators
 
 # Form for managing individual URLs.
 class UrlForm(Form):
@@ -20,7 +20,18 @@ class CustomRSSForm(Form):
 # Form for managing overall configuration settings.
 class ConfigForm(Form):
     delete_cookie = BooleanField(label="Delete cookies")
-    dark_mode = BooleanField(label="Dark Mode")
+    theme = SelectField(label="Theme", choices=[
+        ('light','Light'),
+        ('dark','Dark'),
+        ('solarized','Solarized'),
+        ('futuristic','Futuristic'),
+        ('steampunk','Steampunk'),
+        ('cyberpunk','Cyberpunk'),
+        ('silver','Silver'),
+        ('pastelle','Pastelle'),
+        ('sepia','Sepia'),
+        ('forest','Forest'),
+    ])
     no_underlines = BooleanField(label="No Underlines")
     sans_serif = BooleanField(label="Sans Serif Font")
     urls = FieldList(FormField(UrlForm))
