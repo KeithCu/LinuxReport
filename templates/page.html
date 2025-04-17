@@ -27,6 +27,11 @@
       /* Client-side dynamic sans-serif font */
       body.sans-serif { font-family: sans-serif; }
 
+      /* Force sans-serif font everywhere when enabled */
+      body.sans-serif, body.sans-serif * {
+        font-family: sans-serif !important;
+      }
+
       * {
         box-sizing: border-box;
       }
@@ -36,8 +41,25 @@
         background-color: var(--bg);
       }
 
+      /* Default link style: color and no underline */
       a:link, a:visited, a:hover, a:active {
         color: var(--link);
+        text-decoration: none;
+      }
+
+      /* Ensure code elements use inherited font */
+      code {
+        font-family: inherit !important;
+      }
+
+      /* Override entry link color and remove underline */
+      .linkclass a {
+        color: var(--text) !important;
+        text-decoration: none !important;
+      }
+      .linkclass a:hover, .linkclass a:visited, .linkclass a:active {
+        color: var(--text) !important;
+        text-decoration: none !important;
       }
 
       img {
@@ -51,6 +73,11 @@
 
       /* Client-side dynamic link underlines */
       body.no-underlines a { text-decoration: none; }
+
+      /* Ensure link underlines are removed everywhere when enabled */
+      body.no-underlines a, body.no-underlines a * {
+        text-decoration: none !important;
+      }
 
       {%- if not g.is_mobile %}
       /* Create three equal columns that floats next to each other */
@@ -168,6 +195,10 @@
   
     /* Remove static dark-mode overrides; variables handle all themes */
 
+    /* Override monospace in entry titles and use inherited font */
+    .linkclass code {
+      font-family: inherit !important;
+    }
     
   </style>
   <!-- Apply theme based on 'Theme' cookie and set dropdown selection -->
@@ -181,12 +212,12 @@
       // Set dropdown to current theme
       var select = document.getElementById('theme-select');
       if (select) select.value = theme;
-      // Apply no-underlines setting (default OFF)
+      // Apply no-underlines setting (default ON)
       var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
-      if (nu && nu[1] === '1') document.body.classList.add('no-underlines');
-      // Apply sans-serif setting (default OFF)
+      if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
+      // Apply sans-serif setting (default ON)
       var ss = document.cookie.match(/(?:^|; )SansSerif=([^;]+)/);
-      if (ss && ss[1] === '1') document.body.classList.add('sans-serif');
+      if (!ss || ss[1] === '1') document.body.classList.add('sans-serif');
     });
   </script>
   <script>
