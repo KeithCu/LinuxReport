@@ -10,6 +10,7 @@ from collections import defaultdict
 # Standard library imports
 from datetime import date as date_obj
 from datetime import datetime
+from bisect import bisect_left
 
 import geoip2.database
 # Third-party imports
@@ -35,8 +36,6 @@ FAKE_API = False  # Fake Weather API calls
 # Add default coordinates for weather (Detroit, MI)
 DEFAULT_WEATHER_LAT = "42.3297"
 DEFAULT_WEATHER_LON = "83.0425"
-
-RL_KEY = "weather_api_call_timestamps"
 
 # --- Bucketing helpers ---
 def _round_coord(val, precision=WEATHER_BUCKET_PRECISION):
@@ -68,27 +67,33 @@ def get_location_from_ip(ip):
             return None, None
 
 
+RL_KEY = "weather_api_call_timestamps_v2"
+RATE_LIMIT_WINDOW = 60  # seconds
+RATE_LIMIT_COUNT = 60   # calls per window
+
 def rate_limit_check():
-    """Enforces 60 calls/minute and 1 second between calls."""
+    """Enforces RATE_LIMIT_COUNT calls per RATE_LIMIT_WINDOW seconds."""
     now = time.time()
     timestamps = g_c.get(RL_KEY) or []
-    # Remove timestamps older than 60 seconds
-    timestamps = [t for t in timestamps if now - t < 60]
-    if timestamps:
-        # Enforce at least 1 second between calls
-        if now - timestamps[-1] < 1:
-            time.sleep(1 - (now - timestamps[-1]))
-    if len(timestamps) >= 60:
-        wait_time = 60 - (now - timestamps[0])
+
+    valid_start_time = now - RATE_LIMIT_WINDOW
+    start_index = bisect_left(timestamps, valid_start_time)
+
+    timestamps_in_window = timestamps[start_index:]
+
+    if len(timestamps_in_window) >= RATE_LIMIT_COUNT:
+        # Calculate wait time based on the oldest timestamp in the current window
+        # This ensures we wait until the oldest request expires from the window
+        oldest_in_window = timestamps_in_window[0]
+        wait_time = (oldest_in_window + RATE_LIMIT_WINDOW) - now
         if wait_time > 0:
             time.sleep(wait_time)
-        now = time.time()
-        timestamps = [t for t in timestamps if now - t < 60]
+            now = time.time()
 
-    timestamps.append(time.time())
-    g_c.put(RL_KEY, timestamps, timeout=70)
+    timestamps_in_window.append(now)
 
-# --- Weather cache helpers (bucketed) ---
+    g_c.put(RL_KEY, timestamps_in_window, timeout=RATE_LIMIT_WINDOW + 1)
+
 CACHE_ENTRY_PREFIX = 'weather:cache_entry:'
 
 def save_weather_cache_entry(lat, lon, data):
