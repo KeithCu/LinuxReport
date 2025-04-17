@@ -32,10 +32,6 @@ USE_TOR = True
 # Available theme choices
 THEME_CHOICES = ['light', 'dark', 'solarized', 'futuristic', 'steampunk', 'cyberpunk', 'silver', 'pastelle', 'sepia', 'forest']
 
-# Theme choice: global variable (choose one from THEME_CHOICES)
-THEME = 'dark'
-g_app.jinja_env.globals['THEME'] = THEME
-
 # Import routes and pass the app instance
 import routes
 routes.init_app(g_app)
