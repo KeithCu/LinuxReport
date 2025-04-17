@@ -13,6 +13,7 @@ import os
 # Third-party imports
 import requests
 import geoip2.database
+from geoip2.errors import GeoIP2Error
 
 # Local imports
 from shared import SPATH, DiskCacheWrapper, DEBUG
@@ -57,13 +58,13 @@ def get_location_from_ip(ip):
     global _geoip_reader
     if _geoip_reader is None:
         _geoip_reader = geoip2.database.Reader(GEOIP_DB_PATH)
-    try:
-        response = _geoip_reader.city(ip)
-        lat = response.location.latitude
-        lon = response.location.longitude
-        return lat, lon
-    except Exception:
-        return None, None
+        try:
+            response = _geoip_reader.city(ip)
+            lat = response.location.latitude
+            lon = response.location.longitude
+            return lat, lon
+        except GeoIP2Error:
+            return None, None
 
 
 def rate_limit_check():
@@ -187,18 +188,17 @@ def get_weather_data(lat=None, lon=None, ip=None):
         try:
             today_entry = processed_data["daily"][0]
             current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
-        except Exception:
+        except (IndexError, KeyError, TypeError):
             current_temp = "N/A"
         print(f"Weather API result: city: {city_name}, temp: {current_temp}°F")
         return processed_data, 200
 
     except requests.exceptions.RequestException as e:
-        # Always log error result
-        print(f"Weather API error: Failed to fetch weather data from API")
+        print("Weather API error: Failed to fetch weather data from API")
         return {"error": "Failed to fetch weather data from API"}, 500
-    except Exception as e:
+    except (ValueError, KeyError, TypeError) as e:
         # Always log error result
-        print(f"Weather API error: Failed to process weather data")
+        print("Weather API error: Failed to process weather data")
         return {"error": "Failed to process weather data"}, 500
 
 
@@ -222,7 +222,6 @@ def get_weather_html(ip):
     weather_data, status_code = get_weather_data(ip=ip)
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
         forecast_html = '<div id="weather-forecast" class="weather-forecast">'
-        today_date = datetime.now().date()
         for i, day in enumerate(weather_data["daily"]):
             try:
                 d = datetime.fromtimestamp(day["dt"])
@@ -243,7 +242,7 @@ def get_weather_html(ip):
                         <div class="weather-precip">{precipitation}% precip</div>
                     </div>
                 '''
-            except Exception as e:
+            except (KeyError, TypeError, ValueError) as e:
                 print(f"Error processing weather day data: {e}")
                 forecast_html += '<div class="weather-day error">Error loading day</div>'
         forecast_html += '</div>'

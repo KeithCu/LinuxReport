@@ -73,7 +73,7 @@ def init_app(flask_app):
 
             expired_rss = g_c.has_feed_expired(url)
 
-            if not g_c.has(rss_info.site_url) and expired_rss:
+            if not g_c.has(url) and expired_rss:
                 needed_urls.append(url)
             elif expired_rss:
                 need_fetch = True
