@@ -8,6 +8,13 @@
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{{title}}</title>
     <style>
+      /* Reset default margins and paddings */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
       /* Theme definitions */
       body.theme-light { --bg:#ffffff; --text:#000000; --link:#1a0dab; --btn-bg:#f6f6f6; --btn-border:#092236; --btn-text:#3b5971; --btn-hover-bg:#0078D7; --btn-hover-text:#ffffff; }
       body.theme-dark { --bg:#1e1e1e; --text:#f0f0f0; --link:#8ab4f8; --btn-bg:#333333; --btn-border:#ffffff; --btn-text:#ffffff; --btn-hover-bg:#505050; --btn-hover-text:#ffffff; }
@@ -36,7 +43,11 @@
         box-sizing: border-box;
       }
 
+      /* Import a clean modern font */
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+
       body {
+        font-family: 'Inter', sans-serif !important;
         color: var(--text);
         background-color: var(--bg);
       }
@@ -80,13 +91,19 @@
       }
 
       {%- if not g.is_mobile %}
-      /* Create three equal columns that floats next to each other */
-      .column {
-        float: left;
-        width: 33.33%;
-        padding: 10px;
+      /* Grid-based columns instead of floats */
+      .row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+        padding: 10px 0;
       }
-
+      .column {
+        background-color: var(--btn-bg);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
       .image-container {
         width: 100%;
       }
@@ -98,16 +115,9 @@
       }
 
       .title-container {
-        margin-top: 10px;
-      }
-      /* Clear floats after the columns */
-      .row:after {
-        content: "";
-        display: table;
-        clear: both;
+        margin: 1px 0;  /* Further minimized spacing around titles */
       }
       {%- endif %}
-
 
       .pagination-controls {
         display: flex;
@@ -199,6 +209,106 @@
     .linkclass code {
       font-family: inherit !important;
     }
+
+    /* Main navigation bar styling */
+    .main-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      background-color: var(--btn-bg);
+      border: 2px solid var(--btn-border);
+      padding: 10px 20px;
+      margin: 10px 0;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      align-items: center;
+    }
+    .main-nav a {
+      padding: 5px 10px;
+      font-size: 1rem;
+    }
+    .main-nav select,
+    .main-nav button {
+      margin-left: 10px;
+      padding: 5px 10px;
+      border: 2px solid var(--btn-border);
+      border-radius: 5px;
+      background-color: var(--btn-bg);
+      color: var(--btn-text);
+      cursor: pointer;
+      transition: background-color 0.3s ease, color 0.3s ease;
+    }
+    .main-nav select:hover,
+    .main-nav button:hover {
+      background-color: var(--btn-hover-bg);
+      color: var(--btn-hover-text);
+    }
+
+    /* Card style for feed items */
+    .linkclass {
+      background-color: var(--btn-bg);
+      padding: 15px;
+      margin: 5px 0;  /* Reduced vertical spacing around each item */
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .linkclass:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+    }
+
+    /* Smaller default margins for headings */
+    h1, h2, h3, h4, h5, h6 {
+      margin: 2px 0;
+    }
+
+    /* Site header */
+    .site-header {
+      background-color: var(--btn-bg);
+      padding: 20px 0;
+    }
+    .site-header .header-content {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+    }
+    .site-header .logo {
+      height: 50px;
+    }
+    .site-header h1 {
+      font-size: 1.8rem;
+      color: var(--text);
+    }
+
+    /* Site footer */
+    .site-footer {
+      background-color: var(--btn-bg);
+      padding: 15px 0;
+      text-align: center;
+      font-size: 0.9rem;
+      margin-top: 30px;
+    }
+    .site-footer a {
+      color: var(--link);
+      margin: 0 5px;
+      text-decoration: none;
+    }
+    .site-footer a:hover {
+      text-decoration: underline;
+    }
+
+    /* Smooth button and link transitions */
+    .main-nav a,
+    .main-nav button,
+    .pagination-controls button {
+      transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+    }
+    .main-nav a:hover {
+      transform: translateY(-2px);
+    }
     
   </style>
   <!-- Apply theme based on 'Theme' cookie and set dropdown selection -->
@@ -237,23 +347,23 @@
   </head>
   <body>
 
-<center>
-  <div style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
-    <center>{{ weather_html }}</center>
-  </div>
+  <center>
+    <div style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
+      <center>{{ weather_html }}</center>
+    </div>
   </center>
   
   <center>
-    <div style="border: 2px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: large;">
+    <div class="main-nav">
       <div>
-        <a href="https://linuxreport.net" target="_blank" style="margin: 2px; color: inherit;">Linux</a>
-        <a href="https://covidreport.org" target="_blank" style="margin: 2px; color: inherit;">Covid</a>
-        <a href="https://aireport.keithcu.com" target="_blank" style="margin: 2px; color: inherit;">AI</a>
-        <a href="https://trumpreport.info" target="_blank" style="margin: 2px; color: inherit;">Truth</a>
-        <a href="https://spaceelevatorwiki.com" target="_blank" style="margin: 2px; color: inherit;">Space-Soon</a>
-        <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; color: inherit;">Me</a>
+        <a href="https://linuxreport.net" target="_blank">Linux</a>
+        <a href="https://covidreport.org" target="_blank">Covid</a>
+        <a href="https://aireport.keithcu.com" target="_blank">AI</a>
+        <a href="https://trumpreport.info" target="_blank">Truth</a>
+        <a href="https://spaceelevatorwiki.com" target="_blank">Space-Soon</a>
+        <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
       </div>
-      <select id="theme-select" onchange="setTheme(this.value)" style="margin-left:20px; padding:5px;">
+      <select id="theme-select" onchange="setTheme(this.value)">
         <option value="light">Light</option>
         <option value="dark">Dark</option>
         <option value="solarized">Solarized</option>
@@ -265,12 +375,13 @@
         <option value="sepia">Sepia</option>
         <option value="forest">Forest</option>
       </select>
-      <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
+      <button type="save" name="save" onclick="redirect()">Config...</button>
     </div>
   </center>
 
     <center>{{ above_html }}</center>
-    <center><img src="{{logo_url}}" alt = "{{ title }}" style="max-height:250px;"></center>
+    <center><img src="{{logo_url}}" alt="{{ title }}" style="max-height:250px;"></center>
+    <center><h1>{{ title }}</h1></center>
     <center><small>{{ welcome_html }}</small></center>
 
     <div class="row">
@@ -280,6 +391,14 @@
       <div class="column">{{ columns[2] }}</div>
       {%- endif %}
     </div>
+
+  <!-- Site footer -->
+  <footer class="site-footer">
+    <div class="footer-content">
+      &copy; 2025 <a href="/">{{ title }}</a> | <a href="/sitemap">Sitemap</a>
+    </div>
+  </footer>
+
   </body>
 </html>
  
