@@ -5,6 +5,7 @@ This file contains all the Flask route handlers for the application, including t
 """
 
 # Standard library imports
+import os
 import json
 from timeit import default_timer as timer
 
@@ -12,14 +13,13 @@ from timeit import default_timer as timer
 from flask import g, jsonify, render_template, request
 from markupsafe import Markup
 
-import shared
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo
 # Local imports
 from shared import (ABOVE_HTML_FILE, ALL_URLS, DEBUG, EXPIRE_MINUTES,
-                    EXPIRE_WEEK, FAVICON, LOGO_URL, STANDARD_ORDER_STR,
+                    FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, site_urls)
+                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, PATH)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -259,16 +259,15 @@ def init_app(flask_app):
 
     @flask_app.route('/old_headlines')
     def old_headlines():
-        from shared import MODE
         mode_map = {
-            MODE.LINUX_REPORT: 'linux',
-            MODE.COVID_REPORT: 'covid',
-            MODE.TECHNO_REPORT: 'techno',
-            MODE.AI_REPORT: 'ai',
-            MODE.TRUMP_REPORT: 'trump',
+            Mode.LINUX_REPORT: 'linux',
+            Mode.COVID_REPORT: 'covid',
+            Mode.TECHNO_REPORT: 'techno',
+            Mode.AI_REPORT: 'ai',
+            Mode.TRUMP_REPORT: 'trump',
         }
-        mode_str = mode_map.get(MODE, 'linux')
-        archive_file = f"{mode_str}report_archive.jsonl"
+        mode_str = mode_map.get(Mode)
+        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
         headlines = []
         try:
             with open(archive_file, "r", encoding="utf-8") as f:
