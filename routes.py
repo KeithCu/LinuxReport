@@ -165,7 +165,7 @@ def init_app(flask_app):
             form = ConfigForm()
 
             # Load theme preference
-            form.theme.data = request.cookies.get('Theme', THEME)
+            form.theme.data = request.cookies.get('Theme', 'light')
 
             no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
             form.no_underlines.data = no_underlines_cookie == "1"
