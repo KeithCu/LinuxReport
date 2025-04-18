@@ -200,11 +200,11 @@ def get_weather_data(lat=None, lon=None, ip=None):
         return processed_data, 200
 
     except requests.exceptions.RequestException as e:
-        print("Weather API error: Failed to fetch weather data from API")
+        print(f"Weather API error: Failed to fetch weather data from API: {e}")
         return {"error": "Failed to fetch weather data from API"}, 500
     except (ValueError, KeyError, TypeError) as e:
         # Always log error result
-        print("Weather API error: Failed to process weather data")
+        print(f"Weather API error: Failed to process weather data: {e}")
         return {"error": "Failed to process weather data"}, 500
 
 
