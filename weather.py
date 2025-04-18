@@ -27,11 +27,9 @@ g_c = DiskCacheWrapper(SPATH)
 
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 if DEBUG:
-    WEATHER_CACHE_TIMEOUT = 30
+    WEATHER_CACHE_TIMEOUT = 300
 else:
     WEATHER_CACHE_TIMEOUT = 3600 * 4  # 4 hours
-
-FAKE_API = False  # Fake Weather API calls
 
 # Add default coordinates for weather (Detroit, MI)
 DEFAULT_WEATHER_LAT = "42.3297"
@@ -58,13 +56,14 @@ def get_location_from_ip(ip):
     global _geoip_reader
     if _geoip_reader is None:
         _geoip_reader = geoip2.database.Reader(GEOIP_DB_PATH)
-        try:
-            response = _geoip_reader.city(ip)
-            lat = response.location.latitude
-            lon = response.location.longitude
-            return lat, lon
-        except GeoIP2Error:
-            return None, None
+
+    try:
+        response = _geoip_reader.city(ip)
+        lat = response.location.latitude
+        lon = response.location.longitude
+        return lat, lon
+    except:
+        return DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
 
 RL_KEY = "weather_api_call_timestamps_v2"
@@ -119,7 +118,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
-        #lat, lon = get_location_from_ip(ip)
+        lat, lon = get_location_from_ip(ip)
         if not lat or not lon:
             lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
     if not lat or not lon:
@@ -129,21 +128,6 @@ def get_weather_data(lat=None, lon=None, ip=None):
     bucketed_weather = get_bucketed_weather_cache(lat, lon)
     if bucketed_weather:
         return bucketed_weather, 200
-
-    if FAKE_API:
-        fake_data = {
-            "daily": [
-                {
-                    "dt": int(datetime.now().replace(hour=12, minute=0, second=0, microsecond=0).timestamp()) + i * 86400,
-                    "temp_min": 10 + i,
-                    "temp_max": 20 + i,
-                    "precipitation": 5 * i,
-                    "weather": "Clear" if i % 2 == 0 else "Cloudy",
-                    "weather_icon": "01d" if i % 2 == 0 else "02d"
-                } for i in range(5)
-            ]
-        }
-        return fake_data, 200
 
     try:
         rate_limit_check()
