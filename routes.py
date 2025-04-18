@@ -280,6 +280,11 @@ def init_app(flask_app):
         except FileNotFoundError:
             pass
         headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        # Remove the 3 most recent headlines
+        if len(headlines) > 3:
+            headlines = headlines[3:]
+        else:
+            headlines = []
         return render_template(
             'old_headlines.html',
             headlines=headlines,
