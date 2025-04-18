@@ -1,6 +1,7 @@
 # This file contains worker functions for fetching and processing RSS feeds.
 # Functions include parallel fetching, thread management, and feed processing.
 
+from datetime import datetime
 import concurrent.futures
 import itertools
 # Standard library imports
