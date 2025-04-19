@@ -15,15 +15,14 @@ from bisect import bisect_left
 import geoip2.database
 # Third-party imports
 import requests
-from geoip2.errors import GeoIP2Error
 
 # Local imports
-from shared import DEBUG, SPATH, DiskCacheWrapper
+from shared import DEBUG, g_cs as g_c, DiskcacheSqliteLock
 
 # --- Configurable cache bucketing ---
 WEATHER_BUCKET_PRECISION = 1  # Decimal places for lat/lon rounding (lower = larger area per bucket)
 
-g_c = DiskCacheWrapper(SPATH)
+
 
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 if DEBUG:
@@ -67,8 +66,8 @@ def get_location_from_ip(ip):
 
 
 RL_KEY = "weather_api_call_timestamps_v2"
-RATE_LIMIT_WINDOW = 60  # seconds
-RATE_LIMIT_COUNT = 60   # calls per window
+RATE_LIMIT_WINDOW = 10  # seconds
+RATE_LIMIT_COUNT = 10   # calls per window
 
 def rate_limit_check():
     """Enforces RATE_LIMIT_COUNT calls per RATE_LIMIT_WINDOW seconds."""
@@ -124,72 +123,86 @@ def get_weather_data(lat=None, lon=None, ip=None):
     if not lat or not lon:
         lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
-    # Always use today's date for cache key
+    bucket_key = _bucket_key(lat, lon)
+    lock_key = f"weather_fetch:{bucket_key}"
+
+    # Check cache first (outside the lock for a quick check)
     bucketed_weather = get_bucketed_weather_cache(lat, lon)
     if bucketed_weather:
         return bucketed_weather, 200
 
-    try:
-        rate_limit_check()
-        url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        weather_data = response.json()
-        # Determine city name for logging
-        city_name = weather_data.get("city", {}).get("name", "Unknown location")
+    # Acquire lock specific to this location bucket
+    # The 'with' statement handles waiting and acquisition via __enter__
+    with DiskcacheSqliteLock(lock_key) as lock:
 
-        daily_data = defaultdict(list)
-        for entry in weather_data.get("list", []):
-            date_str = entry.get("dt_txt", "")[:10]
-            daily_data[date_str].append(entry)
+        # Re-check cache *inside* the lock to prevent race condition
+        bucketed_weather = get_bucketed_weather_cache(lat, lon)
+        if bucketed_weather:
+            return bucketed_weather, 200  # Corrected indentation
 
-        processed_data = {"daily": []}
-        today_date = datetime.now().date()
-        days_added = 0
-        for date, entries in sorted(daily_data.items()):
-            entry_date = datetime.strptime(date, "%Y-%m-%d").date()
-            if entry_date < today_date:
-                continue
-            if days_added >= 5:
-                break
-            temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
-            temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
-            pops = [e.get("pop", 0) for e in entries]
-            rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
-
-            # Use noon entry if possible, else first
-            preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
-            weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
-            weather_icon = preferred_entry["weather"][0]["icon"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "01d"
-
-            processed_data["daily"].append({
-                "dt": int(datetime.strptime(date, "%Y-%m-%d").replace(hour=12).timestamp()),
-                "temp_min": min(temp_mins) if temp_mins else None,
-                "temp_max": max(temp_maxs) if temp_maxs else None,
-                "precipitation": round(max(pops) * 100) if pops else 0,
-                "rain": round(rain_total, 2),
-                "weather": weather_main,
-                "weather_icon": weather_icon
-            })
-            days_added += 1
-
-        save_weather_cache_entry(lat, lon, processed_data)
-        # Single log: print city and current temperature
+        # Cache miss and lock acquired, proceed with API call
         try:
-            today_entry = processed_data["daily"][0]
-            current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
-        except (IndexError, KeyError, TypeError):
-            current_temp = "N/A"
-        print(f"Weather API result: city: {city_name}, temp: {current_temp}°F")
-        return processed_data, 200
+            rate_limit_check()
+            url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            weather_data = response.json()
+            # Determine city name for logging
+            city_name = weather_data.get("city", {}).get("name", "Unknown location")
 
-    except requests.exceptions.RequestException as e:
-        print(f"Weather API error: Failed to fetch weather data from API: {e}")
-        return {"error": "Failed to fetch weather data from API"}, 500
-    except (ValueError, KeyError, TypeError) as e:
-        # Always log error result
-        print(f"Weather API error: Failed to process weather data: {e}")
-        return {"error": "Failed to process weather data"}, 500
+            daily_data = defaultdict(list)
+            for entry in weather_data.get("list", []):
+                date_str = entry.get("dt_txt", "")[:10]
+                daily_data[date_str].append(entry)
+
+            processed_data = {"daily": []}
+            today_date = datetime.now().date()
+            days_added = 0
+            for date, entries in sorted(daily_data.items()):
+                entry_date = datetime.strptime(date, "%Y-%m-%d").date()
+                if entry_date < today_date:
+                    continue
+                if days_added >= 5:
+                    break
+                temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
+                temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
+                pops = [e.get("pop", 0) for e in entries]
+                rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
+
+                # Use noon entry if possible, else first
+                preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
+                weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
+                weather_icon = preferred_entry["weather"][0]["icon"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "01d"
+
+                processed_data["daily"].append({
+                    "dt": int(datetime.strptime(date, "%Y-%m-%d").replace(hour=12).timestamp()),
+                    "temp_min": min(temp_mins) if temp_mins else None,
+                    "temp_max": max(temp_maxs) if temp_maxs else None,
+                    "precipitation": round(max(pops) * 100) if pops else 0,
+                    "rain": round(rain_total, 2),
+                    "weather": weather_main,
+                    "weather_icon": weather_icon
+                })
+                days_added += 1
+
+            save_weather_cache_entry(lat, lon, processed_data)
+            # Single log: print city and current temperature
+            try:
+                today_entry = processed_data["daily"][0]
+                current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
+            except (IndexError, KeyError, TypeError):
+                current_temp = "N/A"
+            print(f"Weather API result: city: {city_name}, temp: {current_temp}°F")
+            return processed_data, 200
+
+        except requests.exceptions.RequestException as e:
+            print(f"Weather API error: Failed to fetch weather data from API: {e}")
+            return {"error": "Failed to fetch weather data from API"}, 500
+        except (ValueError, KeyError, TypeError) as e:
+            # Always log error result
+            print(f"Weather API error: Failed to process weather data: {e}")
+            return {"error": "Failed to process weather data"}, 500
+        # Lock is automatically released by the 'with' statement
 
 
 

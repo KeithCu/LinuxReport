@@ -8,7 +8,6 @@ import itertools
 import os
 import re
 import threading
-import time
 from timeit import default_timer as timer
 
 # Third-party imports
@@ -18,29 +17,32 @@ import shared
 from feedfilter import filter_similar_titles, merge_entries, prefilter_news
 from seleniumfetch import fetch_site_posts
 # Local application imports
-from shared import (ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, RSS_TIMEOUT, TZ,
-                    USE_TOR, USER_AGENT, RssFeed, g_c)
+from shared import (
+    ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, RSS_TIMEOUT, TZ,
+    USE_TOR, USER_AGENT, RssFeed, g_c, DiskcacheSqliteLock # Import DiskcacheSqliteLock
+)
 from Tor import fetch_via_tor
 
 LINK_REGEX = re.compile(r'href=["\'](.*?)["\']')
 
 # Worker function to fetch and process a single RSS feed.
 def load_url_worker(url):
-    """Background worker to fetch a URL. Handles """
+    """Background worker to fetch a URL. Handles locking."""
     rss_info = ALL_URLS[url]
-    feedpid = None
-    
-    #This FETCHPID logic is to prevent race conditions of
-    #multiple Python processes fetching an expired RSS feed.
-    #This isn't as useful anymore given the FETCHMODE.
-    if not g_c.has(url + "FETCHPID"):
-        g_c.put(url + "FETCHPID", os.getpid(), timeout=RSS_TIMEOUT)
-        feedpid = g_c.get(url + "FETCHPID") #Check to make sure it's us
+    lock_key = f"feed_fetch:{url}"
 
-    if feedpid == os.getpid():
+    # Use the DiskcacheSqliteLock to ensure only one process fetches this URL at a time
+    with DiskcacheSqliteLock(lock_key, owner_prefix=f"feed_worker_{os.getpid()}") as lock:
+        if not lock.locked():
+            print(f"Could not acquire lock for {url}, another process might be fetching.")
+            # Optionally wait briefly or return, depending on desired behavior
+            # For now, just return, assuming the other process will succeed.
+            return
+
+        # --- Start of locked section ---
         start = timer()
         rssfeed = None
-        rssfeed = g_c.get_feed(url)
+        # rssfeed = g_c.get_feed(url) # No need to get feed here, merge logic handles it
 
         if USE_TOR and "reddit" in url:
             print(f"Using TOR proxy for Reddit URL: {url}")
@@ -109,51 +111,90 @@ def load_url_worker(url):
         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
-            g_c.delete(rss_info.site_url)
+            g_c.delete(rss_info.site_url) # Delete template cache
 
-        g_c.delete(url + "FETCHPID")
+        # No need to delete FETCHPID anymore
         end = timer()
         print(f"Parsing from: {url}, in {end - start:f}.")
-    else:
-        print(f"Waiting for someone else to parse remote site {url}.")
-        # Someone else is fetching, so wait
-        while g_c.has(url + "FETCHPID"):
-            time.sleep(0.1)
-        print(f"Done waiting for someone else to parse {url}.")
+        # --- End of locked section ---
+        # Lock is automatically released by the 'with' statement
 
 def wait_and_set_fetch_mode():
-    #If any other process is fetching feeds, then we should just wait a bit.
-    #This prevents a thundering herd of threads.
-    if g_c.has("FETCHMODE"):
-        print("Waiting on another process to finish fetching.")
-        while g_c.has("FETCHMODE"):
-            time.sleep(0.1)
-        print("Done waiting.")
-    g_c.put("FETCHMODE", "FETCHMODE", timeout=RSS_TIMEOUT)
+    """Acquires a global lock to prevent thundering herd for fetch cycles."""
+    lock_key = "global_fetch_mode"
+    # Attempt to acquire the lock, waiting if necessary
+    lock = DiskcacheSqliteLock(lock_key, owner_prefix=f"fetch_mode_{os.getpid()}")
+    if lock.acquire(wait=True, max_wait_seconds=60): # Wait up to 60 seconds
+        print("Acquired global fetch lock.")
+        return lock # Return the acquired lock object
+    else:
+        print("Failed to acquire global fetch lock after waiting.")
+        return None # Indicate failure
 
 # Fetch multiple RSS feeds in parallel.
 def fetch_urls_parallel(urls):
-    wait_and_set_fetch_mode()
+    lock = wait_and_set_fetch_mode()
+    if not lock:
+        print("Aborting parallel fetch due to inability to acquire global lock.")
+        return
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10 if not DEBUG else 1) as executor:
-        future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10 if not DEBUG else 1) as executor:
+            future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
 
-        for future in concurrent.futures.as_completed(future_to_url):
-            future.result()
-
-    g_c.delete("FETCHMODE")
+            for future in concurrent.futures.as_completed(future_to_url):
+                try:
+                    future.result() # Ensure exceptions in workers are raised
+                except Exception as exc:
+                    print(f'{future_to_url[future]} generated an exception: {exc}')
+    finally:
+        lock.release() # Ensure lock is released
+        print("Released global fetch lock.")
 
 # Refresh all expired RSS feeds in a separate thread.
 def refresh_thread():
-    for url, rss_info in ALL_URLS.items():
-        if g_c.has_feed_expired(url) and rss_info.logo_url != "Custom.png":
-            wait_and_set_fetch_mode()
-            load_url_worker(url)
-            g_c.delete("FETCHMODE")
-            time.sleep(0.2)
+    lock = wait_and_set_fetch_mode()
+    if not lock:
+        print("Aborting refresh thread due to inability to acquire global lock.")
+        return
+
+    try:
+        urls_to_refresh = []
+        for url, rss_info in ALL_URLS.items():
+            if g_c.has_feed_expired(url) and rss_info.logo_url != "Custom.png":
+                urls_to_refresh.append(url)
+
+        if not urls_to_refresh:
+            print("No feeds need refreshing in this cycle.")
+            return
+
+        print(f"Refreshing {len(urls_to_refresh)} expired feeds sequentially...")
+        # Execute sequentially instead of using ThreadPoolExecutor
+        for url in urls_to_refresh:
+            try:
+                load_url_worker(url)
+            except Exception as exc:
+                print(f'{url} generated an exception during refresh: {exc}')
+
+    finally:
+        lock.release()
+        print("Released global fetch lock after refresh.")
 
 # Start a background thread to refresh RSS feeds.
 def fetch_urls_thread():
+    # Check if a refresh is already running using a simple flag/lock
+    # This prevents multiple refresh *threads* from starting if the main page is hit rapidly
+    refresh_lock_key = "refresh_thread_running"
+    if not g_c.cache.add(refresh_lock_key, True, expire=60): # Try to set the flag
+        print("Refresh thread already running or recently started.")
+        return
+
+    print("Starting background refresh thread...")
     t = threading.Thread(target=refresh_thread, args=())
     t.daemon = True
     t.start()
+    # Note: The flag 'refresh_thread_running' will expire after 60s
+    # or it should ideally be deleted at the *very end* of refresh_thread,
+    # but releasing the global lock is more critical.
+    # Adding deletion here might be complex due to threading.
+    # The expiry handles cases where the thread might die unexpectedly.
