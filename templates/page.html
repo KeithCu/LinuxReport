@@ -787,7 +787,8 @@ document.addEventListener("DOMContentLoaded", function () {
                }
                if (comment.image_url) {
                    // Render image if URL is present
-                   contentHTML += `<img src="${comment.image_url}" alt="User image" loading="lazy">`;
+                   // Add onerror handler to gracefully handle loading errors and update alt text
+                   contentHTML += `<img src="${comment.image_url}" alt="Uploaded image" loading="lazy" style="max-width: 100%; max-height: 150px; display: block; margin-top: 5px; border-radius: 4px;" onerror="this.style.display='none'; console.error('Failed to load image:', this.src);">`;
                }
 
                // Add timestamp and IP Prefix

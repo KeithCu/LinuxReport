@@ -395,6 +395,7 @@ def init_app(flask_app):
         sanitized_text = html.escape(text).replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
 
         # Validate image URL (very basic)
+        print(f"Received image_url: '{image_url}'") # DEBUG
         valid_image_url = None
         if image_url:
             # Allow relative paths starting with the upload folder or absolute URLs or data URLs
@@ -402,12 +403,25 @@ def init_app(flask_app):
             is_external_url = image_url.startswith('http://') or image_url.startswith('https://')
             is_data_url = image_url.startswith('data:image/')
 
+            print(f"Validation check: is_local={is_local_upload}, is_external={is_external_url}, is_data={is_data_url}") # DEBUG
+            print(f"Checking startswith: '/{UPLOAD_FOLDER}/'") # DEBUG
+
             if is_local_upload or is_external_url or is_data_url:
                  # Basic check for common image extensions for non-data URLs
-                if not is_data_url and not image_url.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
-                    pass # Invalid extension for local/external URL
-                else:
+                if not is_data_url:
+                    has_valid_extension = image_url.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
+                    print(f"Extension check: valid={has_valid_extension}") # DEBUG
+                    if not has_valid_extension:
+                         print(f"Validation failed: Invalid extension for {image_url}") # DEBUG
+                         pass # Invalid extension for local/external URL - valid_image_url remains None
+                    else:
+                         print(f"Validation passed for: {image_url}") # DEBUG
+                         valid_image_url = image_url
+                else: # Is data URL
+                    print(f"Validation passed (data URL): {image_url[:50]}...") # DEBUG
                     valid_image_url = image_url
+            else:
+                 print(f"Validation failed: URL type not recognized for {image_url}") # DEBUG
 
         comment_id = str(uuid.uuid4()) # Generate unique ID
         ip_prefix = get_ip_prefix(ip) # Get IP prefix
@@ -420,6 +434,7 @@ def init_app(flask_app):
             "image_url": valid_image_url # Use the validated URL
             # Removed "ip": ip - no longer storing full IP in comment object
         }
+        print(f"Final valid_image_url being saved: '{valid_image_url}'") # DEBUG
 
         comments = g_c.get(COMMENTS_KEY) or []
         comments.append(comment)
