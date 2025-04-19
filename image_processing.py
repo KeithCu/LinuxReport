@@ -6,13 +6,10 @@ including Selenium-based fetching. It orchestrates calls to utility and parsing
 functions defined in other modules.
 """
 
-# Keep necessary imports for this file
-# Removed unused import os
 import sys
 import urllib.request
 import urllib.error
-# Removed requests import
-# Removed BeautifulSoup import
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -20,7 +17,6 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 from seleniumfetch import create_driver
 
 # Import from new modules
-# Removed unused DEBUG_LOGGING, IMAGE_EXT_RE, get_actual_image_dimensions, extract_domain
 from image_utils import (
     HEADERS, debug_print,
     is_excluded

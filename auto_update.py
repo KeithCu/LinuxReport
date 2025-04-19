@@ -10,7 +10,7 @@ import json
 import traceback
 
 # Import from our new modular files instead of auto_update_utils
-from image_processing import custom_fetch_largest_image
+from image_parser import custom_fetch_largest_image
 from article_deduplication import (
     fetch_recent_articles,
     get_embedding,

@@ -4,10 +4,8 @@ Module: image_parser.py
 Handles HTML parsing, image candidate extraction and selection,
 and custom site-specific logic.
 """
-import json
-# Removed unused import re
+import os
 from urllib.parse import urljoin
-
 import requests
 from bs4 import BeautifulSoup
 
@@ -15,14 +13,13 @@ from bs4 import BeautifulSoup
 from image_utils import (
     debug_print,
     get_actual_image_dimensions,
-    is_excluded,
-    HEADERS, # Assuming HEADERS is needed here, adjust if not
-    extract_domain, # Needed for custom_hacks logic if kept here
-    IMAGE_EXT_RE, # Added for fetch_largest_image
-    extract_dimensions_from_tag_or_style # Added import
+    HEADERS,
+    extract_domain,
+    IMAGE_EXT_RE
 )
 
-import os # Added for fetch_largest_image
+from html_image_extraction import parse_images_from_soup
+from custom_site_handlers import custom_hacks
 
 # === HTML/Parsing Logic ===
 
@@ -90,96 +87,6 @@ def parse_best_srcset(srcset):
     best_width, best_url = max(entries, key=lambda x: x[0])
     return best_url, best_width
 
-def extract_img_url_from_tag(img_tag, base_url):
-    """Extract the best image URL from an <img> tag, considering src, srcset, and data-* attributes."""
-    srcset = img_tag.get('srcset')
-    if srcset:
-        best, _ = parse_best_srcset(srcset)
-        if best:
-            return urljoin(base_url, best)
-    src = img_tag.get('src', '')
-    if src and not src.startswith('data:'):
-        return urljoin(base_url, src)
-    # Fallback: any attribute value that looks like an image URL
-    ext = ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.svg')
-    for value in img_tag.attrs.values():
-        if isinstance(value, str) and (value.startswith('http') or value.lower().endswith(ext)):
-            return urljoin(base_url, value)
-    return None
-
-def add_candidate(candidate_images, processed_urls, url, metadata):
-    if url and url not in processed_urls and not is_excluded(url):
-        processed_urls.add(url)
-        candidate_images.append((url, metadata))
-
-def parse_images_from_soup(soup, base_url):
-    """Extract image candidates from HTML using BeautifulSoup with improved handling."""
-    candidate_images = []
-    processed_urls = set()
-
-    # 1. Get meta tag images (high priority)
-    meta_tags = [
-        ('meta[property="og:image"]', 'content', 10000000),
-        ('meta[name="twitter:image"]', 'content', 9000000),
-        ('meta[name="twitter:image:src"]', 'content', 9000000),
-        ('meta[property="og:image:secure_url"]', 'content', 10000000),
-        ('meta[itemprop="image"]', 'content', 8000000),
-    ]
-    for selector, attr, score in meta_tags:
-        for tag in soup.select(selector):
-            if tag.get(attr):
-                url = urljoin(base_url, tag[attr])
-                add_candidate(candidate_images, processed_urls, url, {'score': score, 'meta': True})
-
-    # 2. Schema.org image in JSON-LD
-    for script in soup.find_all('script', type='application/ld+json'):
-        try:
-            data = json.loads(script.string)
-            if isinstance(data, dict):
-                image_candidates = []
-                if 'image' in data:
-                    if isinstance(data['image'], str):
-                        image_candidates.append(data['image'])
-                    elif isinstance(data['image'], list):
-                        image_candidates.extend(data['image'])
-                    elif isinstance(data['image'], dict) and 'url' in data['image']:
-                        image_candidates.append(data['image']['url'])
-                if '@graph' in data and isinstance(data['@graph'], list):
-                    for item in data['@graph']:
-                        if isinstance(item, dict) and 'image' in item:
-                            if isinstance(item['image'], str):
-                                image_candidates.append(item['image'])
-                            elif isinstance(item['image'], list):
-                                image_candidates.extend(x for x in item['image'] if isinstance(x, str))
-                for img_url in image_candidates:
-                    if isinstance(img_url, str):
-                        url = urljoin(base_url, img_url)
-                        add_candidate(candidate_images, processed_urls, url, {'score': 8000000, 'meta': True})
-        except Exception as e:
-            debug_print(f"Error parsing JSON-LD: {e}")
-
-    # 3. All <img> tags, robust lazy-load and data-* handling
-    for img in soup.find_all('img'):
-        url = extract_img_url_from_tag(img, base_url)
-        if not url or is_excluded(url):
-            continue
-        # Use imported extract_dimensions_from_tag_or_style
-        width, height = extract_dimensions_from_tag_or_style(img)
-        metadata = {}
-        if width > 0:
-            metadata['width'] = width
-        if height > 0:
-            metadata['height'] = height
-        alt_text = img.get('alt', '')
-        # Score: prefer larger area, boost for alt text
-        area = width * height if width > 0 and height > 0 else 0
-        metadata['score'] = area if area > 0 else 307200  # 640x480 default
-        if alt_text and len(alt_text) > 10:
-            metadata['score'] *= 1.2
-        add_candidate(candidate_images, processed_urls, url, metadata)
-
-    return candidate_images
-
 # === Candidate Selection ===
 
 def process_candidate_images(candidate_images):
@@ -226,8 +133,6 @@ def process_candidate_images(candidate_images):
     print(f"Best image found: {best_url} (score: {best[1].get('score')}, size: {best_width}x{best_height})")
     return best_url
 
-# === Main Fetching Logic (Requests-based) ===
-# Moved from image_processing.py
 
 def fetch_largest_image(url): # Renamed request_url to url
     """Fetch the largest image from a webpage using requests and BeautifulSoup."""
@@ -323,59 +228,6 @@ def fetch_largest_image(url): # Renamed request_url to url
     except Exception as e:
         print(f"Error fetching image: {e}")
         return None
-
-
-# === Custom Site Handlers ===
-
-def extract_underlying_url(url, selector_func):
-    """Common function to extract an underlying URL from a webpage."""
-    try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        underlying_url = selector_func(soup)
-        if underlying_url:
-            print(f"Found underlying URL: {underlying_url}")
-            return underlying_url
-
-        print("No underlying URL found, falling back to original")
-        return None
-    except Exception as e:
-        print(f"Error extracting underlying URL: {e}")
-        return None
-
-def citizenfreepress_selector(soup):
-    external_link_paragraph = soup.find('p', class_='external-link')
-    if external_link_paragraph:
-        link = external_link_paragraph.find('a')
-        if link and 'href' in link.attrs:
-            return link['href']
-    return None
-
-def linuxtoday_selector(soup):
-    link = soup.find('a', class_='action-btn publication_source')
-    if link and 'href' in link.attrs:
-        return link['href']
-    return None
-
-def generic_custom_fetch(url, selector_func):
-    underlying_url = extract_underlying_url(url, selector_func)
-    return fetch_largest_image(underlying_url if underlying_url else url)
-
-def citizenfreepress_custom_fetch(url):
-    return generic_custom_fetch(url, citizenfreepress_selector)
-
-def linuxtoday_custom_fetch(url):
-    return generic_custom_fetch(url, linuxtoday_selector)
-
-# Define custom_hacks *after* the functions it references
-custom_hacks = {}
-custom_hacks["linuxtoday.com"] = linuxtoday_custom_fetch
-custom_hacks["citizenfreepress.com"] = citizenfreepress_custom_fetch
-
-# === Main Entry Point with Custom Handling ===
-# Moved from image_processing.py
 
 def custom_fetch_largest_image(url, underlying_link=None, html_content=None): # Renamed request_url to url
     """Main function to fetch the largest image from a URL, with special handling for certain sites."""
