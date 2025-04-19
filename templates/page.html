@@ -412,9 +412,14 @@ document.addEventListener("DOMContentLoaded", function () {
       fetchWeatherData();
     }
     function fetchWeatherData() {
-      // Add cache-busting param to avoid browser caching
-      const hour = new Date().getHours();
-      fetch(`/api/weather?_=${hour}`)
+      // Add cache-busting param using YYYYMMDDHH to avoid browser caching across days/hours
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = (now.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
+      const day = now.getDate().toString().padStart(2, '0');
+      const hour = now.getHours().toString().padStart(2, '0');
+      const cacheBuster = `${year}${month}${day}${hour}`;
+      fetch(`/api/weather?_=${cacheBuster}`)
         .then(response => {
           if (!response.ok) throw new Error('Network response was not ok');
           return response.json();
