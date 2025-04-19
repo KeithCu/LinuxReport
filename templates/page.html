@@ -253,6 +253,144 @@
     .linkclass code {
       font-family: inherit !important;
     }
+
+      /* Chat Window Styles */
+      #chat-container {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 350px; /* Initial width */
+        height: 400px; /* Initial height */
+        background-color: var(--bg);
+        border: 2px solid var(--btn-border);
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        display: none; /* Hidden by default */
+        flex-direction: column;
+        overflow: hidden; /* Needed for resize handle */
+        z-index: 1000; /* Ensure it's on top */
+        resize: both; /* Allow resizing */
+        min-width: 250px; /* Min size */
+        min-height: 200px; /* Min size */
+      }
+
+      #chat-header {
+        padding: 8px 12px;
+        background-color: var(--btn-bg);
+        color: var(--text);
+        font-weight: bold;
+        cursor: move; /* Indicate draggable */
+        border-bottom: 1px solid var(--btn-border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+       #chat-header button {
+         background: none;
+         border: none;
+         color: var(--text);
+         font-size: 1.2em;
+         cursor: pointer;
+       }
+
+      #chat-messages {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 10px;
+        border-bottom: 1px solid var(--btn-border);
+        display: flex;
+        flex-direction: column-reverse; /* Newest messages at the bottom */
+      }
+
+      .chat-message {
+        margin-bottom: 8px;
+        padding: 6px 10px;
+        border-radius: 5px;
+        background-color: var(--btn-bg);
+        word-wrap: break-word;
+      }
+      .chat-message img {
+         max-width: 100%;
+         max-height: 150px; /* Limit image preview size */
+         display: block;
+         margin-top: 5px;
+         border-radius: 4px;
+      }
+      .chat-message .timestamp {
+         font-size: 0.7em;
+         color: var(--link); /* Use link color for timestamp */
+         display: block;
+         margin-top: 4px;
+      }
+
+      #chat-input-area {
+        padding: 10px;
+        display: flex;
+        gap: 5px;
+      }
+
+      #chat-input-area textarea {
+        flex-grow: 1;
+        padding: 8px;
+        border: 1px solid var(--btn-border);
+        border-radius: 4px;
+        resize: none; /* Disable textarea's own resize handle */
+        background-color: var(--bg);
+        color: var(--text);
+        min-height: 40px; /* Ensure decent initial height */
+        max-height: 100px; /* Limit expansion */
+        transition: border-color 0.3s ease; /* Add transition for dragover */
+      }
+       #chat-input-area input[type="text"] { /* For image URL */
+         flex-grow: 1;
+         padding: 8px;
+         border: 1px solid var(--btn-border);
+         border-radius: 4px;
+         background-color: var(--bg);
+         color: var(--text);
+         margin-top: 5px; /* Space between text and image input */
+       }
+      /* Style for dragover state */
+      #chat-input-area.dragover {
+        border: 2px dashed var(--link);
+        background-color: rgba(138, 180, 248, 0.1); /* Light background tint for dark/light themes */
+      }
+
+      #chat-input-area button {
+        padding: 8px 15px;
+        border: 1px solid var(--btn-border);
+        border-radius: 4px;
+        background-color: var(--btn-bg);
+        color: var(--btn-text);
+        cursor: pointer;
+      }
+      #chat-input-area button:hover {
+         background-color: var(--btn-hover-bg);
+         color: var(--btn-hover-text);
+      }
+
+      /* Chat Toggle Button Style (similar to old headlines) */
+      #chat-toggle-btn {
+        position: relative;
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        animation: pulse 3s infinite; /* Use the same pulse animation */
+        background: var(--btn-bg);
+        border: 2px solid var(--btn-border);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        color: var(--btn-text); /* Ensure button text color is set */
+        cursor: pointer; /* Add cursor pointer */
+        margin-left: 10px; /* Add some space */
+      }
+
+      #chat-toggle-btn:hover {
+        transform: scale(1.05);
+        background: var(--btn-hover-bg);
+        color: var(--btn-hover-text) !important; /* Important to override potential link styles */
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+      }
     
   </style>
   <!-- Apply theme based on 'Theme' cookie and set dropdown selection -->
@@ -324,6 +462,7 @@
         <option value="forest">Forest</option>
       </select>
       <a href="/old_headlines" id="old-headlines-link" style="margin-left: 20px; padding: 5px; text-decoration: underline; color: var(--link); font-size: medium;">Old Headlines</a>
+      <button id="chat-toggle-btn">Chat</button> <!-- Added Chat Toggle Button -->
       <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
     </div>
   </center>
@@ -338,6 +477,25 @@
       <div class="column">{{ columns[1] }}</div>
       <div class="column">{{ columns[2] }}</div>
       {%- endif %}
+    </div>
+
+    <!-- Chat Window HTML -->
+    <div id="chat-container">
+      <div id="chat-header">
+        <span>Visitor Chat</span>
+        <button id="chat-close-btn" title="Close Chat">&times;</button>
+      </div>
+      <div id="chat-messages">
+        <!-- Messages will be loaded here -->
+        <div id="chat-loading" style="text-align: center; padding: 10px;">Loading messages...</div>
+      </div>
+      <div id="chat-input-area">
+         <div style="display: flex; flex-direction: column; flex-grow: 1;">
+             <textarea id="chat-message-input" placeholder="Type your message (use <b>text</b> for bold)" rows="2"></textarea>
+             <input type="text" id="chat-image-url-input" placeholder="Optional: Image URL or base64">
+         </div>
+        <button id="chat-send-btn">Send</button>
+      </div>
     </div>
   </body>
 </html>
@@ -488,3 +646,342 @@ document.addEventListener("DOMContentLoaded", function () {
     setTimeout(loadWeather, 100);
   });
 </script>
+
+<!-- Chat Window JavaScript -->
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const chatContainer = document.getElementById('chat-container');
+    const chatHeader = document.getElementById('chat-header');
+    const chatMessages = document.getElementById('chat-messages');
+    const messageInput = document.getElementById('chat-message-input');
+    const imageUrlInput = document.getElementById('chat-image-url-input');
+    const sendButton = document.getElementById('chat-send-btn');
+    const closeButton = document.getElementById('chat-close-btn');
+    const loadingIndicator = document.getElementById('chat-loading');
+    const chatToggleButton = document.getElementById('chat-toggle-btn'); // Get the toggle button
+    const chatInputArea = document.getElementById('chat-input-area'); // Get input area for drag/drop
+
+    let isAdminMode = document.cookie.split('; ').some(item => item.trim().startsWith('isAdmin=1')); // Check for admin cookie
+    let isDragging = false;
+    let offsetX, offsetY;
+    let lastComments = []; // Store last fetched comments to avoid duplicates
+    let lastCommentTimestamp = null; // Store timestamp of the latest known comment
+    const beepSound = new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAD//w=='); // Simple short beep
+
+    // --- Draggable Window ---
+    chatHeader.addEventListener('mousedown', (e) => {
+      // Prevent dragging if clicking on the close button
+      if (e.target === closeButton) return;
+      isDragging = true;
+      // Calculate offset from the top-left corner of the chat window
+      offsetX = e.clientX - chatContainer.offsetLeft;
+      offsetY = e.clientY - chatContainer.offsetTop;
+      chatContainer.style.cursor = 'grabbing'; // Change cursor while dragging
+      // Prevent text selection while dragging
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      // Calculate new position
+      let newX = e.clientX - offsetX;
+      let newY = e.clientY - offsetY;
+
+      // Boundary checks (keep within viewport)
+      const minX = 0;
+      const minY = 0;
+      const maxX = window.innerWidth - chatContainer.offsetWidth;
+      const maxY = window.innerHeight - chatContainer.offsetHeight;
+
+      newX = Math.max(minX, Math.min(newX, maxX));
+      newY = Math.max(minY, Math.min(newY, maxY));
+
+      chatContainer.style.left = newX + 'px';
+      chatContainer.style.top = newY + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        chatContainer.style.cursor = 'default'; // Reset cursor
+      }
+    });
+
+    // --- Close Button ---
+    closeButton.addEventListener('click', () => {
+      chatContainer.style.display = 'none'; // Hide the chat window
+    });
+
+    // --- Toggle Button ---
+    chatToggleButton.addEventListener('click', () => {
+      const isHidden = chatContainer.style.display === 'none' || chatContainer.style.display === '';
+      chatContainer.style.display = isHidden ? 'flex' : 'none'; // Toggle visibility
+      if (isHidden) {
+         // Optional: Scroll to bottom when opening
+         // chatMessages.scrollTop = chatMessages.scrollHeight;
+         // Optional: Fetch comments immediately when opened if it was hidden
+         // fetchComments();
+      }
+    });
+
+
+    // --- Fetch Comments ---
+    function fetchComments() {
+      fetch('/api/comments')
+        .then(response => response.json())
+        .then(comments => {
+          loadingIndicator.style.display = 'none';
+          renderComments(comments);
+          lastComments = comments; // Update last known comments
+        })
+        .catch(error => {
+          console.error('Error fetching comments:', error);
+          loadingIndicator.textContent = 'Error loading messages.';
+        });
+    }
+
+    // --- Render Comments ---
+    function renderComments(comments) {
+       // Determine if there are genuinely new messages since the last render
+       let hasNewMessages = false;
+       if (comments.length > 0) {
+           const latestFetchedTimestamp = comments[comments.length - 1].timestamp;
+           if (lastCommentTimestamp === null || latestFetchedTimestamp > lastCommentTimestamp) {
+               if (lastCommentTimestamp !== null) { // Don't beep on initial load
+                   hasNewMessages = true;
+               }
+               lastCommentTimestamp = latestFetchedTimestamp; // Update latest known timestamp
+           }
+       } else {
+           lastCommentTimestamp = null; // Reset if no comments
+       }
+
+       // Only re-render fully if the list content has actually changed
+       // This prevents unnecessary DOM manipulation if only timestamps updated slightly
+       // but keeps the check for new messages separate for the beep
+       const currentCommentsString = JSON.stringify(lastComments.map(c => ({ text: c.text, image_url: c.image_url, timestamp: c.timestamp })));
+       const newCommentsString = JSON.stringify(comments.map(c => ({ text: c.text, image_url: c.image_url, timestamp: c.timestamp })));
+
+       if (newCommentsString === currentCommentsString) {
+           return; // No actual content change, don't re-render
+       }
+
+       // Play beep if new messages were detected
+       if (hasNewMessages) {
+           playBeep();
+       }
+
+       chatMessages.innerHTML = ''; // Clear existing messages before rendering new ones
+       if (comments.length === 0) {
+           chatMessages.innerHTML = '<div style="text-align: center; padding: 10px; color: var(--link);">No messages yet.</div>';
+       } else {
+           comments.forEach(comment => {
+               const messageElement = document.createElement('div');
+               messageElement.classList.add('chat-message');
+               messageElement.dataset.commentId = comment.id; // Store comment ID
+
+               let contentHTML = '';
+               if (comment.text) {
+                   // Render text, allowing the sanitized <b> tag
+                   contentHTML += `<div>${comment.text}</div>`;
+               }
+               if (comment.image_url) {
+                   // Render image if URL is present
+                   contentHTML += `<img src="${comment.image_url}" alt="User image" loading="lazy">`;
+               }
+
+               // Add timestamp and IP Prefix
+               const timestamp = new Date(comment.timestamp).toLocaleString();
+               const ipPrefixDisplay = comment.ip_prefix ? ` (IP: ${comment.ip_prefix})` : ''; // Display IP prefix if available
+               contentHTML += `<span class="timestamp">${timestamp}${ipPrefixDisplay}</span>`;
+
+               // Add delete button if in admin mode
+               if (isAdminMode) {
+                   contentHTML += `<button class="delete-comment-btn" data-id="${comment.id}" style="margin-left: 10px; padding: 2px 5px; font-size: 0.8em; cursor: pointer; background: #ffdddd; border: 1px solid red; color: red; border-radius: 3px;">.</button>`;
+               }
+
+               messageElement.innerHTML = contentHTML;
+               chatMessages.appendChild(messageElement); // Add to top (due to flex-direction: column-reverse)
+           });
+
+           // Add event listeners to new delete buttons
+           if (isAdminMode) {
+               document.querySelectorAll('.delete-comment-btn').forEach(button => {
+                   button.removeEventListener('click', handleDeleteComment); // Remove old listener first
+                   button.addEventListener('click', handleDeleteComment); // Add new listener
+               });
+           }
+       }
+       lastComments = comments; // Update the cache
+    }
+
+    // --- Handle Delete Comment ---
+    function handleDeleteComment(event) {
+        const button = event.target;
+        const commentId = button.dataset.id;
+        if (!commentId) return;
+
+        if (confirm('Are you sure you want to delete this comment?')) {
+            button.disabled = true; // Disable button during request
+            button.textContent = 'Deleting...';
+
+            fetch(`/api/comments/delete/${commentId}`, {
+                method: 'DELETE',
+                // Cookies are sent automatically by the browser
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    fetchComments(); // Refresh the comments list
+                } else {
+                    alert('Failed to delete comment: ' + (data.error || 'Unknown error'));
+                    button.disabled = false; // Re-enable button on failure
+                    button.textContent = 'Delete';
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting comment:', error);
+                alert('An error occurred while deleting the comment.');
+                button.disabled = false; // Re-enable button on error
+                button.textContent = 'Delete';
+            });
+        }
+    }
+
+    // --- Play Beep ---
+    function playBeep() {
+        beepSound.play().catch(e => console.log("Beep failed:", e)); // Play sound, catch errors if blocked
+    }
+
+    // --- Handle Image Upload ---
+    function uploadImage(file) {
+        // Client-side validation (optional but good UX)
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+            alert('Invalid file type. Please upload PNG, JPG, GIF, or WEBP.');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            alert('File is too large. Maximum size is 5MB.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        // Display temporary feedback (optional)
+        imageUrlInput.value = 'Uploading...';
+        imageUrlInput.disabled = true;
+
+        fetch('/api/upload_image', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.url) {
+                imageUrlInput.value = data.url; // Set the URL in the input field
+                // Optionally send the message automatically after upload
+                sendComment(); // <--- Uncommented this line
+            } else {
+                alert('Image upload failed: ' + (data.error || 'Unknown error'));
+                imageUrlInput.value = ''; // Clear field on error
+            }
+        })
+        .catch(error => {
+            console.error('Error uploading image:', error);
+            alert('Image upload failed. Please try again.');
+            imageUrlInput.value = ''; // Clear field on error
+        })
+        .finally(() => {
+             imageUrlInput.disabled = false; // Re-enable input
+             // If not auto-sending, keep 'Uploading...' text until user clears/sends
+             if (imageUrlInput.value === 'Uploading...') {
+                 imageUrlInput.value = '';
+             }
+        });
+    }
+
+    // --- Send Comment ---
+    function sendComment() {
+      const text = messageInput.value.trim();
+      const imageUrl = imageUrlInput.value.trim();
+
+      if (!text && !imageUrl) {
+        alert('Please enter a message or an image URL.');
+        return;
+      }
+
+      sendButton.disabled = true; // Prevent double sending
+      sendButton.textContent = 'Sending...';
+
+      fetch('/api/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: text, image_url: imageUrl }),
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          messageInput.value = ''; // Clear input fields
+          imageUrlInput.value = '';
+          fetchComments(); // Refresh comments immediately
+        } else {
+          alert('Error sending comment: ' + (data.error || 'Unknown error'));
+        }
+      })
+      .catch(error => {
+        console.error('Error sending comment:', error);
+        alert('Error sending comment. Please try again.');
+      })
+      .finally(() => {
+        sendButton.disabled = false;
+        sendButton.textContent = 'Send';
+      });
+    }
+
+    // --- Drag and Drop ---
+    chatInputArea.addEventListener('dragover', (e) => {
+        e.preventDefault(); // Prevent default behavior (opening file)
+        e.stopPropagation();
+        chatInputArea.classList.add('dragover'); // Add visual feedback class
+    });
+
+    chatInputArea.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        chatInputArea.classList.remove('dragover'); // Remove visual feedback
+    });
+
+    chatInputArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        chatInputArea.classList.remove('dragover'); // Remove visual feedback
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            const file = e.dataTransfer.files[0]; // Handle the first dropped file
+            uploadImage(file);
+            e.dataTransfer.clearData(); // Clear drag data cache
+        }
+    });
+
+    // --- Event Listeners ---
+    sendButton.addEventListener('click', sendComment); // Add listener for send button
+
+    // Add listener for Enter key in textarea
+    messageInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { // Send on Enter, allow Shift+Enter for newline
+            e.preventDefault(); // Prevent default Enter behavior (newline)
+            sendComment();
+        }
+    });
+
+    // --- Initial Load & Polling ---
+    fetchComments(); // Load comments initially
+    setInterval(fetchComments, 15000); // Poll for new comments every 15 seconds
+
+  });
+</script>
+</html>

@@ -8,10 +8,16 @@ This file contains all the Flask route handlers for the application, including t
 import os
 import json
 from timeit import default_timer as timer
+import datetime
+import html
+import uuid # For unique filenames
+import ipaddress # Add ipaddress import
 
 # Third-party imports
-from flask import g, jsonify, render_template, request
+# Removed unused send_from_directory
+from flask import g, jsonify, render_template, request, make_response
 from markupsafe import Markup
+from werkzeug.utils import secure_filename # For secure file uploads
 
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo
@@ -23,6 +29,37 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, DEBUG, EXPIRE_MINUTES,
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
+# Constants for Chat Feature
+MAX_COMMENTS = 1000
+COMMENTS_KEY = "chat_comments"
+BANNED_IPS_KEY = "banned_ips" # Store as a set in cache
+UPLOAD_FOLDER = 'static/uploads' # Define upload folder relative to app root
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'} # Allowed image types
+MAX_IMAGE_SIZE = 5 * 1024 * 1024 # 5 MB
+
+# Ensure upload folder exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+# Function to check allowed file extensions
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Helper function to get IP prefix
+def get_ip_prefix(ip_str):
+    """Extracts the first part of IPv4 or the first block of IPv6."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        if isinstance(ip, ipaddress.IPv4Address):
+            # Return only the first octet for IPv4
+            return ip_str.split('.')[0]
+        elif isinstance(ip, ipaddress.IPv6Address):
+            # Return the first block for IPv6
+            return ip_str.split(':')[0]
+    except ValueError:
+        return "Invalid IP" # Should not happen with request.remote_addr
+    return None # Fallback
 
 # Function to initialize routes
 def init_app(flask_app):
@@ -174,6 +211,9 @@ def init_app(flask_app):
             sans_serif_cookie = request.cookies.get('SansSerif', "1")
             form.sans_serif.data = sans_serif_cookie == "1"
 
+            # Load admin mode preference from cookie
+            form.admin_mode.data = request.cookies.get('isAdmin') == '1'
+
             page_order = request.cookies.get('RssUrls')
             if page_order is not None:
                 page_order = json.loads(page_order)
@@ -208,11 +248,12 @@ def init_app(flask_app):
             form = ConfigForm(request.form)
             if form.delete_cookie.data:
                 template = render_template('configdone.html', message="Deleted cookies.")
-                resp = flask_app.make_response(template)
+                resp = make_response(template) # Use make_response
                 resp.delete_cookie('RssUrls')
                 resp.delete_cookie('Theme')
                 resp.delete_cookie('NoUnderlines')
                 resp.delete_cookie('SansSerif')
+                resp.delete_cookie('isAdmin') # Delete admin cookie too
                 return resp
 
             page_order = []
@@ -233,7 +274,7 @@ def init_app(flask_app):
                     page_order.append(urlf.url.data)
 
             template = render_template('configdone.html', message="Cookies saved for later.")
-            resp = flask_app.make_response(template)
+            resp = make_response(template) # Use make_response
 
             if page_order != site_urls:
                 cookie_str = json.dumps(page_order)
@@ -248,6 +289,13 @@ def init_app(flask_app):
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_MINUTES)
             resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_MINUTES)
+
+            # Set or delete admin cookie based on form data
+            if form.admin_mode.data:
+                resp.set_cookie('isAdmin', '1', max_age=EXPIRE_MINUTES)
+            else:
+                # Ensure the cookie is deleted if unchecked
+                resp.delete_cookie('isAdmin')
 
             return resp
 
@@ -276,10 +324,15 @@ def init_app(flask_app):
                     try:
                         entry = json.loads(line)
                         headlines.append(entry)
-                    except Exception:
+                    except json.JSONDecodeError: # Catch specific JSON error
+                        # Optionally log this error
+                        # print(f"Skipping invalid JSON line: {line.strip()}")
                         continue
         except FileNotFoundError:
-            pass
+            pass # File not existing is okay
+        except IOError as e: # Catch potential file reading errors
+            print(f"Error reading archive file {archive_file}: {e}")
+            pass # Or handle differently
         headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         # Remove the 3 most recent headlines
         if len(headlines) > 3:
@@ -295,3 +348,147 @@ def init_app(flask_app):
             logo_url=LOGO_URL,
             description=WEB_DESCRIPTION
         )
+
+    @flask_app.route('/api/comments', methods=['GET'])
+    def get_comments():
+        comments = g_c.get(COMMENTS_KEY) or []
+        # Ensure comments have IDs and prefixes (for older comments if schema changed)
+        # This is a simple migration, a dedicated script might be better for large datasets
+        needs_update = False
+        for c in comments:
+            updated = False
+            if 'id' not in c:
+                c['id'] = str(uuid.uuid4()) # Assign ID if missing
+                updated = True
+            if 'ip_prefix' not in c and 'ip' in c: # Add prefix if missing but IP exists
+                c['ip_prefix'] = get_ip_prefix(c['ip']) # Corrected indentation
+                c.pop('ip', None) # Corrected indentation
+                updated = True # Corrected indentation
+            elif 'ip' in c: # If prefix exists but old IP field is still there
+                c.pop('ip', None) # Remove the old full IP field
+                updated = True
+            if updated:
+                needs_update = True
+
+        # If any comment was updated, save the changes back to cache
+        if needs_update:
+            g_c.put(COMMENTS_KEY, comments)
+
+        return jsonify(comments)
+
+    @flask_app.route('/api/comments', methods=['POST'])
+    def post_comment():
+        ip = request.remote_addr
+        banned_ips = g_c.get(BANNED_IPS_KEY) or set()
+
+        if ip in banned_ips:
+            return jsonify({"error": "Banned"}), 403
+
+        data = request.get_json()
+        text = data.get('text', '').strip()
+        image_url = data.get('image_url', '').strip()
+
+        if not text and not image_url:
+            return jsonify({"error": "Comment cannot be empty"}), 400
+
+        # Basic sanitization: escape HTML, allow <b> and <img>
+        sanitized_text = html.escape(text).replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
+
+        # Validate image URL (very basic)
+        valid_image_url = None
+        if image_url:
+            # Allow relative paths starting with the upload folder or absolute URLs or data URLs
+            is_local_upload = image_url.startswith(f'/{UPLOAD_FOLDER}/')
+            is_external_url = image_url.startswith('http://') or image_url.startswith('https://')
+            is_data_url = image_url.startswith('data:image/')
+
+            if is_local_upload or is_external_url or is_data_url:
+                 # Basic check for common image extensions for non-data URLs
+                if not is_data_url and not image_url.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                    pass # Invalid extension for local/external URL
+                else:
+                    valid_image_url = image_url
+
+        comment_id = str(uuid.uuid4()) # Generate unique ID
+        ip_prefix = get_ip_prefix(ip) # Get IP prefix
+
+        comment = {
+            "id": comment_id, # Add ID
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "ip_prefix": ip_prefix, # Store prefix
+            "text": sanitized_text,
+            "image_url": valid_image_url # Use the validated URL
+            # Removed "ip": ip - no longer storing full IP in comment object
+        }
+
+        comments = g_c.get(COMMENTS_KEY) or []
+        comments.append(comment)
+        # Keep only the latest MAX_COMMENTS
+        comments = comments[-MAX_COMMENTS:]
+        g_c.put(COMMENTS_KEY, comments) # Store indefinitely or add timeout
+
+        return jsonify({"success": True, "comment": comment}), 201
+
+    # Add new delete route
+    @flask_app.route('/api/comments/delete/<comment_id>', methods=['DELETE'])
+    def delete_comment(comment_id):
+        # Check for admin cookie
+        is_admin = request.cookies.get('isAdmin') == '1'
+        if not is_admin:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        comments = g_c.get(COMMENTS_KEY) or []
+        initial_length = len(comments)
+
+        # Find and remove the comment by ID
+        comments_after_delete = [c for c in comments if c.get('id') != comment_id]
+
+        if len(comments_after_delete) < initial_length:
+            g_c.put(COMMENTS_KEY, comments_after_delete)
+            return jsonify({"success": True}), 200
+        else:
+            return jsonify({"error": "Comment not found"}), 404
+
+    @flask_app.route('/api/upload_image', methods=['POST'])
+    def upload_image():
+        ip = request.remote_addr
+        banned_ips = g_c.get(BANNED_IPS_KEY) or set()
+
+        if ip in banned_ips:
+            return jsonify({"error": "Banned"}), 403
+
+        if 'image' not in request.files:
+            return jsonify({"error": "No image file part"}), 400
+
+        file = request.files['image']
+
+        if file.filename == '':
+            return jsonify({"error": "No selected file"}), 400
+
+        if file and allowed_file(file.filename):
+            if len(file.read()) > MAX_IMAGE_SIZE:
+                return jsonify({"error": "File size exceeds limit"}), 400
+            file.seek(0)  # Reset file pointer after size check
+            # Create a unique filename to prevent overwrites and use secure_filename
+            _, ext = os.path.splitext(file.filename)
+            filename = secure_filename(f"{uuid.uuid4()}{ext}")
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+            try:
+                file.save(filepath)
+                # Return the URL path to the uploaded file
+                file_url = f"/{UPLOAD_FOLDER}/{filename}" # Construct URL path
+                return jsonify({"success": True, "url": file_url}), 201
+            except (IOError, OSError) as e: # Catch specific file saving errors
+                # Log the error server-side (optional)
+                print(f"Error saving file {filepath}: {e}")
+                return jsonify({"error": "Failed to save image"}), 500
+        else:
+            return jsonify({"error": "Invalid file type"}), 400
+
+    # Route to serve uploaded files (needed if UPLOAD_FOLDER is not directly under static)
+    # If UPLOAD_FOLDER is 'static/uploads', Flask handles this automatically.
+    # If it were outside 'static', you'd need something like this:
+    # @flask_app.route('/uploads/<filename>')
+    # def uploaded_file(filename):
+    #     return send_from_directory(UPLOAD_FOLDER, filename)

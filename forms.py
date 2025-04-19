@@ -36,5 +36,6 @@ class ConfigForm(Form):
     ])
     no_underlines = BooleanField(label="No Underlines")
     sans_serif = BooleanField(label="Sans Serif Font")
+    admin_mode = BooleanField(label="Enable Admin Mode (allows deleting chat messages)", default=False) # Add admin mode field
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))

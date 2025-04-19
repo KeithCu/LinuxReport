@@ -23,6 +23,7 @@ if DEBUG or g_app.debug:
     print("Warning, in debug mode")
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
+g_app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Limit uploads to 5MB
 
 # Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
