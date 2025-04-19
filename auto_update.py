@@ -7,24 +7,31 @@ import re
 import sys
 from timeit import default_timer as timer
 import json
+import traceback
 
-from jinja2 import Template
+# Import from our new modular files instead of auto_update_utils
+from image_processing import custom_fetch_largest_image
+from article_deduplication import (
+    fetch_recent_articles,
+    get_embedding,
+    deduplicate_articles_with_exclusions,
+    get_best_matching_article
+)
+from html_generation import (
+    generate_headlines_html,
+    refresh_images_only
+)
 
-from auto_update_utils import custom_fetch_largest_image
-from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, DiskCacheWrapper, Mode,
-                    g_c)
+from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, DiskCacheWrapper, Mode, g_c)
 
 # --- Configuration and Prompt Constants ---
 
 MAX_PREVIOUS_HEADLINES = 200
 
-# Similarity threshold for deduplication
-THRESHOLD = 0.75
-
 # Model configuration with primary and fallback options
+#These model names only work with together.ai, not openrouter
 PRIMARY_MODEL  = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
 FALLBACK_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
 
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
@@ -78,7 +85,7 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     """
 
 
-#O3-suggested alternate prompt 
+#O3-suggested alternate prompt
 PROMPT_O3_SYSTEM = """
 FORMAT:
 1. Exactly ONE paragraph (<= 40 words) explaining your choice.
@@ -104,27 +111,8 @@ INPUT TITLES:
 
 # --- Global Variables ---
 cache = DiskCacheWrapper(".")
-ALL_URLS = {}
-embedder = None  # Lazy initialization
-st_util = None
-headline_template = Template("""
-<div class="linkclass">
-<center>
-<code>
-<a href="{{ url }}" target="_blank">
-<font size="5"><b>{{ title }}</b></font>
-</a>
-</code>
-{% if image_url %}
-<br/>
-<a href="{{ url }}" target="_blank">
-<img src="{{ image_url }}" width="500" alt="{{ title }}">
-</a>
-{% endif %}
-</center>
-</div>
-<br/>
-""")
+
+ALL_URLS = {} # Initialized here, passed to utils
 
 # --- Global Configuration (Replaces Environment Variables except API Keys) ---
 RUN_MODE = "normal"  # options: "normal", "compare"
@@ -156,7 +144,7 @@ def get_provider_info_from_model(model_name):
                 "base_url": "https://api.together.xyz/v1"}
 
 # Simplified provider client: infer provider from model
-def get_provider_client(model=None, cache=True):
+def get_provider_client(model=None, use_cache=True): # Renamed cache parameter
     global provider_client_cache
     if model is None:
         model = get_current_model()
@@ -165,7 +153,7 @@ def get_provider_client(model=None, cache=True):
     api_key = os.environ.get(info["api_key_env_var"])
     if not api_key:
         raise ValueError(f"API key {info['api_key_env_var']} not set for provider {info['provider']}")
-    if cache:
+    if use_cache: # Use renamed parameter
         if provider_client_cache is None:
             provider_client_cache = OpenAI(api_key=api_key, base_url=info["base_url"])
         return provider_client_cache
@@ -204,51 +192,6 @@ def _try_call_model(client, model, messages, max_tokens, provider_label=""):
     return response_text
 
 
-def fetch_recent_articles():
-    articles = []
-    for url, _ in ALL_URLS.items():
-        feed = cache.get(url)
-        if feed is None:
-            print (f"No data found for {url}")
-            continue
-
-        count = 0
-        for entry in feed.entries:
-            title = entry["title"]
-            articles.append({"title": title, "url": entry["link"]})
-            count += 1
-            if count == 5:
-                break
-
-    return articles
-
-
-def generate_headlines_html(top_articles, output_file):
-    # Determine the first article that has an image to show one image only
-    first_image_idx = None
-    for idx, art in enumerate(top_articles[:3]):
-        if (art.get("image_url")):
-            first_image_idx = idx
-            break
-    # Render HTML: only the first image is displayed
-    html_parts = []
-    for idx, art in enumerate(top_articles[:3]):
-        rendered_html = headline_template.render(
-            url=art["url"],
-            title=art["title"],
-            image_url=art.get("image_url") if idx == first_image_idx else None
-        )
-        html_parts.append(rendered_html)
-
-    # Combine all headline HTML
-    full_html = "\n".join(html_parts)
-
-    # Step 3: Write to the output file
-    output_dir = os.path.dirname(output_file)
-    if (output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
-        f.write(full_html)
 
 
 def extract_top_titles_from_ai(text):
@@ -270,48 +213,6 @@ def extract_top_titles_from_ai(text):
 
     return titles
 
-def get_embedding(text):
-    global embedder, st_util
-    if embedder is None:
-        # Lazy initialization of SentenceTransformer since it takes 5 seconds.
-        from sentence_transformers import SentenceTransformer, util
-        embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
-        st_util = util
-    return embedder.encode(text, convert_to_tensor=True)
-
-def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
-    """Deduplicate articles based on their embeddings, excluding similar ones."""
-    unique_articles = []
-    do_not_select_similar = excluded_embeddings.copy()  # Start with embeddings of previous selections
-
-    for article in articles:
-        title = article["title"]
-        current_emb = get_embedding(title)  # Compute embedding for the article's title
-        
-        is_similar = any(st_util.cos_sim(current_emb, emb).item() >= threshold for emb in do_not_select_similar)
-        
-        if not is_similar:
-            unique_articles.append(article)
-            do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
-        else:
-            print(f"Filtered duplicate (embeddings): {title}")
-
-    return unique_articles
-
-def get_best_matching_article(target_title, articles):
-    """Finds the article with the highest similarity score to the target title."""
-    target_emb = get_embedding(target_title)
-    best_match = None
-    best_score = 0.0
-    for article in articles:
-        score = st_util.cos_sim(target_emb, get_embedding(article["title"])).item()
-#        print (f"Score for {target_title} to {article['title']}: {score}")
-        if score > best_score:
-            best_match = article
-            if score == 1.0:
-                return best_match
-            best_score = score
-    return best_match
 
 def _prepare_messages(prompt_mode, filtered_articles):
     """Prepares the message list based on the prompt mode."""
@@ -338,6 +239,7 @@ def ask_ai_top_articles(articles):
     previous_urls = [sel["url"] for sel in previous_selections]
 
     articles = [article for article in articles if article["url"] not in previous_urls]
+    # Pass threshold to deduplicate function
     filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
 
     if not filtered_articles:
@@ -359,23 +261,19 @@ def ask_ai_top_articles(articles):
         # If successful with primary model, ensure cache reflects it (might have been on fallback before)
         update_model_cache(current_model)
 
-    except Exception as e:
+    except Exception as e: # Keep general for other unexpected errors (network, etc.)
         print(f"Error with model {current_model} ({CHAT_PROVIDER_1}): {e}")
-
-        # Fallback logic specific to together.ai
-        if CHAT_PROVIDER_1 == "together" and current_model != FALLBACK_MODEL:
-            print("Primary model failed. Trying fallback model: {FALLBACK_MODEL}")
-            try:
-                # Ensure we use the primary client instance for the fallback call too
-                response_text = _try_call_model(primary_client, FALLBACK_MODEL, messages, 3000, f"Fallback ({CHAT_PROVIDER_1})")
-                # Update the model cache to use the fallback model
-                update_model_cache(FALLBACK_MODEL)
-            except Exception as fallback_error:
-                print(f"Fallback model also failed: {str(fallback_error)}")
-                return "LLM models are currently unavailable.", filtered_articles, previous_selections
-        else:
-            # For other providers or if primary was already the fallback, report failure
-            return "LLM model failed.", filtered_articles, previous_selections
+        traceback.print_exc() # Print traceback for unexpected errors
+        # Fallback to secondary model if configured
+        try:
+            fallback_client = get_provider_client(model=FALLBACK_MODEL, use_cache=False)
+            print(f"Trying fallback model: {FALLBACK_MODEL}")
+            response_text = _try_call_model(fallback_client, FALLBACK_MODEL, messages, 3000, f"Fallback ({CHAT_PROVIDER_1})")
+            update_model_cache(FALLBACK_MODEL)
+        except Exception as fallback_e:
+            print(f"Fallback model {FALLBACK_MODEL} also failed: {fallback_e}")
+            traceback.print_exc()
+            return "LLM model failed due to error (primary and fallback).", filtered_articles, previous_selections
 
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
         return "No response from LLM models.", filtered_articles, previous_selections
@@ -418,16 +316,11 @@ def run_comparison(articles):
     print(f"Provider: {CHAT_PROVIDER_1}, Model: {MODEL_1}, Prompt Mode: {PROMPT_MODE_1}")
     messages1 = _prepare_messages(PROMPT_MODE_1, filtered_articles)
     print("Messages 1:")
-    provider1_args = {}
-    if CHAT_PROVIDER_1 == "together":
-        provider1_args = {"api_key_env_var": "TOGETHER_API_KEY_LINUXREPORT", "base_url": "https://api.together.xyz/v1"}
-    elif CHAT_PROVIDER_1 == "openrouter":
-        provider1_args = {"api_key_env_var": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"}
-
+    # Corrected get_provider_client call: infer provider from model name
     try:
-        client1 = get_provider_client(provider_name=CHAT_PROVIDER_1, **provider1_args)
+        client1 = get_provider_client(model=MODEL_1, use_cache=False) # Use renamed parameter
         _try_call_model(client1, MODEL_1, messages1, 3000, f"Comparison ({CHAT_PROVIDER_1})")
-    except Exception as e:
+    except Exception as e: # Keep general
         print(f"Error during Comparison Call 1 ({CHAT_PROVIDER_1} / {MODEL_1}): {e}")
 
 
@@ -436,89 +329,17 @@ def run_comparison(articles):
     print(f"Provider: {CHAT_PROVIDER_2}, Model: {MODEL_2}, Prompt Mode: {PROMPT_MODE_2}")
     messages2 = _prepare_messages(PROMPT_MODE_2, filtered_articles)
     print("Messages 2:")
-    provider2_args = {}
-    if CHAT_PROVIDER_2 == "together":
-        provider2_args = {"api_key_env_var": "TOGETHER_API_KEY_LINUXREPORT", "base_url": "https://api.together.xyz/v1"}
-    elif CHAT_PROVIDER_2 == "openrouter":
-        provider2_args = {"api_key_env_var": "OPENROUTER_API_KEY", "base_url": "https://openrouter.ai/api/v1"}
-
+    # Corrected get_provider_client call: infer provider from model name
     try:
-        client2 = get_provider_client(provider_name=CHAT_PROVIDER_2, **provider2_args)
+        client2 = get_provider_client(model=MODEL_2, use_cache=False) # Use renamed parameter
         _try_call_model(client2, MODEL_2, messages2, 3000, f"Comparison ({CHAT_PROVIDER_2})")
-    except Exception as e:
+    except Exception as e: # Keep general
         print(f"Error during Comparison Call 2 ({CHAT_PROVIDER_2} / {MODEL_2}): {e}")
 
     print("\n--- Comparison Mode Finished ---")
 
 
-def extract_articles_from_html(html_file):
-    """Extract article URLs and titles from the HTML file."""
-    if not os.path.exists(html_file):
-        print(f"No existing HTML file found at {html_file}")
-        return []
-        
-    # Read the existing file
-    with open(html_file, "r", encoding="utf-8") as f:
-        current_html = f.read()
-    
-    articles = []
-    pattern = r'<a\s+[^>]*href="([^"]+)"[^>]*>\s*<font[^>]*>\s*<b[^>]*>([^<]+)</b>'
-    matches = re.finditer(pattern, current_html)
-    
-    for match in matches:
-        url, title = match.groups()
-        articles.append({"url": url, "title": title})
-    
-    return articles
-
-def refresh_images_only(mode):
-    """Refresh only the images in the HTML file without changing the articles."""
-    html_file = f"{mode}reportabove.html"
-    
-    # Extract the articles from the HTML
-    articles = extract_articles_from_html(html_file)
-    
-    if not articles:
-        print(f"No articles found in existing HTML file {html_file}")
-        return False
-    
-    print(f"Found {len(articles)} articles in {html_file}, refreshing images...")
-    
-    # Now generate a new HTML with fresh images
-    generate_headlines_html(articles, html_file)
-    print(f"Successfully refreshed images in {html_file}")
-    return True
-
 MAX_ARCHIVE_HEADLINES = 50
-
-def repair_archive_entries_if_needed(archive_file, old_entries):
-    """One-time repair: fill in missing image_url fields in the loaded archive entries list."""
-    repair_flag_key = f"archive_repair_done:{archive_file}"
-    if g_c.get(repair_flag_key):
-        return False  # Already repaired
-    changed = False
-    for entry in old_entries:
-        if not entry.get("image_url"):
-            url = entry["url"]
-            cache_key = f"image_url:{url}"
-            cached_img = g_c.get(cache_key)
-            if cached_img:
-                entry["image_url"] = cached_img
-            else:
-                img_url = custom_fetch_largest_image(url)
-                entry["image_url"] = img_url
-                if img_url:
-                    g_c.put(cache_key, img_url, timeout=60*60*24*30)  # 30 days
-            changed = True
-    if changed:
-        with open(archive_file, "w", encoding="utf-8") as f:
-            for entry in old_entries:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        print(f"Archive {archive_file} updated with missing images.")
-    else:
-        print(f"No missing images found in {archive_file}.")
-    g_c.put(repair_flag_key, True, timeout=60*60*24*365)  # Mark as done for 1 year
-    return changed
 
 def append_to_archive(mode, top_articles):
     """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
@@ -539,9 +360,6 @@ def append_to_archive(mode, top_articles):
             old_entries = [json.loads(line) for line in f if line.strip()]
     except FileNotFoundError:
         old_entries = []
-
-    # One-time repair: fill in missing image_url fields in the loaded entries
-    repair_archive_entries_if_needed(archive_file, old_entries)
 
     all_entries = new_entries + old_entries
     all_entries = all_entries[:MAX_ARCHIVE_HEADLINES]
@@ -565,7 +383,8 @@ def main(mode, dry_run=False): # Add dry_run parameter
     html_file = f"{mode}reportabove.html"
 
     try:
-        articles = fetch_recent_articles()
+        # Pass ALL_URLS and cache to fetch_recent_articles
+        articles = fetch_recent_articles(ALL_URLS, cache)
         if not articles:
             print(f"No articles found for mode: {mode}")
             sys.exit(1) # Keep exit for no articles
@@ -612,6 +431,7 @@ def main(mode, dry_run=False): # Add dry_run parameter
                 )
             # Render HTML and archive with images
             print(f"Generating HTML file: {html_file}")
+            # Pass headline_template to generate_headlines_html
             generate_headlines_html(top_3_articles_match, html_file)
             print(f"Appending to archive for mode: {mode}")
             append_to_archive(mode, top_3_articles_match)
@@ -623,9 +443,14 @@ def main(mode, dry_run=False): # Add dry_run parameter
             print(f"Unknown RUN_MODE: {RUN_MODE}. Exiting.")
             sys.exit(1)
 
-    except Exception as e:
+    except FileNotFoundError as e: # Specific error
+        print(f"Configuration file error for mode {mode}: {e}")
+        sys.exit(1)
+    except ImportError as e: # Specific error
+        print(f"Error importing settings for mode {mode}: {e}")
+        sys.exit(1)
+    except Exception as e: # Keep general for other unexpected errors during main execution
         print(f"Error in mode {mode}: {e}")
-        import traceback
         traceback.print_exc() # Print traceback for debugging
         sys.exit(1)
 

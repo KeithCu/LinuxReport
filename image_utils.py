@@ -1,0 +1,160 @@
+\
+"""
+Module: image_utils.py
+
+Contains core utility functions, constants, and image dimension logic
+extracted from image_processing.py.
+"""
+import re
+import os
+import requests
+from io import BytesIO
+from PIL import Image, UnidentifiedImageError
+import xml.etree.ElementTree as ET
+from urllib.parse import urlparse
+
+# === Constants and Configuration ===
+DEBUG_LOGGING = True # Copy from image_processing.py
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'} # Copy from image_processing.py
+EXCLUDED_PATTERNS = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'css', 'advertisement', 'michaellarabel'] # Copy from image_processing.py
+EXCLUDED_RE = re.compile(r"(?:" + r"|".join(re.escape(p) for p in EXCLUDED_PATTERNS) + r")", re.IGNORECASE) # Copy from image_processing.py
+IMAGE_EXT_RE = re.compile(r"\\.(jpe?g|png|webp|gif|svg)([?#].*)?$", re.IGNORECASE) # Copy from image_processing.py
+
+# === Utility Functions ===
+
+def is_excluded(url):
+    return bool(EXCLUDED_RE.search(url))
+
+def debug_print(message):
+    if DEBUG_LOGGING:
+        print(f"[DEBUG] {message}")
+
+def parse_dimension(value):
+    # Extract leading numeric value (int or float)
+    m = re.match(r'^\s*(\d+(?:\.\d+)?)', str(value))
+    return float(m.group(1)) if m else 0
+
+
+
+def extract_dimensions_from_tag_or_style(tag):
+    width = 0
+    height = 0
+    try:
+        if tag.get('width'):
+            w = tag['width']
+            if isinstance(w, str) and w.strip().endswith('px'):
+                w = w.strip().rstrip('px')
+            if str(w).isdigit():
+                width = int(w)
+        if tag.get('height'):
+            h = tag['height']
+            if isinstance(h, str) and h.strip().endswith('px'):
+                h = h.strip().rstrip('px')
+            if str(h).isdigit():
+                height = int(h)
+    except (ValueError, KeyError):
+        pass
+    # Check for dimensions in style attribute
+    if (width == 0 or height == 0) and tag.get('style'):
+        style = tag['style']
+        width_match = re.search(r'width:\s*(\d+)px', style)
+        if width_match:
+            width = int(width_match.group(1))
+        height_match = re.search(r'height:\s*(\d+)px', style)
+        if height_match:
+            height = int(height_match.group(1))
+    return width, height
+
+
+def get_actual_image_dimensions(img_url):
+    """Fetch an image and get its actual dimensions. Special handling for SVG images with approximate dimensions."""
+    try:
+        headers_with_referer = HEADERS.copy()
+        headers_with_referer["Referer"] = img_url  # Added Referer header
+        response = requests.get(img_url, headers=headers_with_referer, timeout=10)
+        response.raise_for_status()
+        content_type = response.headers.get('Content-Type', '').lower()
+        
+        # Use content-length as a quick check for valid images, but only skip if present and small
+        content_length_header = response.headers.get('Content-Length')
+        if content_length_header is not None:
+            try:
+                content_length = int(content_length_header)
+                if content_length < 100:  # Skip very small images that are likely icons
+                    debug_print(f"Skipping small image ({content_length} bytes): {img_url}")
+                    return 0, 0
+            except Exception:
+                pass
+        
+        if 'svg' in content_type:
+            debug_print(f"SVG image detected for {img_url}, attempting to parse dimensions")
+            try:
+                svg = ET.fromstring(response.content)
+                width = svg.attrib.get('width')
+                height = svg.attrib.get('height')
+                
+                # Improved SVG dimension parsing with unit handling
+                def parse_svgdimension(value):
+                    if not value:
+                        return 0
+                    if value.isdigit():
+                        return int(value)
+                    # Handle px, em, pt, etc.
+                    numeric_part = re.match(r'^(\d+(\.\d+)?)', value)
+                    if numeric_part:
+                        return float(numeric_part.group(1))
+                    return 0
+                    
+                if width and height:
+                    width_val = parse_svgdimension(width)
+                    height_val = parse_svgdimension(height)
+                    if width_val > 0 and height_val > 0:
+                        debug_print(f"Parsed SVG dimensions from attributes for {img_url}: {int(width_val)}x{int(height_val)}")
+                        return int(width_val), int(height_val)
+                        
+                viewBox = svg.attrib.get('viewBox')
+                if viewBox:
+                    parts = viewBox.split()
+                    if len(parts) == 4:
+                        try:
+                            width = float(parts[2])
+                            height = float(parts[3])
+                            debug_print(f"Parsed SVG dimensions from viewBox for {img_url}: {int(width)}x{int(height)}")
+                            return int(width), int(height)
+                        except Exception:
+                            pass
+                            
+                # More realistic fallback based on SVG content complexity
+                fallback_dim = min(max(int(len(response.content) ** 0.4), 200), 800)
+                debug_print(f"Fallback SVG dimensions based on file size for {img_url}: {fallback_dim}x{fallback_dim}")
+                return fallback_dim, fallback_dim
+            except Exception as e:
+                debug_print(f"Error parsing SVG for {img_url}: {e}")
+                return 640, 480  # Default fallback dimensions
+        
+        # More efficient image dimension detection using image header only
+        try:
+            with Image.open(BytesIO(response.content)) as img:
+                width, height = img.size
+                debug_print(f"Got actual dimensions for {img_url}: {width}x{height}")
+                return width, height
+        except Image.UnidentifiedImageError:
+            debug_print(f"Could not identify image file: {img_url}")
+            return 0, 0
+        except Exception as e:
+            debug_print(f"Error reading image dimensions with PIL for {img_url}: {e}")
+            return 0, 0
+    except requests.exceptions.RequestException as e:
+        debug_print(f"Request error getting dimensions for {img_url}: {e}")
+        return 0, 0
+    except Exception as e:
+        debug_print(f"Generic error getting dimensions for {img_url}: {e}")
+        return 0, 0
+
+
+def extract_domain(url):
+    parsed = urlparse(url)
+    netloc = parsed.netloc
+    if netloc.startswith("www."):
+        return netloc[4:]
+    return netloc
