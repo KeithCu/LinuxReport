@@ -257,10 +257,11 @@
       /* Chat Window Styles */
       #chat-container {
         position: fixed;
-        bottom: 20px;
+        top: 20px; /* Changed from bottom */
+        bottom: 20px; /* Added to stretch */
         right: 20px;
-        width: 350px; /* Initial width */
-        height: 400px; /* Initial height */
+        width: 350px; /* Kept width */
+        /* height: 400px; Removed height */
         background-color: var(--bg);
         border: 2px solid var(--btn-border);
         border-radius: 8px;
@@ -269,7 +270,7 @@
         flex-direction: column;
         overflow: hidden; /* Needed for resize handle */
         z-index: 1000; /* Ensure it's on top */
-        resize: both; /* Allow resizing */
+        resize: both; /* Allow resizing - might conflict slightly with top/bottom */
         min-width: 250px; /* Min size */
         min-height: 200px; /* Min size */
       }
