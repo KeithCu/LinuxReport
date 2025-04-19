@@ -15,10 +15,15 @@ from image_utils import (
     get_actual_image_dimensions,
     HEADERS,
     extract_domain,
-    IMAGE_EXT_RE
+    IMAGE_EXT_RE,
+    # parse_best_srcset # Unused import
 )
 
-from html_image_extraction import parse_images_from_soup
+# Import from the renamed file
+from image_html_parser import parse_images_from_soup
+# Import from the new candidate selector module
+from image_candidate_selector import process_candidate_images
+# Import from custom_site_handlers
 from custom_site_handlers import custom_hacks
 
 # === HTML/Parsing Logic ===
@@ -43,7 +48,7 @@ def get_final_response(url, headers, max_redirects=2):
         target_url = None
         for part in parts:
             if part.strip().lower().startswith('url='):
-                target_url = part.strip()[4:].strip()
+                target_url = part.strip()[4:].trip()
                 break
 
         if target_url:
@@ -55,84 +60,7 @@ def get_final_response(url, headers, max_redirects=2):
     print("Error: Too many meta refresh redirects")
     return None
 
-
-def parse_best_srcset(srcset):
-    """Parse srcset attribute and return the best (largest) image URL and its estimated width."""
-    if not srcset:
-        return None, 0
-
-    # Parse each srcset entry to collect (width, url) pairs
-    entries = []
-    for part in srcset.split(','):
-        part = part.strip()
-        if not part:
-            continue
-        tokens = part.split()
-        url = tokens[0]
-        width = 0
-        for descriptor in tokens[1:]:
-            if descriptor.endswith('w') and descriptor[:-1].isdigit():
-                width = int(descriptor[:-1])
-                break
-            if descriptor.endswith('x'):
-                try:
-                    width = int(1000 * float(descriptor[:-1]))
-                    break
-                except ValueError:
-                    pass
-        entries.append((width, url))
-    if not entries:
-        return None, 0
-    # Choose the entry with the maximum width
-    best_width, best_url = max(entries, key=lambda x: x[0])
-    return best_url, best_width
-
-# === Candidate Selection ===
-
-def process_candidate_images(candidate_images):
-    """Process a list of candidate images and return the best one based on a simplified scoring logic."""
-    if not candidate_images:
-        print("No candidate images available for processing.")
-        return None
-
-    # 1. Prioritize meta images
-    meta_images = [(url, meta) for url, meta in candidate_images if meta.get('meta')]
-    if meta_images:
-        candidate_images = meta_images
-
-    # 2. For each candidate, fetch dimensions if missing (for top 5 only)
-    top_candidates = sorted(candidate_images, key=lambda item: item[1].get('score', 0), reverse=True)[:5]
-    for i, (url, meta) in enumerate(top_candidates):
-        width = meta.get('width', 0)
-        height = meta.get('height', 0)
-        if width == 0 or height == 0:
-            actual_width, actual_height = get_actual_image_dimensions(url)
-            if actual_width > 0 and actual_height > 0:
-                meta['width'] = actual_width
-                meta['height'] = actual_height
-                meta['score'] = actual_width * actual_height
-                top_candidates[i] = (url, meta)
-
-    # 3. Resort by area (width*height)
-    top_candidates.sort(key=lambda item: item[1].get('width', 0) * item[1].get('height', 0), reverse=True)
-
-    # Ensure we still have candidates after filtering/sorting
-    if not top_candidates:
-        print("No suitable candidates remain after processing.")
-        return None
-
-    # 4. Fallback: if no dimensions, use original score
-    best = top_candidates[0]
-    best_url = best[0]
-    best_width = best[1].get('width', 0)
-    best_height = best[1].get('height', 0)
-    min_size = 100  # Minimum width and height for a valid image
-    if best_width < min_size or best_height < min_size:
-        print("No suitable images found (all images too small).")
-        return None
-    print(f"Best image found: {best_url} (score: {best[1].get('score')}, size: {best_width}x{best_height})")
-    return best_url
-
+# === Main Fetch Logic ===
 
 def fetch_largest_image(url): # Renamed request_url to url
     """Fetch the largest image from a webpage using requests and BeautifulSoup."""
@@ -148,7 +76,7 @@ def fetch_largest_image(url): # Renamed request_url to url
         if not candidate_images:
             print("No suitable images found in local file.")
             return None
-        # Use imported process_candidate_images
+        # Use imported process_candidate_images from image_candidate_selector
         return process_candidate_images(candidate_images)
 
     try:
@@ -219,7 +147,7 @@ def fetch_largest_image(url): # Renamed request_url to url
             print("No suitable images found.")
             return None
 
-        # Use imported process_candidate_images
+        # Use imported process_candidate_images from image_candidate_selector
         return process_candidate_images(candidate_images)
 
     except requests.exceptions.RequestException as e:
@@ -241,7 +169,7 @@ def custom_fetch_largest_image(url, underlying_link=None, html_content=None): # 
         # from bs4 import BeautifulSoup # Ensure imported at top
         soup = BeautifulSoup(html_content, "html.parser")
         first_link = soup.find("a")
-        if first_link and first_link.get("href"):
+        if (first_link and first_link.get("href")):
             print("Using first link from HTML content")
             url_to_process = first_link["href"] # Use a different variable name
         else:
@@ -250,14 +178,12 @@ def custom_fetch_largest_image(url, underlying_link=None, html_content=None): # 
     else:
         url_to_process = url # Use original url if no underlying link or html content
 
-    # Use imported extract_domain and custom_hacks
+    # Use imported extract_domain and custom_hacks from custom_site_handlers
     domain = extract_domain(url_to_process)
     if domain in custom_hacks:
         print(f"Using custom hack for {domain}")
-        # The custom_hacks dictionary (imported from image_parser) should contain
-        # references to the actual custom fetch functions defined in image_parser.py
-        # Make sure those functions in image_parser.py call fetch_largest_image (defined here)
-        # appropriately, potentially by passing it as an argument.
+        # The custom_hacks dictionary (imported from custom_site_handlers) should contain
+        # references to the actual custom fetch functions.
         return custom_hacks[domain](url_to_process)
     else:
         # Call the local fetch_largest_image

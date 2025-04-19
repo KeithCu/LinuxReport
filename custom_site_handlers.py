@@ -46,7 +46,20 @@ def citizenfreepress_custom_fetch(url):
 def linuxtoday_custom_fetch(url):
     return generic_custom_fetch(url, linuxtoday_selector)
 
-# Define custom_hacks *after* the functions it references
-custom_hacks = {}
-custom_hacks["linuxtoday.com"] = linuxtoday_custom_fetch
-custom_hacks["citizenfreepress.com"] = citizenfreepress_custom_fetch
+def custom_hack_miragenews(url):
+    """Custom handler for miragenews.com to find the video thumbnail."""
+    from image_parser import fetch_largest_image # Import locally
+    return fetch_largest_image(url)
+
+def custom_hack_justthenews(url):
+    """Custom handler for justthenews.com to find the video thumbnail."""
+    from image_parser import fetch_largest_image # Import locally
+    return fetch_largest_image(url)
+
+# Dictionary mapping domains to their custom handlers
+custom_hacks = {
+    'miragenews.com': custom_hack_miragenews,
+    'justthenews.com': custom_hack_justthenews,
+    'linuxtoday.com': linuxtoday_custom_fetch,
+    'citizenfreepress.com': citizenfreepress_custom_fetch
+}

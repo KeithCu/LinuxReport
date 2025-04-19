@@ -1,13 +1,12 @@
 from urllib.parse import urljoin
 import json
-from image_utils import is_excluded, extract_dimensions_from_tag_or_style, debug_print
+from image_utils import is_excluded, extract_dimensions_from_tag_or_style, debug_print, parse_best_srcset
 
 def extract_img_url_from_tag(img_tag, base_url):
     """Extract the best image URL from an <img> tag, considering src, srcset, and data-* attributes."""
     srcset = img_tag.get('srcset')
     if srcset:
-        # Local import to avoid circular import
-        from image_parser import parse_best_srcset
+        # Use imported parse_best_srcset from image_utils
         best, _ = parse_best_srcset(srcset)
         if best:
             return urljoin(base_url, best)

@@ -6,10 +6,10 @@ Contains core utility functions, constants, and image dimension logic
 extracted from image_processing.py.
 """
 import re
-import os
+# import os # Unused
 import requests
 from io import BytesIO
-from PIL import Image, UnidentifiedImageError
+from PIL import Image # Removed UnidentifiedImageError
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
@@ -155,6 +155,40 @@ def get_actual_image_dimensions(img_url):
 def extract_domain(url):
     parsed = urlparse(url)
     netloc = parsed.netloc
-    if netloc.startswith("www."):
+    if (netloc.startswith("www.")):
         return netloc[4:]
     return netloc
+
+# === Srcset Parsing ===
+
+def parse_best_srcset(srcset):
+    """Parse srcset attribute and return the best (largest) image URL and its estimated width."""
+    if not srcset:
+        return None, 0
+
+    # Parse each srcset entry to collect (width, url) pairs
+    entries = []
+    for part in srcset.split(','):
+        part = part.strip()
+        if not part:
+            continue
+        tokens = part.split()
+        url = tokens[0]
+        width = 0
+        for descriptor in tokens[1:]:
+            if descriptor.endswith('w') and descriptor[:-1].isdigit():
+                width = int(descriptor[:-1])
+                break
+            if descriptor.endswith('x'):
+                try:
+                    # Approximate width based on pixel density descriptor
+                    width = int(1000 * float(descriptor[:-1]))
+                    break
+                except ValueError:
+                    pass
+        entries.append((width, url))
+    if not entries:
+        return None, 0
+    # Choose the entry with the maximum width
+    best_width, best_url = max(entries, key=lambda x: x[0])
+    return best_url, best_width

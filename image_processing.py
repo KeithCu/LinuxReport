@@ -21,9 +21,8 @@ from image_utils import (
     HEADERS, debug_print,
     is_excluded
 )
-from image_parser import (
-    process_candidate_images, # Keep for selenium path
-)
+# Import from the new candidate selector module
+from image_candidate_selector import process_candidate_images
 
 
 
@@ -142,7 +141,8 @@ def parse_images_from_selenium(driver):
             debug_print(f"Unexpected error processing image element: {e}")
             continue
 
-    return candidate_images
+    # Use imported process_candidate_images from image_candidate_selector
+    return process_candidate_images(candidate_images)
 
 def fetch_largest_image_selenium(url): # Renamed request_url to url
     """Fetch largest image using Selenium for JavaScript-heavy sites."""
