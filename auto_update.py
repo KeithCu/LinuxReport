@@ -164,29 +164,19 @@ def fetch_recent_articles():
 
 
 def generate_headlines_html(top_articles, output_file):
-    # Step 1: Find the first article with an available image
-    image_article_index = None
-    image_url = None
-    for i, article in enumerate(top_articles[:3]):
-        potential_image_url = custom_fetch_largest_image(
-            article["url"],
-            underlying_link=article.get("underlying_link"),
-            html_content=article.get("html_content")
-        )
-        if potential_image_url:
-            image_article_index = i
-            image_url = potential_image_url
-            break  # Stop at the first article with an image
-    
-    # Step 2: Generate HTML for each of the three headlines
+    # Determine the first article that has an image to show one image only
+    first_image_idx = None
+    for idx, art in enumerate(top_articles[:3]):
+        if art.get("image_url"):
+            first_image_idx = idx
+            break
+    # Render HTML: only the first image is displayed
     html_parts = []
-    for i, article in enumerate(top_articles[:3]):
-        # Only pass image_url if this article is the one with the image
-        current_image_url = image_url if i == image_article_index else None
+    for idx, art in enumerate(top_articles[:3]):
         rendered_html = headline_template.render(
-            url=article["url"],
-            title=article["title"],
-            image_url=current_image_url
+            url=art["url"],
+            title=art["title"],
+            image_url=art.get("image_url") if idx == first_image_idx else None
         )
         html_parts.append(rendered_html)
 
@@ -368,39 +358,58 @@ def refresh_images_only(mode):
 
 MAX_ARCHIVE_HEADLINES = 50
 
+def repair_archive_entries_if_needed(archive_file, old_entries):
+    """One-time repair: fill in missing image_url fields in the loaded archive entries list."""
+    repair_flag_key = f"archive_repair_done:{archive_file}"
+    if g_c.get(repair_flag_key):
+        return False  # Already repaired
+    changed = False
+    for entry in old_entries:
+        if not entry.get("image_url"):
+            url = entry["url"]
+            cache_key = f"image_url:{url}"
+            cached_img = g_c.get(cache_key)
+            if cached_img:
+                entry["image_url"] = cached_img
+            else:
+                img_url = custom_fetch_largest_image(url)
+                entry["image_url"] = img_url
+                if img_url:
+                    g_c.put(cache_key, img_url, timeout=60*60*24*30)  # 30 days
+            changed = True
+    if changed:
+        with open(archive_file, "w", encoding="utf-8") as f:
+            for entry in old_entries:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        print(f"Archive {archive_file} updated with missing images.")
+    else:
+        print(f"No missing images found in {archive_file}.")
+    g_c.put(repair_flag_key, True, timeout=60*60*24*365)  # Mark as done for 1 year
+    return changed
+
 def append_to_archive(mode, top_articles):
     """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
     archive_file = f"{mode}report_archive.jsonl"
     timestamp = datetime.datetime.now(TZ).isoformat()
-    # Find image for these articles (same logic as generate_headlines_html)
-    image_article_index = None
-    image_url = None
-    for i, article in enumerate(top_articles[:3]):
-        potential_image_url = custom_fetch_largest_image(
-            article["url"],
-            underlying_link=article.get("underlying_link"),
-            html_content=article.get("html_content")
-        )
-        if potential_image_url:
-            image_article_index = i
-            image_url = potential_image_url
-            break
-    # Write each article as a JSON line
+    # Build entries directly from pre-fetched image URLs
     new_entries = []
-    for i, article in enumerate(top_articles[:3]):
-        entry = {
+    for article in top_articles[:3]:
+        new_entries.append({
             "title": article["title"],
             "url": article["url"],
             "timestamp": timestamp,
-            "image_url": image_url if i == image_article_index else None
-        }
-        new_entries.append(entry)
+            "image_url": article.get("image_url")
+        })
     # Read old entries, append new, and trim to limit
     try:
         with open(archive_file, "r", encoding="utf-8") as f:
             old_entries = [json.loads(line) for line in f if line.strip()]
     except FileNotFoundError:
         old_entries = []
+
+    # One-time repair: fill in missing image_url fields in the loaded entries
+    repair_archive_entries_if_needed(archive_file, old_entries)
+
     all_entries = new_entries + old_entries
     all_entries = all_entries[:MAX_ARCHIVE_HEADLINES]
     with open(archive_file, "w", encoding="utf-8") as f:
@@ -437,6 +446,12 @@ def main(mode):
             print(f"Best match for {title}: {best_match}")
             if best_match:
                 top_3_articles.append(best_match)
+        # Fetch largest images in-line for each headline
+        for art in top_3_articles:
+            art['image_url'] = custom_fetch_largest_image(
+                art['url'], underlying_link=art.get('underlying_link'), html_content=art.get('html_content')
+            )
+        # Render HTML and archive with images
         generate_headlines_html(top_3_articles, html_file)
         append_to_archive(mode, top_3_articles)  # <-- Archive the headlines
     except Exception as e:
