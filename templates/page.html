@@ -162,6 +162,41 @@
         cursor: not-allowed;
       }
 
+      /* Old Headlines link styling */
+      #old-headlines-link {
+        position: relative;
+        padding: 8px 15px;
+        border-radius: 5px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+        animation: pulse 5s infinite;
+        background: var(--btn-bg);
+        border: 2px solid var(--btn-border);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      #old-headlines-link:hover {
+        transform: scale(1.05);
+        background: var(--btn-hover-bg);
+        color: var(--btn-hover-text) !important;
+        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        50% {
+          transform: scale(1.02);
+          box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+        }
+        100% {
+          transform: scale(1);
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+      }
+
     .weather-container {
       max-width: 100%;
       margin: 10px auto;
