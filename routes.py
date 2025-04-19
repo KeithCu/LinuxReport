@@ -447,21 +447,39 @@ def init_app(flask_app):
     # Add new delete route
     @flask_app.route('/api/comments/delete/<comment_id>', methods=['DELETE'])
     def delete_comment(comment_id):
+        print(f"--- DELETE Request for ID: {comment_id} ---") # DEBUG
         # Check for admin cookie
         is_admin = request.cookies.get('isAdmin') == '1'
+        print(f"Admin cookie ('isAdmin'): {request.cookies.get('isAdmin')}, Check result: {is_admin}") # DEBUG
         if not is_admin:
+            print("Admin check FAILED.") # DEBUG
             return jsonify({"error": "Unauthorized"}), 403
+        print("Admin check PASSED.") # DEBUG
 
         comments = g_c.get(COMMENTS_KEY) or []
         initial_length = len(comments)
+        print(f"Initial comment count: {initial_length}") # DEBUG
+        # print(f"Current comment IDs: {[c.get('id') for c in comments]}") # DEBUG - Optional: uncomment if needed
 
         # Find and remove the comment by ID
         comments_after_delete = [c for c in comments if c.get('id') != comment_id]
+        final_length = len(comments_after_delete)
+        print(f"Comment count after filtering: {final_length}") # DEBUG
 
-        if len(comments_after_delete) < initial_length:
-            g_c.put(COMMENTS_KEY, comments_after_delete)
-            return jsonify({"success": True}), 200
+        if final_length < initial_length:
+            print(f"Comment {comment_id} found. Attempting to update cache...") # DEBUG
+            try:
+                g_c.put(COMMENTS_KEY, comments_after_delete)
+                print(f"Cache updated successfully for key {COMMENTS_KEY}.") # DEBUG
+                # Optional: Verify immediately after putting
+                # verify_comments = g_c.get(COMMENTS_KEY)
+                # print(f"Verification: Cache now has {len(verify_comments)} comments.") # DEBUG
+                return jsonify({"success": True}), 200
+            except Exception as e:
+                print(f"ERROR updating cache for key {COMMENTS_KEY}: {e}") # DEBUG
+                return jsonify({"error": "Failed to update cache after deletion"}), 500
         else:
+            print(f"Comment {comment_id} NOT found in the list.") # DEBUG
             return jsonify({"error": "Comment not found"}), 404
 
     @flask_app.route('/api/upload_image', methods=['POST'])
