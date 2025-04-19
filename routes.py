@@ -33,13 +33,15 @@ from workers import fetch_urls_parallel, fetch_urls_thread
 MAX_COMMENTS = 1000
 COMMENTS_KEY = "chat_comments"
 BANNED_IPS_KEY = "banned_ips" # Store as a set in cache
-UPLOAD_FOLDER = 'static/uploads' # Define upload folder relative to app root
+# Use absolute path for saving on the server
+UPLOAD_FOLDER = '/srv/http/trumpreport/static/uploads' # Define absolute upload folder for server deployment
+WEB_UPLOAD_PATH = '/static/uploads' # Define the web-accessible path prefix
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'} # Allowed image types
 MAX_IMAGE_SIZE = 5 * 1024 * 1024 # 5 MB
 
-# Ensure upload folder exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
+# Ensure upload folder exists - Removed, assuming it exists in deployment
+# if not os.path.exists(UPLOAD_FOLDER):
+#     os.makedirs(UPLOAD_FOLDER)
 
 # Function to check allowed file extensions
 def allowed_file(filename):
@@ -398,13 +400,13 @@ def init_app(flask_app):
         print(f"Received image_url: '{image_url}'") # DEBUG
         valid_image_url = None
         if image_url:
-            # Allow relative paths starting with the upload folder or absolute URLs or data URLs
-            is_local_upload = image_url.startswith(f'/{UPLOAD_FOLDER}/')
+            # Allow relative paths starting with the WEB_UPLOAD_PATH or absolute URLs or data URLs
+            is_local_upload = image_url.startswith(WEB_UPLOAD_PATH + '/') # Check against web path
             is_external_url = image_url.startswith('http://') or image_url.startswith('https://')
             is_data_url = image_url.startswith('data:image/')
 
             print(f"Validation check: is_local={is_local_upload}, is_external={is_external_url}, is_data={is_data_url}") # DEBUG
-            print(f"Checking startswith: '/{UPLOAD_FOLDER}/'") # DEBUG
+            print(f"Checking startswith web path: '{WEB_UPLOAD_PATH}/'") # DEBUG
 
             if is_local_upload or is_external_url or is_data_url:
                  # Basic check for common image extensions for non-data URLs
@@ -499,24 +501,34 @@ def init_app(flask_app):
             return jsonify({"error": "No selected file"}), 400
 
         if file and allowed_file(file.filename):
-            if len(file.read()) > MAX_IMAGE_SIZE:
+            # Check size before saving
+            file.seek(0, os.SEEK_END) # Go to end of file
+            file_length = file.tell() # Get size
+            if file_length > MAX_IMAGE_SIZE:
+                print(f"Upload failed: File size {file_length} exceeds limit {MAX_IMAGE_SIZE}") # DEBUG
                 return jsonify({"error": "File size exceeds limit"}), 400
             file.seek(0)  # Reset file pointer after size check
+
             # Create a unique filename to prevent overwrites and use secure_filename
             _, ext = os.path.splitext(file.filename)
             filename = secure_filename(f"{uuid.uuid4()}{ext}")
+            # Save using the absolute UPLOAD_FOLDER path
             filepath = os.path.join(UPLOAD_FOLDER, filename)
+            print(f"Attempting to save uploaded file to: {filepath}") # DEBUG
 
             try:
                 file.save(filepath)
-                # Return the URL path to the uploaded file
-                file_url = f"/{UPLOAD_FOLDER}/{filename}" # Construct URL path
+                print(f"File saved successfully to: {filepath}") # DEBUG
+                # Return the WEB-ACCESSIBLE URL path to the uploaded file
+                file_url = f"{WEB_UPLOAD_PATH}/{filename}" # Construct web URL path
+                print(f"Returning web-accessible URL to client: {file_url}") # DEBUG
                 return jsonify({"success": True, "url": file_url}), 201
             except (IOError, OSError) as e: # Catch specific file saving errors
-                # Log the error server-side (optional)
-                print(f"Error saving file {filepath}: {e}")
+                # Log the error server-side
+                print(f"ERROR saving file {filepath}: {e}") # DEBUG
                 return jsonify({"error": "Failed to save image"}), 500
         else:
+            print(f"Upload failed: File type not allowed for filename: {file.filename}") # DEBUG
             return jsonify({"error": "Invalid file type"}), 400
 
     # Route to serve uploaded files (needed if UPLOAD_FOLDER is not directly under static)
