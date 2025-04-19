@@ -49,6 +49,7 @@ def init_app(flask_app):
 
         if g.is_mobile:
             suffix = ":MOBILE"
+            single_column = True
 
         # Try full page cache using only page order and mobile flag
         full_page = g_c.get(page_order_s + suffix)
