@@ -52,8 +52,11 @@ MODE_TO_SCHEDULE = {
 }
 
 modetoprompt2 = {
-    Mode.LINUX_REPORT: f"""Arch and Debian Linux programmers and experienced users. Nothing about Ubuntu or any other
-    distro. Anything non-distro-specific is fine, but nothing about the following topics:
+    Mode.LINUX_REPORT: f"""Arch and Debian Linux programmers and experienced users.
+    Prefer major news especially about important codebases. 
+    Avoid simple tutorials, error explanations, troubleshooting guides, or cheat sheets.
+    Nothing about Ubuntu or any other distro. Anything non-distro-specific is fine, but nothing about 
+    the following topics:
     {', '.join(BANNED_WORDS)}.\n""",
     Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",
