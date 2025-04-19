@@ -727,16 +727,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // --- Fetch Comments ---
     function fetchComments() {
-      fetch('/api/comments')
+      // Add cache-busting parameter with current timestamp (including seconds)
+      const cacheBuster = new Date().getTime();
+      fetch(`/api/comments?_=${cacheBuster}`) // Append timestamp here
         .then(response => response.json())
         .then(comments => {
           loadingIndicator.style.display = 'none';
           renderComments(comments);
-          lastComments = comments; // Update last known comments
+          // lastComments = comments; // Update last known comments - Handled within renderComments now
         })
         .catch(error => {
           console.error('Error fetching comments:', error);
-          loadingIndicator.textContent = 'Error loading messages.';
+          // Avoid clearing messages on fetch error, just show indicator
+          if (chatMessages.children.length <= 1) { // Only show if no messages are displayed
+              loadingIndicator.textContent = 'Error loading messages.';
+              loadingIndicator.style.display = 'block';
+          }
         });
     }
 
