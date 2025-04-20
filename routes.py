@@ -25,7 +25,7 @@ from models import RssInfo
 from shared import (ABOVE_HTML_FILE, ALL_URLS, DEBUG, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cs, site_urls, Mode, MODE, PATH, format_last_updated, get_chat_cache)
+                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, MODE, PATH, format_last_updated, get_chat_cache)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -34,14 +34,14 @@ MAX_COMMENTS = 1000
 COMMENTS_KEY = "chat_comments"
 BANNED_IPS_KEY = "banned_ips" # Store as a set in cache
 # Use absolute path for saving on the server
-UPLOAD_FOLDER = '/srv/http/trumpreport/static/uploads' # Define absolute upload folder for server deployment
 WEB_UPLOAD_PATH = '/static/uploads' # Define the web-accessible path prefix
+UPLOAD_FOLDER = PATH + WEB_UPLOAD_PATH # Define absolute upload folder for server deployment
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'} # Allowed image types
 MAX_IMAGE_SIZE = 5 * 1024 * 1024 # 5 MB
 
-# Ensure upload folder exists - Removed, assuming it exists in deployment
-# if not os.path.exists(UPLOAD_FOLDER):
-#     os.makedirs(UPLOAD_FOLDER)
+#Ensure upload folder exists
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
 
 # Function to check allowed file extensions
 def allowed_file(filename):
@@ -192,7 +192,7 @@ def init_app(flask_app):
             g_c.put(page_order_s + suffix, page, timeout=expire)
 
         # Trigger background fetching if needed.
-        if need_fetch and not g_c.has("FETCHMODE"):
+        if need_fetch:
             fetch_urls_thread()
 
         return page

@@ -18,8 +18,8 @@ from feedfilter import filter_similar_titles, merge_entries, prefilter_news
 from seleniumfetch import fetch_site_posts
 # Local application imports
 from shared import (
-    ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, RSS_TIMEOUT, TZ,
-    USE_TOR, USER_AGENT, RssFeed, g_c, DiskcacheSqliteLock # Import DiskcacheSqliteLock
+    ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, TZ,
+    USE_TOR, USER_AGENT, RssFeed, g_c, DiskcacheSqliteLock, GLOBAL_FETCH_MODE_LOCK_KEY
 )
 from Tor import fetch_via_tor
 
@@ -42,7 +42,6 @@ def load_url_worker(url):
         # --- Start of locked section ---
         start = timer()
         rssfeed = None
-        # rssfeed = g_c.get_feed(url) # No need to get feed here, merge logic handles it
 
         if USE_TOR and "reddit" in url:
             print(f"Using TOR proxy for Reddit URL: {url}")
@@ -121,9 +120,8 @@ def load_url_worker(url):
 
 def wait_and_set_fetch_mode():
     """Acquires a global lock to prevent thundering herd for fetch cycles."""
-    lock_key = "global_fetch_mode"
     # Attempt to acquire the lock, waiting if necessary
-    lock = DiskcacheSqliteLock(lock_key, owner_prefix=f"fetch_mode_{os.getpid()}")
+    lock = DiskcacheSqliteLock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_mode_{os.getpid()}")
     if lock.acquire(wait=True, max_wait_seconds=60): # Wait up to 60 seconds
         print("Acquired global fetch lock.")
         return lock # Return the acquired lock object
@@ -169,7 +167,6 @@ def refresh_thread():
             return
 
         print(f"Refreshing {len(urls_to_refresh)} expired feeds sequentially...")
-        # Execute sequentially instead of using ThreadPoolExecutor
         for url in urls_to_refresh:
             try:
                 load_url_worker(url)
@@ -182,19 +179,24 @@ def refresh_thread():
 
 # Start a background thread to refresh RSS feeds.
 def fetch_urls_thread():
-    # Check if a refresh is already running using a simple flag/lock
-    # This prevents multiple refresh *threads* from starting if the main page is hit rapidly
-    refresh_lock_key = "refresh_thread_running"
-    if not g_c.cache.add(refresh_lock_key, True, expire=60): # Try to set the flag
-        print("Refresh thread already running or recently started.")
-        return
+    # Check if a fetch/refresh operation is already running using the global lock.
+    
+    # Create a lock instance just for checking, don't hold it long.
+    check_lock = DiskcacheSqliteLock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_check_{os.getpid()}")
 
-    print("Starting background refresh thread...")
-    t = threading.Thread(target=refresh_thread, args=())
-    t.daemon = True
-    t.start()
-    # Note: The flag 'refresh_thread_running' will expire after 60s
-    # or it should ideally be deleted at the *very end* of refresh_thread,
-    # but releasing the global lock is more critical.
-    # Adding deletion here might be complex due to threading.
-    # The expiry handles cases where the thread might die unexpectedly.
+    # Try to acquire the lock without waiting.
+    if not check_lock.acquire(wait=False):
+        # If acquire returns False, it means the lock is held by another process/thread.
+        print("Fetch/refresh operation already in progress. Skipping background refresh trigger.")
+        # No need to release check_lock here as it was never acquired.
+        return
+    else:
+        # If acquire returns True, it means no fetch/refresh was running *at this moment*.
+        # We acquired the lock, but we don't need to hold it. Release it immediately
+        # so the actual refresh_thread (or a parallel fetch) can acquire it.
+        check_lock.release()
+        print("No fetch operation running. Starting background refresh thread...")
+        # Proceed to start the thread. refresh_thread will acquire the lock properly (waiting if needed).
+        t = threading.Thread(target=refresh_thread, args=())
+        t.daemon = True
+        t.start()

@@ -170,6 +170,10 @@ history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pic
 g_c = DiskCacheWrapper(PATH)
 g_cs = DiskCacheWrapper(SPATH) #Shared cache for all instances
 
+# --- Shared Keys ---
+GLOBAL_FETCH_MODE_LOCK_KEY = "global_fetch_mode"
+
+
 # Configuration for Chat Cache
 # Set to True to use the shared cache (g_cs) for chat comments and banned IPs
 # Set to False to use the site-specific cache (g_c)

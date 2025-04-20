@@ -192,7 +192,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
                 current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
             except (IndexError, KeyError, TypeError):
                 current_temp = "N/A"
-            print(f"Weather API result: city: {city_name}, temp: {current_temp}°F")
+            print(f"Weather API result: city: {city_name}, temp: {current_temp}F")
             return processed_data, 200
 
         except requests.exceptions.RequestException as e:
