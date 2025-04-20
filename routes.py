@@ -381,34 +381,33 @@ def init_app(flask_app):
     # New SSE Route
     @flask_app.route('/api/comments/stream')
     def stream_comments():
-        return None
-        # def event_stream():
-        #     last_data_sent = None
-        #     chat_cache = get_chat_cache() # Use helper function
-        #     while True:
-        #         try:
-        #             # Check for new comments by comparing current cache state to last sent state
-        #             current_comments = chat_cache.get(COMMENTS_KEY) or [] # Use helper function
-        #             current_data = json.dumps(current_comments) # Serialize for comparison
+        def event_stream():
+            last_data_sent = None
+            chat_cache = get_chat_cache() # Use helper function
+            while True:
+                try:
+                    # Check for new comments by comparing current cache state to last sent state
+                    current_comments = chat_cache.get(COMMENTS_KEY) or [] # Use helper function
+                    current_data = json.dumps(current_comments) # Serialize for comparison
 
-        #             if current_data != last_data_sent:
-        #                 # print(f"SSE: Sending update. {len(current_comments)} comments.") # DEBUG
-        #                 yield f"event: new_comment\ndata: {current_data}\n\n" # Send named event
-        #                 last_data_sent = current_data
+                    if current_data != last_data_sent:
+                        # print(f"SSE: Sending update. {len(current_comments)} comments.") # DEBUG
+                        yield f"event: new_comment\ndata: {current_data}\n\n" # Send named event
+                        last_data_sent = current_data
 
-        #             # Wait before checking again to avoid busy-looping
-        #             time.sleep(2) # Check every 2 seconds
-        #         except GeneratorExit:
-        #             # Client disconnected
-        #             # print("SSE: Client disconnected.") # DEBUG
-        #             break
-        #         except Exception as e: # TODO: Consider catching more specific exceptions
-        #             # Log error and potentially break or continue
-        #             print(f"SSE Error: {e}") # Log the error
-        #             # Optionally break or add more robust error handling
-        #             time.sleep(5) # Wait longer after an error
+                    # Wait before checking again to avoid busy-looping
+                    time.sleep(2) # Check every 2 seconds
+                except GeneratorExit:
+                    # Client disconnected
+                    # print("SSE: Client disconnected.") # DEBUG
+                    break
+                except Exception as e: # TODO: Consider catching more specific exceptions
+                    # Log error and potentially break or continue
+                    print(f"SSE Error: {e}") # Log the error
+                    # Optionally break or add more robust error handling
+                    break # Stop the generator
 
-        # return Response(event_stream(), mimetype='text/event-stream')
+        return Response(event_stream(), mimetype='text/event-stream')
 
     @flask_app.route('/api/comments', methods=['POST'])
     def post_comment():
@@ -446,16 +445,16 @@ def init_app(flask_app):
                     has_valid_extension = image_url.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
                     print(f"Extension check: valid={has_valid_extension}") # DEBUG
                     if not has_valid_extension:
-                         print(f"Validation failed: Invalid extension for {image_url}") # DEBUG
-                         # pass # Invalid extension for local/external URL - valid_image_url remains None (pass is implicit)
+                        print(f"Validation failed: Invalid extension for {image_url}") # DEBUG
+                        # pass # Invalid extension for local/external URL - valid_image_url remains None (pass is implicit)
                     else:
-                         print(f"Validation passed for: {image_url}") # DEBUG
-                         valid_image_url = image_url
+                        print(f"Validation passed for: {image_url}") # DEBUG
+                        valid_image_url = image_url
                 else: # Is data URL
                     print(f"Validation passed (data URL): {image_url[:50]}...") # DEBUG
                     valid_image_url = image_url
             else:
-                 print(f"Validation failed: URL type not recognized for {image_url}") # DEBUG
+                print(f"Validation failed: URL type not recognized for {image_url}") # DEBUG
 
         comment_id = str(uuid.uuid4()) # Generate unique ID
         ip_prefix = get_ip_prefix(ip) # Get IP prefix
