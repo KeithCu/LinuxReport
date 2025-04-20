@@ -662,13 +662,19 @@ document.addEventListener("DOMContentLoaded", function () {
     const chatToggleButton = document.getElementById('chat-toggle-btn'); // Get the toggle button
     const chatInputArea = document.getElementById('chat-input-area'); // Get input area for drag/drop
 
+    // --- Configuration ---
+    const useSSE = false; // <<< SET TO true TO ENABLE SSE, false FOR POLLING >>>
+    const pollingInterval = 15000; // Poll every 15 seconds if SSE is disabled
+    // ---------------------
+
     let isAdminMode = document.cookie.split('; ').some(item => item.trim().startsWith('isAdmin=1')); // Check for admin cookie
     let isDragging = false;
     let offsetX, offsetY;
     let lastComments = []; // Store last fetched comments to avoid duplicates
     let lastCommentTimestamp = null; // Store timestamp of the latest known comment
     const beepSound = new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAD//w=='); // Simple short beep
-    let eventSource = null; // Variable to hold the EventSource instance
+    let eventSource = null; // Variable to hold the EventSource instance for SSE
+    let pollingTimer = null; // Variable to hold the polling interval timer
 
     // --- Draggable Window ---
     chatHeader.addEventListener('mousedown', (e) => {
@@ -712,6 +718,16 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- Close Button ---
     closeButton.addEventListener('click', () => {
       chatContainer.style.display = 'none'; // Hide the chat window
+      if (useSSE && eventSource) {
+          console.log("Closing SSE connection.");
+          eventSource.close(); // Close SSE connection when chat is hidden
+          eventSource = null;
+      }
+      if (!useSSE && pollingTimer) {
+          console.log("Stopping polling timer.");
+          clearInterval(pollingTimer);
+          pollingTimer = null;
+      }
     });
 
     // --- Toggle Button ---
@@ -719,28 +735,55 @@ document.addEventListener("DOMContentLoaded", function () {
       const isHidden = chatContainer.style.display === 'none' || chatContainer.style.display === '';
       chatContainer.style.display = isHidden ? 'flex' : 'none'; // Toggle visibility
       if (isHidden) {
-         // Optional: Scroll to bottom when opening
-         // chatMessages.scrollTop = chatMessages.scrollHeight;
-         // Optional: Fetch comments immediately when opened if it was hidden
-         // fetchComments();
+         // If opening the chat:
+         if (useSSE) {
+             initializeSSE(); // Start SSE if enabled
+         } else {
+             // Fetch comments immediately via polling if it was hidden and hasn't loaded yet
+             if (lastComments.length === 0 && loadingIndicator.style.display !== 'none') {
+                 fetchComments();
+             }
+             // Start polling if not already started
+             if (!pollingTimer) {
+                 console.log(`Starting polling timer. Interval: ${pollingInterval}ms`);
+                 pollingTimer = setInterval(fetchComments, pollingInterval);
+             }
+         }
+      } else {
+          // If closing the chat:
+          if (useSSE && eventSource) {
+              console.log("Closing SSE connection via toggle.");
+              eventSource.close();
+              eventSource = null;
+          }
+          if (!useSSE && pollingTimer) {
+              console.log("Stopping polling timer via toggle.");
+              clearInterval(pollingTimer);
+              pollingTimer = null;
+          }
       }
     });
 
 
-    // --- Fetch Comments ---
+    // --- Fetch Comments (Used for Polling) ---
     function fetchComments() {
+      // *** Only fetch if chat is visible AND SSE is DISABLED ***
+      if (useSSE || chatContainer.style.display === 'none') {
+          // console.log("Skipping fetch: SSE enabled or Chat hidden.");
+          return;
+      }
+
       // Add cache-busting parameter with current timestamp (including seconds)
       const cacheBuster = new Date().getTime();
+      console.log("Polling for comments..."); // Log polling action
       fetch(`/api/comments?_=${cacheBuster}`) // Append timestamp here
         .then(response => response.json())
         .then(comments => {
           loadingIndicator.style.display = 'none';
           renderComments(comments);
-          // lastComments = comments; // Update last known comments - Handled within renderComments now
         })
         .catch(error => {
           console.error('Error fetching comments:', error);
-          // Avoid clearing messages on fetch error, just show indicator
           if (chatMessages.children.length <= 1) { // Only show if no messages are displayed
               loadingIndicator.textContent = 'Error loading messages.';
               loadingIndicator.style.display = 'block';
@@ -750,77 +793,58 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // --- Render Comments ---
     function renderComments(comments) {
-       console.log("renderComments received:", JSON.stringify(comments)); // <-- Add this log to check received data
-
-       // *** Only update DOM if chat is visible ***
-       if (chatContainer.style.display === 'none') {
-           // Update cache even if hidden, so it's fresh when opened
-           lastComments = comments;
-           if (comments.length > 0) {
-               lastCommentTimestamp = comments[comments.length - 1].timestamp;
-           } else {
-               lastCommentTimestamp = null;
-           }
-           console.log("Chat hidden, updated cache only.");
-           return; // Don't update DOM if hidden
-       }
+       // console.log("renderComments received:", JSON.stringify(comments));
 
        // Determine if there are genuinely new messages since the last render (for beep)
-       let hasNewMessages = false;
+       let newMessagesExist = false;
+       let latestTimestampInBatch = null;
        if (comments.length > 0) {
-           const latestFetchedTimestamp = comments[comments.length - 1].timestamp;
-           if (lastCommentTimestamp === null || latestFetchedTimestamp > lastCommentTimestamp) {
-               if (lastCommentTimestamp !== null) { // Don't beep on initial load
-                   hasNewMessages = true;
-               }
-               // Update timestamp immediately for beep logic, even if content is identical
-               lastCommentTimestamp = latestFetchedTimestamp;
+           // Find the timestamp of the newest comment in the received batch
+           latestTimestampInBatch = new Date(comments[0].timestamp).getTime(); // Assuming newest is first
+           // If we have a previous timestamp, check if the newest in batch is newer
+           if (lastCommentTimestamp && latestTimestampInBatch > lastCommentTimestamp) {
+               newMessagesExist = true;
            }
-       } else {
-           lastCommentTimestamp = null; // Reset if no comments
-       }
-       if (hasNewMessages) {
-           playBeep(); // Play beep if new messages detected based on timestamp
+           // Update the last known timestamp to the newest one from this batch
+           lastCommentTimestamp = latestTimestampInBatch;
        }
 
+       // Compare stringified content to avoid unnecessary DOM manipulation if content is identical
+       if (JSON.stringify(comments) === JSON.stringify(lastComments)) {
+           // console.log("No change in comments, skipping DOM update.");
+           return; // Exit if comments haven't changed
+       }
 
-       // Compare stringified content to avoid unnecessary DOM manipulation
-       const currentCommentsString = JSON.stringify(lastComments.map(c => ({ id: c.id, text: c.text, image_url: c.image_url, timestamp: c.timestamp }))); // Include ID for comparison
-       const newCommentsString = JSON.stringify(comments.map(c => ({ id: c.id, text: c.text, image_url: c.image_url, timestamp: c.timestamp }))); // Include ID for comparison
-
-       if (newCommentsString === currentCommentsString) {
-           console.log("Render skipped: comment content identical.");
-           return; // No actual content change, don't re-render
+       // Play beep only if new messages arrived and chat is visible
+       if (newMessagesExist && chatContainer.style.display !== 'none') {
+           playBeep();
        }
 
        // *** Build HTML string for all comments ***
        let messagesHTML = '';
        if (comments.length === 0) {
-           messagesHTML = '<div style="text-align: center; padding: 10px; color: var(--link);">No messages yet.</div>';
+           messagesHTML = '<div class="chat-message system-message">No messages yet.</div>';
        } else {
-           // Build messages in reverse order for display (newest first due to flex-direction: column-reverse)
-           for (let i = comments.length - 1; i >= 0; i--) {
-               const comment = comments[i];
-               let contentHTML = '';
-               if (comment.text) {
-                   contentHTML += `<div>${comment.text}</div>`; // Assumes server sanitizes
-               }
-               if (comment.image_url) {
-                   contentHTML += `<img src="${comment.image_url}" alt="Uploaded image" loading="lazy" style="max-width: 100%; max-height: 150px; display: block; margin-top: 5px; border-radius: 4px;" onerror="this.style.display='none'; console.error('Failed to load image:', this.src);">`;
-               }
-               const timestamp = new Date(comment.timestamp).toLocaleString();
-               const ipPrefixDisplay = comment.ip_prefix ? ` (IP: ${comment.ip_prefix})` : '';
-               contentHTML += `<span class="timestamp">${timestamp}${ipPrefixDisplay}</span>`;
+           comments.forEach(comment => {
+               const messageDate = new Date(comment.timestamp);
+               const timeString = messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+               const isAdminClass = comment.is_admin ? ' admin-message' : '';
+               const deleteButtonHTML = isAdminMode ? `<button class="delete-comment-btn" data-comment-id="${comment.id}">❌</button>` : '';
+               const imageHTML = comment.image_url ? `<br><a href="${comment.image_url}" target="_blank"><img src="${comment.image_url}" alt="User image" class="chat-image"></a>` : '';
 
-               if (isAdminMode) {
-                   contentHTML += `<button class="delete-comment-btn" data-id="${comment.id}" style="margin-left: 10px; padding: 2px 5px; font-size: 0.8em; cursor: pointer; background: #ffdddd; border: 1px solid red; color: red; border-radius: 3px;">.</button>`;
-               }
-               messagesHTML += `<div class="chat-message" data-comment-id="${comment.id}">${contentHTML}</div>`;
-           }
+               messagesHTML += `
+                   <div class="chat-message${isAdminClass}" data-comment-id="${comment.id}">
+                       <span class="timestamp">${timeString}</span>
+                       <span class="message-text">${comment.text}</span>
+                       ${imageHTML}
+                       ${deleteButtonHTML}
+                   </div>
+               `;
+           });
        }
 
        // *** Set innerHTML once ***
-       console.log("Setting innerHTML with:", messagesHTML); // <-- Add log before setting innerHTML
+       // console.log("Setting innerHTML with:", messagesHTML);
        chatMessages.innerHTML = messagesHTML;
 
        // *** Add delete listeners AFTER setting innerHTML ***
@@ -829,118 +853,53 @@ document.addEventListener("DOMContentLoaded", function () {
        }
 
        lastComments = comments; // Update the cache
-       // lastCommentTimestamp is already updated above for beep logic
-    }
-
-    // --- Helper to add a single comment to the DOM ---
-    function addCommentToDOM(comment, isNew) {
-        // Avoid adding duplicates if SSE sends a comment already fetched
-        if (lastComments.some(existing => existing.id === comment.id)) {
-            return false; // Indicate comment was not added
-        }
-
-        const messageElement = document.createElement('div');
-        messageElement.classList.add('chat-message');
-        messageElement.dataset.commentId = comment.id; // Store comment ID
-
-        let contentHTML = '';
-        if (comment.text) {
-            contentHTML += `<div>${comment.text}</div>`; // Assumes server sanitizes
-        }
-        if (comment.image_url) {
-            contentHTML += `<img src="${comment.image_url}" alt="Uploaded image" loading="lazy" style="max-width: 100%; max-height: 150px; display: block; margin-top: 5px; border-radius: 4px;" onerror="this.style.display='none'; console.error('Failed to load image:', this.src);">`;
-        }
-
-        const timestamp = new Date(comment.timestamp).toLocaleString();
-        const ipPrefixDisplay = comment.ip_prefix ? ` (IP: ${comment.ip_prefix})` : '';
-        contentHTML += `<span class="timestamp">${timestamp}${ipPrefixDisplay}</span>`;
-
-        if (isAdminMode) {
-            contentHTML += `<button class="delete-comment-btn" data-id="${comment.id}" style="margin-left: 10px; padding: 2px 5px; font-size: 0.8em; cursor: pointer; background: #ffdddd; border: 1px solid red; color: red; border-radius: 3px;">.</button>`;
-        }
-
-        messageElement.innerHTML = contentHTML;
-
-        // Remove "No messages yet" placeholder if present
-        const noMessagesPlaceholder = chatMessages.querySelector('div[style*="text-align: center"]');
-        if (noMessagesPlaceholder) {
-            noMessagesPlaceholder.remove();
-        }
-
-        chatMessages.insertBefore(messageElement, chatMessages.firstChild); // Add to top (due to flex-direction: column-reverse)
-
-        // Add listener to the new delete button if admin
-        if (isAdminMode) {
-            const deleteButton = messageElement.querySelector('.delete-comment-btn');
-            if (deleteButton) {
-                deleteButton.addEventListener('click', handleDeleteComment);
-            }
-        }
-
-        // Update caches and play sound for new messages
-        if (isNew) {
-            lastComments.push(comment); // Add to cache
-            lastCommentTimestamp = comment.timestamp; // Update latest timestamp
-            playBeep(); // Play sound for new comment
-        }
-        return true; // Indicate comment was added
     }
 
     // --- Helper to add delete listeners ---
     function addDeleteButtonListeners() {
         document.querySelectorAll('.delete-comment-btn').forEach(button => {
-            button.removeEventListener('click', handleDeleteComment); // Remove old listener first
-            button.addEventListener('click', handleDeleteComment); // Add new listener
+            // Remove existing listener to prevent duplicates if re-rendering
+            button.removeEventListener('click', handleDeleteComment);
+            // Add the listener
+            button.addEventListener('click', handleDeleteComment);
         });
     }
 
-
     // --- Handle Delete Comment ---
     function handleDeleteComment(event) {
-        const button = event.target;
-        const commentId = button.dataset.id;
+        const commentId = event.target.getAttribute('data-comment-id');
         if (!commentId) return;
 
         if (confirm('Are you sure you want to delete this comment?')) {
-            button.disabled = true; // Disable button during request
-            button.textContent = 'Deleting...';
-
-            fetch(`/api/comments/delete/${commentId}`, {
+            fetch(`/api/comments/${commentId}`, {
                 method: 'DELETE',
-                // Cookies are sent automatically by the browser
             })
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Remove the comment element directly instead of full refresh
-                    const elementToRemove = document.querySelector(`.chat-message[data-comment-id="${commentId}"]`);
-                    if (elementToRemove) {
-                        elementToRemove.remove();
+                    // Remove the comment element from the DOM immediately
+                    const commentElement = event.target.closest('.chat-message');
+                    if (commentElement) {
+                        commentElement.remove();
                     }
-                    // Also remove from the local cache
-                    lastComments = lastComments.filter(c => c.id !== commentId);
-                    // Check if chat is now empty
-                    if (lastComments.length === 0) {
-                         chatMessages.innerHTML = '<div style="text-align: center; padding: 10px; color: var(--link);">No messages yet.</div>';
+                    // Optionally, re-fetch comments if not using SSE to ensure consistency
+                    if (!useSSE) {
+                        fetchComments();
                     }
                 } else {
-                    alert('Failed to delete comment: ' + (data.error || 'Unknown error'));
-                    button.disabled = false; // Re-enable button on failure
-                    button.textContent = 'Delete';
+                    alert('Error deleting comment: ' + (data.error || 'Unknown error'));
                 }
             })
             .catch(error => {
                 console.error('Error deleting comment:', error);
-                alert('An error occurred while deleting the comment.');
-                button.disabled = false; // Re-enable button on error
-                button.textContent = 'Delete';
+                alert('Error deleting comment. Please try again.');
             });
         }
     }
 
     // --- Play Beep ---
     function playBeep() {
-        beepSound.play().catch(e => console.log("Beep failed:", e)); // Play sound, catch errors if blocked
+        beepSound.play().catch(error => console.error("Error playing beep:", error));
     }
 
     // --- Handle Image Upload ---
@@ -972,7 +931,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (data.success && data.url) {
                 imageUrlInput.value = data.url; // Set the URL in the input field
                 // Optionally send the message automatically after upload
-                sendComment(); // <--- Uncommented this line
+                // sendComment(); // <-- Keep this commented or uncomment based on desired UX
             } else {
                 alert('Image upload failed: ' + (data.error || 'Unknown error'));
                 imageUrlInput.value = ''; // Clear field on error
@@ -1017,8 +976,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.success) {
           messageInput.value = ''; // Clear input fields
           imageUrlInput.value = '';
-          // Don't need fetchComments() here anymore, SSE will deliver the new message
-          // fetchComments(); // Refresh comments immediately <-- REMOVED
+          // Fetch comments immediately ONLY if using polling
+          if (!useSSE) {
+              fetchComments();
+          }
+          // If using SSE, the update will arrive via the stream
         } else {
           alert('Error sending comment: ' + (data.error || 'Unknown error'));
         }
@@ -1069,51 +1031,63 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     });
 
-    // --- Initialize SSE Connection ---
+    // --- Initialize SSE Connection (Only if useSSE is true) ---
     function initializeSSE() {
-        if (eventSource) {
-            eventSource.close(); // Close existing connection if any
+        if (!useSSE || eventSource) {
+            // Don't initialize if SSE is disabled or already running
+            return;
         }
-        console.log('Initializing SSE connection...');
+        // Ensure chat is visible before connecting
+        if (chatContainer.style.display === 'none') {
+            console.log("SSE init skipped: Chat hidden.");
+            return;
+        }
+
+        console.log("Initializing SSE connection...");
         eventSource = new EventSource('/api/comments/stream');
 
-        eventSource.onmessage = function(event) {
-            // Generic message handler (might not be used if using named events)
-            console.log("SSE message data:", event.data);
+        eventSource.onopen = function() {
+            console.log("SSE connection established.");
+            loadingIndicator.style.display = 'none'; // Hide loading once connected
         };
 
-        eventSource.addEventListener('new_comment', function(event) {
-            console.log("SSE new_comment event received. Data length:", event.data.length); // Log receipt
+        eventSource.onmessage = function(event) {
+            // console.log("SSE message received:", event.data);
             try {
-                const all_comments = JSON.parse(event.data); // Parse the full list
-                // Call renderComments to handle the update, it includes checks
-                renderComments(all_comments);
-                // No need for timestamp check or addCommentToDOM here, renderComments handles it.
+                const comments = JSON.parse(event.data);
+                renderComments(comments);
             } catch (e) {
-                console.error('Error parsing SSE data (full list expected):', e, "Data received:", event.data);
+                console.error("Error parsing SSE data:", e);
             }
-        });
+        };
 
         eventSource.onerror = function(err) {
             console.error('EventSource failed:', err);
-            eventSource.close();
-            // Optional: Attempt to reconnect after a delay or fall back to polling
-            console.log('SSE connection closed due to error. Will attempt reconnect in 10s.');
-            setTimeout(initializeSSE, 10000); // Try reconnecting after 10 seconds
-        };
-
-        eventSource.onopen = function() {
-            console.log('SSE connection opened.');
-            // Optional: Clear any error messages shown previously
+            loadingIndicator.textContent = 'Connection error. Retrying...';
+            loadingIndicator.style.display = 'block';
+            if (eventSource) eventSource.close(); // Close the connection
+            eventSource = null;
+            // Optional: Implement retry logic with backoff
+            setTimeout(initializeSSE, 5000); // Retry after 5 seconds
         };
     }
 
-    // --- Initial Load & SSE Start ---
-    fetchComments(); // Load initial comments via standard fetch
-    initializeSSE(); // Start the SSE connection
+    // --- Initial Load & Polling/SSE Start ---
+    // Determine initial state based on whether chat starts visible or hidden
+    const chatStartsVisible = chatContainer.style.display !== 'none';
 
-    // Remove the old polling mechanism
-    // setInterval(fetchComments, 15000); // Poll for new comments every 15 seconds <-- REMOVED
+    if (chatStartsVisible) {
+        if (useSSE) {
+            initializeSSE();
+        } else {
+            fetchComments(); // Initial fetch for polling mode
+            console.log(`Starting polling timer. Interval: ${pollingInterval}ms`);
+            pollingTimer = setInterval(fetchComments, pollingInterval);
+        }
+    } else {
+        // If chat starts hidden, SSE/Polling will be started by the toggle button
+        console.log("Chat starts hidden. SSE/Polling will start on toggle.");
+    }
 
   });
 </script>

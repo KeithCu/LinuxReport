@@ -170,6 +170,16 @@ history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pic
 g_c = DiskCacheWrapper(PATH)
 g_cs = DiskCacheWrapper(SPATH) #Shared cache for all instances
 
+# Configuration for Chat Cache
+# Set to True to use the shared cache (g_cs) for chat comments and banned IPs
+# Set to False to use the site-specific cache (g_c)
+USE_SHARED_CACHE_FOR_CHAT = False
+
+# Helper function to get the appropriate cache for chat features
+def get_chat_cache() -> DiskCacheWrapper:
+    """Returns the cache instance to use for chat based on the configuration."""
+    return g_cs if USE_SHARED_CACHE_FOR_CHAT else g_c
+
 # Simple non-blocking lock using global Python/diskcache cache (g_cs)
 class DiskcacheSqliteLock:
     """
@@ -181,10 +191,7 @@ class DiskcacheSqliteLock:
     - Wait with configurable retry strategy
     - Deadlock prevention with configurable timeouts
     - Ownership verification to prevent accidental releases
-    - Self-repair for abandoned locks (with careful ownership verification)
-    
-    While no distributed lock is 100% reliable, this implementation takes steps to
-    minimize race conditions and handle common failure scenarios.
+    - Self-repair for abandoned locks (with ownership verification)
     """
     def __init__(self, lock_name: str, owner_prefix: Optional[str] = None):
         self.cache = g_cs

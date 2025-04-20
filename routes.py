@@ -15,8 +15,7 @@ import ipaddress # Add ipaddress import
 import time # Import time for SSE sleep
 
 # Third-party imports
-# Removed unused send_from_directory
-from flask import g, jsonify, render_template, request, make_response, Response # Add Response for SSE
+from flask import g, jsonify, render_template, request, make_response, Response
 from markupsafe import Markup
 from werkzeug.utils import secure_filename # For secure file uploads
 
@@ -26,7 +25,7 @@ from models import RssInfo
 from shared import (ABOVE_HTML_FILE, ALL_URLS, DEBUG, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, MODE, PATH, format_last_updated)
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cs, site_urls, Mode, MODE, PATH, format_last_updated, get_chat_cache)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -353,7 +352,8 @@ def init_app(flask_app):
 
     @flask_app.route('/api/comments', methods=['GET'])
     def get_comments():
-        comments = g_c.get(COMMENTS_KEY) or []
+        chat_cache = get_chat_cache() # Use helper function
+        comments = chat_cache.get(COMMENTS_KEY) or []
         # Ensure comments have IDs and prefixes (for older comments if schema changed)
         # This is a simple migration, a dedicated script might be better for large datasets
         needs_update = False
@@ -374,44 +374,47 @@ def init_app(flask_app):
 
         # If any comment was updated, save the changes back to cache
         if needs_update:
-            g_c.put(COMMENTS_KEY, comments)
+            chat_cache.put(COMMENTS_KEY, comments) # Use helper function
 
         return jsonify(comments) # Still useful for potential direct checks or initial load fallback
 
     # New SSE Route
     @flask_app.route('/api/comments/stream')
     def stream_comments():
-        def event_stream():
-            last_data_sent = None
-            while True:
-                try:
-                    # Check for new comments by comparing current cache state to last sent state
-                    current_comments = g_c.get(COMMENTS_KEY) or []
-                    current_data = json.dumps(current_comments) # Serialize for comparison
+        return None
+        # def event_stream():
+        #     last_data_sent = None
+        #     chat_cache = get_chat_cache() # Use helper function
+        #     while True:
+        #         try:
+        #             # Check for new comments by comparing current cache state to last sent state
+        #             current_comments = chat_cache.get(COMMENTS_KEY) or [] # Use helper function
+        #             current_data = json.dumps(current_comments) # Serialize for comparison
 
-                    if current_data != last_data_sent:
-                        # print(f"SSE: Sending update. {len(current_comments)} comments.") # DEBUG
-                        yield f"event: new_comment\ndata: {current_data}\n\n" # Send named event
-                        last_data_sent = current_data
+        #             if current_data != last_data_sent:
+        #                 # print(f"SSE: Sending update. {len(current_comments)} comments.") # DEBUG
+        #                 yield f"event: new_comment\ndata: {current_data}\n\n" # Send named event
+        #                 last_data_sent = current_data
 
-                    # Wait before checking again to avoid busy-looping
-                    time.sleep(2) # Check every 2 seconds
-                except GeneratorExit:
-                    # Client disconnected
-                    # print("SSE: Client disconnected.") # DEBUG
-                    break
-                except Exception as e: # TODO: Consider catching more specific exceptions
-                    # Log error and potentially break or continue
-                    print(f"SSE Error: {e}") # Log the error
-                    # Optionally break or add more robust error handling
-                    time.sleep(5) # Wait longer after an error
+        #             # Wait before checking again to avoid busy-looping
+        #             time.sleep(2) # Check every 2 seconds
+        #         except GeneratorExit:
+        #             # Client disconnected
+        #             # print("SSE: Client disconnected.") # DEBUG
+        #             break
+        #         except Exception as e: # TODO: Consider catching more specific exceptions
+        #             # Log error and potentially break or continue
+        #             print(f"SSE Error: {e}") # Log the error
+        #             # Optionally break or add more robust error handling
+        #             time.sleep(5) # Wait longer after an error
 
-        return Response(event_stream(), mimetype='text/event-stream')
+        # return Response(event_stream(), mimetype='text/event-stream')
 
     @flask_app.route('/api/comments', methods=['POST'])
     def post_comment():
         ip = request.remote_addr
-        banned_ips = g_c.get(BANNED_IPS_KEY) or set()
+        chat_cache = get_chat_cache() # Use helper function
+        banned_ips = chat_cache.get(BANNED_IPS_KEY) or set() # Use helper function
 
         if ip in banned_ips:
             return jsonify({"error": "Banned"}), 403
@@ -467,11 +470,11 @@ def init_app(flask_app):
         }
         print(f"Final valid_image_url being saved: '{valid_image_url}'") # DEBUG
 
-        comments = g_c.get(COMMENTS_KEY) or []
+        comments = chat_cache.get(COMMENTS_KEY) or [] # Use helper function
         comments.append(comment)
         # Keep only the latest MAX_COMMENTS
         comments = comments[-MAX_COMMENTS:]
-        g_c.put(COMMENTS_KEY, comments) # Store indefinitely or add timeout
+        chat_cache.put(COMMENTS_KEY, comments) # Store indefinitely or add timeout # Use helper function
 
         # No need to return the comment here, SSE will push the update
         return jsonify({"success": True}), 201 # Just confirm success
@@ -487,7 +490,8 @@ def init_app(flask_app):
             return jsonify({"error": "Unauthorized"}), 403
         print("Admin check PASSED.") # DEBUG
 
-        comments = g_c.get(COMMENTS_KEY) or []
+        chat_cache = get_chat_cache() # Use helper function
+        comments = chat_cache.get(COMMENTS_KEY) or [] # Use helper function
         initial_length = len(comments)
         print(f"Initial comment count: {initial_length}") # DEBUG
         # print(f"Current comment IDs: {[c.get('id') for c in comments]}") # DEBUG - Optional: uncomment if needed
@@ -500,10 +504,10 @@ def init_app(flask_app):
         if final_length < initial_length:
             print(f"Comment {comment_id} found. Attempting to update cache...") # DEBUG
             try:
-                g_c.put(COMMENTS_KEY, comments_after_delete)
+                chat_cache.put(COMMENTS_KEY, comments_after_delete) # Use helper function
                 print(f"Cache updated successfully for key {COMMENTS_KEY}.") # DEBUG
                 # Optional: Verify immediately after putting
-                # verify_comments = g_c.get(COMMENTS_KEY)
+                # verify_comments = chat_cache.get(COMMENTS_KEY)
                 # print(f"Verification: Cache now has {len(verify_comments)} comments.") # DEBUG
                 return jsonify({"success": True}), 200
             except Exception as e:
@@ -516,7 +520,8 @@ def init_app(flask_app):
     @flask_app.route('/api/upload_image', methods=['POST'])
     def upload_image():
         ip = request.remote_addr
-        banned_ips = g_c.get(BANNED_IPS_KEY) or set()
+        chat_cache = get_chat_cache() # Use helper function
+        banned_ips = chat_cache.get(BANNED_IPS_KEY) or set() # Use helper function
 
         if ip in banned_ips:
             return jsonify({"error": "Banned"}), 403
