@@ -1060,6 +1060,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 console.error("Error parsing SSE data:", e);
             }
         };
+        // Add listener for named SSE events matching server `event: new_comment`
+        eventSource.addEventListener('new_comment', function(event) {
+            try {
+                const comments = JSON.parse(event.data);
+                renderComments(comments);
+            } catch (e) {
+                console.error("Error parsing SSE new_comment:", e);
+            }
+        });
 
         eventSource.onerror = function(err) {
             console.error('EventSource failed:', err);
