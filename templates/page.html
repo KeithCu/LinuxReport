@@ -88,10 +88,12 @@
       .linkclass a {
         color: var(--text) !important;
         text-decoration: none !important;
+        font-family: inherit !important;
       }
       .linkclass a:hover, .linkclass a:visited, .linkclass a:active {
         color: var(--text) !important;
         text-decoration: none !important;
+        font-family: inherit !important;
       }
 
       img {
@@ -470,20 +472,43 @@
       }
       // Change font via cookie and update dynamically
       function setFont(font) {
+        // Set the cookie
         document.cookie = 'FontFamily=' + font + ';path=/';
-        // Remove all font classes
-        document.body.classList.remove('font-system', 'font-monospace', 'font-inter', 
-          'font-roboto', 'font-open-sans', 'font-source-sans', 
-          'font-noto-sans', 'font-lato', 'font-raleway');
+        
+        // Remove all existing font classes
+        document.body.classList.remove(
+          'font-system', 'font-monospace', 'font-inter',
+          'font-roboto', 'font-open-sans', 'font-source-sans',
+          'font-noto-sans', 'font-lato', 'font-raleway',
+          'sans-serif'
+        );
+        
         // Add the new font class
         document.body.classList.add('font-' + font);
+        
         // Update the dropdown to match
         var fontSelect = document.getElementById('font-select');
         if (fontSelect) fontSelect.value = font;
+        
         // Force a reflow to ensure the font change takes effect
         document.body.style.display = 'none';
         document.body.offsetHeight; // Force reflow
         document.body.style.display = '';
+        
+        // Also update the sans-serif setting based on the selected font
+        if (font === 'system' || font === 'inter' || font === 'roboto' || 
+            font === 'open-sans' || font === 'source-sans' || 
+            font === 'noto-sans' || font === 'lato' || font === 'raleway') {
+          document.body.classList.add('sans-serif');
+        } else {
+          document.body.classList.remove('sans-serif');
+        }
+
+        // Force font change on all elements
+        const allElements = document.querySelectorAll('*');
+        allElements.forEach(element => {
+          element.style.fontFamily = 'inherit';
+        });
       }
     </script>
   </head>
