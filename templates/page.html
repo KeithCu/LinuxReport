@@ -7,22 +7,54 @@
     <meta name="description" content = "{{description}}">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{{title}}</title>
+    <!-- Load Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=Open+Sans:wght@400;600&family=Source+Sans+Pro:wght@400;600&family=Ubuntu:wght@400;500&family=Noto+Sans:wght@400;500&family=Lato:wght@400;700&family=Raleway:wght@400;500&display=swap" rel="stylesheet">
     <style>
+      /* Font definitions */
+      body.font-system { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; }
+      body.font-monospace { font-family: 'Courier New', Courier, monospace; }
+      body.font-inter { font-family: 'Inter', sans-serif; }
+      body.font-roboto { font-family: 'Roboto', sans-serif; }
+      body.font-open-sans { font-family: 'Open Sans', sans-serif; }
+      body.font-source-sans { font-family: 'Source Sans Pro', sans-serif; }
+      body.font-noto-sans { font-family: 'Noto Sans', sans-serif; }
+      body.font-lato { font-family: 'Lato', sans-serif; }
+      body.font-raleway { font-family: 'Raleway', sans-serif; }
+
+      /* Force font everywhere when enabled */
+      body.font-system *, body.font-monospace *, body.font-inter *, 
+      body.font-roboto *, body.font-open-sans *, body.font-source-sans *, 
+      body.font-noto-sans *, body.font-lato *, body.font-raleway * {
+        font-family: inherit !important;
+      }
+
       /* Theme definitions */
       body.theme-light { --bg:#ffffff; --text:#000000; --link:#1a0dab; --btn-bg:#f6f6f6; --btn-border:#092236; --btn-text:#3b5971; --btn-hover-bg:#0078D7; --btn-hover-text:#ffffff; }
       body.theme-silver  { --bg:#C0C0C0; --text:#000000; --link:#1a0dab; --btn-bg:#EFEFEF; --btn-border:#888888; --btn-text:#000000; --btn-hover-bg:#C0C0C0; --btn-hover-text:#FFFFFF; }
-      body.theme-dark { --bg:#1e1e1e; --text:#f0f0f0; --link:#8ab4f8; --btn-bg:#333333; --btn-border:#ffffff; --btn-text:#ffffff; --btn-hover-bg:#505050; --btn-hover-text:#ffffff; }
+      body.theme-dark { --bg:#1e1e1e; --text:#d4d4d4; --link:#8ab4f8; --btn-bg:#333333; --btn-border:#ffffff; --btn-text:#d4d4d4; --btn-hover-bg:#505050; --btn-hover-text:#ffffff; }
       body.theme-solarized { --bg:#fdf6e3; --text:#657b83; --link:#268bd2; --btn-bg:#eee8d5; --btn-border:#586e75; --btn-text:#586e75; --btn-hover-bg:#b58900; --btn-hover-text:#fdf6e3; }
 
       /* New custom themes */
-      body.theme-futuristic { --bg:#0f0f0f; --text:rgb(49, 165, 165); --link:#0f0; --btn-bg:#111; --btn-border:#0ff; --btn-text:#0ff; --btn-hover-bg:#0f0; --btn-hover-text:#000; }
+      body.theme-futuristic { --bg:#0f0f0f; --text:#7fbfbf; --link:#0f0; --btn-bg:#111; --btn-border:#0ff; --btn-text:#7fbfbf; --btn-hover-bg:#0f0; --btn-hover-text:#000; }
       body.theme-steampunk { --bg:#2b1b0e; --text:#d5c1a1; --link:#a67c52; --btn-bg:#3e2c1c; --btn-border:#a67c52; --btn-text:#d5c1a1; --btn-hover-bg:#a67c52; --btn-hover-text:#2b1b0e; }
-      body.theme-cyberpunk { --bg:#1e001f; --text:#a027a0; --link:#00ffff; --btn-bg:#330033; --btn-border:#ff00ff; --btn-text:#ff00ff; --btn-hover-bg:#00ffff; --btn-hover-text:#1e001f; }
-
-      /* Additional custom themes */
+      body.theme-cyberpunk { --bg:#1e001f; --text:#c080c0; --link:#00ffff; --btn-bg:#330033; --btn-border:#ff00ff; --btn-text:#c080c0; --btn-hover-bg:#00ffff; --btn-hover-text:#1e001f; }
       body.theme-pastelle{ --bg:#FFEFD5; --text:#4B3621; --link:#FFB6C1; --btn-bg:#FFDAB9; --btn-border:#DEB887; --btn-text:#4B3621; --btn-hover-bg:#FFA07A; --btn-hover-text:#FFFFFF; }
       body.theme-sepia   { --bg:#704214; --text:#FFF8E7; --link:#B8860B; --btn-bg:#C19A6B; --btn-border:#8B4513; --btn-text:#FFF8E7; --btn-hover-bg:#8B4513; --btn-hover-text:#FFF8E7; }
       body.theme-forest  { --bg:#2E4A2E; --text:#E0EBD8; --link:#A3B18A; --btn-bg:#4A6F4A; --btn-border:#A3B18A; --btn-text:#E0EBD8; --btn-hover-bg:#A3B18A; --btn-hover-text:#2E4A2E; }
+
+      /* Additional new themes */
+      body.theme-ocean { --bg:#0a192f; --text:#cbd5e1; --link:#64ffda; --btn-bg:#112240; --btn-border:#64ffda; --btn-text:#cbd5e1; --btn-hover-bg:#1d4ed8; --btn-hover-text:#ffffff; }
+      body.theme-neon { --bg:#000000; --text:#90ee90; --link:#ff69b4; --btn-bg:#1a1a1a; --btn-border:#00ffff; --btn-text:#90ee90; --btn-hover-bg:#ff69b4; --btn-hover-text:#000000; }
+      body.theme-retro { --bg:#000080; --text:#90ee90; --link:#ffff00; --btn-bg:#0000cd; --btn-border:#90ee90; --btn-text:#90ee90; --btn-hover-bg:#ff69b4; --btn-hover-text:#000000; }
+      body.theme-midnight { --bg:#0f172a; --text:#cbd5e1; --link:#818cf8; --btn-bg:#1e293b; --btn-border:#818cf8; --btn-text:#cbd5e1; --btn-hover-bg:#4f46e5; --btn-hover-text:#ffffff; }
+      body.theme-autumn { --bg:#2c1810; --text:#f5deb3; --link:#d2691e; --btn-bg:#3d2316; --btn-border:#d2691e; --btn-text:#f5deb3; --btn-hover-bg:#cd853f; --btn-hover-text:#2c1810; }
+      body.theme-nord { --bg:#2e3440; --text:#d8dee9; --link:#88c0d0; --btn-bg:#3b4252; --btn-border:#88c0d0; --btn-text:#d8dee9; --btn-hover-bg:#5e81ac; --btn-hover-text:#2e3440; }
+      body.theme-dracula { --bg:#282a36; --text:#e2e8f0; --link:#ff79c6; --btn-bg:#44475a; --btn-border:#ff79c6; --btn-text:#e2e8f0; --btn-hover-bg:#bd93f9; --btn-hover-text:#282a36; }
+      body.theme-monokai { --bg:#272822; --text:#e2e8f0; --link:#a6e22e; --btn-bg:#3e3d32; --btn-border:#a6e22e; --btn-text:#e2e8f0; --btn-hover-bg:#f92672; --btn-hover-text:#272822; }
+      body.theme-terminal { --bg:#000000; --text:#90ee90; --link:#90ee90; --btn-bg:#001100; --btn-border:#90ee90; --btn-text:#90ee90; --btn-hover-bg:#003300; --btn-hover-text:#90ee90; }
+      body.theme-paper { --bg:#f5f5f5; --text:#333333; --link:#1a0dab; --btn-bg:#ffffff; --btn-border:#cccccc; --btn-text:#333333; --btn-hover-bg:#e6e6e6; --btn-hover-text:#333333; }
 
       /* Client-side dynamic sans-serif font */
       body.sans-serif { font-family: sans-serif; }
@@ -394,7 +426,7 @@
       }
     
   </style>
-  <!-- Apply theme based on 'Theme' cookie and set dropdown selection -->
+  <!-- Apply theme and font based on cookies -->
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       // Read theme cookie or default
@@ -405,6 +437,16 @@
       // Set dropdown to current theme
       var select = document.getElementById('theme-select');
       if (select) select.value = theme;
+
+      // Read font cookie or default
+      var fontMatch = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
+      var font = fontMatch ? fontMatch[1] : 'system';
+      // Apply font class to body
+      document.body.classList.add('font-' + font);
+      // Set dropdown to current font
+      var fontSelect = document.getElementById('font-select');
+      if (fontSelect) fontSelect.value = font;
+
       // Apply no-underlines setting (default ON)
       var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
       if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
@@ -426,12 +468,17 @@
         document.cookie = 'Theme=' + theme + ';path=/';
         window.location.reload();
       }
+      // Change font via cookie and reload
+      function setFont(font) {
+        document.cookie = 'FontFamily=' + font + ';path=/';
+        window.location.reload();
+      }
     </script>
   </head>
   <body>
 
-<div style="background: var(--btn-bg); color: var(--text); border: 2px solid var(--btn-border); border-radius: 8px; margin: 10px auto 0 auto; max-width: 700px; padding: 8px; font-size: .5em; text-align: center;">
-  <strong>Message from Keith:</strong> Sorry! I fixed some bugs recently, it should be smooth sailing now.
+<div style="background: var(--btn-bg); color: var(--text); border: 2px solid var(--btn-border); border-radius: 8px; margin: 10px auto 0 auto; max-width: 700px; padding: 8px; font-size: .7em; text-align: center;">
+  <strong>Message from Keith:</strong> Fixed some bugs caused by adding new features. Should be good now! Enjoy being well-informed...
 </div>
 
 <center>
@@ -464,9 +511,29 @@
         <option value="pastelle">Pastelle</option>
         <option value="sepia">Sepia</option>
         <option value="forest">Forest</option>
+        <option value="ocean">Ocean</option>
+        <option value="neon">Neon</option>
+        <option value="retro">Retro</option>
+        <option value="midnight">Midnight</option>
+        <option value="autumn">Autumn</option>
+        <option value="nord">Nord</option>
+        <option value="dracula">Dracula</option>
+        <option value="monokai">Monokai</option>
+        <option value="terminal">Terminal</option>
+        <option value="paper">Paper</option>
       </select>
-      <a href="/old_headlines" id="old-headlines-link" style="margin-left: 20px; padding: 5px; text-decoration: underline; color: var(--link); font-size: medium;">Old Headlines</a>
-      <button id="chat-toggle-btn">Chat</button> <!-- Added Chat Toggle Button -->
+      <select id="font-select" onchange="setFont(this.value)" style="margin-left:20px; padding:5px;">
+        <option value="system">System Default</option>
+        <option value="monospace">Monospace</option>
+        <option value="inter">Inter</option>
+        <option value="roboto">Roboto</option>
+        <option value="open-sans">Open Sans</option>
+        <option value="source-sans">Source Sans</option>
+        <option value="noto-sans">Noto Sans</option>
+        <option value="lato">Lato</option>
+        <option value="raleway">Raleway</option>
+      </select>
+      <button id="chat-toggle-btn">Chat</button>
       <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
     </div>
   </center>
@@ -481,6 +548,15 @@
       <div class="column">{{ columns[1] }}</div>
       <div class="column">{{ columns[2] }}</div>
       {%- endif %}
+    </div>
+
+    <!-- Enhanced Old Headlines Section -->
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="/old_headlines" id="old-headlines-link" style="display: inline-block; padding: 15px 30px; font-size: 1.2em; text-decoration: none; color: var(--text); background: var(--btn-bg); border: 2px solid var(--btn-border); border-radius: 8px; transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+        <span style="font-weight: bold;">📰 Old Headlines Archive</span>
+        <br>
+        <small style="opacity: 0.8;">View past headlines and stories</small>
+      </a>
     </div>
 
     <!-- Chat Window HTML -->

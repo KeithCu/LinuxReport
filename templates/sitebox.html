@@ -18,12 +18,10 @@
     {% endif %}
     <div class="title-container">
       {%- set tooltip = (e.html_content or e.summary)|striptags|truncate(500)|trim %}
-      <code>
-        <a target="_blank" href="{{ e.link }}"
-           title="{{ tooltip if tooltip.split()|length >= 3 else '' }}">
-          {{ e.title | striptags }}
-        </a>
-      </code>
+      <a target="_blank" href="{{ e.link }}"
+         title="{{ tooltip if tooltip.split()|length >= 3 else '' }}">
+        {{ e.title | striptags }}
+      </a>
     </div>
   </div>
   {%- endfor %}

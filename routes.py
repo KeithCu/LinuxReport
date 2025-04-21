@@ -204,6 +204,8 @@ def init_app(flask_app):
             sans_serif_cookie = request.cookies.get('SansSerif', "1")
             form.sans_serif.data = sans_serif_cookie == "1"
 
+            form.font_family.data = request.cookies.get('FontFamily', 'system')
+
             form.admin_mode.data = request.cookies.get('isAdmin') == '1'
 
             page_order = request.cookies.get('RssUrls')
@@ -279,6 +281,7 @@ def init_app(flask_app):
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_MINUTES)
             resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_MINUTES)
+            resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_MINUTES)
 
             if form.admin_mode.data:
                 resp.set_cookie('isAdmin', '1', max_age=EXPIRE_MINUTES)
@@ -366,18 +369,15 @@ def init_app(flask_app):
                 try:
                     current_comments = chat_cache.get(COMMENTS_KEY) or []
                     current_data = json.dumps(current_comments)
-
                     if current_data != last_data_sent:
                         yield f"event: new_comment\ndata: {current_data}\n\n"
                         last_data_sent = current_data
-
                     time.sleep(2)
                 except GeneratorExit:
                     break
                 except Exception as e:
                     print(f"SSE Error: {e}")
                     break
-
         return Response(event_stream(), mimetype='text/event-stream')
 
     @flask_app.route('/api/comments', methods=['POST'])

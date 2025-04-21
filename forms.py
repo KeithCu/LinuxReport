@@ -34,6 +34,17 @@ class ConfigForm(Form):
         ('sepia','Sepia'),
         ('forest','Forest'),
     ])
+    font_family = SelectField(label="Font", choices=[
+        ('system', 'System Default (Sans-serif)'),
+        ('monospace', 'Monospace (Drudge-style)'),
+        ('inter', 'Inter (Modern)'),
+        ('roboto', 'Roboto (Clean)'),
+        ('open-sans', 'Open Sans (Readable)'),
+        ('source-sans', 'Source Sans Pro (Professional)'),
+        ('noto-sans', 'Noto Sans (Universal)'),
+        ('lato', 'Lato (Elegant)'),
+        ('raleway', 'Raleway (Stylish)'),
+    ])
     no_underlines = BooleanField(label="No Underlines")
     sans_serif = BooleanField(label="Sans Serif Font")
     admin_mode = BooleanField(label="Enable Admin Mode (allows deleting chat messages)", default=False) # Add admin mode field
