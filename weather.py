@@ -5,6 +5,7 @@ Provides functions to fetch and cache weather data, including a fake API mode fo
 """
 
 import os
+import math
 import time
 from collections import defaultdict
 # Standard library imports
@@ -19,10 +20,19 @@ import requests
 # Local imports
 from shared import DEBUG, g_cs as g_c, DiskcacheSqliteLock
 
-# --- Configurable cache bucketing ---
-WEATHER_BUCKET_PRECISION = 1  # Decimal places for lat/lon rounding (lower = larger area per bucket)
+# --- Arbitrary bucket resolution (miles-based) ---
+WEATHER_BUCKET_SIZE_MILES = 10  # default bucket diameter in miles (good balance for weather data)
+_WEATHER_BUCKET_SIZE_DEG = WEATHER_BUCKET_SIZE_MILES / 69.0  # convert miles to degrees (~1° ≈ 69 miles)
 
+def _bucket_coord(val, bucket_size_deg=_WEATHER_BUCKET_SIZE_DEG):
+    """Buckets a coordinate into intervals of bucket_size_deg degrees."""
+    return math.floor(float(val) / bucket_size_deg) * bucket_size_deg
 
+def _bucket_key(lat, lon):
+    """Generates a cache key based on bucketed lat/lon coordinates."""
+    lat_b = _bucket_coord(lat)
+    lon_b = _bucket_coord(lon)
+    return f"{lat_b:.6f},{lon_b:.6f}"
 
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 if DEBUG:
@@ -33,13 +43,6 @@ else:
 # Add default coordinates for weather (Detroit, MI)
 DEFAULT_WEATHER_LAT = "42.3297"
 DEFAULT_WEATHER_LON = "83.0425"
-
-# --- Bucketing helpers ---
-def _round_coord(val, precision=WEATHER_BUCKET_PRECISION):
-    return round(float(val), int(precision))
-
-def _bucket_key(lat, lon, precision=WEATHER_BUCKET_PRECISION):
-    return f"{_round_coord(lat, precision):.{precision}f},{_round_coord(lon, precision):.{precision}f}"
 
 # --- GeoIP ---
 def _get_geoip_db_path():
