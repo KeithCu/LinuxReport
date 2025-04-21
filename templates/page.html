@@ -663,7 +663,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const chatInputArea = document.getElementById('chat-input-area'); // Get input area for drag/drop
 
     // --- Configuration ---
-    const useSSE = true; // <<< SET TO true TO ENABLE SSE, false FOR POLLING >>>
+    const useSSE = false; // <<< SET TO true TO ENABLE SSE, false FOR POLLING >>>
     const pollingInterval = 15000; // Poll every 15 seconds if SSE is disabled
     // ---------------------
 
@@ -718,11 +718,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // --- Close Button ---
     closeButton.addEventListener('click', () => {
       chatContainer.style.display = 'none'; // Hide the chat window
-      if (useSSE && eventSource) {
-          console.log("Closing SSE connection.");
-          eventSource.close(); // Close SSE connection when chat is hidden
-          eventSource = null;
-      }
+      if (useSSE) closeSSE();
       if (!useSSE && pollingTimer) {
           console.log("Stopping polling timer.");
           clearInterval(pollingTimer);
@@ -751,11 +747,7 @@ document.addEventListener("DOMContentLoaded", function () {
          }
       } else {
           // If closing the chat:
-          if (useSSE && eventSource) {
-              console.log("Closing SSE connection via toggle.");
-              eventSource.close();
-              eventSource = null;
-          }
+          if (useSSE) closeSSE();
           if (!useSSE && pollingTimer) {
               console.log("Stopping polling timer via toggle.");
               clearInterval(pollingTimer);
@@ -1032,35 +1024,64 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     // --- Initialize SSE Connection (Only if useSSE is true) ---
+    let sseReconnectTimer = null;
+    const SSE_MAX_LIFETIME = 15000; // 15 seconds
+    const SSE_RECONNECT_DELAY = 1000; // 1 second
+    let sseLastActivity = null;
+    let enableSSEReconnect = false; // Set to true to enable periodic disconnect/reconnect
+
+    function closeSSE() {
+        if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+        }
+        if (sseReconnectTimer) {
+            clearTimeout(sseReconnectTimer);
+            sseReconnectTimer = null;
+        }
+    }
+
+    function scheduleSSEReconnect() {
+        if (!enableSSEReconnect) return;
+        if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
+        sseReconnectTimer = setTimeout(() => {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            setTimeout(() => {
+                if (chatContainer.style.display !== 'none') {
+                    initializeSSE();
+                }
+            }, SSE_RECONNECT_DELAY);
+        }, SSE_MAX_LIFETIME);
+    }
+
     function initializeSSE() {
         if (!useSSE || eventSource) {
-            // Don't initialize if SSE is disabled or already running
             return;
         }
-        // Ensure chat is visible before connecting
         if (chatContainer.style.display === 'none') {
-            console.log("SSE init skipped: Chat hidden.");
             return;
         }
-
-        console.log("Initializing SSE connection...");
         eventSource = new EventSource('/api/comments/stream');
-
+        sseLastActivity = Date.now();
+        scheduleSSEReconnect();
         eventSource.onopen = function() {
-            console.log("SSE connection established.");
-            loadingIndicator.style.display = 'none'; // Hide loading once connected
+            loadingIndicator.style.display = 'none';
+            sseLastActivity = Date.now();
+            scheduleSSEReconnect();
         };
-
         eventSource.onmessage = function(event) {
-            // console.log("SSE message received:", event.data);
             try {
                 const comments = JSON.parse(event.data);
                 renderComments(comments);
             } catch (e) {
                 console.error("Error parsing SSE data:", e);
             }
+            sseLastActivity = Date.now();
+            scheduleSSEReconnect();
         };
-        // Add listener for named SSE events matching server `event: new_comment`
         eventSource.addEventListener('new_comment', function(event) {
             try {
                 const comments = JSON.parse(event.data);
@@ -1068,18 +1089,54 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (e) {
                 console.error("Error parsing SSE new_comment:", e);
             }
+            sseLastActivity = Date.now();
+            scheduleSSEReconnect();
         });
-
         eventSource.onerror = function(err) {
-            console.error('EventSource failed:', err);
             loadingIndicator.textContent = 'Connection error. Retrying...';
             loadingIndicator.style.display = 'block';
-            if (eventSource) eventSource.close(); // Close the connection
+            if (eventSource) eventSource.close();
             eventSource = null;
-            // Optional: Implement retry logic with backoff
-            setTimeout(initializeSSE, 5000); // Retry after 5 seconds
+            if (sseReconnectTimer) clearTimeout(sseReconnectTimer);
+            setTimeout(() => {
+                if (chatContainer.style.display !== 'none') {
+                    initializeSSE();
+                }
+            }, SSE_RECONNECT_DELAY);
         };
     }
+
+    // Update close/toggle logic to use closeSSE
+    closeButton.addEventListener('click', () => {
+      chatContainer.style.display = 'none';
+      if (useSSE) closeSSE();
+      if (!useSSE && pollingTimer) {
+          clearInterval(pollingTimer);
+          pollingTimer = null;
+      }
+    });
+    chatToggleButton.addEventListener('click', () => {
+      const isHidden = chatContainer.style.display === 'none' || chatContainer.style.display === '';
+      chatContainer.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden) {
+         if (useSSE) {
+             initializeSSE();
+         } else {
+             if (lastComments.length === 0 && loadingIndicator.style.display !== 'none') {
+                 fetchComments();
+             }
+             if (!pollingTimer) {
+                 pollingTimer = setInterval(fetchComments, pollingInterval);
+             }
+         }
+      } else {
+          if (useSSE) closeSSE();
+          if (!useSSE && pollingTimer) {
+              clearInterval(pollingTimer);
+              pollingTimer = null;
+          }
+      }
+    });
 
     // --- Initial Load & Polling/SSE Start ---
     // Determine initial state based on whether chat starts visible or hidden
