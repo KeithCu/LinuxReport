@@ -1107,21 +1107,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // --- Initial Load & Polling/SSE Start ---
-    // Determine initial state based on whether chat starts visible or hidden
-    const chatStartsVisible = chatContainer.style.display !== 'none';
-
-    if (chatStartsVisible) {
-        if (useSSE) {
-            initializeSSE();
-        } else {
-            fetchComments(); // Initial fetch for polling mode
-            console.log(`Starting polling timer. Interval: ${pollingInterval}ms`);
-            pollingTimer = setInterval(fetchComments, pollingInterval);
-        }
-    } else {
-        // If chat starts hidden, SSE/Polling will be started by the toggle button
-        console.log("Chat starts hidden. SSE/Polling will start on toggle.");
-    }
+    // Do NOT start polling or SSE until chat is made visible by the user.
+    // (No polling or fetching on page load)
+    // If chat starts hidden, SSE/Polling will be started by the toggle button.
+    console.log("Chat will not poll or fetch until made visible by user.");
 
   });
 </script>
