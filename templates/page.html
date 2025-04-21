@@ -435,10 +435,13 @@
 </div>
 
 <center>
-  <div style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small;">
-    <center>{{ weather_html }}</center>
+  <div style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small; position: relative;">
+    <a href="https://openweathermap.org" target="_blank" style="text-decoration: none; color: inherit;">
+      <center>{{ weather_html }}</center>
+      <div style="position: absolute; bottom: 0; right: 0; font-size: 8px; color: var(--link);">Data by OpenWeather</div>
+    </a>
   </div>
-  </center>
+</center>
   
   <center>
     <div style="border: 2px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: large;">
