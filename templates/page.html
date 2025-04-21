@@ -1106,38 +1106,6 @@ document.addEventListener("DOMContentLoaded", function () {
         };
     }
 
-    // Update close/toggle logic to use closeSSE
-    closeButton.addEventListener('click', () => {
-      chatContainer.style.display = 'none';
-      if (useSSE) closeSSE();
-      if (!useSSE && pollingTimer) {
-          clearInterval(pollingTimer);
-          pollingTimer = null;
-      }
-    });
-    chatToggleButton.addEventListener('click', () => {
-      const isHidden = chatContainer.style.display === 'none' || chatContainer.style.display === '';
-      chatContainer.style.display = isHidden ? 'flex' : 'none';
-      if (isHidden) {
-         if (useSSE) {
-             initializeSSE();
-         } else {
-             if (lastComments.length === 0 && loadingIndicator.style.display !== 'none') {
-                 fetchComments();
-             }
-             if (!pollingTimer) {
-                 pollingTimer = setInterval(fetchComments, pollingInterval);
-             }
-         }
-      } else {
-          if (useSSE) closeSSE();
-          if (!useSSE && pollingTimer) {
-              clearInterval(pollingTimer);
-              pollingTimer = null;
-          }
-      }
-    });
-
     // --- Initial Load & Polling/SSE Start ---
     // Determine initial state based on whether chat starts visible or hidden
     const chatStartsVisible = chatContainer.style.display !== 'none';
