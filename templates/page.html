@@ -51,7 +51,6 @@
       body.theme-midnight { --bg:#0f172a; --text:#cbd5e1; --link:#818cf8; --btn-bg:#1e293b; --btn-border:#818cf8; --btn-text:#cbd5e1; --btn-hover-bg:#4f46e5; --btn-hover-text:#ffffff; }
       body.theme-autumn { --bg:#2c1810; --text:#f5deb3; --link:#d2691e; --btn-bg:#3d2316; --btn-border:#d2691e; --btn-text:#f5deb3; --btn-hover-bg:#cd853f; --btn-hover-text:#2c1810; }
       body.theme-nord { --bg:#2e3440; --text:#d8dee9; --link:#88c0d0; --btn-bg:#3b4252; --btn-border:#88c0d0; --btn-text:#d8dee9; --btn-hover-bg:#5e81ac; --btn-hover-text:#2e3440; }
-      body.theme-dracula { --bg:#282a36; --text:#e2e8f0; --link:#ff79c6; --btn-bg:#44475a; --btn-border:#ff79c6; --btn-text:#e2e8f0; --btn-hover-bg:#bd93f9; --btn-hover-text:#282a36; }
       body.theme-monokai { --bg:#272822; --text:#e2e8f0; --link:#a6e22e; --btn-bg:#3e3d32; --btn-border:#a6e22e; --btn-text:#e2e8f0; --btn-hover-bg:#f92672; --btn-hover-text:#272822; }
       body.theme-terminal { --bg:#000000; --text:#90ee90; --link:#90ee90; --btn-bg:#001100; --btn-border:#90ee90; --btn-text:#90ee90; --btn-hover-bg:#003300; --btn-hover-text:#90ee90; }
       body.theme-paper { --bg:#f5f5f5; --text:#333333; --link:#1a0dab; --btn-bg:#ffffff; --btn-border:#cccccc; --btn-text:#333333; --btn-hover-bg:#e6e6e6; --btn-hover-text:#333333; }
@@ -113,8 +112,7 @@
         text-decoration: none !important;
       }
 
-      {%- if not g.is_mobile %}
-      /* Create three equal columns that floats next to each other */
+      /* {%- if not g.is_mobile %} */
       .column {
         float: left;
         width: 33.33%;
@@ -142,8 +140,7 @@
       }
       {%- endif %}
 
-      /* Override nav links for mobile: larger tap targets, spacing, block display */
-      {%- if g.is_mobile %}
+      /* {%- if g.is_mobile %} */
       .nav-links-mobile a {
         display: block;
         font-size: 1.3em;
@@ -160,7 +157,7 @@
         background: var(--btn-hover-bg);
         color: var(--btn-hover-text) !important;
       }
-      {%- endif %}
+      /* {%- endif %} */
 
       .pagination-controls {
         display: flex;
@@ -426,6 +423,34 @@
         color: var(--btn-hover-text) !important; /* Important to override potential link styles */
         box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
       }
+
+      /* Theme preview in dropdown */
+      #theme-select option[value="light"] { background-color: #ffffff; color: #000000; }
+      #theme-select option[value="silver"] { background-color: #C0C0C0; color: #000000; }
+      #theme-select option[value="paper"] { background-color: #f5f5f5; color: #333333; }
+      #theme-select option[value="terminal"] { background-color: #000000; color: #90ee90; }
+      #theme-select option[value="neon"] { background-color: #000000; color: #90ee90; }
+      #theme-select option[value="retro"] { background-color: #000080; color: #90ee90; }
+      #theme-select option[value="dark"] { background-color: #1e1e1e; color: #d4d4d4; }
+      #theme-select option[value="monokai"] { background-color: #272822; color: #e2e8f0; }
+      #theme-select option[value="futuristic"] { background-color: #0f0f0f; color: #7fbfbf; }
+      #theme-select option[value="cyberpunk"] { background-color: #1e001f; color: #c080c0; }
+      #theme-select option[value="midnight"] { background-color: #0f172a; color: #cbd5e1; }
+      #theme-select option[value="ocean"] { background-color: #0a192f; color: #cbd5e1; }
+      #theme-select option[value="nord"] { background-color: #2e3440; color: #d8dee9; }
+      #theme-select option[value="forest"] { background-color: #2E4A2E; color: #E0EBD8; }
+      #theme-select option[value="steampunk"] { background-color: #2b1b0e; color: #d5c1a1; }
+      #theme-select option[value="autumn"] { background-color: #2c1810; color: #f5deb3; }
+      #theme-select option[value="sepia"] { background-color: #704214; color: #FFF8E7; }
+      #theme-select option[value="solarized"] { background-color: #fdf6e3; color: #657b83; }
+      #theme-select option[value="pastelle"] { background-color: #FFEFD5; color: #4B3621; }
+
+      /* clear floats after the columns */
+      .row::after {
+        content: "";
+        display: table;
+        clear: both;
+      }
     
   </style>
   <!-- Apply theme and font based on cookies -->
@@ -538,26 +563,26 @@
         <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; color: inherit;">Me</a>
       </div>
       <select id="theme-select" onchange="setTheme(this.value)" style="margin-left:20px; padding:5px;">
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-        <option value="solarized">Solarized</option>
-        <option value="futuristic">Futuristic</option>
-        <option value="steampunk">Steampunk</option>
-        <option value="cyberpunk">Cyberpunk</option>
-        <option value="silver">Silver</option>
-        <option value="pastelle">Pastelle</option>
-        <option value="sepia">Sepia</option>
-        <option value="forest">Forest</option>
-        <option value="ocean">Ocean</option>
-        <option value="neon">Neon</option>
-        <option value="retro">Retro</option>
-        <option value="midnight">Midnight</option>
-        <option value="autumn">Autumn</option>
-        <option value="nord">Nord</option>
-        <option value="dracula">Dracula</option>
-        <option value="monokai">Monokai</option>
-        <option value="terminal">Terminal</option>
-        <option value="paper">Paper</option>
+        <option value="light" style="background:#ffffff;color:#000;">Light</option>
+        <option value="paper" style="background:#f5f5f5;color:#333;">Paper</option>
+        <option value="terminal" style="background:#000;color:#90ee90;">Terminal</option>
+        <option value="neon" style="background:#000;color:#90ee90;">Neon</option>
+        <option value="retro" style="background:#000080;color:#90ee90;">Retro</option>
+        <option value="dark" style="background:#1e1e1e;color:#d4d4d4;">Dark</option>
+        <option value="dracula" style="background:#282a36;color:#e2e8f0;">Dracula</option>
+        <option value="monokai" style="background:#272822;color:#e2e8f0;">Monokai</option>
+        <option value="futuristic" style="background:#0f0f0f;color:#7fbfbf;">Futuristic</option>
+        <option value="cyberpunk" style="background:#1e001f;color:#c080c0;">Cyberpunk</option>
+        <option value="midnight" style="background:#0f172a;color:#cbd5e1;">Midnight</option>
+        <option value="ocean" style="background:#0a192f;color:#cbd5e1;">Ocean</option>
+        <option value="nord" style="background:#2e3440;color:#d8dee9;">Nord</option>
+        <option value="forest" style="background:#2E4A2E;color:#E0EBD8;">Forest</option>
+        <option value="steampunk" style="background:#2b1b0e;color:#d5c1a1;">Steampunk</option>
+        <option value="autumn" style="background:#2c1810;color:#f5deb3;">Autumn</option>
+        <option value="sepia" style="background:#704214;color:#FFF8E7;">Sepia</option>
+        <option value="silver" style="background:#C0C0C0;color:#000;">Silver</option>
+        <option value="solarized" style="background:#fdf6e3;color:#657b83;">Solarized</option>
+        <option value="pastelle" style="background:#FFEFD5;color:#4B3621;">Pastelle</option>
       </select>
       <select id="font-select" onchange="setFont(this.value)" style="margin-left:20px; padding:5px;">
         <option value="system">System Default</option>

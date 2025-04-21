@@ -30,9 +30,6 @@ URLS_COOKIE_VERSION = "2"
 
 USE_TOR = True
 
-# Available theme choices
-THEME_CHOICES = ['light', 'dark', 'solarized', 'futuristic', 'steampunk', 'cyberpunk', 'silver', 'pastelle', 'sepia', 'forest']
-
 # Import routes and pass the app instance
 import routes
 
