@@ -119,6 +119,27 @@ body.no-underlines a, body.no-underlines a * {
   margin-top: 10px;
 }
 
+/* Desktop navigation links */
+.desktop-view .nav-links-desktop {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.desktop-view .nav-links-desktop a {
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--btn-bg);
+  color: var(--link) !important;
+  text-decoration: none;
+  transition: background-color 0.3s ease;
+}
+
+.desktop-view .nav-links-desktop a:hover {
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text) !important;
+}
+
 /* Clear floats after the columns */
 .desktop-view .row:after {
   content: "";
@@ -127,6 +148,11 @@ body.no-underlines a, body.no-underlines a * {
 }
 
 /* Mobile view styles */
+.mobile-view .column {
+  width: 100%;
+  padding: 10px;
+}
+
 .mobile-view .nav-links-mobile a {
   display: block;
   font-size: 1.3em;

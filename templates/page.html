@@ -85,10 +85,10 @@
 
     <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}">
       <div class="column">{{ columns[0] }}</div>
-      {%- if not g.is_mobile %}
+      {% if not g.is_mobile %}
       <div class="column">{{ columns[1] }}</div>
       <div class="column">{{ columns[2] }}</div>
-      {%- endif %}
+      {% endif %}
     </div>
 
     <!-- Chat Window HTML -->
