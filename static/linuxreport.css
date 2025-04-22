@@ -1,0 +1,437 @@
+/* Font definitions */
+body.font-system { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important; }
+body.font-monospace { font-family: 'Courier New', Courier, monospace !important; }
+body.font-inter { font-family: 'Inter', sans-serif !important; }
+body.font-roboto { font-family: 'Roboto', sans-serif !important; }
+body.font-open-sans { font-family: 'Open Sans', sans-serif !important; }
+body.font-source-sans { font-family: 'Source Sans Pro', sans-serif !important; }
+body.font-noto-sans { font-family: 'Noto Sans', sans-serif !important; }
+body.font-lato { font-family: 'Lato', sans-serif !important; }
+body.font-raleway { font-family: 'Raleway', sans-serif !important; }
+
+/* Force font everywhere when enabled */
+body.font-system *, body.font-monospace *, body.font-inter *, 
+body.font-roboto *, body.font-open-sans *, body.font-source-sans *, 
+body.font-noto-sans *, body.font-lato *, body.font-raleway * {
+  font-family: inherit !important;
+}
+
+/* Theme definitions */
+body.theme-light { --bg:#ffffff; --text:#000000; --link:#1a0dab; --btn-bg:#f6f6f6; --btn-border:#092236; --btn-text:#3b5971; --btn-hover-bg:#0078D7; --btn-hover-text:#ffffff; }
+body.theme-silver  { --bg:#C0C0C0; --text:#000000; --link:#1a0dab; --btn-bg:#EFEFEF; --btn-border:#888888; --btn-text:#000000; --btn-hover-bg:#C0C0C0; --btn-hover-text:#FFFFFF; }
+body.theme-dark { --bg:#1e1e1e; --text:#d4d4d4; --link:#8ab4f8; --btn-bg:#333333; --btn-border:#ffffff; --btn-text:#d4d4d4; --btn-hover-bg:#505050; --btn-hover-text:#ffffff; }
+body.theme-solarized { --bg:#fdf6e3; --text:#657b83; --link:#268bd2; --btn-bg:#eee8d5; --btn-border:#586e75; --btn-text:#586e75; --btn-hover-bg:#b58900; --btn-hover-text:#fdf6e3; }
+
+/* New custom themes */
+body.theme-futuristic { --bg:#0f0f0f; --text:#7fbfbf; --link:#0f0; --btn-bg:#111; --btn-border:#0ff; --btn-text:#7fbfbf; --btn-hover-bg:#0f0; --btn-hover-text:#000; }
+body.theme-steampunk { --bg:#2b1b0e; --text:#d5c1a1; --link:#a67c52; --btn-bg:#3e2c1c; --btn-border:#a67c52; --btn-text:#d5c1a1; --btn-hover-bg:#a67c52; --btn-hover-text:#2b1b0e; }
+body.theme-cyberpunk { --bg:#1e001f; --text:#c080c0; --link:#00ffff; --btn-bg:#330033; --btn-border:#ff00ff; --btn-text:#c080c0; --btn-hover-bg:#00ffff; --btn-hover-text:#1e001f; }
+body.theme-pastelle{ --bg:#FFEFD5; --text:#4B3621; --link:#FFB6C1; --btn-bg:#FFDAB9; --btn-border:#DEB887; --btn-text:#4B3621; --btn-hover-bg:#FFA07A; --btn-hover-text:#FFFFFF; }
+body.theme-sepia   { --bg:#704214; --text:#FFF8E7; --link:#B8860B; --btn-bg:#C19A6B; --btn-border:#8B4513; --btn-text:#FFF8E7; --btn-hover-bg:#8B4513; --btn-hover-text:#FFF8E7; }
+body.theme-forest  { --bg:#2E4A2E; --text:#E0EBD8; --link:#A3B18A; --btn-bg:#4A6F4A; --btn-border:#A3B18A; --btn-text:#E0EBD8; --btn-hover-bg:#A3B18A; --btn-hover-text:#2E4A2E; }
+
+/* Additional new themes */
+body.theme-ocean { --bg:#0a192f; --text:#cbd5e1; --link:#64ffda; --btn-bg:#112240; --btn-border:#64ffda; --btn-text:#cbd5e1; --btn-hover-bg:#1d4ed8; --btn-hover-text:#ffffff; }
+body.theme-neon { --bg:#000000; --text:#90ee90; --link:#ff69b4; --btn-bg:#1a1a1a; --btn-border:#00ffff; --btn-text:#90ee90; --btn-hover-bg:#ff69b4; --btn-hover-text:#000000; }
+body.theme-retro { --bg:#000080; --text:#90ee90; --link:#ffff00; --btn-bg:#0000cd; --btn-border:#90ee90; --btn-text:#90ee90; --btn-hover-bg:#ff69b4; --btn-hover-text:#000000; }
+body.theme-midnight { --bg:#0f172a; --text:#cbd5e1; --link:#818cf8; --btn-bg:#1e293b; --btn-border:#818cf8; --btn-text:#cbd5e1; --btn-hover-bg:#4f46e5; --btn-hover-text:#ffffff; }
+body.theme-autumn { --bg:#2c1810; --text:#f5deb3; --link:#d2691e; --btn-bg:#3d2316; --btn-border:#d2691e; --btn-text:#f5deb3; --btn-hover-bg:#cd853f; --btn-hover-text:#2c1810; }
+body.theme-nord { --bg:#2e3440; --text:#d8dee9; --link:#88c0d0; --btn-bg:#3b4252; --btn-border:#88c0d0; --btn-text:#d8dee9; --btn-hover-bg:#5e81ac; --btn-hover-text:#2e3440; }
+body.theme-monokai { --bg:#272822; --text:#e2e8f0; --link:#a6e22e; --btn-bg:#3e3d32; --btn-border:#a6e22e; --btn-text:#e2e8f0; --btn-hover-bg:#f92672; --btn-hover-text:#272822; }
+body.theme-terminal { --bg:#000000; --text:#90ee90; --link:#90ee90; --btn-bg:#001100; --btn-border:#90ee90; --btn-text:#90ee90; --btn-hover-bg:#003300; --btn-hover-text:#90ee90; }
+body.theme-paper { --bg:#f5f5f5; --text:#333333; --link:#1a0dab; --btn-bg:#ffffff; --btn-border:#cccccc; --btn-text:#333333; --btn-hover-bg:#e6e6e6; --btn-hover-text:#333333; }
+
+/* Client-side dynamic sans-serif font */
+body.sans-serif { font-family: sans-serif; }
+
+/* Force sans-serif font everywhere when enabled */
+body.sans-serif, body.sans-serif * {
+  font-family: sans-serif !important;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--text);
+  background-color: var(--bg);
+}
+
+/* Default link style: color and no underline */
+a:link, a:visited, a:hover, a:active {
+  color: var(--link);
+  text-decoration: none;
+}
+
+/* Ensure code elements use inherited font */
+code {
+  font-family: inherit !important;
+}
+
+/* Override entry link color and remove underline */
+.linkclass a {
+  color: var(--text) !important;
+  text-decoration: none !important;
+  font-family: inherit !important;
+}
+.linkclass a:hover, .linkclass a:visited, .linkclass a:active {
+  color: var(--text) !important;
+  text-decoration: none !important;
+  font-family: inherit !important;
+}
+
+img {
+  max-width: 100%;
+}
+
+.linkclass {
+  margin-bottom: .6em;
+  font-size: large
+}
+
+/* Client-side dynamic link underlines */
+body.no-underlines a { text-decoration: none; }
+
+/* Ensure link underlines are removed everywhere when enabled */
+body.no-underlines a, body.no-underlines a * {
+  text-decoration: none !important;
+}
+
+/* {%- if not g.is_mobile %} */
+.column {
+  float: left;
+  width: 33.33%;
+  padding: 10px;
+}
+
+.image-container {
+  width: 100%;
+}
+
+.image-container img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.title-container {
+  margin-top: 10px;
+}
+/* Clear floats after the columns */
+.row:after {
+  content: "";
+  display: table;
+  clear: both;
+}
+{%- endif %}
+
+/* {%- if g.is_mobile %} */
+.nav-links-mobile a {
+  display: block;
+  font-size: 1.3em;
+  padding: 14px 0 14px 0;
+  margin: 6px 0;
+  min-width: 44px;
+  min-height: 44px;
+  text-align: center;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--link) !important;
+}
+.nav-links-mobile a:active, .nav-links-mobile a:focus {
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text) !important;
+}
+/* {%- endif %} */
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.pagination-controls button {
+  padding: 5px 15px;
+  border: 2px solid var(--btn-border);
+  border-radius: 5px;
+  background-color: var(--btn-bg);
+  color: var(--btn-text);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-controls button:hover:not(:disabled) {
+  background-color: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
+  transform: scale(1.05);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+.pagination-controls button:disabled {
+  background-color: #e0e0e0;
+  color: #a0a0a0;
+  cursor: not-allowed;
+}
+
+/* Old Headlines link styling */
+#old-headlines-link {
+  position: relative;
+  padding: 8px 15px;
+  border-radius: 5px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  animation: pulse 3s infinite;
+  background: var(--btn-bg);
+  border: 2px solid var(--btn-border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#old-headlines-link:hover {
+  transform: scale(1.05);
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text) !important;
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.weather-container {
+  max-width: 100%;
+  margin: 10px auto;
+  padding: 10px;
+  background-color: var(--btn-bg);
+  color: var(--text);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.weather-container h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.weather-forecast {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.weather-day {
+  flex: 1;
+  min-width: 80px;
+  margin: 5px;
+  padding: 8px;
+  background-color: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: 5px;
+}
+
+.weather-day-name {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.weather-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.weather-temp {
+  margin: 5px 0;
+}
+
+.weather-precip {
+  font-size: 0.9em;
+  color: var(--link);
+}
+
+/* Remove static dark-mode overrides; variables handle all themes */
+
+/* Override monospace in entry titles and use inherited font */
+.linkclass code {
+  font-family: inherit !important;
+}
+
+/* Chat Window Styles */
+#chat-container {
+  position: fixed;
+  top: 20px; /* Changed from bottom */
+  bottom: 20px; /* Added to stretch */
+  right: 20px;
+  width: 350px; /* Kept width */
+  /* height: 400px; Removed height */
+  background-color: var(--bg);
+  border: 2px solid var(--btn-border);
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  display: none; /* Hidden by default */
+  flex-direction: column;
+  overflow: hidden; /* Needed for resize handle */
+  z-index: 1000; /* Ensure it's on top */
+  resize: both; /* Allow resizing - might conflict slightly with top/bottom */
+  min-width: 250px; /* Min size */
+  min-height: 200px; /* Min size */
+}
+
+#chat-header {
+  padding: 8px 12px;
+  background-color: var(--btn-bg);
+  color: var(--text);
+  font-weight: bold;
+  cursor: move; /* Indicate draggable */
+  border-bottom: 1px solid var(--btn-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+ #chat-header button {
+   background: none;
+   border: none;
+   color: var(--text);
+   font-size: 1.2em;
+   cursor: pointer;
+ }
+
+#chat-messages {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px;
+  border-bottom: 1px solid var(--btn-border);
+  display: flex;
+  flex-direction: column-reverse; /* Newest messages at the bottom */
+}
+
+.chat-message {
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  background-color: var(--btn-bg);
+  word-wrap: break-word;
+}
+.chat-message img {
+   max-width: 100%;
+   max-height: 150px; /* Limit image preview size */
+   display: block;
+   margin-top: 5px;
+   border-radius: 4px;
+}
+.chat-message .timestamp {
+   font-size: 0.7em;
+   color: var(--link); /* Use link color for timestamp */
+   display: block;
+   margin-top: 4px;
+}
+
+#chat-input-area {
+  padding: 10px;
+  display: flex;
+  gap: 5px;
+}
+
+#chat-input-area textarea {
+  flex-grow: 1;
+  padding: 8px;
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  resize: none; /* Disable textarea's own resize handle */
+  background-color: var(--bg);
+  color: var(--text);
+  min-height: 40px; /* Ensure decent initial height */
+  max-height: 100px; /* Limit expansion */
+  transition: border-color 0.3s ease; /* Add transition for dragover */
+}
+ #chat-input-area input[type="text"] { /* For image URL */
+   flex-grow: 1;
+   padding: 8px;
+   border: 1px solid var(--btn-border);
+   border-radius: 4px;
+   background-color: var(--bg);
+   color: var(--text);
+   margin-top: 5px; /* Space between text and image input */
+ }
+/* Style for dragover state */
+#chat-input-area.dragover {
+  border: 2px dashed var(--link);
+  background-color: rgba(138, 180, 248, 0.1); /* Light background tint for dark/light themes */
+}
+
+#chat-input-area button {
+  padding: 8px 15px;
+  border: 1px solid var(--btn-border);
+  border-radius: 4px;
+  background-color: var(--btn-bg);
+  color: var(--btn-text);
+  cursor: pointer;
+}
+#chat-input-area button:hover {
+   background-color: var(--btn-hover-bg);
+   color: var(--btn-hover-text);
+}
+
+/* Chat Toggle Button Style (similar to old headlines) */
+#chat-toggle-btn {
+  position: relative;
+  padding: 8px 15px;
+  border-radius: 5px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+  animation: pulse 3s infinite; /* Use the same pulse animation */
+  background: var(--btn-bg);
+  border: 2px solid var(--btn-border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  color: var(--btn-text); /* Ensure button text color is set */
+  cursor: pointer; /* Add cursor pointer */
+  margin-left: 10px; /* Add some space */
+}
+
+#chat-toggle-btn:hover {
+  transform: scale(1.05);
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text) !important; /* Important to override potential link styles */
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Theme preview in dropdown */
+#theme-select option[value="light"] { background-color: #ffffff; color: #000000; }
+#theme-select option[value="silver"] { background-color: #C0C0C0; color: #000000; }
+#theme-select option[value="paper"] { background-color: #f5f5f5; color: #333333; }
+#theme-select option[value="retro"] { background-color: #000080; color: #90ee90; }
+#theme-select option[value="dark"] { background-color: #1e1e1e; color: #d4d4d4; }
+#theme-select option[value="monokai"] { background-color: #272822; color: #e2e8f0; }
+#theme-select option[value="futuristic"] { background-color: #0f0f0f; color: #7fbfbf; }
+#theme-select option[value="cyberpunk"] { background-color: #1e001f; color: #c080c0; }
+#theme-select option[value="midnight"] { background-color: #0f172a; color: #cbd5e1; }
+#theme-select option[value="ocean"] { background-color: #0a192f; color: #cbd5e1; }
+#theme-select option[value="nord"] { background-color: #2e3440; color: #d8dee9; }
+#theme-select option[value="forest"] { background-color: #2E4A2E; color: #E0EBD8; }
+#theme-select option[value="steampunk"] { background-color: #2b1b0e; color: #d5c1a1; }
+#theme-select option[value="autumn"] { background-color: #2c1810; color: #f5deb3; }
+#theme-select option[value="sepia"] { background-color: #704214; color: #FFF8E7; }
+#theme-select option[value="solarized"] { background-color: #fdf6e3; color: #657b83; }
+#theme-select option[value="pastelle"] { background-color: #FFEFD5; color: #4B3621; }
+
+/* clear floats after the columns */
+.row::after {
+  content: "";
+  display: table;
+  clear: both;
+}
