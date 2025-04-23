@@ -15,7 +15,6 @@ from abc import ABC, abstractmethod
 import multiprocessing
 
 import diskcache
-import fasteners
 
 import FeedHistory
 
@@ -190,8 +189,7 @@ def get_chat_cache() -> DiskCacheWrapper:
 # Simple non-blocking lock using global Python/diskcache cache (g_cs)
 class LockBase(ABC):
     @abstractmethod
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False, 
-                retry_delay: float = 0.5, max_wait_seconds: float = 30) -> bool:
+    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
         pass
 
     @abstractmethod
@@ -210,21 +208,12 @@ class LockBase(ABC):
     def locked(self) -> bool:
         pass
 
-    @abstractmethod
-    def force_release(self) -> bool:
-        pass
 
 class DiskcacheSqliteLock(LockBase):
     """
     A distributed lock implementation using the global diskcache (with a Sqlite backend).
-    
-    This lock supports waiting/retrying when a lock is unavailable and provides
-    features for reliable multi-process and multi-threaded environments:
-    
-    - Wait with configurable retry strategy
-    - Deadlock prevention with configurable timeouts
-    - Ownership verification to prevent accidental releases
-    - Self-repair for abandoned locks (with ownership verification)
+    This lock supports waiting when a lock is unavailable and provides
+    features for reliable multi-process and multi-threaded environments.
     """
     def __init__(self, lock_name: str, owner_prefix: Optional[str] = None):
         self.cache = g_cs
@@ -233,37 +222,30 @@ class DiskcacheSqliteLock(LockBase):
             owner_prefix = f"pid{os.getpid()}_tid{threading.get_ident()}"
         self.owner_id = f"{owner_prefix}_{uuid.uuid4()}"
         self._locked = False
-        
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False, 
-                retry_delay: float = 0.5, max_wait_seconds: float = 30) -> bool:
+
+    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
         """
-        Tries to acquire the lock with support for waiting/retrying.
-        
+        Tries to acquire the lock.
         Args:
             timeout_seconds: How long the lock should be held before expiring
-            wait: If True, will wait and retry until the lock is acquired or max_wait_seconds is reached
-            retry_delay: Seconds between retry attempts
-            max_wait_seconds: Maximum seconds to wait for the lock if wait=True
-            
+            wait: If True, will wait until the lock is acquired or timeout_seconds is reached
         Returns:
             True if lock was acquired, False otherwise
         """
         if self._locked:
             return True
-            
+
         start_time = time.monotonic()
         while True:
             acquired = self._attempt_acquire(timeout_seconds)
             if acquired:
                 return True
-                
-            # If not waiting or we've exceeded max wait time, return False
-            if not wait or (time.monotonic() - start_time > max_wait_seconds):
+            if not wait:
                 return False
-                
-            # Sleep before retrying
-            time.sleep(retry_delay)
-    
+            if (time.monotonic() - start_time) > timeout_seconds:
+                return False
+            time.sleep(0.1)  # Short sleep before retrying
+
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
         """Internal method that attempts to acquire the lock once."""
         try:
@@ -334,91 +316,10 @@ class DiskcacheSqliteLock(LockBase):
         """Check if the lock is currently held by this instance."""
         return self._locked
         
-    def force_release(self) -> bool:
-        """
-        Force-release any lock with this name, regardless of ownership.
-        USE WITH EXTREME CAUTION as this can cause race conditions.
-        Returns True if a lock was released, False if no lock existed.
-        """
-        try:
-            current_value = self.cache.get(self.lock_key)
-            if current_value is not None:
-                self.cache.delete(self.lock_key)
-                return True
-            return False
-        except Exception as e:
-            print(f"Error force-releasing lock {self.lock_key}: {e}")
-            return False
-
-class FastenersFileLock(LockBase):
-    """
-    A file-based lock using the fasteners library, with added thread safety.
-    Suitable for local inter-process and inter-thread locking.
-    """
-    _thread_locks = {}
-    _thread_locks_lock = threading.Lock()
-
-    def __init__(self, lock_name: str, owner_prefix: Optional[str] = None):
-        self.lock_file = os.path.join(SPATH, f"{lock_name}.lock")
-        self._lock = fasteners.InterProcessLock(self.lock_file)
-        # Ensure a unique threading.Lock per lock_file
-        with FastenersFileLock._thread_locks_lock:
-            if self.lock_file not in FastenersFileLock._thread_locks:
-                FastenersFileLock._thread_locks[self.lock_file] = threading.Lock()
-            self._thread_lock = FastenersFileLock._thread_locks[self.lock_file]
-        self._locked = False
-
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False, 
-                retry_delay: float = 0.5, max_wait_seconds: float = 30) -> bool:
-        if self._locked:
-            return True
-        # Acquire thread lock first
-        thread_acquired = self._thread_lock.acquire(timeout=max_wait_seconds if wait else 0)
-        if not thread_acquired:
-            return False
-        try:
-            if wait:
-                acquired = self._lock.acquire(blocking=True, timeout=max_wait_seconds)
-            else:
-                acquired = self._lock.acquire(blocking=False)
-            self._locked = acquired
-            if not acquired:
-                self._thread_lock.release()
-            return acquired
-        except Exception:
-            self._thread_lock.release()
-            raise
-
-    def release(self) -> bool:
-        if self._locked:
-            self._lock.release()
-            self._thread_lock.release()
-            self._locked = False
-            return True
-        return False
-
-    def __enter__(self):
-        if not self.acquire(wait=True):
-            raise TimeoutError(f"Could not acquire fasteners lock '{self.lock_file}'")
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.release()
-
-    def locked(self) -> bool:
-        return self._locked
-
-    def force_release(self) -> bool:
-        # Not supported by fasteners; just try to release if locked
-        if self._locked:
-            self.release()
-            return True
-        return False
-
 class MultiprocessLock(LockBase):
     """
     A lock using multiprocessing.Lock for inter-process and inter-thread safety (on the same machine).
-    Includes print logging for acquire/release/force_release.
+    Implements the LockBase API for compatibility with other lock implementations.
     """
     _locks = {}
     _locks_lock = threading.Lock()
@@ -429,20 +330,24 @@ class MultiprocessLock(LockBase):
             if lock_name not in MultiprocessLock._locks:
                 MultiprocessLock._locks[lock_name] = multiprocessing.Lock()
             self._lock = MultiprocessLock._locks[lock_name]
+        self.owner_prefix = owner_prefix or f"pid{os.getpid()}_tid{threading.get_ident()}_{uuid.uuid4()}"
         self._locked = False
-        self.owner_prefix = owner_prefix or f"pid{os.getpid()}_tid{threading.get_ident()}"
 
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False, 
-                retry_delay: float = 0.5, max_wait_seconds: float = 30) -> bool:
-        if self._locked:
-            print(f"[MultiprocessLock] Already locked: {self.lock_name}")
-            return True
-        block = wait
-        timeout = max_wait_seconds if wait else 0
+    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+        """
+        Attempts to acquire the lock.
+        Args:
+            timeout_seconds: Maximum time to wait for the lock (in seconds).
+            wait: If True, block until the lock is acquired or timeout occurs.
+        Returns:
+            True if the lock was acquired, False otherwise.
+        """
         try:
-            acquired = self._lock.acquire(block, timeout)
+            if wait:
+                acquired = self._lock.acquire(timeout=timeout_seconds)
+            else:
+                acquired = self._lock.acquire(block=False)
             self._locked = acquired
-            print(f"[MultiprocessLock] acquire({self.lock_name}, owner={self.owner_prefix}) -> {acquired}")
             return acquired
         except Exception as e:
             print(f"[MultiprocessLock] Error acquiring {self.lock_name}: {e}")
@@ -450,12 +355,12 @@ class MultiprocessLock(LockBase):
             return False
 
     def release(self) -> bool:
-        if not self._locked:
-            print(f"[MultiprocessLock] release({self.lock_name}) called but not locked.")
-            return False
+        """
+        Releases the lock if currently held by this instance.
+        Returns True if the lock was released successfully, False otherwise.
+        """
         try:
             self._lock.release()
-            print(f"[MultiprocessLock] release({self.lock_name}, owner={self.owner_prefix}) -> True")
             self._locked = False
             return True
         except Exception as e:
@@ -471,17 +376,13 @@ class MultiprocessLock(LockBase):
         self.release()
 
     def locked(self) -> bool:
-        state = self._lock.locked()
-        print(f"[MultiprocessLock] locked({self.lock_name}) -> {state}")
-        return state
-
-    def force_release(self) -> bool:
-        # No true force-release, just try to release if locked
-        if self._locked:
-            print(f"[MultiprocessLock] force_release({self.lock_name})")
-            return self.release()
-        print(f"[MultiprocessLock] force_release({self.lock_name}) called but not locked.")
-        return False
+        """
+        Checks if the lock is currently held by this instance.
+        Returns:
+            True if the lock is held, False otherwise.
+        """
+        # Note: multiprocessing.Lock does not track ownership, so this is best-effort
+        return self._lock.locked() or self._locked
 
 # Selectable lock class and factory
 LOCK_CLASS: Type[LockBase] = DiskcacheSqliteLock
