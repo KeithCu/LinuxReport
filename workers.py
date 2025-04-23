@@ -12,16 +12,26 @@ from timeit import default_timer as timer
 
 # Third-party imports
 import feedparser
+from time import mktime
+from datetime import timedelta
+from fake_useragent import UserAgent
+ua = UserAgent()
 
+# Local application imports
 import shared
 from feedfilter import filter_similar_titles, merge_entries, prefilter_news
 from seleniumfetch import fetch_site_posts
-# Local application imports
 from shared import (
     ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, TZ,
-    USE_TOR, USER_AGENT, RssFeed, g_c, DiskcacheSqliteLock, GLOBAL_FETCH_MODE_LOCK_KEY
+    USE_TOR, USER_AGENT, RssFeed, g_c, g_cs, DiskcacheSqliteLock, GLOBAL_FETCH_MODE_LOCK_KEY
 )
 from Tor import fetch_via_tor
+
+ #Reddit is a pain, so hide user_agent
+if not g_cs.has("REDDIT_USER_AGENT"):
+    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
+
+USER_AGENT_RANDOM = g_cs.get("REDDIT_USER_AGENT")
 
 LINK_REGEX = re.compile(r'href=["\'](.*?)["\']')
 
@@ -34,28 +44,30 @@ def load_url_worker(url):
     # Use the DiskcacheSqliteLock to ensure only one process fetches this URL at a time
     with DiskcacheSqliteLock(lock_key, owner_prefix=f"feed_worker_{os.getpid()}") as lock:
         if not lock.locked():
-            print(f"Could not acquire lock for {url}, another process might be fetching.")
-            # Optionally wait briefly or return, depending on desired behavior
-            # For now, just return, assuming the other process will succeed.
+            print(f"Could not acquire lock for {url}, another process is fetching.")
             return
 
-        # --- Start of locked section ---
         start = timer()
         rssfeed = None
 
-        if USE_TOR and "reddit" in url:
-            print(f"Using TOR proxy for Reddit URL: {url}")
-            res = fetch_via_tor(url, rss_info.site_url)
-        elif "fakefeed" in url:
-            res = fetch_site_posts(rss_info.site_url, USER_AGENT)
+        if "lwn.net" in url:
+            new_entries = handle_lwn_feed(url)
         else:
-            res = feedparser.parse(url, agent=USER_AGENT)
-
-        new_entries = prefilter_news(url, res)
-        new_entries = filter_similar_titles(url, new_entries)
-
-        #Trim the entries to the limit before compare so it doesn't find 500 new entries.
-        new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
+            # Standard feed parsing logic
+            if USE_TOR and "reddit" in url:
+                print(f"Using TOR proxy for Reddit URL: {url}")
+                res = fetch_via_tor(url, rss_info.site_url)
+            elif "fakefeed" in url:
+                res = fetch_site_posts(rss_info.site_url, USER_AGENT)
+            else:
+                user_a = USER_AGENT
+                if "reddit" in url:
+                    user_a = USER_AGENT_RANDOM
+                res = feedparser.parse(url, agent=user_a)
+            new_entries = prefilter_news(url, res)
+            new_entries = filter_similar_titles(url, new_entries)
+            #Trim the entries to the limit before compare so it doesn't find 500 new entries.
+            new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
 
         # Added detailed logging when no entries are found
         if len(new_entries) == 0:
@@ -110,13 +122,42 @@ def load_url_worker(url):
         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
-            g_c.delete(rss_info.site_url) # Delete template cache
+            g_c.delete(rss_info.site_url)
 
-        # No need to delete FETCHPID anymore
         end = timer()
         print(f"Parsing from: {url}, in {end - start:f}.")
-        # --- End of locked section ---
         # Lock is automatically released by the 'with' statement
+
+def handle_lwn_feed(url):
+    pending = g_c.get("lwn_pending") or {}
+    displayed = g_c.get("lwn_displayed") or set()
+    res = feedparser.parse(url, agent=USER_AGENT)
+    now = datetime.now(TZ)
+    ready = []
+    for entry in res.entries:
+        link = entry.link
+        title = entry.get('title','')
+        pub = datetime.fromtimestamp(mktime(entry.published_parsed), tz=TZ)
+        if title.startswith("[$]"):
+            if link not in pending and link not in displayed:
+                pending[link] = {'title': title, 'published': pub}
+                print(f"[LWN] Article locked, saving for future: {title} ({link}) at {pub.isoformat()}")
+        else:
+            if link not in displayed:
+                ready.append({'link': link, 'title': title, 'html_content': '', 'published': pub})
+                displayed.add(link)
+                pending.pop(link, None)
+    for link, info in list(pending.items()):
+        if now - info['published'] >= timedelta(days=15):
+            ready.append({'link': link, 'title': info['title'], 'html_content': '', 'published': now})
+            displayed.add(link)
+            pending.pop(link)
+            print(f"[LWN] Article now available for free: {info['title']} ({link}) at {now.isoformat()}")
+    # sort by publication/availability date for interleaving
+    ready.sort(key=lambda x: x['published'])
+    g_c.put("lwn_pending", pending)
+    g_c.put("lwn_displayed", displayed)
+    return ready
 
 def wait_and_set_fetch_mode():
     """Acquires a global lock to prevent thundering herd for fetch cycles."""
@@ -124,10 +165,10 @@ def wait_and_set_fetch_mode():
     lock = DiskcacheSqliteLock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_mode_{os.getpid()}")
     if lock.acquire(wait=True, max_wait_seconds=60): # Wait up to 60 seconds
         print("Acquired global fetch lock.")
-        return lock # Return the acquired lock object
+        return lock
     else:
         print("Failed to acquire global fetch lock after waiting.")
-        return None # Indicate failure
+        return None
 
 # Fetch multiple RSS feeds in parallel.
 def fetch_urls_parallel(urls):
@@ -143,7 +184,7 @@ def fetch_urls_parallel(urls):
             for future in concurrent.futures.as_completed(future_to_url):
                 try:
                     future.result() # Ensure exceptions in workers are raised
-                except Exception as exc:
+                except Exception as exc:  # noqa: E722
                     print(f'{future_to_url[future]} generated an exception: {exc}')
     finally:
         lock.release() # Ensure lock is released
@@ -170,7 +211,7 @@ def refresh_thread():
         for url in urls_to_refresh:
             try:
                 load_url_worker(url)
-            except Exception as exc:
+            except Exception as exc:  # noqa: E722
                 print(f'{url} generated an exception during refresh: {exc}')
 
     finally:
@@ -184,11 +225,8 @@ def fetch_urls_thread():
     # Create a lock instance just for checking, don't hold it long.
     check_lock = DiskcacheSqliteLock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_check_{os.getpid()}")
 
-    # Try to acquire the lock without waiting.
     if not check_lock.acquire(wait=False):
-        # If acquire returns False, it means the lock is held by another process/thread.
         print("Fetch/refresh operation already in progress. Skipping background refresh trigger.")
-        # No need to release check_lock here as it was never acquired.
         return
     else:
         # If acquire returns True, it means no fetch/refresh was running *at this moment*.
@@ -196,7 +234,6 @@ def fetch_urls_thread():
         # so the actual refresh_thread (or a parallel fetch) can acquire it.
         check_lock.release()
         print("No fetch operation running. Starting background refresh thread...")
-        # Proceed to start the thread. refresh_thread will acquire the lock properly (waiting if needed).
         t = threading.Thread(target=refresh_thread, args=())
         t.daemon = True
         t.start()
