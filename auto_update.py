@@ -8,6 +8,7 @@ import sys
 from timeit import default_timer as timer
 import json
 import traceback
+import time
 
 # Import from our new modular files instead of auto_update_utils
 from image_parser import custom_fetch_largest_image
@@ -22,7 +23,7 @@ from html_generation import (
     refresh_images_only
 )
 
-from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, DiskCacheWrapper, Mode, g_c)
+from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c)
 
 # --- Configuration and Prompt Constants ---
 
@@ -61,6 +62,10 @@ FALLBACK_MODEL = PROVIDER_CONFIGS["together"]["models"]["fallback"]
 
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
+# === Global LLM/AI config ===
+MAX_TOKENS = 5000
+TIMEOUT = 60
+
 BASE = "/srv/http/"
 
 MODE_TO_PATH = {
@@ -82,6 +87,8 @@ BANNED_WORDS = [
     "tmux",
     "redox",
     "java",
+    "javascript",
+    "mysql (mariadb is ok)",
 ]
 
 modetoprompt2 = {
@@ -89,7 +96,7 @@ modetoprompt2 = {
     Prefer major news especially about important codebases. 
     Avoid simple tutorials, error explanations, troubleshooting guides, or cheat sheets.
     Nothing about Ubuntu or any other distro. Anything non-distro-specific is fine, but nothing about 
-    the following topics:
+    the following products:
     {', '.join(BANNED_WORDS)}.\n""",
     Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",
@@ -135,7 +142,7 @@ INPUT TITLES:
 
 
 # --- Global Variables ---
-cache = DiskCacheWrapper(".")
+cache = g_c
 
 ALL_URLS = {} # Initialized here, passed to utils
 
@@ -244,23 +251,32 @@ def get_provider_client(model=None, use_cache=True):
     return client
 
 def _try_call_model(client, model, messages, max_tokens, provider_label=""):
-    """Helper function to call a specific model using a provided client instance."""
-    start = timer()
-    print(f"[_try_call_model] Calling model: {model} ({provider_label})")
-    try:
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            max_tokens=max_tokens,
-        )
-        end = timer()
-        response_text = response.choices[0].message.content
-        print(f"LLM Response from {provider_label} ({model}) in {end - start:.3f}s:")
-        print(response_text)
-        return response_text
-    except Exception as e:
-        print(f"Error calling model {model} ({provider_label}): {e}")
-        raise
+    """Helper to call a model with retry logic, timeout, and logging."""
+    max_retries = 2
+    for attempt in range(1, max_retries + 1):
+        start = timer()
+        print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model} ({provider_label})")
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                timeout=TIMEOUT
+            )
+            end = timer()
+            choice = response.choices[0]
+            response_text = choice.message.content
+            finish_reason = choice.finish_reason
+            print(f"[_try_call_model] Response from {provider_label} ({model}) in {end - start:.3f}s, finish_reason: {finish_reason}")
+            if finish_reason != "stop":
+                print(f"Warning: Response finish_reason is {finish_reason}")
+            return response_text
+        except Exception as e:
+            print(f"Error on attempt {attempt} for model {model} ({provider_label}): {e}")
+            traceback.print_exc()
+            if attempt < max_retries:
+                time.sleep(1)
+    raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model} ({provider_label})")
 
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text after the first '***' marker."""
@@ -341,7 +357,7 @@ def ask_ai_top_articles(articles):
         provider_config = PROVIDER_CONFIGS[CHAT_PROVIDER_1]
         current_model = provider_config["models"]["primary"]
         primary_client = get_provider_client(model=current_model, use_cache=True)
-        response_text = _try_call_model(primary_client, current_model, messages, 3000, f"Primary ({CHAT_PROVIDER_1})")
+        response_text = _try_call_model(primary_client, current_model, messages, MAX_TOKENS, f"Primary ({CHAT_PROVIDER_1})")
         update_model_cache(current_model)
     except Exception as e:
         print(f"Error with model {current_model} ({CHAT_PROVIDER_1}): {e}")
@@ -351,7 +367,7 @@ def ask_ai_top_articles(articles):
             fallback_model = provider_config["models"]["fallback"]
             fallback_client = get_provider_client(model=fallback_model, use_cache=False)
             print(f"Trying fallback model: {fallback_model}")
-            response_text = _try_call_model(fallback_client, fallback_model, messages, 3000, f"Fallback ({CHAT_PROVIDER_1})")
+            response_text = _try_call_model(fallback_client, fallback_model, messages, MAX_TOKENS, f"Fallback ({CHAT_PROVIDER_1})")
             update_model_cache(fallback_model)
         except Exception as fallback_e:
             print(f"Fallback model {fallback_model} also failed: {fallback_e}")
@@ -366,7 +382,7 @@ def ask_ai_top_articles(articles):
     top_articles = []
     for title in top_titles:
         best_match = get_best_matching_article(title, filtered_articles)
-        if best_match:
+        if (best_match):
             top_articles.append(best_match)
 
     new_selections = [{"url": art["url"], "title": art["title"]}
@@ -401,7 +417,7 @@ def run_comparison(articles):
     # Corrected get_provider_client call: infer provider from model name
     try:
         client1 = get_provider_client(model=MODEL_1, use_cache=False) # Use renamed parameter
-        _try_call_model(client1, MODEL_1, messages1, 3000, f"Comparison ({CHAT_PROVIDER_1})")
+        _try_call_model(client1, MODEL_1, messages1, MAX_TOKENS, f"Comparison ({CHAT_PROVIDER_1})")
     except Exception as e: # Keep general
         print(f"Error during Comparison Call 1 ({CHAT_PROVIDER_1} / {MODEL_1}): {e}")
 
@@ -414,7 +430,7 @@ def run_comparison(articles):
     # Corrected get_provider_client call: infer provider from model name
     try:
         client2 = get_provider_client(model=MODEL_2, use_cache=False) # Use renamed parameter
-        _try_call_model(client2, MODEL_2, messages2, 3000, f"Comparison ({CHAT_PROVIDER_2})")
+        _try_call_model(client2, MODEL_2, messages2, MAX_TOKENS, f"Comparison ({CHAT_PROVIDER_2})")
     except Exception as e: # Keep general
         print(f"Error during Comparison Call 2 ({CHAT_PROVIDER_2} / {MODEL_2}): {e}")
 
@@ -543,6 +559,7 @@ if __name__ == "__main__":
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
     parser.add_argument('--provider', choices=['together','openrouter'], default='openrouter', help='Primary chat provider: together or openrouter')
     parser.add_argument('--compare', action='store_true', help='Run in comparison mode (compare two providers/models)')
+    parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
     args = parser.parse_args()
 
     # Configure primary provider from CLI
@@ -561,6 +578,10 @@ if __name__ == "__main__":
         MODEL_1 = PROVIDER_CONFIGS["openrouter"]["models"]["primary_compare"]
         CHAT_PROVIDER_2 = "openrouter"
         MODEL_2 = PROVIDER_CONFIGS["openrouter"]["models"]["fallback_compare"]
+
+    # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
+    if args.include_summary:
+        INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
 
     cwd = os.getcwd()
     for mode_key in MODE_TO_PATH.keys(): # Use mode_key to avoid conflict
