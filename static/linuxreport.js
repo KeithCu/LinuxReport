@@ -693,3 +693,62 @@ document.addEventListener('DOMContentLoaded', function() {
   console.log("Chat will not poll or fetch until made visible by user.");
 
 });
+
+// Config page JS: apply settings and enable drag-and-drop ordering
+document.addEventListener('DOMContentLoaded', function() {
+  // Only run on config page
+  if (!document.querySelector('.config-container')) return;
+
+  // Apply theme and font classes
+  var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
+  var theme = match ? match[1] : 'paper';
+  document.body.classList.add('theme-' + theme);
+  var fontMatch = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
+  var font = fontMatch ? fontMatch[1] : 'system';
+  document.body.classList.add('font-' + font);
+  var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
+  if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
+  var ss = document.cookie.match(/(?:^|; )SansSerif=([^;]+)/);
+  if (!ss || ss[1] === '1') document.body.classList.add('sans-serif');
+
+  // Drag-and-drop for URL entries
+  const urlEntries = document.querySelectorAll('.url-entry');
+  let draggedItem = null;
+  urlEntries.forEach(entry => {
+    entry.addEventListener('dragstart', function() {
+      draggedItem = this;
+      setTimeout(() => this.style.display = 'none', 0);
+    });
+    entry.addEventListener('dragend', function() {
+      setTimeout(() => {
+        this.style.display = 'block';
+        draggedItem = null;
+      }, 0);
+    });
+    entry.addEventListener('dragover', function(e) { e.preventDefault(); });
+    entry.addEventListener('dragenter', function(e) {
+      e.preventDefault();
+      this.style.border = '2px dashed #000';
+    });
+    entry.addEventListener('dragleave', function() { this.style.border = ''; });
+    entry.addEventListener('drop', function() {
+      this.style.border = '';
+      if (this !== draggedItem) {
+        const allEntries = Array.from(urlEntries);
+        const draggedIndex = allEntries.indexOf(draggedItem);
+        const targetIndex = allEntries.indexOf(this);
+        if (draggedIndex < targetIndex) {
+          this.parentNode.insertBefore(draggedItem, this.nextSibling);
+        } else {
+          this.parentNode.insertBefore(draggedItem, this);
+        }
+        // Update priority inputs
+        const updatedEntries = document.querySelectorAll('.url-entry');
+        updatedEntries.forEach((ent, idx) => {
+          const priorityInput = ent.querySelector('input[type="number"]');
+          if (priorityInput) priorityInput.value = (idx + 1) * 10;
+        });
+      }
+    });
+  });
+});

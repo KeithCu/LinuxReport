@@ -462,3 +462,69 @@ body.no-underlines a, body.no-underlines a * {
   display: table;
   clear: both;
 }
+
+.config-border-box {
+  border: 2px solid var(--btn-border, #888);
+  margin: 40px auto;
+  padding: 40px 60px;
+  display: block;
+  background: var(--bg, #fff);
+  border-radius: 10px;
+  box-shadow: 0 0 18px rgba(0,0,0,0.10);
+  min-width: 0;
+  max-width: 900px;
+  width: 90vw;
+}
+
+.config-container {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 20px;
+  background: var(--btn-bg, #fff);
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.08);
+}
+
+.form-group {
+  margin-bottom: 15px;
+}
+.form-group label {
+  margin-right: 10px;
+  font-weight: bold;
+}
+dt {
+  font-weight: bold;
+  margin-top: 10px;
+}
+dd {
+  margin-left: 20px;
+  margin-bottom: 10px;
+}
+input[type="number"] {
+  width: 60px;
+  padding: 5px;
+}
+input[type="text"] {
+  width: 100%;
+  padding: 5px;
+  margin-top: 5px;
+}
+button[type="submit"] {
+  padding: 10px 20px;
+  background-color: #0078D7;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  margin-top: 20px;
+}
+button[type="submit"]:hover {
+  background-color: #005a9e;
+}
+.url-entry {
+  margin-bottom: 10px;
+  padding: 10px;
+  background-color: #f0f0f0;
+  cursor: move;
+  border-radius: 6px;
+}
