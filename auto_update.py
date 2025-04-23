@@ -43,7 +43,10 @@ PROVIDER_CONFIGS = {
         "base_url": "https://openrouter.ai/api/v1",
         "models": {
             "primary": "meta-llama/llama-3.3-70b-instruct:free",
-            "fallback": "meta-llama/llama-3.3-70b-instruct:floor"
+            "fallback": "meta-llama/llama-3.3-70b-instruct:floor",
+            "primary_compare": "x-ai/grok-3-mini-beta",
+            "fallback_compare": "google/gemini-2.5-flash-preview"
+
         },
         "headers": {
             "HTTP-Referer": "https://linuxreport.net",
@@ -111,7 +114,7 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
 #O3-suggested alternate prompt
 PROMPT_O3_SYSTEM = """
 FORMAT:
-1. Exactly ONE paragraph (<= 40 words) explaining your choice.
+1. Exactly ONE paragraph (<= 100 words) explaining your choice.
 2. *** on its own line.
 3. Best headline.
 4. Second headline.
@@ -140,9 +143,9 @@ ALL_URLS = {} # Initialized here, passed to utils
 RUN_MODE = "normal"  # options: "normal", "compare"
 
 # Configuration for the primary provider/model
-CHAT_PROVIDER_1 = "together"  # options: "together", "openrouter"
+CHAT_PROVIDER_1 = "openrouter"  # options: "together", "openrouter"
 PROMPT_MODE_1 = "default"     # options: "default", "o3"
-MODEL_1 = PRIMARY_MODEL # Model for provider 1 (uses the globally defined PRIMARY_MODEL)
+MODEL_1 = None
 
 # Configuration for the secondary provider/model (for comparison mode)
 CHAT_PROVIDER_2 = "openrouter" # options: "together", "openrouter"
@@ -227,6 +230,9 @@ def get_provider_client(model=None, use_cache=True):
     if info["provider"] == "openrouter" and "headers" in PROVIDER_CONFIGS["openrouter"]:
         for header, value in PROVIDER_CONFIGS["openrouter"]["headers"].items():
             client._client.headers[header] = value
+        print(f"[OpenRouter] Using headers: {PROVIDER_CONFIGS['openrouter']['headers']}")
+    
+    print(f"[get_provider_client] Provider: {info['provider']}, Model: {model}, Base URL: {info['base_url']}")
     
     # Cache the client if requested
     if use_cache:
@@ -237,6 +243,7 @@ def get_provider_client(model=None, use_cache=True):
 def _try_call_model(client, model, messages, max_tokens, provider_label=""):
     """Helper function to call a specific model using a provided client instance."""
     start = timer()
+    print(f"[_try_call_model] Calling model: {model} ({provider_label})")
     try:
         response = client.chat.completions.create(
             model=model,
@@ -316,39 +323,26 @@ def ask_ai_top_articles(articles):
     response_text = None
 
     try:
+        # Only use models for the selected provider
+        provider_config = PROVIDER_CONFIGS[CHAT_PROVIDER_1]
+        current_model = provider_config["models"]["primary"]
         primary_client = get_provider_client(model=current_model, use_cache=True)
-        response_text = _try_call_model(primary_client, current_model, messages, 3000, f"Primary ({current_provider})")
-        # If successful with primary model, ensure cache reflects it
+        response_text = _try_call_model(primary_client, current_model, messages, 3000, f"Primary ({CHAT_PROVIDER_1})")
         update_model_cache(current_model)
-
     except Exception as e:
-        print(f"Error with model {current_model} ({current_provider}): {e}")
+        print(f"Error with model {current_model} ({CHAT_PROVIDER_1}): {e}")
         traceback.print_exc()
-        
-        # Try fallback model from same provider
+        # Try fallback model for the same provider only
         try:
             fallback_model = provider_config["models"]["fallback"]
             fallback_client = get_provider_client(model=fallback_model, use_cache=False)
             print(f"Trying fallback model: {fallback_model}")
-            response_text = _try_call_model(fallback_client, fallback_model, messages, 3000, f"Fallback ({current_provider})")
+            response_text = _try_call_model(fallback_client, fallback_model, messages, 3000, f"Fallback ({CHAT_PROVIDER_1})")
             update_model_cache(fallback_model)
         except Exception as fallback_e:
             print(f"Fallback model {fallback_model} also failed: {fallback_e}")
             traceback.print_exc()
-            
-            # If all models from current provider failed, try the other provider
-            other_provider = "openrouter" if current_provider == "together" else "together"
-            other_config = PROVIDER_CONFIGS[other_provider]
-            try:
-                other_model = other_config["models"]["primary"]
-                other_client = get_provider_client(model=other_model, use_cache=False)
-                print(f"Trying alternative provider {other_provider} with model {other_model}")
-                response_text = _try_call_model(other_client, other_model, messages, 3000, f"Alternative ({other_provider})")
-                update_model_cache(other_model)
-            except Exception as other_e:
-                print(f"Alternative provider {other_provider} also failed: {other_e}")
-                traceback.print_exc()
-                return "LLM models failed due to error (all providers).", filtered_articles, previous_selections
+            return "LLM models failed due to error (all models for selected provider).", filtered_articles, previous_selections
 
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
         return "No response from LLM models.", filtered_articles, previous_selections
@@ -533,11 +527,26 @@ if __name__ == "__main__":
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
-    parser.add_argument('--provider', choices=['together','openrouter'], default='together', help='Primary chat provider: together or openrouter')
+    parser.add_argument('--provider', choices=['together','openrouter'], default='openrouter', help='Primary chat provider: together or openrouter')
+    parser.add_argument('--compare', action='store_true', help='Run in comparison mode (compare two providers/models)')
     args = parser.parse_args()
 
     # Configure primary provider from CLI
     CHAT_PROVIDER_1 = args.provider
+    # Set MODEL_1 dynamically based on selected provider
+    MODEL_1 = PROVIDER_CONFIGS[CHAT_PROVIDER_1]["models"]["primary"]
+
+    # Set MODEL_2 dynamically to fallback model for selected provider (for comparison mode)
+    MODEL_2 = PROVIDER_CONFIGS[CHAT_PROVIDER_1]["models"].get("fallback", MODEL_1)
+
+    # Set RUN_MODE to 'compare' if --compare is specified
+    if args.compare:
+        RUN_MODE = "compare"
+        # In compare mode, use openrouter for both, but with dedicated comparison models
+        CHAT_PROVIDER_1 = "openrouter"
+        MODEL_1 = PROVIDER_CONFIGS["openrouter"]["models"]["primary_compare"]
+        CHAT_PROVIDER_2 = "openrouter"
+        MODEL_2 = PROVIDER_CONFIGS["openrouter"]["models"]["fallback_compare"]
 
     cwd = os.getcwd()
     for mode_key in MODE_TO_PATH.keys(): # Use mode_key to avoid conflict
@@ -550,3 +559,4 @@ if __name__ == "__main__":
                 if args.force or current_hour in hours or args.dry_run or RUN_MODE == "compare": # Ensure dry-run/compare always run if specified
                     main(mode_key, dry_run=args.dry_run) # Pass dry_run flag
             break
+
