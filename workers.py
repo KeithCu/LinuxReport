@@ -1,19 +1,18 @@
 # This file contains worker functions for fetching and processing RSS feeds.
 # Functions include parallel fetching, thread management, and feed processing.
 
-from datetime import datetime
+# Standard library imports
+from datetime import datetime, timedelta
 import concurrent.futures
 import itertools
-# Standard library imports
 import os
 import re
+from time import mktime
 import threading
 from timeit import default_timer as timer
 
 # Third-party imports
 import feedparser
-from time import mktime
-from datetime import timedelta
 from fake_useragent import UserAgent
 ua = UserAgent()
 
@@ -23,7 +22,7 @@ from feedfilter import filter_similar_titles, merge_entries, prefilter_news
 from seleniumfetch import fetch_site_posts
 from shared import (
     ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, TZ,
-    USE_TOR, USER_AGENT, RssFeed, g_c, g_cs, DiskcacheSqliteLock, GLOBAL_FETCH_MODE_LOCK_KEY
+    USE_TOR, USER_AGENT, RssFeed, g_c, g_cs, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY
 )
 from Tor import fetch_via_tor
 
@@ -42,7 +41,7 @@ def load_url_worker(url):
     lock_key = f"feed_fetch:{url}"
 
     # Use the DiskcacheSqliteLock to ensure only one process fetches this URL at a time
-    with DiskcacheSqliteLock(lock_key, owner_prefix=f"feed_worker_{os.getpid()}") as lock:
+    with get_lock(lock_key, owner_prefix=f"feed_worker_{os.getpid()}") as lock:
         if not lock.locked():
             print(f"Could not acquire lock for {url}, another process is fetching.")
             return
@@ -167,7 +166,7 @@ def handle_lwn_feed(url):
 def wait_and_set_fetch_mode():
     """Acquires a global lock to prevent thundering herd for fetch cycles."""
     # Attempt to acquire the lock, waiting if necessary
-    lock = DiskcacheSqliteLock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_mode_{os.getpid()}")
+    lock = get_lock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_mode_{os.getpid()}")
     if lock.acquire(wait=True, max_wait_seconds=60): # Wait up to 60 seconds
         print("Acquired global fetch lock.")
         return lock
@@ -228,7 +227,7 @@ def fetch_urls_thread():
     # Check if a fetch/refresh operation is already running using the global lock.
     
     # Create a lock instance just for checking, don't hold it long.
-    check_lock = DiskcacheSqliteLock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_check_{os.getpid()}")
+    check_lock = get_lock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_check_{os.getpid()}")
 
     if not check_lock.acquire(wait=False):
         print("Fetch/refresh operation already in progress. Skipping background refresh trigger.")

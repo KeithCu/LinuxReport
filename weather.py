@@ -18,7 +18,7 @@ import geoip2.database
 import requests
 
 # Local imports
-from shared import DEBUG, g_cs as g_c, DiskcacheSqliteLock
+from shared import DEBUG, g_cs as g_c, get_lock
 
 # --- Arbitrary bucket resolution (miles-based) ---
 WEATHER_BUCKET_SIZE_MILES = 10  # default bucket diameter in miles (good balance for weather data)
@@ -136,7 +136,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
 
     # Acquire lock specific to this location bucket
     # The 'with' statement handles waiting and acquisition via __enter__
-    with DiskcacheSqliteLock(lock_key) as lock:
+    with get_lock(lock_key) as lock:
 
         # Re-check cache *inside* the lock to prevent race condition
         bucketed_weather = get_bucketed_weather_cache(lat, lon)
