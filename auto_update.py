@@ -155,6 +155,9 @@ MODEL_2 = PROVIDER_CONFIGS["openrouter"]["models"]["primary"] # Model for provid
 # Add unified provider client cache (for normal mode)
 provider_client_cache = None
 
+# Optional: include more article data (summary, etc) in LLM prompt
+INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
+
 # Helper: Map model name to provider info
 def get_provider_info_from_model(model_name):
     """Get provider configuration based on model name or provider name."""
@@ -281,14 +284,25 @@ def extract_top_titles_from_ai(text):
 
 def _prepare_messages(prompt_mode, filtered_articles):
     """Prepares the message list based on the prompt mode."""
+    if INCLUDE_ARTICLE_SUMMARY_FOR_LLM:
+        def article_line(i, article):
+            summary = article.get('summary') or article.get('html_content') or ''
+            if summary:
+                return f"{i}. {article['title']}\n    Summary: {summary.strip()}"
+            else:
+                return f"{i}. {article['title']}"
+    else:
+        def article_line(i, article):
+            return f"{i}. {article['title']}"
+
     if prompt_mode == "o3":
-        user_list = "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
+        user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [
             {"role": "system", "content": PROMPT_O3_SYSTEM},
             {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=modetoprompt2[MODE]) + user_list},
         ]
     else: # Default mode
-        prompt = PROMPT_AI + "\n" + "\n".join(f"{i}. {article['title']}" for i, article in enumerate(filtered_articles, 1))
+        prompt = PROMPT_AI + "\n" + "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [{"role": "user", "content": prompt}]
     return messages
 
