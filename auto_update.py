@@ -28,10 +28,33 @@ from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, DiskCacheWrapper, Mode, g
 
 MAX_PREVIOUS_HEADLINES = 200
 
-# Model configuration with primary and fallback options
-#These model names only work with together.ai, not openrouter
-PRIMARY_MODEL  = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
-FALLBACK_MODEL = "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+# Provider configurations
+PROVIDER_CONFIGS = {
+    "together": {
+        "api_key_env_var": "TOGETHER_API_KEY_LINUXREPORT",
+        "base_url": "https://api.together.xyz/v1",
+        "models": {
+            "primary": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+            "fallback": "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+        }
+    },
+    "openrouter": {
+        "api_key_env_var": "OPENROUTER_API_KEY",
+        "base_url": "https://openrouter.ai/api/v1",
+        "models": {
+            "primary": "meta-llama/llama-3.3-70b-instruct:free",
+            "fallback": "meta-llama/llama-3.3-70b-instruct:floor"
+        },
+        "headers": {
+            "HTTP-Referer": "https://linuxreport.net",
+            "X-Title": "LinuxReport"
+        }
+    }
+}
+
+# Default to Together AI's primary model
+PRIMARY_MODEL = PROVIDER_CONFIGS["together"]["models"]["primary"]
+FALLBACK_MODEL = PROVIDER_CONFIGS["together"]["models"]["fallback"]
 
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
@@ -107,7 +130,6 @@ Some headlines are irrelevant—discard them.
 INPUT TITLES:
 """
 
-# --- End Configuration and Prompt Constants ---
 
 # --- Global Variables ---
 cache = DiskCacheWrapper(".")
@@ -125,40 +147,38 @@ MODEL_1 = PRIMARY_MODEL # Model for provider 1 (uses the globally defined PRIMAR
 # Configuration for the secondary provider/model (for comparison mode)
 CHAT_PROVIDER_2 = "openrouter" # options: "together", "openrouter"
 PROMPT_MODE_2 = "default"      # options: "default", "o3"
-MODEL_2 = "openai/gpt-4o" # Model for provider 2 (example)
-# --- End Global Configuration ---
+MODEL_2 = PROVIDER_CONFIGS["openrouter"]["models"]["primary"] # Model for provider 2
 
 # Add unified provider client cache (for normal mode)
 provider_client_cache = None
 
 # Helper: Map model name to provider info
 def get_provider_info_from_model(model_name):
-    if "openrouter" in model_name:
-        return {"provider": "openrouter",
-                "api_key_env_var": "OPENROUTER_API_KEY",
-                "base_url": "https://openrouter.ai/api/v1"}
-    else:
-        # default to Together AI
-        return {"provider": "together",
-                "api_key_env_var": "TOGETHER_API_KEY_LINUXREPORT",
-                "base_url": "https://api.together.xyz/v1"}
-
-# Simplified provider client: infer provider from model
-def get_provider_client(model=None, use_cache=True): # Renamed cache parameter
-    global provider_client_cache
-    if model is None:
-        model = get_current_model()
-    info = get_provider_info_from_model(model)
-    from openai import OpenAI
-    api_key = os.environ.get(info["api_key_env_var"])
-    if not api_key:
-        raise ValueError(f"API key {info['api_key_env_var']} not set for provider {info['provider']}")
-    if use_cache: # Use renamed parameter
-        if provider_client_cache is None:
-            provider_client_cache = OpenAI(api_key=api_key, base_url=info["base_url"])
-        return provider_client_cache
-    else:
-        return OpenAI(api_key=api_key, base_url=info["base_url"])
+    """Get provider configuration based on model name or provider name."""
+    # First try to find provider by model name
+    for provider, config in PROVIDER_CONFIGS.items():
+        if any(model_name == model for model in config["models"].values()):
+            return {
+                "provider": provider,
+                "api_key_env_var": config["api_key_env_var"],
+                "base_url": config["base_url"]
+            }
+    
+    # If not found by model name, try by provider name
+    if model_name in PROVIDER_CONFIGS:
+        config = PROVIDER_CONFIGS[model_name]
+        return {
+            "provider": model_name,
+            "api_key_env_var": config["api_key_env_var"],
+            "base_url": config["base_url"]
+        }
+    
+    # Default to Together AI if no match found
+    return {
+        "provider": "together",
+        "api_key_env_var": PROVIDER_CONFIGS["together"]["api_key_env_var"],
+        "base_url": PROVIDER_CONFIGS["together"]["base_url"]
+    }
 
 def get_current_model():
     """Get the current working model, with fallback mechanism."""
@@ -167,8 +187,9 @@ def get_current_model():
     if cached_model:
         return cached_model
     
-    # Default to PRIMARY_MODEL if no cached info
-    return PRIMARY_MODEL
+    # Get the current provider's primary model
+    provider_config = PROVIDER_CONFIGS.get(CHAT_PROVIDER_1, PROVIDER_CONFIGS["together"])
+    return provider_config["models"]["primary"]
 
 def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
@@ -177,22 +198,59 @@ def update_model_cache(model):
         return
     g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
 
+def get_provider_client(model=None, use_cache=True):
+    """Get a client for the specified model or provider."""
+    global provider_client_cache
+    
+    if model is None:
+        model = get_current_model()
+    
+    info = get_provider_info_from_model(model)
+    from openai import OpenAI
+    
+    # Get API key from environment
+    api_key = os.environ.get(info["api_key_env_var"])
+    if not api_key:
+        raise ValueError(f"API key {info['api_key_env_var']} not set for provider {info['provider']}")
+    
+    # If using cache and we have a cached client for this provider
+    if use_cache and provider_client_cache is not None:
+        return provider_client_cache
+    
+    # Create new client with provider-specific configuration
+    client = OpenAI(
+        api_key=api_key,
+        base_url=info["base_url"]
+    )
+    
+    # Add OpenRouter-specific headers if needed
+    if info["provider"] == "openrouter" and "headers" in PROVIDER_CONFIGS["openrouter"]:
+        for header, value in PROVIDER_CONFIGS["openrouter"]["headers"].items():
+            client._client.headers[header] = value
+    
+    # Cache the client if requested
+    if use_cache:
+        provider_client_cache = client
+    
+    return client
+
 def _try_call_model(client, model, messages, max_tokens, provider_label=""):
     """Helper function to call a specific model using a provided client instance."""
     start = timer()
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        max_tokens=max_tokens,
-    )
-    end = timer()
-    response_text = response.choices[0].message.content
-    print(f"LLM Response from {provider_label} ({model}) in {end - start:.3f}s:")
-    print(response_text)
-    return response_text
-
-
-
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            max_tokens=max_tokens,
+        )
+        end = timer()
+        response_text = response.choices[0].message.content
+        print(f"LLM Response from {provider_label} ({model}) in {end - start:.3f}s:")
+        print(response_text)
+        return response_text
+    except Exception as e:
+        print(f"Error calling model {model} ({provider_label}): {e}")
+        raise
 
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text after the first '***' marker."""
@@ -244,7 +302,7 @@ def ask_ai_top_articles(articles):
 
     if not filtered_articles:
         print("No new articles available after deduplication.")
-        return "No new articles to rank.", [], previous_selections # Return structure includes articles and selections
+        return "No new articles to rank.", [], previous_selections
 
     # --- Prepare Messages ---
     messages = _prepare_messages(PROMPT_MODE_1, filtered_articles)
@@ -252,28 +310,45 @@ def ask_ai_top_articles(articles):
     print(messages)
 
     # --- Call Primary LLM ---
-    primary_client = get_provider_client() # Get cached primary client
-    current_model = get_current_model() # Uses MODEL_CACHE_DURATION cache
+    current_provider = CHAT_PROVIDER_1
+    current_model = get_current_model()
+    provider_config = PROVIDER_CONFIGS[current_provider]
     response_text = None
 
     try:
-        response_text = _try_call_model(primary_client, current_model, messages, 3000, f"Primary ({CHAT_PROVIDER_1})")
-        # If successful with primary model, ensure cache reflects it (might have been on fallback before)
+        primary_client = get_provider_client(model=current_model, use_cache=True)
+        response_text = _try_call_model(primary_client, current_model, messages, 3000, f"Primary ({current_provider})")
+        # If successful with primary model, ensure cache reflects it
         update_model_cache(current_model)
 
-    except Exception as e: # Keep general for other unexpected errors (network, etc.)
-        print(f"Error with model {current_model} ({CHAT_PROVIDER_1}): {e}")
-        traceback.print_exc() # Print traceback for unexpected errors
-        # Fallback to secondary model if configured
+    except Exception as e:
+        print(f"Error with model {current_model} ({current_provider}): {e}")
+        traceback.print_exc()
+        
+        # Try fallback model from same provider
         try:
-            fallback_client = get_provider_client(model=FALLBACK_MODEL, use_cache=False)
-            print(f"Trying fallback model: {FALLBACK_MODEL}")
-            response_text = _try_call_model(fallback_client, FALLBACK_MODEL, messages, 3000, f"Fallback ({CHAT_PROVIDER_1})")
-            update_model_cache(FALLBACK_MODEL)
+            fallback_model = provider_config["models"]["fallback"]
+            fallback_client = get_provider_client(model=fallback_model, use_cache=False)
+            print(f"Trying fallback model: {fallback_model}")
+            response_text = _try_call_model(fallback_client, fallback_model, messages, 3000, f"Fallback ({current_provider})")
+            update_model_cache(fallback_model)
         except Exception as fallback_e:
-            print(f"Fallback model {FALLBACK_MODEL} also failed: {fallback_e}")
+            print(f"Fallback model {fallback_model} also failed: {fallback_e}")
             traceback.print_exc()
-            return "LLM model failed due to error (primary and fallback).", filtered_articles, previous_selections
+            
+            # If all models from current provider failed, try the other provider
+            other_provider = "openrouter" if current_provider == "together" else "together"
+            other_config = PROVIDER_CONFIGS[other_provider]
+            try:
+                other_model = other_config["models"]["primary"]
+                other_client = get_provider_client(model=other_model, use_cache=False)
+                print(f"Trying alternative provider {other_provider} with model {other_model}")
+                response_text = _try_call_model(other_client, other_model, messages, 3000, f"Alternative ({other_provider})")
+                update_model_cache(other_model)
+            except Exception as other_e:
+                print(f"Alternative provider {other_provider} also failed: {other_e}")
+                traceback.print_exc()
+                return "LLM models failed due to error (all providers).", filtered_articles, previous_selections
 
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
         return "No response from LLM models.", filtered_articles, previous_selections
@@ -291,7 +366,6 @@ def ask_ai_top_articles(articles):
     updated_selections = previous_selections + new_selections
     if len(updated_selections) > MAX_PREVIOUS_HEADLINES:
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
-    # Defer g_c.put to main function after potential dry-run check
 
     return response_text, top_articles, updated_selections
 
@@ -458,7 +532,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate report with optional force update')
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
-    parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files') # Add dry-run arg
+    parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
     parser.add_argument('--provider', choices=['together','openrouter'], default='together', help='Primary chat provider: together or openrouter')
     args = parser.parse_args()
 
