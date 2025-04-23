@@ -6,19 +6,18 @@ Contains core utility functions, constants, and image dimension logic
 extracted from image_processing.py.
 """
 import re
-# import os # Unused
 import requests
 from io import BytesIO
-from PIL import Image # Removed UnidentifiedImageError
+from PIL import Image
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
 
 # === Constants and Configuration ===
-DEBUG_LOGGING = True # Copy from image_processing.py
-HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/113.0'} # Copy from image_processing.py
-EXCLUDED_PATTERNS = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'css', 'advertisement', 'michaellarabel'] # Copy from image_processing.py
-EXCLUDED_RE = re.compile(r"(?:" + r"|".join(re.escape(p) for p in EXCLUDED_PATTERNS) + r")", re.IGNORECASE) # Copy from image_processing.py
-IMAGE_EXT_RE = re.compile(r"\\.(jpe?g|png|webp|gif|svg)([?#].*)?$", re.IGNORECASE) # Copy from image_processing.py
+DEBUG_LOGGING = True
+HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:138.0) Gecko/20100101 Firefox/138.0'}
+EXCLUDED_PATTERNS = ['logo', 'icon', 'avatar', 'banner', 'emoji', 'css', 'advertisement', 'michaellarabel']
+EXCLUDED_RE = re.compile(r"(?:" + r"|".join(re.escape(p) for p in EXCLUDED_PATTERNS) + r")", re.IGNORECASE)
+IMAGE_EXT_RE = re.compile(r"\\.(jpe?g|png|webp|gif|svg)([?#].*)?$", re.IGNORECASE)
 
 # === Utility Functions ===
 
@@ -33,8 +32,6 @@ def parse_dimension(value):
     # Extract leading numeric value (int or float)
     m = re.match(r'^\s*(\d+(?:\.\d+)?)', str(value))
     return float(m.group(1)) if m else 0
-
-
 
 def extract_dimensions_from_tag_or_style(tag):
     width = 0
