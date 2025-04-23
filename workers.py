@@ -49,6 +49,7 @@ def load_url_worker(url):
 
         start = timer()
         rssfeed = None
+        res = None  # Ensure res is always defined
 
         if "lwn.net" in url:
             new_entries = handle_lwn_feed(url)
@@ -71,8 +72,12 @@ def load_url_worker(url):
 
         # Added detailed logging when no entries are found
         if len(new_entries) == 0:
-            http_status = res.get("status", "unknown") if hasattr(res, "get") else "unknown"
-            bozo_exception = res.get("bozo_exception", "None") if hasattr(res, "get") else "None"
+            if res is not None:
+                http_status = res.get("status", "unknown") if hasattr(res, "get") else "unknown"
+                bozo_exception = res.get("bozo_exception", "None") if hasattr(res, "get") else "None"
+            else:
+                http_status = "N/A (LWN feed)"
+                bozo_exception = "N/A (LWN feed)"
             print(f"No entries found for {url}. HTTP status: {http_status}. Bozo exception: {bozo_exception}")
 
         for entry in new_entries:
