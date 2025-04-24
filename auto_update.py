@@ -10,24 +10,22 @@ import json
 import traceback
 import time
 
-# Import from our new modular files instead of auto_update_utils
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
-    fetch_recent_articles,
-    get_embedding,
-    deduplicate_articles_with_exclusions,
+    fetch_recent_articles, get_embedding, deduplicate_articles_with_exclusions,
     get_best_matching_article
 )
 from html_generation import (
-    generate_headlines_html,
-    refresh_images_only
+    generate_headlines_html, refresh_images_only
 )
 
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c)
 
 # --- Configuration and Prompt Constants ---
-
 MAX_PREVIOUS_HEADLINES = 200
+
+# How many articles from each feed to consider for the LLM
+MAX_ARTICLES_PER_FEED_FOR_LLM = 5
 
 # Provider configurations
 PROVIDER_CONFIGS = {

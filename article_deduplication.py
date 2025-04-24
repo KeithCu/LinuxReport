@@ -81,6 +81,7 @@ def extract_articles_from_html(html_file):
 
 def fetch_recent_articles(all_urls, cache):
     """Fetch recent articles from RSS feeds stored in cache."""
+    from auto_update import MAX_ARTICLES_PER_FEED_FOR_LLM
     articles = []
     for feed_url, _ in all_urls.items():
         feed = cache.get(feed_url)
@@ -93,7 +94,7 @@ def fetch_recent_articles(all_urls, cache):
             title = entry["title"]
             articles.append({"title": title, "url": entry["link"]})
             count += 1
-            if count == 5:
+            if count == MAX_ARTICLES_PER_FEED_FOR_LLM:
                 break
 
     return articles
