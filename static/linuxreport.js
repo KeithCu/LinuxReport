@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
   // Read theme cookie or default
   var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
-  var theme = match ? match[1] : 'paper';
+  var theme = match ? match[1] : 'silver';
   // Apply theme class to body
   document.body.classList.add('theme-' + theme);
   // Set dropdown to current theme
