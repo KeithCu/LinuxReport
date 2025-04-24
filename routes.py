@@ -185,7 +185,7 @@ def init_app(flask_app):
                 expire = 30
             g_c.put(page_order_s + suffix, page, timeout=expire)
 
-        # Trigger background fetching if needed.
+        # Trigger background fetching if needed
         if need_fetch:
             fetch_urls_thread()
 
@@ -326,6 +326,7 @@ def init_app(flask_app):
             headlines = headlines[3:]
         else:
             headlines = []
+        is_admin = request.cookies.get('isAdmin') == '1'
         return render_template(
             'old_headlines.html',
             headlines=headlines,
@@ -333,8 +334,49 @@ def init_app(flask_app):
             title=f"Old Headlines - {mode_str.title()}Report",
             favicon=FAVICON,
             logo_url=LOGO_URL,
-            description=WEB_DESCRIPTION
+            description=WEB_DESCRIPTION,
+            is_admin=is_admin
         )
+
+    @flask_app.route('/api/delete_headline', methods=['POST'])
+    def delete_headline():
+        is_admin = request.cookies.get('isAdmin') == '1'
+        if not is_admin:
+            return jsonify({'error': 'Unauthorized'}), 403
+        data = request.get_json()
+        url = data.get('url')
+        timestamp = data.get('timestamp')
+        mode_map = {
+            Mode.LINUX_REPORT: 'linux',
+            Mode.COVID_REPORT: 'covid',
+            Mode.TECHNO_REPORT: 'techno',
+            Mode.AI_REPORT: 'ai',
+            Mode.TRUMP_REPORT: 'trump',
+        }
+        mode_str = mode_map.get(MODE)
+        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
+        try:
+            with open(archive_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            new_lines = []
+            deleted = False
+            for line in lines:
+                try:
+                    entry = json.loads(line)
+                    if entry.get('url') == url and entry.get('timestamp') == timestamp:
+                        deleted = True
+                        continue
+                except Exception:
+                    pass
+                new_lines.append(line)
+            if deleted:
+                with open(archive_file, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+                return jsonify({'success': True})
+            else:
+                return jsonify({'error': 'Not found'}), 404
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
     @flask_app.route('/api/comments', methods=['GET'])
     def get_comments():

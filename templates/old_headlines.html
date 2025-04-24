@@ -65,9 +65,12 @@
         <h2>Old Headlines ({{ mode.title() }}Report)</h2>
         {% if headlines %}
             {% for h in headlines %}
-                <div class="headline-entry">
-                    <div class="headline-title">
-                        <a href="{{ h.url }}" target="_blank">{{ h.title }}</a>
+                <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
+                    <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span><a href="{{ h.url }}" target="_blank">{{ h.title }}</a></span>
+                        {% if is_admin %}
+                        <button class="delete-headline-btn" title="Delete" style="background: none; border: none; color: #888; font-size: 1.2em; cursor: pointer; margin-left: 8px; padding: 0; line-height: 1;">&#10005;</button>
+                        {% endif %}
                     </div>
                     {% if h.image_url %}
                         <img src="{{ h.image_url }}" class="headline-image" alt="headline image">
@@ -81,5 +84,6 @@
             <p>No old headlines found for this report.</p>
         {% endif %}
     </div>
+    <script src="/static/linuxreport.js?v={{ static_file_hash('linuxreport.js') }}"></script>
 </body>
 </html>

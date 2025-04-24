@@ -752,3 +752,37 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+// --- Old Headlines Admin Delete Button ---
+(function() {
+  // Only run on old_headlines page
+  const archiveContainer = document.querySelector('.headline-archive-container');
+  if (!archiveContainer) return;
+  // is_admin is injected as a global variable by Jinja
+  const isAdmin = typeof window.isAdmin !== 'undefined' ? window.isAdmin : (document.cookie.split('; ').some(item => item.trim().startsWith('isAdmin=1')));
+  if (isAdmin) {
+    archiveContainer.addEventListener('click', function(e) {
+      if (e.target.classList.contains('delete-headline-btn')) {
+        const entry = e.target.closest('.headline-entry');
+        const url = entry.getAttribute('data-url');
+        const timestamp = entry.getAttribute('data-timestamp');
+        if (confirm('Delete this headline?')) {
+          fetch('/api/delete_headline', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, timestamp })
+          })
+          .then(r => r.json())
+          .then(resp => {
+            if (resp.success) {
+              entry.remove();
+            } else {
+              alert('Delete failed: ' + (resp.error || 'Unknown error'));
+            }
+          })
+          .catch(() => alert('Delete failed.'));
+        }
+      }
+    });
+  }
+})();
