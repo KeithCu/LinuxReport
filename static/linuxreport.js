@@ -701,7 +701,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Apply theme and font classes
   var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
-  var theme = match ? match[1] : 'paper';
+  var theme = match ? match[1] : 'silver';
   document.body.classList.add('theme-' + theme);
   var fontMatch = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
   var font = fontMatch ? fontMatch[1] : 'system';
