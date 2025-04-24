@@ -50,7 +50,7 @@ def static_file_hash(filename):
 # Make static_file_hash available to all templates
 g_app.jinja_env.globals['static_file_hash'] = static_file_hash
 
-# Import routes and pass the app instance
-import routes
+# Import only init_app to avoid circular import
+from routes import init_app
 
-routes.init_app(g_app)
+init_app(g_app)
