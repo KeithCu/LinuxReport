@@ -28,3 +28,8 @@ class RssInfo:
         self.logo_url = logo_url
         self.logo_alt = logo_alt
         self.site_url = site_url
+
+DEBUG = False
+
+# Add a global config for Tor usage
+USE_TOR = True

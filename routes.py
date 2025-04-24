@@ -15,12 +15,12 @@ import ipaddress # Add ipaddress import
 import time # Import time for SSE sleep
 
 # Third-party imports
-from flask import g, jsonify, render_template, request, make_response, Response
+from flask import g, jsonify, render_template, request, make_response, Response, current_app
 from markupsafe import Markup
 from werkzeug.utils import secure_filename # For secure file uploads
 
 from forms import ConfigForm, CustomRSSForm, UrlForm
-from models import RssInfo
+from models import RssInfo, DEBUG
 # Local imports
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
@@ -28,7 +28,6 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
                     WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, MODE, PATH, format_last_updated, get_chat_cache)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
-from app import DEBUG
 
 # Constants for Chat Feature
 MAX_COMMENTS = 1000
@@ -63,6 +62,7 @@ def get_ip_prefix(ip_str):
 
 # Function to initialize routes
 def init_app(flask_app):
+    global DEBUG
     
     @flask_app.route('/')
     def index():

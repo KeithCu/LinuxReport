@@ -15,9 +15,9 @@ sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
 from shared import EXPIRE_WEEK, PATH
+from models import USE_TOR
 
 DEBUG = False
-USE_TOR = True
 
 # Initialize Flask app
 g_app = Flask(__name__)
@@ -29,6 +29,7 @@ if DEBUG or g_app.debug:
 
 g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 g_app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Limit uploads to 5MB
+g_app.config['DEBUG'] = DEBUG
 
 # Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
