@@ -4,7 +4,6 @@ app.py
 Main entry point for the Flask application. Initializes the Flask app, configures extensions, loads shared settings, and registers routes.
 """
 import sys
-import subprocess
 import os
 import hashlib
 
@@ -15,7 +14,10 @@ from flask_mobility import Mobility
 sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
-from shared import DEBUG, EXPIRE_WEEK, PATH
+from shared import EXPIRE_WEEK, PATH
+
+DEBUG = False
+USE_TOR = True
 
 # Initialize Flask app
 g_app = Flask(__name__)
@@ -30,8 +32,6 @@ g_app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Limit uploads to 5MB
 
 # Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
-
-USE_TOR = True
 
 def get_file_hash(filepath):
     """Get a hash of the file contents"""

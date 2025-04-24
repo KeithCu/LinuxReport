@@ -22,12 +22,13 @@ from werkzeug.utils import secure_filename # For secure file uploads
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo
 # Local imports
-from shared import (ABOVE_HTML_FILE, ALL_URLS, DEBUG, EXPIRE_MINUTES,
+from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
                     WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, MODE, PATH, format_last_updated, get_chat_cache)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
+from app import DEBUG
 
 # Constants for Chat Feature
 MAX_COMMENTS = 1000

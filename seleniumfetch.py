@@ -23,9 +23,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
 # Local imports
-import shared
-
-g_cache = shared.DiskCacheWrapper("/tmp")
+from shared import g_cs
 
 def create_driver(use_tor, user_agent):
     options = Options()
@@ -146,7 +144,7 @@ def fetch_site_posts(url, user_agent):
     if config.get("needs_selenium", True):
 
         if "reddit" in site:
-            user_agent = g_cache.get("REDDIT_USER_AGENT")
+            user_agent = g_cs.get("REDDIT_USER_AGENT")
         driver = create_driver(config["needs_tor"], user_agent)
         try:
             driver.get(url)

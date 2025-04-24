@@ -21,10 +21,11 @@ import shared
 from feedfilter import filter_similar_titles, merge_entries, prefilter_news
 from seleniumfetch import fetch_site_posts
 from shared import (
-    ALL_URLS, DEBUG, EXPIRE_WEEK, MAX_ITEMS, TZ,
-    USE_TOR, USER_AGENT, RssFeed, g_c, g_cs, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY
+    ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
+    USER_AGENT, RssFeed, g_c, g_cs, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY
 )
 from Tor import fetch_via_tor
+from app import USE_TOR, DEBUG
 
  #Reddit is a pain, so hide user_agent
 if not g_cs.has("REDDIT_USER_AGENT"):
@@ -167,7 +168,7 @@ def wait_and_set_fetch_mode():
     """Acquires a global lock to prevent thundering herd for fetch cycles."""
     # Attempt to acquire the lock, waiting if necessary
     lock = get_lock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_mode_{os.getpid()}")
-    if lock.acquire(wait=True, max_wait_seconds=60): # Wait up to 60 seconds
+    if lock.acquire(timeout_seconds=60, wait=True): # Wait up to 60 seconds
         print("Acquired global fetch lock.")
         return lock
     else:

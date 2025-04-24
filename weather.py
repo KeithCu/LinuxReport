@@ -18,7 +18,8 @@ import geoip2.database
 import requests
 
 # Local imports
-from shared import DEBUG, g_cs as g_c, get_lock
+from app import DEBUG
+from shared import g_cs as g_c, get_lock
 
 # --- Arbitrary bucket resolution (miles-based) ---
 WEATHER_BUCKET_SIZE_MILES = 10  # default bucket diameter in miles (good balance for weather data)

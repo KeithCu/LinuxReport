@@ -31,7 +31,6 @@ class Mode(Enum):
     SPACE_REPORT = 7
 
 # Constants
-DEBUG: bool = False
 
 # Path for code and cache
 PATH: str = "/srv/http/LinuxReport2"
@@ -49,7 +48,6 @@ MODE = Mode.AI_REPORT
 
 # Constants for configuration
 URLS_COOKIE_VERSION = "2"
-USE_TOR = True
 
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
