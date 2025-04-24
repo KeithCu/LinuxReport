@@ -270,6 +270,7 @@ def _try_call_model(client, model, messages, max_tokens, provider_label=""):
             print(f"[_try_call_model] Response from {provider_label} ({model}) in {end - start:.3f}s, finish_reason: {finish_reason}")
             if finish_reason != "stop":
                 print(f"Warning: Response finish_reason is {finish_reason}")
+            print(f"[_try_call_model] Model response (Attempt {attempt}):\n{response_text}\n{'-'*40}")
             return response_text
         except Exception as e:
             print(f"Error on attempt {attempt} for model {model} ({provider_label}): {e}")
