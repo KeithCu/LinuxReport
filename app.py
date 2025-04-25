@@ -6,6 +6,7 @@ Main entry point for the Flask application. Initializes the Flask app, configure
 import sys
 import os
 import hashlib
+from functools import lru_cache
 
 # Third-party imports
 from flask import Flask
@@ -42,6 +43,7 @@ def get_file_hash(filepath):
     except:
         return 'dev'
 
+@lru_cache(maxsize=10)
 def static_file_hash(filename):
     """Get the hash for a specific static file"""
     static_dir = os.path.join(PATH, 'static')
