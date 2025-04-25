@@ -25,7 +25,7 @@ from models import RssInfo, DEBUG
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, Mode, MODE, PATH, format_last_updated, get_chat_cache)
+                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -299,14 +299,7 @@ def init_app(flask_app):
 
     @flask_app.route('/old_headlines')
     def old_headlines():
-        mode_map = {
-            Mode.LINUX_REPORT: 'linux',
-            Mode.COVID_REPORT: 'covid',
-            Mode.TECHNO_REPORT: 'techno',
-            Mode.AI_REPORT: 'ai',
-            Mode.TRUMP_REPORT: 'trump',
-        }
-        mode_str = mode_map.get(MODE)
+        mode_str = MODE_MAP.get(MODE)
         archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
         headlines = []
         try:
@@ -346,14 +339,7 @@ def init_app(flask_app):
         data = request.get_json()
         url = data.get('url')
         timestamp = data.get('timestamp')
-        mode_map = {
-            Mode.LINUX_REPORT: 'linux',
-            Mode.COVID_REPORT: 'covid',
-            Mode.TECHNO_REPORT: 'techno',
-            Mode.AI_REPORT: 'ai',
-            Mode.TRUMP_REPORT: 'trump',
-        }
-        mode_str = mode_map.get(MODE)
+        mode_str = MODE_MAP.get(MODE)
         archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
         try:
             with open(archive_file, "r", encoding="utf-8") as f:

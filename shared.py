@@ -12,7 +12,6 @@ import uuid
 from enum import Enum
 from typing import Any, Optional, cast, Type
 from abc import ABC, abstractmethod
-import multiprocessing
 
 import diskcache
 
@@ -87,6 +86,14 @@ WELCOME_HTML = (
 )
 STANDARD_ORDER_STR = str(site_urls)
 
+MODE_MAP = {
+    Mode.LINUX_REPORT: 'linux',
+    Mode.COVID_REPORT: 'covid',
+    Mode.TECHNO_REPORT: 'techno',
+    Mode.AI_REPORT: 'ai',
+    Mode.TRUMP_REPORT: 'trump',
+}
+
 # Classes
 class RssFeed:
     """Represents an RSS feed with entries and optional top articles."""
@@ -107,6 +114,9 @@ class RssFeed:
 
 class DiskCacheWrapper:
     """Wrapper for diskcache to manage caching operations."""
+    # In-memory cache (shared by all DiskCacheWrapper instances)
+    _mem_cache = {}
+
     def __init__(self, cache_dir: str) -> None:
         self.cache = diskcache.Cache(cache_dir)
 
@@ -154,17 +164,16 @@ class DiskCacheWrapper:
         """Cache the last fetch timestamp for a feed."""
         self.put(url + ":last_fetch", timestamp, timeout)
 
-    # Template cache accessors for clarity
+    # Template cache accessors for clarity (now in-memory only)
     def get_template(self, site_key: str) -> Optional[str]:
-        """Retrieve a rendered template from cache."""
-        value = self.get(site_key)
-        return cast(Optional[str], value)
+        """Retrieve a rendered template from in-memory cache."""
+        return self._mem_cache.get(site_key)
 
     def set_template(self, site_key: str, template: str, timeout: Optional[int] = None) -> None:
-        """Cache a rendered template with optional timeout."""
+        """Cache a rendered template in memory (ignores timeout)."""
         if not isinstance(template, str):
             raise TypeError(f"set_template expects str, got {type(template).__name__}")
-        self.put(site_key, template, timeout)
+        self._mem_cache[site_key] = template
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")
@@ -254,7 +263,7 @@ class DiskcacheSqliteLock(LockBase):
                 
                 # Lock exists and is still valid
                 if current_value is not None:
-                    owner, expiry_time = current_value
+                    expiry_time = current_value[1]
                     # Lock is still valid
                     if now < expiry_time:
                         return False
@@ -272,6 +281,11 @@ class DiskcacheSqliteLock(LockBase):
                 
                 self._locked = False
                 return False
+        except (diskcache.Timeout, Timeout) as e:
+            # Log the exception but don't crash
+            print(f"Error acquiring lock {self.lock_key}: {e}")
+            self._locked = False
+            return False
         except Exception as e:
             # Log the exception but don't crash
             print(f"Error acquiring lock {self.lock_key}: {e}")
@@ -357,7 +371,12 @@ LOCK_CLASS: Type[LockBase] = DiskcacheSqliteLock
 
 def get_lock(lock_name: str, owner_prefix: Optional[str] = None) -> LockBase:
     """Factory to get a lock instance using the selected lock class."""
-    return LOCK_CLASS(lock_name, owner_prefix)
+    if issubclass(LOCK_CLASS, FileLockWrapper):
+        return LOCK_CLASS(lock_name)
+    elif issubclass(LOCK_CLASS, DiskcacheSqliteLock):
+        return LOCK_CLASS(lock_name)
+    else:
+        raise TypeError(f"Unsupported lock class: {LOCK_CLASS}")
 
 # Functions
 def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
