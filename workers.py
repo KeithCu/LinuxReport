@@ -127,7 +127,7 @@ def load_url_worker(url):
         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
-            g_c.delete(rss_info.site_url)
+            g_c.delete_template(rss_info.site_url)
 
         end = timer()
         print(f"Parsing from: {url}, in {end - start:f}.")

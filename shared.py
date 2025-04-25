@@ -175,6 +175,11 @@ class DiskCacheWrapper:
             raise TypeError(f"set_template expects str, got {type(template).__name__}")
         self._mem_cache[site_key] = template
 
+    def delete_template(self, key: str) -> None:
+        """Delete a key from the in-memory cache if it exists."""
+        self._mem_cache.pop(key, None)
+
+
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")
 g_c = DiskCacheWrapper(PATH) #Private cache for each instance
