@@ -10,7 +10,7 @@ TZ = zoneinfo.ZoneInfo("US/Eastern")
 # Constants
 
 EXPIRE_HOUR = 3600
-INITIAL_INTERVAL = timedelta(hours=2)  # Query every 2 hours
+INITIAL_INTERVAL = timedelta(hours=4)
 MIN_INTERVAL = timedelta(minutes=60)
 MAX_INTERVAL = timedelta(hours=12)
 BUCKET_SIZE_HOURS = 2                 # 12 buckets per day

@@ -19,7 +19,7 @@ from html_generation import (
     generate_headlines_html, refresh_images_only
 )
 
-from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c)
+from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c, MODE_MAP) # Import MODE_MAP
 
 # --- Configuration and Prompt Constants ---
 MAX_PREVIOUS_HEADLINES = 200
@@ -67,20 +67,19 @@ TIMEOUT = 60
 BASE = "/srv/http/"
 
 MODE_TO_PATH = {
-    "linux": BASE + "LinuxReport2",
-    "ai": BASE + "aireport",
-    "covid": BASE + "CovidReport2",
-    "trump": BASE + "trumpreport",
-    "solar": BASE + "pvreport",
+    Mode.LINUX_REPORT: BASE + "LinuxReport2",
+    Mode.AI_REPORT: BASE + "aireport",
+    Mode.COVID_REPORT: BASE + "CovidReport2",
+    Mode.TRUMP_REPORT: BASE + "trumpreport",
+    Mode.SOLAR_REPORT: BASE + "pvreport",
 }
 
-#Simple schedule for when to do updates. Service calls hourly
 MODE_TO_SCHEDULE = {
-    "linux": [0, 8, 12, 16, 20],
-    "ai": [7, 11, 15, 19, 23],
-    "covid": [7, 11, 15, 19, 23],
-    "trump": [0, 4, 8, 10, 12, 14, 16, 20],
-    "solar": [6, 12, 18],
+    Mode.LINUX_REPORT: [0, 8, 12, 16, 20],
+    Mode.AI_REPORT: [7, 11, 15, 19, 23],
+    Mode.COVID_REPORT: [7, 11, 15, 19, 23],
+    Mode.TRUMP_REPORT: [0, 4, 8, 10, 12, 14, 16, 20],
+    Mode.SOLAR_REPORT: [6, 12, 18],
 }
 
 BANNED_WORDS = [
@@ -102,14 +101,6 @@ modetoprompt2 = {
     Mode.COVID_REPORT : "COVID-19 researchers",
     Mode.TRUMP_REPORT : "Trump's biggest fans",
     Mode.SOLAR_REPORT: "Solar energy industry professionals and enthusiasts. Focus on major solar and battery technology, policy, and market news. Avoid basic installation guides, generic green energy content, or unrelated renewables."
-}
-
-modetoprompt = {
-    "linux": modetoprompt2[Mode.LINUX_REPORT],
-    "ai": modetoprompt2[Mode.AI_REPORT],
-    "covid": modetoprompt2[Mode.COVID_REPORT],
-    "trump": modetoprompt2[Mode.TRUMP_REPORT],
-    "solar": modetoprompt2[Mode.SOLAR_REPORT],
 }
 
 PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
@@ -587,15 +578,34 @@ if __name__ == "__main__":
     if args.include_summary:
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
 
+    # Revert to CWD-based mode detection
     cwd = os.getcwd()
-    for mode_key in MODE_TO_PATH.keys(): # Use mode_key to avoid conflict
-        if mode_key.lower() in cwd.lower():
-            if args.forceimage:
-                refresh_images_only(mode_key)
-            else:
-                hours = MODE_TO_SCHEDULE[mode_key]
-                current_hour = datetime.datetime.now(TZ).hour
-                if args.force or current_hour in hours or args.dry_run or RUN_MODE == "compare": # Ensure dry-run/compare always run if specified
-                    main(mode_key, dry_run=args.dry_run) # Pass dry_run flag
+    selected_mode_enum = None
+    for mode_enum, path in MODE_TO_PATH.items():
+        # Check if the CWD matches the expected path for a mode
+        if cwd == path:
+            selected_mode_enum = mode_enum
             break
+
+    if selected_mode_enum is None:
+        print(f"Error: Could not determine mode from current directory: {cwd}")
+        print(f"Expected directories: {list(MODE_TO_PATH.values())}")
+        sys.exit(1)
+
+    # Get the string representation for use in file paths etc.
+    selected_mode_str = MODE_MAP[selected_mode_enum]
+    print(f"Detected mode '{selected_mode_str}' based on current directory.")
+
+    if args.forceimage:
+        refresh_images_only(selected_mode_str) # Pass string mode
+    else:
+        # Check schedule using the Mode enum key
+        hours = MODE_TO_SCHEDULE.get(selected_mode_enum) # Use .get() for safety if a mode has a path but no schedule
+        current_hour = datetime.datetime.now(TZ).hour
+        # Ensure dry-run/compare always run if specified, otherwise check schedule or force flag
+        should_run = args.force or (hours and current_hour in hours) or args.dry_run or RUN_MODE == "compare"
+        if should_run:
+            main(selected_mode_str, dry_run=args.dry_run) # Pass string mode
+        else:
+            print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {hours}). Use --force to override.")
 
