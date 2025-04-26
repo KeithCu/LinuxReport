@@ -144,6 +144,11 @@ def get_weather_data(lat=None, lon=None, ip=None):
         if bucketed_weather:
             return bucketed_weather, 200  # Corrected indentation
 
+        # Check for valid API key before proceeding
+        if not WEATHER_API_KEY or len(WEATHER_API_KEY) < 10:
+            print("Weather API error: WEATHER_API_KEY is missing or too short.")
+            return {"error": "Weather API key is not configured"}, 500
+
         # Cache miss and lock acquired, proceed with API call
         try:
             rate_limit_check()
