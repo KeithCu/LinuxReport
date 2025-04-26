@@ -14,6 +14,8 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://www.washingtonexaminer.com/feed/": RssInfo("washingtonexaminer.webp", "Washington Examiner", "https://washingtonexaminer.com"),
 		"https://conservativereview.com/feeds/feed.rss": RssInfo("conservativereview.webp", "Conservative Review", "https://conservativereview.com"),
 		"https://townhall.com/feed/": RssInfo("logo-townhall.svg", "Townhall", "https://townhall.com"),
+		"https://api.dailycaller.com/?feed=full&key=abad8678eeda58de4efcc7e9a704d008": RssInfo("dailycaller.png", "Daily Caller", "https://dailycaller.com"),
+
 	},
 	USER_AGENT="Trump Report -- https://trumpreport.info",
 	site_urls=[
@@ -21,6 +23,7 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://patriots.win/fakefeed",
 		"https://revolver.news/fakefeed",
 		"https://nypost.com/politics/feed/",
+        "https://api.dailycaller.com/?feed=full&key=abad8678eeda58de4efcc7e9a704d008",
 		"https://justthenews.com/rss.xml",
 		"https://thefederalist.com/feed/",
 		"https://freebeacon.com/feed/",
