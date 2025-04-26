@@ -19,6 +19,8 @@ import FeedHistory
 
 from filelock import FileLock, Timeout
 
+import threading, os
+
 class Mode(Enum):
     """Enumeration for different report modes."""
     LINUX_REPORT = 1
@@ -28,6 +30,7 @@ class Mode(Enum):
     PYTHON_REPORT = 5
     TRUMP_REPORT = 6
     SPACE_REPORT = 7
+    SOLAR_REPORT = 8
 
 # Constants
 
@@ -59,6 +62,8 @@ CONFIG_MODULES = {
     Mode.TECHNO_REPORT: "techno_report_settings",
     Mode.AI_REPORT: "ai_report_settings",
     Mode.TRUMP_REPORT: "trump_report_settings",
+    Mode.SOLAR_REPORT: "solar_report_settings",
+    Mode.SPACE_REPORT: "space_report_settings",
 }
 
 config_module_name = CONFIG_MODULES.get(MODE)
@@ -92,6 +97,8 @@ MODE_MAP = {
     Mode.TECHNO_REPORT: 'techno',
     Mode.AI_REPORT: 'ai',
     Mode.TRUMP_REPORT: 'trump',
+    Mode.SPACE_REPORT: 'space',
+    Mode.SOLAR_REPORT: 'solar',
 }
 
 # Classes
@@ -407,3 +414,23 @@ def format_last_updated_fancy(last_fetch: Optional[datetime.datetime]) -> str:
         if rounded_hours == 1:
             return "1 hour ago"
         return f"{int(rounded_hours)} hours ago"
+
+_file_cache = {}
+
+def get_cached_file_content(file_path, encoding='utf-8'):
+    """Return content of any file, caching and invalidating when it changes (no locking)."""
+    try:
+        mtime = os.path.getmtime(file_path)
+    except OSError:
+        return ''
+    entry = _file_cache.get(file_path)
+    if entry and entry['mtime'] == mtime:
+        return entry['content']
+    # Read file fresh
+    try:
+        with open(file_path, 'r', encoding=encoding) as f:
+            content = f.read()
+    except FileNotFoundError:
+        content = ''
+    _file_cache[file_path] = {'mtime': mtime, 'content': content}
+    return content
