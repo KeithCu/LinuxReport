@@ -10,14 +10,14 @@ import json
 from timeit import default_timer as timer
 import datetime
 import html
-import uuid # For unique filenames
-import ipaddress # Add ipaddress import
-import time # Import time for SSE sleep
+import uuid
+import ipaddress
+import time
 
 # Third-party imports
-from flask import g, jsonify, render_template, request, make_response, Response, current_app
+from flask import g, jsonify, render_template, request, make_response, Response
 from markupsafe import Markup
-from werkzeug.utils import secure_filename # For secure file uploads
+from werkzeug.utils import secure_filename
 
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo, DEBUG
@@ -25,7 +25,7 @@ from models import RssInfo, DEBUG
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP)
+                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -60,9 +60,12 @@ def get_ip_prefix(ip_str):
         return "Invalid IP"
     return None
 
+def get_cached_above_html():
+    """Return content of ABOVE_HTML_FILE using generic cache."""
+    return get_cached_file_content(ABOVE_HTML_FILE)
+
 # Function to initialize routes
 def init_app(flask_app):
-    global DEBUG
     
     @flask_app.route('/')
     def index():
@@ -112,7 +115,7 @@ def init_app(flask_app):
 
             expired_rss = g_c.has_feed_expired(url)
 
-            if not g_c.has(url):
+            if not g_c.has(url) or "solartribune" in url:
                 needed_urls.append(url)
             elif expired_rss:
                 need_fetch = True
@@ -158,11 +161,7 @@ def init_app(flask_app):
             result[2] = Markup(''.join(result[2]))
 
         # Include additional HTML content if available.
-        try:
-            with open(ABOVE_HTML_FILE, 'r', encoding='utf-8') as f:
-                above_html = f.read()
-        except FileNotFoundError:
-            above_html = ""
+        above_html = get_cached_above_html()
 
         if not single_column:
             above_html = above_html.replace("<hr/>", "")

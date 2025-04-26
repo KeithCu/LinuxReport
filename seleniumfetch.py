@@ -125,6 +125,26 @@ site_configs = {
         "link_attr": "href",
         "filter_pattern": ""
     },
+
+    "https://solarmagazine.com": {
+        "needs_selenium": False,
+        "needs_tor": False,
+        "post_container": "h3",
+        "title_selector": "a",
+        "link_selector": "a",
+        "link_attr": "href",
+        "filter_pattern": ""
+    },
+
+    "https://solartribune.com": {
+        "needs_selenium": False,
+        "needs_tor": False,
+        "post_container": "div.primary-story__story-image",
+        "title_selector": "h1.large-title a",
+        "link_selector": "h1.large-title a",
+        "link_attr": "href",
+        "filter_pattern": ""
+    },
 }
 
 def fetch_site_posts(url, user_agent):
@@ -174,13 +194,13 @@ def fetch_site_posts(url, user_agent):
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             posts = soup.select(config["post_container"])
+            for post in posts:
+                entry = extract_post_data(post, config, url, use_selenium=False)
+                if entry:
+                    entries.append(entry)
         except Exception as e:
             print(f"Error fetching {site} with requests: {e}")
-            posts = []
-        for post in posts:
-            entry = extract_post_data(post, config, url, use_selenium=False)
-            if entry:
-                entries.append(entry)
+            # posts = []  # Not needed, handled above
 
     result = {
         'entries': entries,

@@ -7,4 +7,5 @@ Flask-Mobility
 Werkzeug
 WTForms
 autoscraper
+openai
 
