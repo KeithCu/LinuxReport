@@ -62,7 +62,7 @@ CONFIG_MODULES = {
     Mode.TECHNO_REPORT: "techno_report_settings",
     Mode.AI_REPORT: "ai_report_settings",
     Mode.TRUMP_REPORT: "trump_report_settings",
-    Mode.SOLAR_REPORT: "solar_report_settings",
+    Mode.SOLAR_REPORT: "pv_report_settings",
     Mode.SPACE_REPORT: "space_report_settings",
 }
 
@@ -91,6 +91,7 @@ WELCOME_HTML = (
 )
 STANDARD_ORDER_STR = str(site_urls)
 
+# Map modes to a short string for use in URLs and other identifiers
 MODE_MAP = {
     Mode.LINUX_REPORT: 'linux',
     Mode.COVID_REPORT: 'covid',
@@ -98,7 +99,7 @@ MODE_MAP = {
     Mode.AI_REPORT: 'ai',
     Mode.TRUMP_REPORT: 'trump',
     Mode.SPACE_REPORT: 'space',
-    Mode.SOLAR_REPORT: 'solar',
+    Mode.SOLAR_REPORT: 'pv',
 }
 
 # Classes

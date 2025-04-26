@@ -16,7 +16,6 @@ sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
 from shared import EXPIRE_WEEK, PATH
-from models import USE_TOR
 
 DEBUG = False
 
