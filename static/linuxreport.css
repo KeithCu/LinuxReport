@@ -156,8 +156,8 @@ body.no-underlines a, body.no-underlines a * {
 .mobile-view .nav-links-mobile a {
   display: block;
   font-size: 1.3em;
-  padding: 14px 0 14px 0;
-  margin: 6px 0;
+  padding: 14px 10px;
+  margin: 8px 0;
   min-width: 44px;
   min-height: 44px;
   text-align: center;
