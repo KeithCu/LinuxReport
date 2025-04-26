@@ -71,6 +71,7 @@ MODE_TO_PATH = {
     "ai": BASE + "aireport",
     "covid": BASE + "CovidReport2",
     "trump": BASE + "trumpreport",
+    "solar": BASE + "pvreport",
 }
 
 #Simple schedule for when to do updates. Service calls hourly
@@ -79,6 +80,7 @@ MODE_TO_SCHEDULE = {
     "ai": [7, 11, 15, 19, 23],
     "covid": [7, 11, 15, 19, 23],
     "trump": [0, 4, 8, 10, 12, 14, 16, 20],
+    "solar": [6, 12, 18],
 }
 
 BANNED_WORDS = [
@@ -99,6 +101,7 @@ modetoprompt2 = {
     Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",
     Mode.TRUMP_REPORT : "Trump's biggest fans",
+    Mode.SOLAR_REPORT: "Solar energy industry professionals and enthusiasts. Focus on major solar and battery technology, policy, and market news. Avoid basic installation guides, generic green energy content, or unrelated renewables."
 }
 
 modetoprompt = {
@@ -106,6 +109,7 @@ modetoprompt = {
     "ai": modetoprompt2[Mode.AI_REPORT],
     "covid": modetoprompt2[Mode.COVID_REPORT],
     "trump": modetoprompt2[Mode.TRUMP_REPORT],
+    "solar": modetoprompt2[Mode.SOLAR_REPORT],
 }
 
 PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
@@ -116,10 +120,10 @@ PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
     """
 
 
-#O3-suggested alternate prompt
+#O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = """
 FORMAT:
-1. Exactly ONE paragraph (<= 100 words) explaining your choice.
+1. Exactly ONE paragraph (<= 40 words) explaining your choice.
 2. *** on its own line.
 3. Best headline.
 4. Second headline.
@@ -129,11 +133,12 @@ No other text.
 
 PROMPT_O3_USER_TEMPLATE = """
 <scratchpad>
-Think step-by-step, de-duplicate, choose three best.
+Think step-by-step, de-duplicate, choose three best. Some headlines are irrelevant—discard them.
 </scratchpad>
 
+Find the top 3 articles most interesting to:
 {mode_instructions}
-Some headlines are irrelevant—discard them.
+
 
 INPUT TITLES:
 """
