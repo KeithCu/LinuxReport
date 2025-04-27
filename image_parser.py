@@ -48,7 +48,7 @@ def get_final_response(url, headers, max_redirects=2):
         target_url = None
         for part in parts:
             if part.strip().lower().startswith('url='):
-                target_url = part.strip()[4:].trip()
+                target_url = part.strip()[4:].strip()
                 break
 
         if target_url:

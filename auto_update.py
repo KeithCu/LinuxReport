@@ -79,7 +79,7 @@ MODE_TO_SCHEDULE = {
     Mode.AI_REPORT: [7, 11, 15, 19, 23],
     Mode.COVID_REPORT: [7, 11, 15, 19, 23],
     Mode.TRUMP_REPORT: [0, 4, 8, 10, 12, 14, 16, 20],
-    Mode.SOLAR_REPORT: [6, 12, 18],
+    Mode.SOLAR_REPORT: [1, 7, 13, 19],
 }
 
 BANNED_WORDS = [
