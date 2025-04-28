@@ -277,7 +277,10 @@ def init_app(flask_app):
                 resp.delete_cookie('RssUrls')
                 resp.delete_cookie('UrlsVer')
 
-            resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
+            if form.theme.data is not None:
+                resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
+            else:
+                resp.delete_cookie('Theme')
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
             resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_YEARS)
