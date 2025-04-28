@@ -22,7 +22,7 @@ from werkzeug.utils import secure_filename
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo, DEBUG
 # Local imports
-from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
+from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
                     WEB_TITLE, WELCOME_HTML, g_c, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
@@ -271,20 +271,20 @@ def init_app(flask_app):
 
             if page_order != site_urls:
                 cookie_str = json.dumps(page_order)
-                resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_MINUTES)
-                resp.set_cookie('UrlsVer', URLS_COOKIE_VERSION, max_age=EXPIRE_MINUTES)
+                resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
+                resp.set_cookie('UrlsVer', URLS_COOKIE_VERSION, max_age=EXPIRE_YEARS)
             else:
                 resp.delete_cookie('RssUrls')
                 resp.delete_cookie('UrlsVer')
 
-            resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_MINUTES)
+            resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
 
-            resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_MINUTES)
-            resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_MINUTES)
-            resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_MINUTES)
+            resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
+            resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_YEARS)
+            resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
 
             if form.admin_mode.data:
-                resp.set_cookie('isAdmin', '1', max_age=EXPIRE_MINUTES)
+                resp.set_cookie('isAdmin', '1', max_age=EXPIRE_YEARS)
             else:
                 resp.delete_cookie('isAdmin')
 
