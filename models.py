@@ -21,6 +21,7 @@ class SiteConfig:
     WEB_DESCRIPTION: str
     WEB_TITLE: str
     ABOVE_HTML_FILE: str
+    CUSTOM_FETCH_CONFIG: dict = None
 
 class RssInfo:
     """Represents information about an RSS feed."""
@@ -32,4 +33,15 @@ class RssInfo:
 DEBUG = False
 
 # Add a global config for Tor usage
-USE_TOR = True
+USE_TOR = False
+
+# --- Shared Reddit Fetch Config ---
+REDDIT_FETCH_CONFIG = {
+    "needs_selenium": True,
+    "needs_tor": True,
+    "post_container": "article",
+    "title_selector": "a[id^='post-title-']",
+    "link_selector": "a[id^='post-title-']",
+    "link_attr": "href",
+    "filter_pattern": ""
+}

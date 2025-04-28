@@ -81,6 +81,7 @@ LOGO_URL = config_settings.CONFIG.LOGO_URL
 WEB_DESCRIPTION = config_settings.CONFIG.WEB_DESCRIPTION
 WEB_TITLE = config_settings.CONFIG.WEB_TITLE
 ABOVE_HTML_FILE = config_settings.CONFIG.ABOVE_HTML_FILE
+CUSTOM_FETCH_CONFIG = config_settings.CONFIG.CUSTOM_FETCH_CONFIG
 
 WELCOME_HTML = (
     '<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
@@ -195,7 +196,6 @@ g_cs = DiskCacheWrapper(SPATH) #Shared cache for all instances
 
 # --- Shared Keys ---
 GLOBAL_FETCH_MODE_LOCK_KEY = "global_fetch_mode"
-
 
 # Configuration for Chat Cache
 # Set to True to use the shared cache (g_cs) for chat comments and banned IPs

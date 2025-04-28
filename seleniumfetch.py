@@ -23,7 +23,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
 # Local imports
-from shared import g_cs
+from shared import g_cs, CUSTOM_FETCH_CONFIG
 
 def create_driver(use_tor, user_agent):
     options = Options()
@@ -84,75 +84,12 @@ def extract_post_data(post, config, url, use_selenium):
         return None
     return {"title": title, "link": link, "id": link, "summary": post.text.strip()}
 
-# Site configurations
-site_configs = {
-    "https://patriots.win": {
-        "needs_selenium": True,
-        "needs_tor": False,
-        "post_container": ".post-item",
-        "title_selector": ".title a",
-        "link_selector": ".preview-parent",
-        "link_attr": "href",
-        "filter_pattern": ""  # No filter needed for Patriots.win
-    },
-    "https://breitbart.com": {
-        "needs_selenium": False,
-        "needs_tor": False,
-        "post_container": "article",
-        "title_selector": "h2 a",
-        "link_selector": "h2 a",
-        "link_attr": "href",
-        "published_selector": ".header_byline time",
-        "filter_pattern": "/tech/"  # Ensure only tech articles are included
-    },
-
-    "https://revolver.news": {
-        "needs_selenium": False,
-        "needs_tor": False,
-        "post_container": "article.item",
-        "title_selector": "h2.title a",
-        "link_selector": "h2.title a",
-        "link_attr": "href",
-        "filter_pattern": ""
-    },
-
-    "https://www.reddit.com": {
-        "needs_selenium": True,
-        "needs_tor": True,
-        "post_container": "article",
-        "title_selector": "a[id^='post-title-']",
-        "link_selector": "a[id^='post-title-']",
-        "link_attr": "href",
-        "filter_pattern": ""
-    },
-
-    "https://solarmagazine.com": {
-        "needs_selenium": False,
-        "needs_tor": False,
-        "post_container": "h3",
-        "title_selector": "a",
-        "link_selector": "a",
-        "link_attr": "href",
-        "filter_pattern": ""
-    },
-
-    "https://solartribune.com": {
-        "needs_selenium": False,
-        "needs_tor": False,
-        "post_container": "div.primary-story__story-image",
-        "title_selector": "h1.large-title a",
-        "link_selector": "h1.large-title a",
-        "link_attr": "href",
-        "filter_pattern": ""
-    },
-}
-
 def fetch_site_posts(url, user_agent):
     parsed = urlparse(url)
     base_site = f"{parsed.scheme}://{parsed.netloc}"
     site = base_site
 
-    config = site_configs.get(site)
+    config = CUSTOM_FETCH_CONFIG.get(site)
     if not config:
         print(f"Configuration for site '{site}' not found.")
         return []

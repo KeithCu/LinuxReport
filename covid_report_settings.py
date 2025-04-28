@@ -1,5 +1,5 @@
-from models import RssInfo, SiteConfig
-
+from models import RssInfo, SiteConfig, REDDIT_FETCH_CONFIG
+import shared
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={
         "https://www.reddit.com/r/Coronavirus/rising/.rss": RssInfo("redditlogosmall.webp", "Reddit Corona virus sub", "https://www.reddit.com/r/Coronavirus/"),
@@ -24,4 +24,7 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_DESCRIPTION="COVID-19 and Infectious Disease News",
     WEB_TITLE="COVID-19 Report",
     ABOVE_HTML_FILE="/srv/http/CovidReport2/covidreportabove.html",
+    CUSTOM_FETCH_CONFIG={
+        "https://www.reddit.com": REDDIT_FETCH_CONFIG
+    }
 )

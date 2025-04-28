@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-from models import RssInfo, SiteConfig
+from models import RssInfo, SiteConfig, REDDIT_FETCH_CONFIG
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
@@ -34,4 +34,16 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_DESCRIPTION="AI News",
 	WEB_TITLE="AI Report",
 	ABOVE_HTML_FILE="/srv/http/aireport/aireportabove.html",
+    CUSTOM_FETCH_CONFIG={
+        "https://www.reddit.com": REDDIT_FETCH_CONFIG,
+        "https://huggingface.co": {
+            "needs_selenium": False,
+            "needs_tor": False,
+            "post_container": "article",
+            "title_selector": "h2 a, h3 a",
+            "link_selector": "h2 a, h3 a",
+            "link_attr": "href",
+            "filter_pattern": ""
+        },
+    }
 )

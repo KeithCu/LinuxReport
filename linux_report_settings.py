@@ -1,4 +1,5 @@
-from models import RssInfo, SiteConfig
+from models import RssInfo, SiteConfig, REDDIT_FETCH_CONFIG
+import shared
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={
@@ -32,4 +33,17 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_DESCRIPTION="Linux News",
     WEB_TITLE="Linux Report",
     ABOVE_HTML_FILE="/srv/http/LinuxReport2/linuxreportabove.html",
+    CUSTOM_FETCH_CONFIG={
+        "https://www.reddit.com": REDDIT_FETCH_CONFIG,
+        "https://breitbart.com": {
+            "needs_selenium": False,
+            "needs_tor": False,
+            "post_container": "article",
+            "title_selector": "h2 a",
+            "link_selector": "h2 a",
+            "link_attr": "href",
+            "published_selector": ".header_byline time",
+            "filter_pattern": "/tech/"
+        },
+    }
 )
