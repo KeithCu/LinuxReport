@@ -25,7 +25,7 @@ from models import RssInfo, DEBUG
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -90,7 +90,7 @@ def init_app(flask_app):
             single_column = True
 
         # Try full page cache using only page order and mobile flag
-        full_page = g_c.get(page_order_s + suffix)
+        full_page = g_cm.get(page_order_s + suffix)
         if not DEBUG and full_page is not None:
             return full_page
 
@@ -131,9 +131,9 @@ def init_app(flask_app):
         for url in page_order:
             rss_info = ALL_URLS[url]
 
-            template = g_c.get_template(rss_info.site_url)
+            template = g_cm.get(rss_info.site_url)
             if DEBUG or template is None:
-                feed = g_c.get_feed(url)
+                feed = g_c.get(url)
                 last_fetch = g_c.get_last_fetch(url)
                 last_fetch_str = format_last_updated(last_fetch)
                 if feed is not None:
@@ -146,7 +146,7 @@ def init_app(flask_app):
                                            alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url,
                                            error_message=("Feed could not be loaded." if feed is None else None))
 
-                g_c.set_template(rss_info.site_url, template, timeout=EXPIRE_MINUTES * 12)
+                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_MINUTES * 12)
 
             result[cur_col].append(template)
 
@@ -182,7 +182,7 @@ def init_app(flask_app):
             expire = EXPIRE_MINUTES
             if need_fetch:
                 expire = 30
-            g_c.put(page_order_s + suffix, page, timeout=expire)
+            g_cm.set(page_order_s + suffix, page, ttl=expire)
 
         # Trigger background fetching if needed
         if need_fetch:

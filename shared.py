@@ -14,6 +14,7 @@ from typing import Any, Optional, cast, Type
 from abc import ABC, abstractmethod
 
 import diskcache
+from cacheout import Cache
 
 import FeedHistory
 
@@ -123,27 +124,21 @@ class RssFeed:
 
 class DiskCacheWrapper:
     """Wrapper for diskcache to manage caching operations."""
-    # In-memory cache (shared by all DiskCacheWrapper instances)
-    _mem_cache = {}
-
     def __init__(self, cache_dir: str) -> None:
         self.cache = diskcache.Cache(cache_dir)
+
+    def get(self, key: str) -> Any:
+        return self.cache.get(key)
+
+    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
+        self.cache.set(key, value, expire=timeout)
+
+    def delete(self, key: str) -> None:
+        self.cache.delete(key)
 
     def has(self, key: str) -> bool:
         """Check if a key exists in the cache."""
         return key in self.cache
-
-    def get(self, key: str) -> Any:
-        """Retrieve a value from the cache by key."""
-        return self.cache.get(key)
-
-    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
-        """Store a value in the cache with an optional timeout."""
-        self.cache.set(key, value, expire=timeout)
-
-    def delete(self, key: str) -> None:
-        """Delete a key from the cache."""
-        self.cache.delete(key)
 
     def has_feed_expired(self, url: str) -> bool:
         """Check if a feed has expired based on the last fetch time."""
@@ -152,48 +147,18 @@ class DiskCacheWrapper:
             return True
         return history.has_expired(url, last_fetch)
 
-    # Feed cache accessors for clarity
-    def get_feed(self, url: str) -> Optional[RssFeed]:
-        """Retrieve a raw RSS feed from cache."""
-        value = self.get(url)
-        return cast(Optional[RssFeed], value)
-
-    def set_feed(self, url: str, feed: RssFeed, timeout: Optional[int] = None) -> None:
-        """Cache a raw RSS feed with optional timeout."""
-        if not isinstance(feed, RssFeed):
-            raise TypeError(f"set_feed expects RssFeed, got {type(feed).__name__}")
-        self.put(url, feed, timeout)
-
     def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
-        """Get the last fetch timestamp for a feed."""
         value = self.get(url + ":last_fetch")
         return cast(Optional[datetime.datetime], value)
 
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
-        """Cache the last fetch timestamp for a feed."""
         self.put(url + ":last_fetch", timestamp, timeout)
-
-    # Template cache accessors for clarity (now in-memory only)
-    def get_template(self, site_key: str) -> Optional[str]:
-        """Retrieve a rendered template from in-memory cache."""
-        return self._mem_cache.get(site_key)
-
-    def set_template(self, site_key: str, template: str, timeout: Optional[int] = None) -> None:
-        """Cache a rendered template in memory (ignores timeout)."""
-        if not isinstance(template, str):
-            raise TypeError(f"set_template expects str, got {type(template).__name__}")
-        self._mem_cache[site_key] = template
-
-    def delete_template(self, key: str) -> None:
-        """Delete a key from the in-memory cache if it exists."""
-        self._mem_cache.pop(key, None)
-
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")
 g_c = DiskCacheWrapper(PATH) #Private cache for each instance
-g_cs = DiskCacheWrapper(SPATH) #Shared cache for all instances
-
+g_cs = DiskCacheWrapper(SPATH) #Shared cache for all instances stored in /run/linuxreport, for weather, etc.
+g_cm = Cache(maxsize=100, ttl=3600)  # In-memory cache with per-item TTL (seconds)
 # --- Shared Keys ---
 GLOBAL_FETCH_MODE_LOCK_KEY = "global_fetch_mode"
 

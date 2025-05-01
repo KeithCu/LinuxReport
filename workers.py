@@ -22,7 +22,7 @@ from feedfilter import filter_similar_titles, merge_entries, prefilter_news
 from seleniumfetch import fetch_site_posts
 from shared import (
     ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
-    USER_AGENT, RssFeed, g_c, g_cs, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY
+    USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY
 )
 from Tor import fetch_via_tor
 from models import DEBUG, USE_TOR
@@ -102,7 +102,7 @@ def load_url_worker(url):
                         #print (entry['link'])
 
         # Merge with cached entries (if any) to retain history.
-        old_feed = g_c.get_feed(url)
+        old_feed = g_c.get(url)
         new_count = len(new_entries)
         if old_feed and old_feed.entries:
             new_count = len(set(e.get('link') for e in new_entries) - set(e.get('link') for e in old_feed.entries))
@@ -123,11 +123,11 @@ def load_url_worker(url):
                 top_articles = old_feed.top_articles
 
         rssfeed = RssFeed(entries, top_articles=top_articles)
-        g_c.set_feed(url, rssfeed, timeout=EXPIRE_WEEK)
+        g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
 
         if len(entries) > 2:
-            g_c.delete_template(rss_info.site_url)
+            g_cm.delete(rss_info.site_url)
 
         end = timer()
         print(f"Parsing from: {url}, in {end - start:f}.")
