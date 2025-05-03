@@ -297,7 +297,8 @@ def init_app(flask_app):
     @flask_app.route('/api/weather')
     def get_weather():
         ip = request.remote_addr
-        weather_data, status_code = get_weather_data(ip=ip)
+        units = request.args.get('units', 'imperial')
+        weather_data, status_code = get_weather_data(ip=ip, units=units)
         return jsonify(weather_data), status_code
 
     @flask_app.route('/old_headlines')

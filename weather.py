@@ -116,8 +116,13 @@ def get_bucketed_weather_cache(lat, lon):
         return entry['data']
     return None
 
+def fahrenheit_to_celsius(f_temp):
+    """Convert Fahrenheit temperature to Celsius, rounded to 1 decimal place."""
+    if f_temp is None:
+        return None
+    return round((f_temp - 32) * 5/9, 1)
 
-def get_weather_data(lat=None, lon=None, ip=None):
+def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
@@ -133,6 +138,11 @@ def get_weather_data(lat=None, lon=None, ip=None):
     # Check cache first (outside the lock for a quick check)
     bucketed_weather = get_bucketed_weather_cache(lat, lon)
     if bucketed_weather:
+        # Convert to metric if requested
+        if units == 'metric':
+            for day in bucketed_weather['daily']:
+                day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
+                day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
         return bucketed_weather, 200
 
     # Acquire lock specific to this location bucket
@@ -142,7 +152,12 @@ def get_weather_data(lat=None, lon=None, ip=None):
         # Re-check cache *inside* the lock to prevent race condition
         bucketed_weather = get_bucketed_weather_cache(lat, lon)
         if bucketed_weather:
-            return bucketed_weather, 200  # Corrected indentation
+            # Convert to metric if requested
+            if units == 'metric':
+                for day in bucketed_weather['daily']:
+                    day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
+                    day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
+            return bucketed_weather, 200
 
         # Check for valid API key before proceeding
         if not WEATHER_API_KEY or len(WEATHER_API_KEY) < 10:
@@ -152,6 +167,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
         # Cache miss and lock acquired, proceed with API call
         try:
             rate_limit_check()
+            # Always fetch in imperial (Fahrenheit) for consistent caching
             url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
             response = requests.get(url, timeout=10)
             response.raise_for_status()
@@ -201,7 +217,14 @@ def get_weather_data(lat=None, lon=None, ip=None):
                 current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
             except (IndexError, KeyError, TypeError):
                 current_temp = "N/A"
-            print(f"Weather API result: city: {city_name}, temp: {current_temp}F")
+            print(f"Weather API result: city: {city_name}, temp: {current_temp}{'°C' if units == 'metric' else '°F'}")
+
+            # Convert to metric if requested
+            if units == 'metric':
+                for day in processed_data['daily']:
+                    day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
+                    day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
+
             return processed_data, 200
 
         except requests.exceptions.RequestException as e:

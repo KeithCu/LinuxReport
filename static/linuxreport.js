@@ -158,20 +158,24 @@ document.addEventListener("DOMContentLoaded", function() {
     const day = now.getDate().toString().padStart(2, '0');
     const hour = now.getHours().toString().padStart(2, '0');
     const cacheBuster = `${year}${month}${day}${hour}`;
-    fetch(`/api/weather?_=${cacheBuster}`)
+    
+    // Use Intl API to determine if user prefers metric system
+    const useMetric = new Intl.Locale(navigator.language).region !== 'US';
+    
+    fetch(`/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_=${cacheBuster}`)
       .then(response => {
         if (!response.ok) throw new Error('Network response was not ok');
         return response.json();
       })
       .then(data => {
-        renderWeatherData(data);
+        renderWeatherData(data, useMetric);
       })
       .catch(error => {
         if (document.getElementById('weather-loading')) document.getElementById('weather-loading').style.display = "none";
         if (document.getElementById('weather-error')) document.getElementById('weather-error').style.display = "block";
       });
   }
-  function renderWeatherData(data) {
+  function renderWeatherData(data, useMetric) {
     const weatherForecast = document.getElementById('weather-forecast');
     const weatherLoading = document.getElementById('weather-loading');
     const weatherError = document.getElementById('weather-error');
@@ -211,8 +215,8 @@ document.addEventListener("DOMContentLoaded", function() {
         <div class="weather-day-name">${dayName}</div>
         <img class="weather-icon" src="https://openweathermap.org/img/wn/${day.weather_icon}.png" alt="${day.weather}">
         <div class="weather-temp">
-          <span class="temp-max">${Math.round(day.temp_max)}°</span> /
-          <span class="temp-min">${Math.round(day.temp_min)}°</span>
+          <span class="temp-max">${Math.round(day.temp_max)}°${useMetric ? 'C' : 'F'}</span> /
+          <span class="temp-min">${Math.round(day.temp_min)}°${useMetric ? 'C' : 'F'}</span>
         </div>
         <div class="weather-precip">${Math.round(day.precipitation)}% precip</div>
       `;
