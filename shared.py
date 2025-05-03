@@ -159,7 +159,12 @@ class DiskCacheWrapper:
         return last_fetch
 
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
+        """Set the last fetch time for a URL and cache it in memory."""
+        # Store in disk cache
         self.put(url + ":last_fetch", timestamp, timeout)
+        
+        # Also update the in-memory cache
+        g_cm.set(f"last_fetch::{url}", timestamp, ttl=300)
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")
