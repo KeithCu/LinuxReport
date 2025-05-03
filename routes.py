@@ -22,7 +22,7 @@ from werkzeug.utils import secure_filename
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo, DEBUG
 # Local imports
-from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_YEARS,
+from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
@@ -146,7 +146,8 @@ def init_app(flask_app):
                                            alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url,
                                            error_message=("Feed could not be loaded." if feed is None else None))
 
-                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_MINUTES * 12)
+                # Cache entry deleted by worker thread after fetch
+                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_DAY)
 
             result[cur_col].append(template)
 
