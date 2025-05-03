@@ -33,7 +33,7 @@ class RssInfo:
 DEBUG = False
 
 # Add a global config for Tor usage
-USE_TOR = False
+USE_TOR = True
 
 # --- Shared Reddit Fetch Config ---
 REDDIT_FETCH_CONFIG = {
