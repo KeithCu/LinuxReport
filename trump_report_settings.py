@@ -1,9 +1,9 @@
-from models import RssInfo, SiteConfig
+from models import RssInfo, SiteConfig, REDDIT_FETCH_CONFIG
+import shared
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
 		"https://revolver.news/fakefeed": RssInfo("revolvernews.png", "Revolver News", "https://revolver.news"),
-		"https://justthenews.com/rss.xml": RssInfo("justthenewslogo.svg", "Just The News", "https://justthenews.com"),
 		"https://citizenfreepress.com/feed/": RssInfo("citizenfreepress.webp", "Citizen Free Press", "https://citizenfreepress.com"),
 		"https://patriots.win/fakefeed": RssInfo("patriotswin.webp", "Patriots.win", "https://patriots.win"),
 		"https://thefederalist.com/feed/": RssInfo("federalist.webp", "The Federalist", "https://thefederalist.com"),
@@ -11,7 +11,6 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://freebeacon.com/feed/": RssInfo("freebeacon.png", "Free Beacon", "https://freebeacon.com"),
 		"https://feeds.feedburner.com/breitbart": RssInfo("breitbart.webp", "Breitbart", "https://breitbart.com"),
 		"https://nypost.com/politics/feed/": RssInfo("nypost.webp", "New York Post Politics Section", "https://nypost.com/politics/"),
-		"https://www.washingtonexaminer.com/feed/": RssInfo("washingtonexaminer.webp", "Washington Examiner", "https://washingtonexaminer.com"),
 		"https://conservativereview.com/feeds/feed.rss": RssInfo("conservativereview.webp", "Conservative Review", "https://conservativereview.com"),
 		"https://townhall.com/feed/": RssInfo("logo-townhall.svg", "Townhall", "https://townhall.com"),
 		"https://api.dailycaller.com/?feed=full&key=abad8678eeda58de4efcc7e9a704d008": RssInfo("dailycaller.png", "Daily Caller", "https://dailycaller.com"),
@@ -24,13 +23,11 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://revolver.news/fakefeed",
 		"https://nypost.com/politics/feed/",
         "https://api.dailycaller.com/?feed=full&key=abad8678eeda58de4efcc7e9a704d008",
-		"https://justthenews.com/rss.xml",
+		"https://citizenfreepress.com/feed/",
 		"https://thefederalist.com/feed/",
 		"https://freebeacon.com/feed/",
 		"https://townhall.com/feed/",
-		"https://citizenfreepress.com/feed/",
 		"http://bonginoreport.com/index.rss",
-		"https://www.washingtonexaminer.com/feed/",
 		"https://conservativereview.com/feeds/feed.rss",
 	],
 	URL_IMAGES="https://trumpreport.info/static/images/",
@@ -39,4 +36,35 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_DESCRIPTION="Trump Report",
 	WEB_TITLE="TrumpReport",
 	ABOVE_HTML_FILE="/srv/http/trumpreport/trumpreportabove.html",
+    CUSTOM_FETCH_CONFIG={
+        "https://patriots.win": {
+            "needs_selenium": True,
+            "needs_tor": False,
+            "post_container": ".post-item",
+            "title_selector": ".title a",
+            "link_selector": ".preview-parent",
+            "link_attr": "href",
+            "filter_pattern": ""
+        },
+        "https://breitbart.com": {
+            "needs_selenium": False,
+            "needs_tor": False,
+            "post_container": "article",
+            "title_selector": "h2 a",
+            "link_selector": "h2 a",
+            "link_attr": "href",
+            "published_selector": ".header_byline time",
+            "filter_pattern": "/tech/"
+        },
+        "https://revolver.news": {
+            "needs_selenium": False,
+            "needs_tor": False,
+            "post_container": "article.item",
+            "title_selector": "h2.title a",
+            "link_selector": "h2.title a",
+            "link_attr": "href",
+            "filter_pattern": ""
+        },
+        "https://www.reddit.com": REDDIT_FETCH_CONFIG,
+    }
 )
