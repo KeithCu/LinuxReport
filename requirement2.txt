@@ -1,0 +1,23 @@
+
+# The rest of your requirements
+beautifulsoup4
+cacheout
+diskcache
+fake_useragent
+feedparser
+filelock
+Flask
+Flask_Mobility
+geoip2
+Jinja2
+MarkupSafe
+openai
+pandas
+Pillow
+Requests
+selenium
+sentence_transformers
+sqlalchemy
+webdriver_manager
+Werkzeug
+WTForms
