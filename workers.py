@@ -154,7 +154,11 @@ def handle_lwn_feed(url):
                 pending.pop(link, None)
     for link, info in list(pending.items()):
         if now - info['published'] >= timedelta(days=15):
-            ready.append({'link': link, 'title': info['title'], 'html_content': '', 'published': now})
+            title = info['title']
+            # Remove [$] prefix if present
+            if title.startswith("[$]"):
+                title = title[3:].strip()
+            ready.append({'link': link, 'title': title, 'html_content': '', 'published': now})
             displayed.add(link)
             pending.pop(link)
             print(f"[LWN] Article now available for free: {info['title']} ({link}) at {now.isoformat()}")
