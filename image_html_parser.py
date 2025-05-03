@@ -1,6 +1,6 @@
 from urllib.parse import urljoin
 import json
-from image_utils import is_excluded, extract_dimensions_from_tag_or_style, debug_print, parse_best_srcset
+from image_utils import is_excluded, extract_dimensions_from_tag_or_style, debug_print, parse_best_srcset, score_image_candidate
 
 def extract_img_url_from_tag(img_tag, base_url):
     """Extract the best image URL from an <img> tag, considering src, srcset, and data-* attributes."""
@@ -85,10 +85,7 @@ def parse_images_from_soup(soup, base_url):
             metadata['height'] = height
         alt_text = img.get('alt', '')
         # Score: prefer larger area, boost for alt text
-        area = width * height if width > 0 and height > 0 else 0
-        metadata['score'] = area if area > 0 else 307200  # 640x480 default
-        if alt_text and len(alt_text) > 10:
-            metadata['score'] *= 1.2
+        metadata['score'] = score_image_candidate(width, height, alt_text)
         add_candidate(candidate_images, processed_urls, url, metadata)
 
     return candidate_images

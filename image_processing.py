@@ -19,7 +19,8 @@ from seleniumfetch import create_driver
 # Import from new modules
 from image_utils import (
     HEADERS, debug_print,
-    is_excluded
+    is_excluded,
+    score_image_candidate
 )
 # Import from the new candidate selector module
 from image_candidate_selector import process_candidate_images
@@ -120,7 +121,7 @@ def parse_images_from_selenium(driver):
             metadata = {
                 'width': width,
                 'height': height,
-                'score': width * height if width > 0 and height > 0 else 640 * 480
+                'score': score_image_candidate(width, height, img.get_attribute('alt'))
             }
 
             # Evaluate file size only for potentially good candidates
@@ -191,11 +192,11 @@ if __name__ == '__main__':
     from image_parser import custom_fetch_largest_image
     if len(sys.argv) > 1 and sys.argv[1] == '--test-urls':
         test_urls = [
-            'https://justthenews.com/government/congress/watch-live-marjorie-taylor-greene-holds-town-hall-georgia',
-            'https://www.miragenews.com/new-bat-cell-lines-advance-hantavirus-1445117/',
-            'https://lwn.net/',
-            'https://www.phoronix.com/news/GCC-15.1-Last-Minute-Znver5-Bit',
-            'https://www.cnbc.com/2025/04/15/nvidia-says-it-will-record-5point5-billion-quarterly-charge-tied-to-h20-processors-exported-to-china.html'
+            'https://www.sfchronicle.com/tech/article/waymo-private-sales-20294443.php',
+            'https://www.reddit.com/r/LocalLLaMA/comments/1k8ncco/introducing_kimi_audio_7b_a_sota_audio_foundation/',
+ #           'https://lwn.net/',
+ #           'https://www.phoronix.com/news/GCC-15.1-Last-Minute-Znver5-Bit',
+ #           'https://www.cnbc.com/2025/04/15/nvidia-says-it-will-record-5point5-billion-quarterly-charge-tied-to-h20-processors-exported-to-china.html'
         ]
         print("Running test mode on sample URLs:\n")
         for url_test in test_urls: # Use different variable name

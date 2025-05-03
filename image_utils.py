@@ -189,3 +189,11 @@ def parse_best_srcset(srcset):
     # Choose the entry with the maximum width
     best_width, best_url = max(entries, key=lambda x: x[0])
     return best_url, best_width
+
+def score_image_candidate(width, height, alt_text=None):
+    """Score an image candidate based on area and alt text."""
+    area = width * height if width > 0 and height > 0 else 0
+    score = area if area > 0 else 640 * 480  # Default to 640x480 if unknown
+    if alt_text and len(alt_text) > 10:
+        score *= 1.2
+    return score
