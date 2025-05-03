@@ -1,3 +1,10 @@
+# Install PyTorch CPU first
+--index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+torchaudio
+
+# The rest of your requirements
 beautifulsoup4
 cacheout
 diskcache
