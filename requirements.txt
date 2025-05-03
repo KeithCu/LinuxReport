@@ -1,7 +1,0 @@
-# Install PyTorch CPU first
---index-url https://download.pytorch.org/whl/cpu
-torch
-torchvision
-torchaudio
-
-# Then do pip install -r requirements2.txt to get the rest of the requirements

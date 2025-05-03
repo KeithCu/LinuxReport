@@ -140,7 +140,17 @@ class DiskCacheWrapper:
 
     def has_feed_expired(self, url: str) -> bool:
         """Check if a feed has expired based on the last fetch time."""
-        last_fetch = self.get(url + ":last_fetch")
+        # Use in-memory cache for last_fetch checks
+        cache_key = f"last_fetch::{url}"
+        cached_last_fetch = g_cm.get(cache_key)
+        if cached_last_fetch is not None:
+            last_fetch = cached_last_fetch
+        else:
+            # If not in cache, get from disk
+            last_fetch = self.get(url + ":last_fetch")
+            # Cache the last_fetch value for 5 minutes
+            g_cm.set(cache_key, last_fetch, ttl=300)
+
         if last_fetch is None:
             return True
         return history.has_expired(url, last_fetch)

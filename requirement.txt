@@ -1,5 +1,4 @@
-
-# The rest of your requirements
+# The requirements to run the app
 beautifulsoup4
 cacheout
 diskcache
