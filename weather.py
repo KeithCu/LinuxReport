@@ -117,10 +117,10 @@ def get_bucketed_weather_cache(lat, lon):
     return None
 
 def fahrenheit_to_celsius(f_temp):
-    """Convert Fahrenheit temperature to Celsius, rounded to 1 decimal place."""
+    """Convert Fahrenheit temperature to Celsius, rounded to a whole number."""
     if f_temp is None:
         return None
-    return round((f_temp - 32) * 5/9, 1)
+    return round((f_temp - 32) * 5/9)
 
 def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     """Fetches weather data for given coordinates or IP address, using cache or API."""
