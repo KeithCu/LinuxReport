@@ -160,7 +160,11 @@ document.addEventListener("DOMContentLoaded", function() {
     const cacheBuster = `${year}${month}${day}${hour}`;
     
     // Use Intl API to determine if user prefers metric system
-    const useMetric = new Intl.Locale(navigator.language).region !== 'US';
+    const userLocale = new Intl.Locale(navigator.language || 'en-US');
+    // Regions primarily using Fahrenheit:
+    // US: United States, BS: Bahamas, BZ: Belize, KY: Cayman Islands, PW: Palau
+    const prefersFahrenheit = ['US', 'BS', 'BZ', 'KY', 'PW'].includes(userLocale.region);
+    const useMetric = !prefersFahrenheit;
     
     fetch(`/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_=${cacheBuster}`)
       .then(response => {
