@@ -211,19 +211,22 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 days_added += 1
 
             save_weather_cache_entry(lat, lon, processed_data)
-            # Single log: print city and current temperature
-            try:
-                today_entry = processed_data["daily"][0]
-                current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
-            except (IndexError, KeyError, TypeError):
-                current_temp = "N/A"
-            print(f"Weather API result: city: {city_name}, temp: {current_temp}{'C' if units == 'metric' else 'F'}")
 
-            # Convert to metric if requested
+            # Convert to metric if requested *before* logging
             if units == 'metric':
                 for day in processed_data['daily']:
                     day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
                     day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
+
+            try:
+                today_entry = processed_data["daily"][0]
+                # Get the temp (already potentially converted)
+                current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
+                log_unit = 'C' if units == 'metric' else 'F'
+                print(f"Weather API result: city: {city_name}, temp: {current_temp}{log_unit}")
+            except (IndexError, KeyError, TypeError):
+                 # Indicate error or missing data
+                print(f"Weather API result: city: {city_name}, temp: N/A")
 
             return processed_data, 200
 
