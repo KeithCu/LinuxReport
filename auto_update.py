@@ -72,6 +72,7 @@ MODE_TO_PATH = {
     Mode.COVID_REPORT: BASE + "CovidReport2",
     Mode.TRUMP_REPORT: BASE + "trumpreport",
     Mode.PV_REPORT: BASE + "pvreport",
+    Mode.TECHNO_REPORT: BASE + "flask",
 }
 
 MODE_TO_SCHEDULE = {
@@ -80,6 +81,7 @@ MODE_TO_SCHEDULE = {
     Mode.COVID_REPORT: [7, 11, 15, 19, 23],
     Mode.TRUMP_REPORT: [0, 4, 8, 10, 12, 14, 16, 20],
     Mode.PV_REPORT: [1, 7, 13, 19],
+    Mode.TECHNO_REPORT: [0, 12],
 }
 
 BANNED_WORDS = [
@@ -100,7 +102,8 @@ modetoprompt2 = {
     Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
     Mode.COVID_REPORT : "COVID-19 researchers",
     Mode.TRUMP_REPORT : "Trump's biggest fans",
-    Mode.PV_REPORT: "Solar energy industry professionals and enthusiasts. Focus on major solar and battery technology, policy, and market news. Avoid basic installation guides, generic green energy content, or unrelated renewables."
+    Mode.PV_REPORT: "Solar energy industry professionals and enthusiasts. Focus on major solar and battery technology, policy, and market news. Avoid basic installation guides, generic green energy content, or unrelated renewables.",
+    Mode.TECHNO_REPORT: "Detroit Techno fans and artists.",
 }
 
 PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
