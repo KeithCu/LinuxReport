@@ -217,7 +217,7 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
             except (IndexError, KeyError, TypeError):
                 current_temp = "N/A"
-            print(f"Weather API result: city: {city_name}, temp: {current_temp}{'°C' if units == 'metric' else '°F'}")
+            print(f"Weather API result: city: {city_name}, temp: {current_temp}{'C' if units == 'metric' else 'F'}")
 
             # Convert to metric if requested
             if units == 'metric':
