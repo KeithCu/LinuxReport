@@ -10,6 +10,8 @@ import re
 from time import mktime
 import threading
 from timeit import default_timer as timer
+from urllib.parse import urlparse
+from collections import defaultdict
 
 # Third-party imports
 import feedparser
@@ -179,7 +181,50 @@ def wait_and_set_fetch_mode():
         print("Failed to acquire global fetch lock after waiting.")
         return None
 
-# Fetch multiple RSS feeds in parallel.
+def get_domain(url):
+    """Extract domain from URL."""
+    try:
+        return urlparse(url).netloc
+    except:
+        return url
+
+def process_domain_urls(urls):
+    """Process URLs from the same domain sequentially."""
+    for url in urls:
+        try:
+            load_url_worker(url)
+        except Exception as exc:  # noqa: E722
+            print(f'{url} generated an exception: {exc}')
+
+def process_urls_in_parallel(urls, description="processing"):
+    """Process URLs in parallel while ensuring no domain gets multiple simultaneous requests.
+    
+    Args:
+        urls: List of URLs to process
+        description: Description of the operation for logging purposes
+    """
+    # Group URLs by domain
+    domain_to_urls = defaultdict(list)
+    for url in urls:
+        domain = get_domain(url)
+        domain_to_urls[domain].append(url)
+
+    print(f"{description.capitalize()} {len(urls)} URLs with domain-based parallel processing...")
+    
+    # Process each domain's URLs sequentially, but different domains in parallel
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10 if not DEBUG else 1) as executor:
+        futures = []
+        for domain, domain_urls in domain_to_urls.items():
+            # Submit a task for each domain that will process its URLs sequentially
+            future = executor.submit(process_domain_urls, domain_urls)
+            futures.append(future)
+
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                future.result()  # Ensure exceptions in workers are raised
+            except Exception as exc:  # noqa: E722
+                print(f'Domain processing generated an exception during {description}: {exc}')
+
 def fetch_urls_parallel(urls):
     lock = wait_and_set_fetch_mode()
     if not lock:
@@ -187,19 +232,11 @@ def fetch_urls_parallel(urls):
         return
 
     try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10 if not DEBUG else 1) as executor:
-            future_to_url = {executor.submit(load_url_worker, url): url for url in urls}
-
-            for future in concurrent.futures.as_completed(future_to_url):
-                try:
-                    future.result() # Ensure exceptions in workers are raised
-                except Exception as exc:  # noqa: E722
-                    print(f'{future_to_url[future]} generated an exception: {exc}')
+        process_urls_in_parallel(urls, "fetching")
     finally:
-        lock.release() # Ensure lock is released
+        lock.release()  # Ensure lock is released
         print("Released global fetch lock.")
 
-# Refresh all expired RSS feeds in a separate thread.
 def refresh_thread():
     lock = wait_and_set_fetch_mode()
     if not lock:
@@ -207,6 +244,7 @@ def refresh_thread():
         return
 
     try:
+        # Collect URLs that need refreshing
         urls_to_refresh = []
         for url, rss_info in ALL_URLS.items():
             if g_c.has_feed_expired(url) and rss_info.logo_url != "Custom.png":
@@ -216,13 +254,7 @@ def refresh_thread():
             print("No feeds need refreshing in this cycle.")
             return
 
-        print(f"Refreshing {len(urls_to_refresh)} expired feeds sequentially...")
-        for url in urls_to_refresh:
-            try:
-                load_url_worker(url)
-            except Exception as exc:  # noqa: E722
-                print(f'{url} generated an exception during refresh: {exc}')
-
+        process_urls_in_parallel(urls_to_refresh, "refreshing")
     finally:
         lock.release()
         print("Released global fetch lock after refresh.")
