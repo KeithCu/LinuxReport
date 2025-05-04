@@ -24,7 +24,7 @@ CONFIG: SiteConfig = SiteConfig(
     LOGO_URL = "http://news.thedetroitilove.com/static/images/TechnoReport.png",
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News",
     WEB_TITLE = "The Detroit Techno Report",
-    ABOVE_HTML_FILE = "/srv/http/technoreport/technoreportabove.html",
+    ABOVE_HTML_FILE = "/srv/http/flask/technoreportabove.html",
 
     CUSTOM_FETCH_CONFIG={
         "bandcamp.com": {
