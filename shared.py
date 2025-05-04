@@ -154,8 +154,7 @@ class DiskCacheWrapper:
             
         # If not in cache, get from disk
         last_fetch = self.get(url + ":last_fetch")
-        # Cache the last_fetch value for 5 minutes
-        g_cm.set(cache_key, last_fetch, ttl=300)
+        g_cm.set(cache_key, last_fetch, ttl=EXPIRE_HOUR)
         return last_fetch
 
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
@@ -164,7 +163,7 @@ class DiskCacheWrapper:
         self.put(url + ":last_fetch", timestamp, timeout)
         
         # Also update the in-memory cache
-        g_cm.set(f"last_fetch::{url}", timestamp, ttl=300)
+        g_cm.set(f"last_fetch::{url}", timestamp, ttl=EXPIRE_HOUR)
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")
