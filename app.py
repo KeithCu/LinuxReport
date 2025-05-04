@@ -16,8 +16,7 @@ sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
 from shared import EXPIRE_WEEK, PATH
-
-DEBUG = False
+from models import DEBUG
 
 # Initialize Flask app
 g_app = Flask(__name__)
@@ -42,9 +41,9 @@ def get_file_hash(filepath):
     except:
         return 'dev'
 
-@lru_cache(maxsize=10)
+@lru_cache()
 def static_file_hash(filename):
-    """Get the hash for a specific static file"""
+    """Get the hash for a specific static file. If the files change, service must be restarted."""
     static_dir = os.path.join(PATH, 'static')
     filepath = os.path.join(static_dir, filename)
     return get_file_hash(filepath)
