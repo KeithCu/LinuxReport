@@ -10,28 +10,31 @@ import threading
 import time
 import uuid
 from enum import Enum
-from typing import Any, Optional, cast, Type
+from typing import Any, Optional, Type
 from abc import ABC, abstractmethod
 
 import diskcache
 from cacheout import Cache
+from filelock import FileLock, Timeout
 
 import FeedHistory
 
-from filelock import FileLock, Timeout
+class Mode(str, Enum):
+    """Enumeration for different report modes using string values."""
+    LINUX_REPORT = "linux"
+    COVID_REPORT = "covid"
+    TECHNO_REPORT = "techno"
+    AI_REPORT = "ai"
+    PYTHON_REPORT = "python"
+    TRUMP_REPORT = "trump"
+    SPACE_REPORT = "space"
+    PV_REPORT = "pv"
 
-class Mode(Enum):
-    """Enumeration for different report modes."""
-    LINUX_REPORT = 1
-    COVID_REPORT = 2
-    TECHNO_REPORT = 3
-    AI_REPORT = 4
-    PYTHON_REPORT = 5
-    TRUMP_REPORT = 6
-    SPACE_REPORT = 7
-    SOLAR_REPORT = 8
+# Simple map from Mode enum to URL identifiers - identical to enum values
+MODE_MAP = {mode: mode.value for mode in Mode}
 
-# Constants
+# Config modules derived from mode names
+CONFIG_MODULES = {mode: f"{mode.value}_report_settings" for mode in Mode}
 
 # Path for code and cache
 PATH: str = "/srv/http/LinuxReport2"
@@ -47,23 +50,11 @@ EXPIRE_YEARS: int = 86400 * 365 * 2
 
 MODE = Mode.AI_REPORT
 
-# Constants for configuration
 URLS_COOKIE_VERSION = "2"
 
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
-MAX_ITEMS = 40  # Maximum number of items to process in RSS feeds
-
-# Mapping for configuration modules
-CONFIG_MODULES = {
-    Mode.LINUX_REPORT: "linux_report_settings",
-    Mode.COVID_REPORT: "covid_report_settings",
-    Mode.TECHNO_REPORT: "techno_report_settings",
-    Mode.AI_REPORT: "ai_report_settings",
-    Mode.TRUMP_REPORT: "trump_report_settings",
-    Mode.SOLAR_REPORT: "pv_report_settings",
-    Mode.SPACE_REPORT: "space_report_settings",
-}
+MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
 
 config_module_name = CONFIG_MODULES.get(MODE)
 if not config_module_name:
@@ -91,16 +82,6 @@ WELCOME_HTML = (
 )
 STANDARD_ORDER_STR = str(site_urls)
 
-# Map modes to a short string for use in URLs and other identifiers
-MODE_MAP = {
-    Mode.LINUX_REPORT: 'linux',
-    Mode.COVID_REPORT: 'covid',
-    Mode.TECHNO_REPORT: 'techno',
-    Mode.AI_REPORT: 'ai',
-    Mode.TRUMP_REPORT: 'trump',
-    Mode.SPACE_REPORT: 'space',
-    Mode.SOLAR_REPORT: 'pv',
-}
 
 # Classes
 class RssFeed:
