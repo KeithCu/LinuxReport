@@ -25,6 +25,6 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_TITLE="COVID-19 Report",
     ABOVE_HTML_FILE="/srv/http/CovidReport2/covidreportabove.html",
     CUSTOM_FETCH_CONFIG={
-        "https://www.reddit.com": REDDIT_FETCH_CONFIG
+        "reddit.com": REDDIT_FETCH_CONFIG
     }
 )

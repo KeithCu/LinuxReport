@@ -65,6 +65,6 @@ CONFIG: SiteConfig = SiteConfig(
             "link_attr": "href",
             "filter_pattern": ""
         },
-        "https://www.reddit.com": REDDIT_FETCH_CONFIG,
+        "reddit.com": REDDIT_FETCH_CONFIG,
     }
 )

@@ -8,7 +8,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://placeintimeandspace.com/feed/": RssInfo("pits.png", "Place In Time And Space", "https://placeintimeandspace.com/"),
         "https://planetecommunications.bandcamp.com/fakefeed": RssInfo("planete.png", "Planet-E Communications", "https://planetecommunications.bandcamp.com/music"),
         "https://sampleddetroit.bandcamp.com/fakefeed": RssInfo("SampledDetroit.png", "Sampled Detroit", "https://sampleddetroit.bandcamp.com/music"),
-        "https://womenonwax.com/fakefeed": RssInfo("womenonwax.png", "Women On Wax", "https://womenonwax.com/"),
+        "https://womenonwax.com/feed/": RssInfo("womenonwax.png", "Women On Wax", "https://womenonwax.com/"),
     },
     USER_AGENT = "The Detroit Techno Report -- http://news.thedetroitilove.com/",
     site_urls = [
@@ -19,12 +19,25 @@ CONFIG: SiteConfig = SiteConfig(
         "https://placeintimeandspace.com/feed/",
         "https://planetecommunications.bandcamp.com/fakefeed",
         "https://sampleddetroit.bandcamp.com/fakefeed",
-        "https://womenonwax.com/fakefeed",
+        "https://womenonwax.com/feed/",
     ],
     URL_IMAGES = "http://news.thedetroitilove.com/static/images/",
     FAVICON = "http://news.thedetroitilove.com/static/images/technoreport.ico",
     LOGO_URL = "http://news.thedetroitilove.com/static/images/TechnoReport.png",
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News",
-    WEB_TITLE = "The Detroit Report",
-    ABOVE_HTML_FILE = "/srv/http/flask/detroitreportabove.html",
+    WEB_TITLE = "The Detroit Techno Report",
+    ABOVE_HTML_FILE = "/srv/http/technoreport/technoreportabove.html",
+
+    CUSTOM_FETCH_CONFIG={
+        "bandcamp.com": {
+            "needs_selenium": True,
+            "needs_tor": False,
+            "post_container": ".music-grid-item",
+            "title_selector": ".title",
+            "link_selector": "a",
+            "link_attr": "href",
+            "published_selector": None,
+            "filter_pattern": None
+        },
+    }
 )

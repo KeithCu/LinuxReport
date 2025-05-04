@@ -34,8 +34,8 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_TITLE="Linux Report",
     ABOVE_HTML_FILE="/srv/http/LinuxReport2/linuxreportabove.html",
     CUSTOM_FETCH_CONFIG={
-        "https://www.reddit.com": REDDIT_FETCH_CONFIG,
-        "https://breitbart.com": {
+        "reddit.com": REDDIT_FETCH_CONFIG,
+        "breitbart.com": {
             "needs_selenium": False,
             "needs_tor": False,
             "post_container": "article",

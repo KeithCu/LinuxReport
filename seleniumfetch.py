@@ -86,12 +86,22 @@ def extract_post_data(post, config, url, use_selenium):
 
 def fetch_site_posts(url, user_agent):
     parsed = urlparse(url)
-    base_site = f"{parsed.scheme}://{parsed.netloc}"
-    site = base_site
+    # Extract base domain (e.g., bandcamp.com from rocksteadydisco.bandcamp.com)
+    domain_parts = parsed.netloc.split('.')
+    if len(domain_parts) > 2:
+        # Handle subdomains like www.example.com or sub.example.co.uk
+        # This logic might need adjustment for complex TLDs like .co.uk
+        # For now, assume simple cases like example.com or sub.example.com
+        base_domain = '.'.join(domain_parts[-2:])
+    else:
+        base_domain = parsed.netloc
 
-    config = CUSTOM_FETCH_CONFIG.get(site)
+    # Always try base domain first, then fallback to netloc (for legacy configs)
+    config = CUSTOM_FETCH_CONFIG.get(base_domain)
     if not config:
-        print(f"Configuration for site '{site}' not found.")
+        config = CUSTOM_FETCH_CONFIG.get(parsed.netloc)
+    if not config:
+        print(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
         return []
 
     etag = ""
@@ -100,12 +110,12 @@ def fetch_site_posts(url, user_agent):
 
     if config.get("needs_selenium", True):
 
-        if "reddit" in site:
+        if "reddit" in base_domain:
             user_agent = g_cs.get("REDDIT_USER_AGENT")
         driver = create_driver(config["needs_tor"], user_agent)
         try:
             driver.get(url)
-            if site == "https://www.reddit.com":
+            if base_domain == "reddit.com":
                 pass
                 #WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
             else:
@@ -125,7 +135,7 @@ def fetch_site_posts(url, user_agent):
         finally:
             driver.quit()
     else:
-        print(f"Fetching {site} using requests (no Selenium)")
+        print(f"Fetching {base_domain} using requests (no Selenium)")
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
@@ -136,7 +146,7 @@ def fetch_site_posts(url, user_agent):
                 if entry:
                     entries.append(entry)
         except Exception as e:
-            print(f"Error fetching {site} with requests: {e}")
+            print(f"Error fetching {base_domain} with requests: {e}")
             # posts = []  # Not needed, handled above
 
     result = {

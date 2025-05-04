@@ -35,7 +35,7 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_TITLE="AI Report",
 	ABOVE_HTML_FILE="/srv/http/aireport/aireportabove.html",
     CUSTOM_FETCH_CONFIG={
-        "https://www.reddit.com": REDDIT_FETCH_CONFIG,
+        "reddit.com": REDDIT_FETCH_CONFIG,
         "https://huggingface.co": {
             "needs_selenium": False,
             "needs_tor": False,
