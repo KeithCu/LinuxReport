@@ -213,7 +213,8 @@ def init_app(flask_app):
             # Load headlines HTML if in admin mode
             if is_admin:
                 try:
-                    with open(ABOVE_HTML_FILE, 'r', encoding='utf-8') as f:
+                    above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
+                    with open(above_html_path, 'r', encoding='utf-8') as f:
                         form.headlines.data = f.read()
                 except Exception as e:
                     print(f"Error reading headlines file: {e}")
@@ -266,6 +267,7 @@ def init_app(flask_app):
                     above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
                     with open(above_html_path, 'w', encoding='utf-8') as f:
                         f.write(form.headlines.data)
+                    print(f("Saved headlines to {above_html_path}."))
                     # Clear the cache for the above HTML file
                     g_c.delete(ABOVE_HTML_FILE)
                 except Exception as e:
