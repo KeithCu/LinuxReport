@@ -30,4 +30,17 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_DESCRIPTION="Solar News",
     WEB_TITLE="Solar PV Report",
     ABOVE_HTML_FILE="/srv/http/pvreport/pvreportabove.html",
+
+    CUSTOM_FETCH_CONFIG={
+        "solarmagazine.com": {
+            "needs_selenium": False,
+            "needs_tor": False,
+            "post_container": "h3",
+            "title_selector": "a",
+            "link_selector": "a",
+            "link_attr": "href",
+            "published_selector": None,
+            "filter_pattern": ""
+        },
+    },
 )

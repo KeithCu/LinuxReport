@@ -66,7 +66,9 @@ def get_cached_above_html():
 
 # Function to initialize routes
 def init_app(flask_app):
-    
+
+    # The main page of LinuxReport. Most of the time, it won't need to hit the disk to return the page
+    # even if the page cache is expired.
     @flask_app.route('/')
     def index():
         # Determine the order of RSS feeds to display.
@@ -115,7 +117,7 @@ def init_app(flask_app):
 
             expired_rss = g_c.has_feed_expired(url)
 
-            if not g_c.has(url):
+            if not g_c.has(url) or "placeintimeandspace.com" in url:
                 needed_urls.append(url)
             elif expired_rss:
                 need_fetch = True
@@ -161,13 +163,11 @@ def init_app(flask_app):
             result[1] = Markup(''.join(result[1]))
             result[2] = Markup(''.join(result[2]))
 
-        # Include additional HTML content if available.
         above_html = get_cached_above_html()
 
         if not single_column:
             above_html = above_html.replace("<hr/>", "")
 
-        # Get weather HTML
         weather_html = get_default_weather_html()
 
         # Render the final page.
