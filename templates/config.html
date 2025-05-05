@@ -47,8 +47,19 @@
         </div>
         <div class="form-group">
           <label for="admin_mode">Admin Mode:</label>
-          {{ form.admin_mode }} <!-- Added Admin Mode Checkbox -->
+          {{ form.admin_mode }}
         </div>
+
+        {% if is_admin %}
+        <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--btn-border); padding-top: 20px;">
+          <h3>Headlines Editor</h3>
+          <p style="font-size: 0.9em; color: var(--text-secondary);">
+            Edit the HTML content that appears above the main content. Changes are saved when you click "Save".
+          </p>
+          {{ render_field(form.headlines) }}
+        </div>
+        {% endif %}
+
         <div><i>Drag and Drop to have a custom order.</i></div>
         <div class="url-list">
           {% for urlf in form.urls %}

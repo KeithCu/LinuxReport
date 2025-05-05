@@ -193,6 +193,7 @@ def init_app(flask_app):
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
     def config():
+        is_admin = request.cookies.get('isAdmin') == '1'
 
         if request.method == 'GET':
             form = ConfigForm()
@@ -207,7 +208,16 @@ def init_app(flask_app):
 
             form.font_family.data = request.cookies.get('FontFamily', 'system')
 
-            form.admin_mode.data = request.cookies.get('isAdmin') == '1'
+            form.admin_mode.data = is_admin
+
+            # Load headlines HTML if in admin mode
+            if is_admin:
+                try:
+                    with open(ABOVE_HTML_FILE, 'r', encoding='utf-8') as f:
+                        form.headlines.data = f.read()
+                except Exception as e:
+                    print(f"Error reading headlines file: {e}")
+                    form.headlines.data = ""
 
             page_order = request.cookies.get('RssUrls')
             if page_order is not None:
@@ -236,7 +246,7 @@ def init_app(flask_app):
                 rssf.pri = (i + 30) * 10
                 form.url_custom.append_entry(rssf)
 
-            page = render_template('config.html', form=form)
+            page = render_template('config.html', form=form, is_admin=is_admin)
             return page
         else:
             form = ConfigForm(request.form)
@@ -249,6 +259,16 @@ def init_app(flask_app):
                 resp.delete_cookie('SansSerif')
                 resp.delete_cookie('isAdmin')
                 return resp
+
+            # Save headlines if in admin mode and headlines were provided
+            if is_admin and form.headlines.data:
+                try:
+                    with open(ABOVE_HTML_FILE, 'w', encoding='utf-8') as f:
+                        f.write(form.headlines.data)
+                    # Clear the cache for the above HTML file
+                    g_c.delete(ABOVE_HTML_FILE)
+                except Exception as e:
+                    print(f"Error saving headlines file: {e}")
 
             page_order = []
 
