@@ -263,7 +263,8 @@ def init_app(flask_app):
             # Save headlines if in admin mode and headlines were provided
             if is_admin and form.headlines.data:
                 try:
-                    with open(ABOVE_HTML_FILE, 'w', encoding='utf-8') as f:
+                    above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
+                    with open(above_html_path, 'w', encoding='utf-8') as f:
                         f.write(form.headlines.data)
                     # Clear the cache for the above HTML file
                     g_c.delete(ABOVE_HTML_FILE)
