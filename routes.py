@@ -25,7 +25,7 @@ from models import RssInfo, DEBUG
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -269,8 +269,9 @@ def init_app(flask_app):
                     with open(above_html_path, 'w', encoding='utf-8') as f:
                         f.write(form.headlines.data)
                     print(f("Saved headlines to {above_html_path}."))
-                    # Clear the cache for the above HTML file
-                    g_c.delete(ABOVE_HTML_FILE)
+                    # Clear the cache for the above HTML file (in-memory and diskcache)
+                    if ABOVE_HTML_FILE in _file_cache:
+                        del _file_cache[ABOVE_HTML_FILE]
                     # Clear all page caches since headlines have changed
                     clear_page_caches()
                 except Exception as e:
