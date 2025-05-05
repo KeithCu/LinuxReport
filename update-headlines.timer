@@ -1,0 +1,10 @@
+# /etc/systemd/system/update-headlines.timer
+[Unit]
+Description=Run headline updates hourly
+
+[Timer]
+OnCalendar=*-*-* *:01:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
