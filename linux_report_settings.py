@@ -15,7 +15,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://breitbart.com/fakefeed": RssInfo("breitbart.webp", "Breitbart Tech feed", "https://breitbart.com/tech/"),
     },
     USER_AGENT="Linux Report -- https://linuxreport.net/",
-    site_urls=[
+    SITE_URLS=[
         "http://lxer.com/module/newswire/headlines.rss",
         "https://www.reddit.com/r/linux/.rss",
         "http://rss.slashdot.org/Slashdot/slashdotMain",

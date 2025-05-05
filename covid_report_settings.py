@@ -10,7 +10,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg": RssInfo("JohnCampbell.png", "Dr. John Campbell", "https://www.youtube.com/user/Campbellteaching/videos"),
     },
     USER_AGENT="Covid-19 Report -- https://covidreport.org/",
-    site_urls=[
+    SITE_URLS=[
         "https://www.reddit.com/r/Coronavirus/rising/.rss",
         "https://www.reddit.com/r/COVID19/.rss",
         "https://www.google.com/alerts/feeds/12151242449143161443/16985802477674969984",

@@ -16,7 +16,7 @@ class SiteConfig:
     """Configuration for a site."""
     ALL_URLS: Dict[str, "RssInfo"]
     USER_AGENT: str
-    site_urls: List[str]
+    SITE_URLS: List[str]
     URL_IMAGES: str
     FAVICON: str
     LOGO_URL: str

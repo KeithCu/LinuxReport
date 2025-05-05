@@ -17,7 +17,7 @@ CONFIG: SiteConfig = SiteConfig(
 
 	},
 	USER_AGENT="Trump Report -- https://trumpreport.info",
-	site_urls=[
+	SITE_URLS=[
 		"https://feeds.feedburner.com/breitbart",
 		"https://patriots.win/fakefeed",
 		"https://revolver.news/fakefeed",

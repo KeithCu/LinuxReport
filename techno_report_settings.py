@@ -10,7 +10,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://womenonwax.com/feed/": RssInfo("womenonwax.png", "Women On Wax", "https://womenonwax.com"),
     },
     USER_AGENT = "The Detroit Techno Report -- http://news.thedetroitilove.com/",
-    site_urls = [
+    SITE_URLS = [
         "http://detroiteq.com/feed",
         "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530",
         "https://rocksteadydisco.bandcamp.com/fakefeed",

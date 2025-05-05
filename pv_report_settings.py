@@ -13,7 +13,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://www.altenergymag.com/rss/news/": RssInfo("altenergymag.png", "Alternative Energy Magazine", "https://www.altenergymag.com"),
     },
     USER_AGENT="Solar Report -- https://pvreport.org",
-    site_urls=[
+    SITE_URLS=[
         "https://www.pv-tech.org/feed",
         "https://www.solarpowerworldonline.com/feed/",
         "https://www.pv-magazine.com/feed/",

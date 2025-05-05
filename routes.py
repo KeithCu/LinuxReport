@@ -25,7 +25,7 @@ from models import RssInfo, DEBUG
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, site_urls, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -79,7 +79,7 @@ def init_app(flask_app):
                 page_order = json.loads(page_order)
 
         if page_order is None:
-            page_order = site_urls
+            page_order = SITE_URLS
 
         page_order_s = str(page_order)
 
@@ -213,7 +213,7 @@ def init_app(flask_app):
             if page_order is not None:
                 page_order = json.loads(page_order)
             else:
-                page_order = site_urls
+                page_order = SITE_URLS
 
             custom_count = 0
             for i, p_url in enumerate(page_order):
@@ -270,7 +270,7 @@ def init_app(flask_app):
             template = render_template('configdone.html', message="Cookies saved for later.")
             resp = make_response(template)
 
-            if page_order != site_urls:
+            if page_order != SITE_URLS:
                 cookie_str = json.dumps(page_order)
                 resp.set_cookie('RssUrls', cookie_str, max_age=EXPIRE_YEARS)
                 resp.set_cookie('UrlsVer', URLS_COOKIE_VERSION, max_age=EXPIRE_YEARS)

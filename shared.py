@@ -63,7 +63,7 @@ if not config_module_name:
 config_settings = __import__(config_module_name, fromlist=["CONFIG"])
 
 ALL_URLS = config_settings.CONFIG.ALL_URLS
-site_urls = config_settings.CONFIG.site_urls
+SITE_URLS = config_settings.CONFIG.SITE_URLS
 USER_AGENT = config_settings.CONFIG.USER_AGENT
 URL_IMAGES = config_settings.CONFIG.URL_IMAGES
 FAVICON = config_settings.CONFIG.FAVICON
@@ -80,7 +80,7 @@ WELCOME_HTML = (
     '<br/>The Reddit Woke mafia had blocked my user-agent and IP address for political reasons, (I was making max a few requests per hour!!) '
     '<br/>So, I picked a random USER_AGENT and am using <a href = "https://www.torproject.org/">TOR</a> to fetch Reddit feeds. Checkmate, bitches!'
 )
-STANDARD_ORDER_STR = str(site_urls)
+STANDARD_ORDER_STR = str(SITE_URLS)
 
 
 # Classes

@@ -16,7 +16,7 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://futurism.com/categories/ai-artificial-intelligence/feed": RssInfo("futurism.svg", "Futurism", "https://futurism.com/categories/ai-artificial-intelligence"),
 	},
 	USER_AGENT="AI Report -- https://aireport.keithcu.com",
-	site_urls=[
+	SITE_URLS=[
 		"https://www.reddit.com/r/LocalLlama/.rss",
 		"https://huggingface.co/blog/feed.xml",
 		"https://futurism.com/categories/ai-artificial-intelligence/feed",
