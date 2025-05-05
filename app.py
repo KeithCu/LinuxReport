@@ -7,6 +7,7 @@ import sys
 import os
 import hashlib
 from functools import lru_cache
+import datetime
 
 # Third-party imports
 from flask import Flask
@@ -39,7 +40,9 @@ def get_file_hash(filepath):
         with open(filepath, 'rb') as f:
             return hashlib.md5(f.read()).hexdigest()[:8]
     except:
-        return 'dev'
+        # Return 'dev' plus a timestamp on error (useful for dev environments)
+        now = datetime.datetime.now()
+        return f'dev{int(now.timestamp())}'
 
 @lru_cache()
 def static_file_hash(filename):

@@ -17,11 +17,16 @@
   <body>
 
 <center>
-  <div style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: small; position: relative;">
-    <a href="https://openweathermap.org" target="_blank" style="text-decoration: none; color: inherit;">
-      <center>{{ weather_html }}</center>
-      <div style="position: absolute; bottom: 0; right: 0; font-size: 8px; color: var(--link);">Data by OpenWeather</div>
-    </a>
+  <div id="weather-widget-container" style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-block; font-size: small; position: relative;">
+    <div id="weather-content">
+      <a href="https://openweathermap.org" target="_blank" style="text-decoration: none; color: inherit;">
+        <center>{{ weather_html }}</center>
+        <div style="position: absolute; bottom: 0; right: 0; font-size: 8px; color: var(--link);">Data by OpenWeather</div>
+      </a>
+    </div>
+    <!-- Moved button outside the a tag -->
+    <span id="weather-collapsed-label" style="display: none; vertical-align: middle;">Weather</span> <!-- Label shown when collapsed -->
+    <button id="weather-toggle-btn" title="Toggle Weather" style="position: absolute; top: 0; right: 0; background: none; border: none; font-size: 1.2em; cursor: pointer; color: var(--text); padding: 0 5px; z-index: 1; vertical-align: middle;">&#9660;</button> <!-- Down arrow initially -->
   </div>
 </center>
     <center>{{ above_html }}</center>

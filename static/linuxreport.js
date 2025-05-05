@@ -25,6 +25,74 @@ document.addEventListener('DOMContentLoaded', function() {
   if (!ss || ss[1] === '1') document.body.classList.add('sans-serif');
 });
 
+// Global flag to enable/disable weather widget toggle. Set to false to always show widget and hide toggle UI.
+const weatherWidgetToggleEnabled = false;
+
+// --- Weather Widget Toggle ---
+const weatherDefaultCollapsed = false; // <<< SET TO true FOR COLLAPSED BY DEFAULT, false FOR OPEN BY DEFAULT >>>
+
+document.addEventListener('DOMContentLoaded', function() {
+  const weatherContainer = document.getElementById('weather-widget-container');
+  const weatherContent = document.getElementById('weather-content');
+  const weatherToggleBtn = document.getElementById('weather-toggle-btn');
+
+  if (!weatherWidgetToggleEnabled) {
+    // Ensure widget always open
+    if (weatherContainer) weatherContainer.classList.remove('collapsed');
+    if (weatherContent) weatherContent.style.display = '';
+    // Hide toggle UI
+    if (weatherToggleBtn) weatherToggleBtn.style.display = 'none';
+    const label = document.getElementById('weather-collapsed-label');
+    if (label) label.style.display = 'none';
+    return;
+  }
+
+  if (!weatherContainer || !weatherContent || !weatherToggleBtn) {
+    console.warn('Weather toggle elements not found.');
+    return;
+  }
+
+  // Function to set state based on cookie OR default setting
+  function setInitialWeatherState() {
+    const cookieValue = document.cookie.split('; ').find(item => item.trim().startsWith('weatherCollapsed='));
+    let isCollapsed;
+
+    if (cookieValue) {
+      // Use cookie value if it exists
+      isCollapsed = cookieValue.split('=')[1] === 'true';
+    } else {
+      // Otherwise, use the default setting
+      isCollapsed = weatherDefaultCollapsed;
+    }
+
+    if (isCollapsed) {
+      weatherContainer.classList.add('collapsed');
+      weatherToggleBtn.innerHTML = '&#9650;'; // Up arrow
+    } else {
+      weatherContainer.classList.remove('collapsed');
+      weatherToggleBtn.innerHTML = '&#9660;'; // Down arrow
+    }
+  }
+
+  // Set initial state on load
+  setInitialWeatherState();
+
+  // Add click listener to toggle button
+  weatherToggleBtn.addEventListener('click', function(event) { // Added event parameter
+    console.log('Weather toggle button clicked!'); // Add this line for debugging
+    event.stopPropagation(); // Prevent the click from bubbling up
+    const isCurrentlyCollapsed = weatherContainer.classList.toggle('collapsed');
+    if (isCurrentlyCollapsed) {
+      weatherToggleBtn.innerHTML = '&#9650;'; // Up arrow
+      document.cookie = 'weatherCollapsed=true; path=/; max-age=31536000; SameSite=Lax'; // Added SameSite
+    } else {
+      weatherToggleBtn.innerHTML = '&#9660;'; // Down arrow
+      document.cookie = 'weatherCollapsed=false; path=/; max-age=31536000; SameSite=Lax'; // Added SameSite
+    }
+  });
+});
+// --- End Weather Widget Toggle ---
+
 function redirect() {
   window.location = "/config"
 }

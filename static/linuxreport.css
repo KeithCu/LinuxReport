@@ -291,6 +291,25 @@ body.no-underlines a, body.no-underlines a * {
   color: var(--link);
 }
 
+/* Weather Widget Toggle */
+#weather-widget-container.collapsed #weather-content {
+  display: none;
+}
+
+#weather-toggle-btn {
+  /* Basic styling is inline, add hover/focus if needed */
+  transition: transform 0.2s ease-in-out;
+}
+
+#weather-widget-container.collapsed #weather-toggle-btn {
+  transform: rotate(180deg); /* Point up when collapsed */
+}
+
+#weather-widget-container.collapsed #weather-collapsed-label {
+  display: inline !important; /* Show the label when collapsed, overriding inline style */
+  padding-right: 25px; /* Add padding to prevent overlap with the button */
+}
+
 /* Remove static dark-mode overrides; variables handle all themes */
 
 /* Override monospace in entry titles and use inherited font */
