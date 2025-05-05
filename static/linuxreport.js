@@ -299,6 +299,15 @@ document.addEventListener("DOMContentLoaded", function() {
     weatherForecast.style.display = "flex";
   }
   setTimeout(loadWeather, 100);
+
+  // Fetch weather when widget is toggled open
+  const weatherToggleBtn = document.getElementById('weather-toggle-btn');
+  if (weatherToggleBtn) {
+    weatherToggleBtn.addEventListener('click', function() {
+      // Delay slightly to allow UI state to update
+      setTimeout(loadWeather, 100);
+    });
+  }
 });
 
 document.addEventListener('DOMContentLoaded', function() {
