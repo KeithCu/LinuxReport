@@ -37,7 +37,7 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_TITLE="TrumpReport",
 	ABOVE_HTML_FILE="/srv/http/trumpreport/trumpreportabove.html",
     CUSTOM_FETCH_CONFIG={
-        "https://patriots.win": {
+        "patriots.win": {
             "needs_selenium": True,
             "needs_tor": False,
             "post_container": ".post-item",
@@ -46,7 +46,7 @@ CONFIG: SiteConfig = SiteConfig(
             "link_attr": "href",
             "filter_pattern": ""
         },
-        "https://breitbart.com": {
+        "breitbart.com": {
             "needs_selenium": False,
             "needs_tor": False,
             "post_container": "article",
@@ -56,7 +56,7 @@ CONFIG: SiteConfig = SiteConfig(
             "published_selector": ".header_byline time",
             "filter_pattern": "/tech/"
         },
-        "https://revolver.news": {
+        "revolver.news": {
             "needs_selenium": False,
             "needs_tor": False,
             "post_container": "article.item",
