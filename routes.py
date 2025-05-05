@@ -92,7 +92,8 @@ def init_app(flask_app):
             single_column = True
 
         # Try full page cache using only page order and mobile flag
-        full_page = g_cm.get(page_order_s + suffix)
+        cache_key = f"page-cache:{page_order_s}{suffix}"
+        full_page = g_cm.get(cache_key)
         if not DEBUG and full_page is not None:
             return full_page
 
@@ -183,7 +184,7 @@ def init_app(flask_app):
             expire = EXPIRE_MINUTES
             if need_fetch:
                 expire = 30
-            g_cm.set(page_order_s + suffix, page, ttl=expire)
+            g_cm.set(cache_key, page, ttl=expire)
 
         # Trigger background fetching if needed
         if need_fetch:
@@ -270,6 +271,8 @@ def init_app(flask_app):
                     print(f("Saved headlines to {above_html_path}."))
                     # Clear the cache for the above HTML file
                     g_c.delete(ABOVE_HTML_FILE)
+                    # Clear all page caches since headlines have changed
+                    clear_page_caches()
                 except Exception as e:
                     print(f"Error saving headlines file: {e}")
 

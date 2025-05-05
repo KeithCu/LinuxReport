@@ -412,3 +412,12 @@ def get_cached_file_content(file_path, encoding='utf-8'):
 
     _file_cache[file_path] = {'mtime': mtime, 'content': content, 'last_check_time': now}
     return content
+
+def clear_page_caches():
+    """Clear all page caches from the in-memory cache."""
+    # Get all keys from the cache
+    keys = list(g_cm.keys())
+    # Delete all keys that start with page-cache:
+    for key in keys:
+        if key.startswith('page-cache:'):
+            g_cm.delete(key)
