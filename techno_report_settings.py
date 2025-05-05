@@ -2,7 +2,7 @@ from models import RssInfo, SiteConfig
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS = {
         "http://detroiteq.com/feed": RssInfo("deq.png", "Detroit Electronic Quarterly", "http://detroiteq.com/"),
-        "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530": RssInfo("Google-News.png", "Google Detroit Techno news", "https://news.google.com/search?q=detroit techno"),
+        "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530": RssInfo("Google-NewsTechno.png", "Google Detroit Techno news", "https://news.google.com/search?q=detroit techno"),
         "https://rocksteadydisco.bandcamp.com/fakefeed": RssInfo("RockSteadyDisco.png", "RockSteady Disco", "https://rocksteadydisco.bandcamp.com"),
         "https://transmatdetroit.bandcamp.com/fakefeed": RssInfo("Transmat.png", "Transmat", "https://transmatdetroit.bandcamp.com"),
         "https://pitsdetroit.bandcamp.com/fakefeed": RssInfo("pits.png", "Place In Time And Space", "https://pitsdetroit.bandcamp.com/"),
