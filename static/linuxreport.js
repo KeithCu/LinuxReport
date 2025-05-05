@@ -213,9 +213,10 @@ document.addEventListener("DOMContentLoaded", function() {
   function loadWeather() {
     const weatherContainer = document.getElementById('weather-container');
     if (!weatherContainer) return;
-    const weatherLoading = document.getElementById('weather-loading');
-    const weatherError = document.getElementById('weather-error');
-    const weatherForecast = document.getElementById('weather-forecast');
+    // Only fetch weather if widget is visible
+    const widgetWrapper = document.getElementById('weather-widget-container');
+    if ((widgetWrapper && widgetWrapper.classList.contains('collapsed')) ||
+        getComputedStyle(weatherContainer).display === 'none') return;
     fetchWeatherData();
   }
   function fetchWeatherData() {
