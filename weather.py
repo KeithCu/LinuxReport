@@ -18,7 +18,7 @@ import geoip2.database
 import requests
 
 # Local imports
-from shared import g_cs as g_c, get_lock
+from shared import g_cs as g_c, get_lock, PATH
 from models import DEBUG
 
 # --- Arbitrary bucket resolution (miles-based) ---
@@ -47,7 +47,7 @@ DEFAULT_WEATHER_LON = "83.0425"
 
 # --- GeoIP ---
 def _get_geoip_db_path():
-    srv_path = os.path.join('/srv/http/LinuxReport2', 'GeoLite2-City.mmdb')
+    srv_path = os.path.join(PATH, 'GeoLite2-City.mmdb')
     if os.path.exists(srv_path):
         return srv_path
     return os.path.join(os.path.dirname(__file__), 'GeoLite2-City.mmdb')
