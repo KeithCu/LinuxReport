@@ -26,7 +26,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Global flag to enable/disable weather widget toggle. Set to false to always show widget and hide toggle UI.
-const weatherWidgetToggleEnabled = false;
+const weatherWidgetToggleEnabled = true;
 
 // --- Weather Widget Toggle ---
 const weatherDefaultCollapsed = false; // <<< SET TO true FOR COLLAPSED BY DEFAULT, false FOR OPEN BY DEFAULT >>>
