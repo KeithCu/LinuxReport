@@ -22,7 +22,6 @@ class SiteConfig:
     LOGO_URL: str
     WEB_DESCRIPTION: str
     WEB_TITLE: str
-    ABOVE_HTML_FILE: str
     CUSTOM_FETCH_CONFIG: dict = None
 
 class RssInfo:
