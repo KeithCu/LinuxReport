@@ -28,8 +28,8 @@ CONFIG: SiteConfig = SiteConfig(
     FAVICON="https://pvreport.org/static/images/pvreport.ico",
     LOGO_URL="https://pvreport.org/static/images/pvreport.webp",
     WEB_DESCRIPTION="Solar News",
-    WEB_TITLE="Solar PV Report",
-    ABOVE_HTML_FILE="/srv/http/pvreport/pvreportabove.html",
+    WEB_TITLE="Photovoltaic Report",
+    ABOVE_HTML_FILE="pvreportabove.html",
 
     CUSTOM_FETCH_CONFIG={
         "solarmagazine.com": {

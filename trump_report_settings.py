@@ -35,7 +35,7 @@ CONFIG: SiteConfig = SiteConfig(
 	LOGO_URL="https://trumpreport.info/static/images/TrumpReport.webp",
 	WEB_DESCRIPTION="Trump Report",
 	WEB_TITLE="TrumpReport",
-	ABOVE_HTML_FILE="/srv/http/trumpreport/trumpreportabove.html",
+	ABOVE_HTML_FILE="trumpreportabove.html",
     CUSTOM_FETCH_CONFIG={
         "patriots.win": {
             "needs_selenium": True,

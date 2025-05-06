@@ -32,7 +32,7 @@ CONFIG: SiteConfig = SiteConfig(
     LOGO_URL="https://linuxreport.net/static/images/linuxreportfancy.webp",
     WEB_DESCRIPTION="Linux News",
     WEB_TITLE="Linux Report",
-    ABOVE_HTML_FILE="/srv/http/LinuxReport2/linuxreportabove.html",
+    ABOVE_HTML_FILE="linuxreportabove.html",
     CUSTOM_FETCH_CONFIG={
         "reddit.com": REDDIT_FETCH_CONFIG,
         "breitbart.com": {

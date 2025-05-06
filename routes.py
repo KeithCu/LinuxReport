@@ -62,7 +62,7 @@ def get_ip_prefix(ip_str):
 
 def get_cached_above_html():
     """Return content of ABOVE_HTML_FILE using generic cache."""
-    return get_cached_file_content(ABOVE_HTML_FILE)
+    return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
 
 # Function to initialize routes
 def init_app(flask_app):
@@ -215,6 +215,7 @@ def init_app(flask_app):
             if is_admin:
                 try:
                     above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
+
                     with open(above_html_path, 'r', encoding='utf-8') as f:
                         form.headlines.data = f.read()
                 except Exception as e:
@@ -268,14 +269,16 @@ def init_app(flask_app):
                     above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
                     with open(above_html_path, 'w', encoding='utf-8') as f:
                         f.write(form.headlines.data)
-                    print(f("Saved headlines to {above_html_path}."))
-                    # Clear the cache for the above HTML file (in-memory and diskcache)
-                    if ABOVE_HTML_FILE in _file_cache:
-                        del _file_cache[ABOVE_HTML_FILE]
-                    # Clear all page caches since headlines have changed
-                    clear_page_caches()
+                    print(f"Saved headlines to {above_html_path}.")
                 except Exception as e:
                     print(f"Error saving headlines file: {e}")
+
+                # Clear the cache for the above HTML file (in-memory and diskcache)
+                above_html_full_path = os.path.join(PATH, ABOVE_HTML_FILE)
+                if above_html_full_path in _file_cache:
+                    del _file_cache[above_html_full_path]
+                # Clear all page caches since headlines have changed
+                clear_page_caches()
 
             page_order = []
 
