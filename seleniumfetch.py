@@ -6,6 +6,7 @@ Provides functions to fetch and parse posts from sites requiring JavaScript rend
 
 import os
 import time
+import threading
 # Standard library imports
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
@@ -42,6 +43,61 @@ def create_driver(use_tor, user_agent):
     driver.execute_cdp_cmd("Network.enable", {})
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {"Accept-Encoding": "identity"}})
     return driver
+
+class SharedSeleniumDriver:
+    _instance = None
+    _lock = threading.Lock()
+    _timer = None
+    _timeout = 300  # 5 minutes
+
+    def __init__(self, use_tor, user_agent):
+        self.driver = create_driver(use_tor, user_agent)
+        self.last_used = time.time()
+        self.use_tor = use_tor
+        self.user_agent = user_agent
+
+    @classmethod
+    def get_driver(cls, use_tor, user_agent):
+        with cls._lock:
+            if cls._instance is None or not cls._instance._is_valid(use_tor, user_agent):
+                if cls._instance:
+                    try:
+                        cls._instance.driver.quit()
+                    except Exception:
+                        pass
+                cls._instance = SharedSeleniumDriver(use_tor, user_agent)
+            cls._instance.last_used = time.time()
+            cls._reset_timer()
+            return cls._instance.driver
+
+    @classmethod
+    def _is_valid(cls, use_tor, user_agent):
+        # Only reuse if config matches
+        return (
+            cls._instance and
+            cls._instance.use_tor == use_tor and
+            cls._instance.user_agent == user_agent and
+            hasattr(cls._instance, 'driver')
+        )
+
+    @classmethod
+    def _reset_timer(cls):
+        if cls._timer:
+            cls._timer.cancel()
+        cls._timer = threading.Timer(cls._timeout, cls._shutdown)
+        cls._timer.daemon = True
+        cls._timer.start()
+
+    @classmethod
+    def _shutdown(cls):
+        with cls._lock:
+            if cls._instance:
+                try:
+                    cls._instance.driver.quit()
+                except Exception:
+                    pass
+                cls._instance = None
+                cls._timer = None
 
 class FeedParserDict(dict):
     """Mimic feedparser's FeedParserDict for compatibility"""
@@ -112,7 +168,7 @@ def fetch_site_posts(url, user_agent):
 
         if "reddit" in base_domain:
             user_agent = g_cs.get("REDDIT_USER_AGENT")
-        driver = create_driver(config["needs_tor"], user_agent)
+        driver = SharedSeleniumDriver.get_driver(config["needs_tor"], user_agent)
         try:
             driver.get(url)
             if base_domain == "reddit.com":
@@ -132,8 +188,7 @@ def fetch_site_posts(url, user_agent):
                     entries.append(entry)
         except Exception as e:
             print(f"Error on {url}: {e}")
-        finally:
-            driver.quit()
+        # Do not quit driver here; managed by SharedSeleniumDriver
     else:
         print(f"Fetching {base_domain} using requests (no Selenium)")
         try:
