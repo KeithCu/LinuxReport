@@ -47,7 +47,8 @@ DEFAULT_WEATHER_LON = "83.0425"
 
 # --- GeoIP ---
 def _get_geoip_db_path():
-    srv_path = os.path.join(PATH, 'GeoLite2-City.mmdb')
+    #Database stored in /srv/http/LinuxReport2/GeoLite2-City.mmdb
+    srv_path = os.path.join('/srv/http/LinuxReport2', 'GeoLite2-City.mmdb')
     if os.path.exists(srv_path):
         return srv_path
     return os.path.join(os.path.dirname(__file__), 'GeoLite2-City.mmdb')
@@ -90,6 +91,7 @@ def rate_limit_check():
         wait_time = (oldest_in_window + RATE_LIMIT_WINDOW) - now
         if wait_time > 0:
             time.sleep(wait_time)
+            print(f"Weather API rate limit exceeded. Sleeping for {wait_time:.2f} seconds. Consider increasing WEATHER_BUCKET_SIZE_MILES.")
             now = time.time()
 
     timestamps_in_window.append(now)
