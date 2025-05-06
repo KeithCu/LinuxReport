@@ -33,7 +33,6 @@ CONFIG: SiteConfig = SiteConfig(
 	LOGO_URL="https://aireport.keithcu.com/static/images/aireportfancy.webp",
 	WEB_DESCRIPTION="AI News",
 	WEB_TITLE="AI Report",
-	ABOVE_HTML_FILE="aireportabove.html",
     CUSTOM_FETCH_CONFIG={
         "reddit.com": REDDIT_FETCH_CONFIG,
     }

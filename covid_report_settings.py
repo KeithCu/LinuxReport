@@ -23,7 +23,6 @@ CONFIG: SiteConfig = SiteConfig(
     LOGO_URL="https://covidreport.org/static/images/covidreportfancy.webp",
     WEB_DESCRIPTION="COVID-19 and Infectious Disease News",
     WEB_TITLE="COVID-19 Report",
-    ABOVE_HTML_FILE="covidreportabove.html",
     CUSTOM_FETCH_CONFIG={
         "reddit.com": REDDIT_FETCH_CONFIG
     }

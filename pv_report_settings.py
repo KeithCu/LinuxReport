@@ -29,7 +29,6 @@ CONFIG: SiteConfig = SiteConfig(
     LOGO_URL="https://pvreport.org/static/images/pvreport.webp",
     WEB_DESCRIPTION="Solar News",
     WEB_TITLE="Photovoltaic Report",
-    ABOVE_HTML_FILE="pvreportabove.html",
 
     CUSTOM_FETCH_CONFIG={
         "solarmagazine.com": {
