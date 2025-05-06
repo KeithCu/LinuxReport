@@ -23,7 +23,7 @@ CONFIG: SiteConfig = SiteConfig(
     FAVICON = "http://news.thedetroitilove.com/static/images/technoreport.ico",
     LOGO_URL = "http://news.thedetroitilove.com/static/images/TechnoReport.png",
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News",
-    WEB_TITLE = "The Detroit Techno Report",
+    WEB_TITLE = "The Detroit Report",
     ABOVE_HTML_FILE = "/srv/http/flask/technoreportabove.html",
 
     CUSTOM_FETCH_CONFIG={
