@@ -2,6 +2,7 @@
 
 // Global flag to enable/disable weather widget toggle. Set to false to always show widget and hide toggle UI.
 const weatherWidgetToggleEnabled = true;
+const WEATHER_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 // --- Weather Widget Toggle ---
 const weatherDefaultCollapsed = false; // <<< SET TO true FOR COLLAPSED BY DEFAULT, false FOR OPEN BY DEFAULT >>>
@@ -10,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const weatherContainer = document.getElementById('weather-widget-container');
   const weatherContent = document.getElementById('weather-content');
   const weatherToggleBtn = document.getElementById('weather-toggle-btn');
+  let weatherToggleHandler = null;
 
   if (!weatherWidgetToggleEnabled) {
     if (weatherContainer) weatherContainer.classList.remove('collapsed');
@@ -46,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   setInitialWeatherState();
 
-  weatherToggleBtn.addEventListener('click', function(event) {
+  weatherToggleHandler = function(event) {
     console.log('Weather toggle button clicked!');
     event.stopPropagation();
     const isCurrentlyCollapsed = weatherContainer.classList.toggle('collapsed');
@@ -57,97 +59,188 @@ document.addEventListener('DOMContentLoaded', function() {
       weatherToggleBtn.innerHTML = '&#9660;';
       document.cookie = 'weatherCollapsed=false; path=/; max-age=31536000; SameSite=Lax';
     }
+  };
+
+  weatherToggleBtn.addEventListener('click', weatherToggleHandler);
+
+  // Cleanup handler on page unload
+  window.addEventListener('unload', () => {
+    if (weatherToggleBtn && weatherToggleHandler) {
+      weatherToggleBtn.removeEventListener('click', weatherToggleHandler);
+    }
   });
 });
 
-// Weather data fetch and render
+// Weather data fetch and render with caching
+function getCachedWeatherData() {
+  try {
+    const cached = sessionStorage.getItem('weatherData');
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached);
+      if (Date.now() - timestamp < WEATHER_CACHE_DURATION) {
+        return data;
+      }
+    }
+  } catch (error) {
+    console.error('Error reading cached weather data:', error);
+  }
+  return null;
+}
+
+function setCachedWeatherData(data) {
+  try {
+    sessionStorage.setItem('weatherData', JSON.stringify({
+      data,
+      timestamp: Date.now()
+    }));
+  } catch (error) {
+    console.error('Error caching weather data:', error);
+  }
+}
 
 function loadWeather() {
   const weatherContainer = document.getElementById('weather-container');
   if (!weatherContainer) return;
+  
   const widgetWrapper = document.getElementById('weather-widget-container');
   if ((widgetWrapper && widgetWrapper.classList.contains('collapsed')) ||
       getComputedStyle(weatherContainer).display === 'none') return;
+
+  const cachedData = getCachedWeatherData();
+  if (cachedData) {
+    renderWeatherData(cachedData, determineUnits());
+    return;
+  }
+
   fetchWeatherData();
 }
 
-function fetchWeatherData() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = (now.getMonth() + 1).toString().padStart(2, '0');
-  const day = now.getDate().toString().padStart(2, '0');
-  const hour = now.getHours().toString().padStart(2, '0');
-  const cacheBuster = `${year}${month}${day}${hour}`;
+function determineUnits() {
   const userLocale = new Intl.Locale(navigator.language || 'en-US');
-  const prefersFahrenheit = ['US', 'BS', 'BZ', 'KY', 'PW'].includes(userLocale.region);
-  const useMetric = !prefersFahrenheit;
-  fetch(`/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_=${cacheBuster}`)
-    .then(response => {
-      if (!response.ok) throw new Error('Network response was not ok');
-      return response.json();
-    })
-    .then(data => {
-      renderWeatherData(data, useMetric);
-    })
-    .catch(error => {
-      if (document.getElementById('weather-loading')) document.getElementById('weather-loading').style.display = "none";
-      if (document.getElementById('weather-error')) document.getElementById('weather-error').style.display = "block";
-    });
+  return ['US', 'BS', 'BZ', 'KY', 'PW'].includes(userLocale.region) ? 'imperial' : 'metric';
+}
+
+async function fetchWeatherData() {
+  const now = new Date();
+  const cacheBuster = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}`;
+  const useMetric = determineUnits() === 'metric';
+
+  try {
+    const response = await fetch(`/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_=${cacheBuster}`);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    setCachedWeatherData(data);
+    renderWeatherData(data, useMetric);
+  } catch (error) {
+    console.error('Weather fetch error:', error);
+    const weatherLoading = document.getElementById('weather-loading');
+    const weatherError = document.getElementById('weather-error');
+    if (weatherLoading) weatherLoading.style.display = "none";
+    if (weatherError) {
+      weatherError.style.display = "block";
+      weatherError.textContent = "Unable to load weather data. Please try again later.";
+    }
+  }
 }
 
 function renderWeatherData(data, useMetric) {
   const weatherForecast = document.getElementById('weather-forecast');
   const weatherLoading = document.getElementById('weather-loading');
   const weatherError = document.getElementById('weather-error');
-  if (!weatherForecast || !weatherLoading || !weatherError) return;
+  
+  if (!weatherForecast || !weatherLoading || !weatherError) {
+    console.error('Weather elements not found');
+    return;
+  }
+
   if (!data.daily || data.daily.length === 0) {
     weatherLoading.style.display = "none";
     weatherError.style.display = "block";
     weatherError.textContent = "No weather data available.";
     return;
   }
-  weatherForecast.innerHTML = '';
-  weatherForecast.className = 'weather-forecast';
+
+  // Create document fragment for better performance
+  const fragment = document.createDocumentFragment();
   const today = new Date();
   const todayYear = today.getFullYear();
   const todayMonth = today.getMonth();
   const todayDate = today.getDate();
+  const userLocale = navigator.language || 'en-US';
+
   data.daily.forEach((day, i) => {
     const dayElement = document.createElement('div');
     dayElement.className = 'weather-day';
+
     const date = new Date(day.dt * 1000);
-    const userLocale = navigator.language || 'en-US';
     let dayName;
-    if (
-      date.getFullYear() === todayYear &&
-      date.getMonth() === todayMonth &&
-      date.getDate() === todayDate
-    ) {
+    
+    if (date.getFullYear() === todayYear &&
+        date.getMonth() === todayMonth &&
+        date.getDate() === todayDate) {
       dayName = userLocale.startsWith('en') ? 'Today' : date.toLocaleDateString(userLocale, { weekday: 'long' });
     } else {
       dayName = date.toLocaleDateString(userLocale, { weekday: 'short' });
     }
-    dayElement.innerHTML = `
-        <div class="weather-day-name">${dayName}</div>
-        <img class="weather-icon" src="https://openweathermap.org/img/wn/${day.weather_icon}.png" alt="${day.weather}">
-        <div class="weather-temp">
-          <span class="temp-max">${Math.round(day.temp_max)}°${useMetric ? 'C' : 'F'}</span> /
-          <span class="temp-min">${Math.round(day.temp_min)}°${useMetric ? 'C' : 'F'}</span>
-        </div>
-        <div class="weather-precip">${Math.round(day.precipitation)}% precip</div>
-      `;
-    weatherForecast.appendChild(dayElement);
+
+    const dayNameDiv = document.createElement('div');
+    dayNameDiv.className = 'weather-day-name';
+    dayNameDiv.textContent = dayName;
+    dayElement.appendChild(dayNameDiv);
+
+    const img = document.createElement('img');
+    img.className = 'weather-icon';
+    img.src = `https://openweathermap.org/img/wn/${day.weather_icon}.png`;
+    img.alt = day.weather;
+    img.loading = 'lazy';
+    img.onerror = function() {
+      this.onerror = null;
+      this.src = '/static/weather-fallback.png'; // Make sure to create this fallback icon
+    };
+    dayElement.appendChild(img);
+
+    const tempDiv = document.createElement('div');
+    tempDiv.className = 'weather-temp';
+    tempDiv.innerHTML = `
+      <span class="temp-max">${Math.round(day.temp_max)}°${useMetric ? 'C' : 'F'}</span> /
+      <span class="temp-min">${Math.round(day.temp_min)}°${useMetric ? 'C' : 'F'}</span>
+    `;
+    dayElement.appendChild(tempDiv);
+
+    const precipDiv = document.createElement('div');
+    precipDiv.className = 'weather-precip';
+    precipDiv.textContent = `${Math.round(day.precipitation)}% precip`;
+    dayElement.appendChild(precipDiv);
+
+    fragment.appendChild(dayElement);
   });
+
+  weatherForecast.innerHTML = '';
+  weatherForecast.appendChild(fragment);
   weatherLoading.style.display = "none";
   weatherForecast.style.display = "flex";
 }
 
+// Initialize weather fetch with debouncing
+let weatherLoadTimeout = null;
+function debouncedLoadWeather() {
+  if (weatherLoadTimeout) {
+    clearTimeout(weatherLoadTimeout);
+  }
+  weatherLoadTimeout = setTimeout(loadWeather, 100);
+}
+
 // Initialize weather fetch
-setTimeout(loadWeather, 100);
+debouncedLoadWeather();
 
 const weatherToggleBtn = document.getElementById('weather-toggle-btn');
 if (weatherToggleBtn) {
-  weatherToggleBtn.addEventListener('click', function() {
-    setTimeout(loadWeather, 100);
+  weatherToggleBtn.addEventListener('click', debouncedLoadWeather);
+  
+  // Cleanup
+  window.addEventListener('unload', () => {
+    if (weatherToggleBtn) {
+      weatherToggleBtn.removeEventListener('click', debouncedLoadWeather);
+    }
   });
 }

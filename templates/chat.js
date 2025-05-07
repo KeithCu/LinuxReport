@@ -1,112 +1,520 @@
 // Chat widget: SSE/Polling, draggable, send/delete, mute-beep
 
-document.addEventListener('DOMContentLoaded', function() {
-  const chatContainer = document.getElementById('chat-container');
-  const chatHeader = document.getElementById('chat-header');
-  const chatMessages = document.getElementById('chat-messages');
-  const messageInput = document.getElementById('chat-message-input');
-  const imageUrlInput = document.getElementById('chat-image-url-input');
-  const sendButton = document.getElementById('chat-send-btn');
-  const closeButton = document.getElementById('chat-close-btn');
-  const loadingIndicator = document.getElementById('chat-loading');
-  const chatToggleButton = document.getElementById('chat-toggle-btn');
-  const chatInputArea = document.getElementById('chat-input-area');
+class ChatWidget {
+  constructor() {
+    this.elements = {};
+    this.state = {
+      isAdminMode: Cookie.get('isAdmin') === '1',
+      isDragging: false,
+      offsetX: 0,
+      offsetY: 0,
+      lastComments: [],
+      lastCommentTimestamp: null,
+      eventSource: null,
+      pollingTimer: null,
+      beepEnabled: true
+    };
 
-  if (!chatContainer || !chatHeader || !chatMessages || !messageInput || !imageUrlInput || !sendButton || !closeButton || !loadingIndicator || !chatToggleButton || !chatInputArea) {
-    console.error("Chat UI elements not found. Chat functionality disabled.");
-    return;
+    // Configuration
+    this.config = {
+      useSSE: false, // <<< SET TO true TO ENABLE SSE, false FOR POLLING >>>
+      pollingInterval: 15000,
+      maxRetries: 5,
+      baseRetryDelay: 1000,
+      maxRetryDelay: 30000
+    };
+
+    // Initialize beep sound with lazy loading
+    this.beepSound = null;
+    this.initBeepSound();
   }
-  // --- Configuration ---
-  const useSSE = false; // <<< SET TO true TO ENABLE SSE, false FOR POLLING >>>
-  const pollingInterval = 15000;
-  let isAdminMode = document.cookie.split('; ').some(item => item.trim().startsWith('isAdmin=1'));
-  let isDragging = false, offsetX, offsetY;
-  let lastComments = [], lastCommentTimestamp = null;
-  const beepSound = new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAD//w==');
-  let eventSource = null, pollingTimer = null;
 
-  // Draggable Window
-  chatHeader.addEventListener('mousedown', e => {
-    if (e.target === closeButton) return;
-    isDragging = true;
-    offsetX = e.clientX - chatContainer.offsetLeft;
-    offsetY = e.clientY - chatContainer.offsetTop;
-    chatContainer.style.cursor = 'grabbing'; e.preventDefault();
-  });
-  document.addEventListener('mousemove', e => {
-    if (!isDragging) return;
-    let newX = Math.max(0, Math.min(e.clientX - offsetX, window.innerWidth - chatContainer.offsetWidth));
-    let newY = Math.max(0, Math.min(e.clientY - offsetY, window.innerHeight - chatContainer.offsetHeight));
-    chatContainer.style.left = newX + 'px'; chatContainer.style.top = newY + 'px';
-  });
-  document.addEventListener('mouseup', () => { if (isDragging) { isDragging = false; chatContainer.style.cursor = 'default'; }});
+  init() {
+    // Get all required elements
+    const requiredElements = [
+      'chat-container',
+      'chat-header',
+      'chat-messages',
+      'chat-message-input',
+      'chat-image-url-input',
+      'chat-send-btn',
+      'chat-close-btn',
+      'chat-loading',
+      'chat-toggle-btn',
+      'chat-input-area'
+    ];
 
-  // Close and Toggle
-  closeButton.addEventListener('click', () => {
-    chatContainer.style.display = 'none'; if (useSSE && eventSource) eventSource.close();
-    if (!useSSE && pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
-  });
-  chatToggleButton.addEventListener('click', () => {
-    const isHidden = chatContainer.style.display === 'none' || chatContainer.style.display === '';
-    chatContainer.style.display = isHidden ? 'flex' : 'none';
+    // Check all required elements exist
+    const missingElements = requiredElements.filter(id => {
+      const element = document.getElementById(id);
+      if (element) {
+        this.elements[id] = element;
+        return false;
+      }
+      return true;
+    });
+
+    if (missingElements.length > 0) {
+      console.error("Missing chat UI elements:", missingElements.join(', '));
+      return false;
+    }
+
+    this.setupEventListeners();
+    return true;
+  }
+
+  initBeepSound() {
+    // Lazy load the beep sound
+    const loadBeep = () => {
+      if (!this.beepSound) {
+        this.beepSound = new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAD//w==');
+      }
+    };
+
+    // Load beep sound on first user interaction
+    const userInteractionEvents = ['click', 'touchstart', 'keydown'];
+    const loadBeepOnce = () => {
+      loadBeep();
+      userInteractionEvents.forEach(event => 
+        document.removeEventListener(event, loadBeepOnce)
+      );
+    };
+    userInteractionEvents.forEach(event => 
+      document.addEventListener(event, loadBeepOnce, { once: true })
+    );
+  }
+
+  setupEventListeners() {
+    // Draggable window
+    this.setupDraggable();
+
+    // Close and toggle handlers
+    this.elements['chat-close-btn'].addEventListener('click', () => this.closeChat());
+    this.elements['chat-toggle-btn'].addEventListener('click', () => this.toggleChat());
+
+    // Send message handlers
+    this.elements['chat-send-btn'].addEventListener('click', () => this.sendComment());
+    this.elements['chat-message-input'].addEventListener('keypress', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        this.sendComment();
+      }
+    });
+
+    // Image upload handlers
+    this.setupImageUpload();
+
+    // Cleanup on page unload
+    window.addEventListener('unload', () => this.cleanup());
+  }
+
+  setupDraggable() {
+    const header = this.elements['chat-header'];
+    const container = this.elements['chat-container'];
+    const closeBtn = this.elements['chat-close-btn'];
+
+    const onMouseDown = e => {
+      if (e.target === closeBtn) return;
+      this.state.isDragging = true;
+      this.state.offsetX = e.clientX - container.offsetLeft;
+      this.state.offsetY = e.clientY - container.offsetTop;
+      container.style.cursor = 'grabbing';
+      e.preventDefault();
+    };
+
+    const onMouseMove = e => {
+      if (!this.state.isDragging) return;
+      requestAnimationFrame(() => {
+        const newX = Math.max(0, Math.min(e.clientX - this.state.offsetX, 
+          window.innerWidth - container.offsetWidth));
+        const newY = Math.max(0, Math.min(e.clientY - this.state.offsetY, 
+          window.innerHeight - container.offsetHeight));
+        container.style.left = newX + 'px';
+        container.style.top = newY + 'px';
+      });
+    };
+
+    const onMouseUp = () => {
+      if (this.state.isDragging) {
+        this.state.isDragging = false;
+        container.style.cursor = 'default';
+      }
+    };
+
+    header.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+
+    // Store handlers for cleanup
+    this.dragHandlers = { onMouseDown, onMouseMove, onMouseUp };
+  }
+
+  setupImageUpload() {
+    const inputArea = this.elements['chat-input-area'];
+    
+    const dragEvents = {
+      dragover: e => {
+        e.preventDefault();
+        inputArea.classList.add('dragover');
+      },
+      dragleave: e => {
+        e.preventDefault();
+        inputArea.classList.remove('dragover');
+      },
+      drop: e => {
+        e.preventDefault();
+        inputArea.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) this.uploadImage(file);
+      }
+    };
+
+    Object.entries(dragEvents).forEach(([event, handler]) => {
+      inputArea.addEventListener(event, handler);
+    });
+
+    // Store handlers for cleanup
+    this.dragUploadHandlers = dragEvents;
+  }
+
+  async uploadImage(file) {
+    const allowed = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowed.includes(file.type)) {
+      alert('Invalid file type. Allowed types: PNG, JPEG, GIF, WebP');
+      return;
+    }
+
+    if (file.size > maxSize) {
+      alert('File too large. Maximum size: 5MB');
+      return;
+    }
+
+    const imageUrlInput = this.elements['chat-image-url-input'];
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      imageUrlInput.value = 'Uploading...';
+      imageUrlInput.disabled = true;
+
+      const response = await fetch('/api/upload_image', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.url) {
+        imageUrlInput.value = data.url;
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+      alert('Upload failed: ' + error.message);
+      imageUrlInput.value = '';
+    } finally {
+      imageUrlInput.disabled = false;
+    }
+  }
+
+  async sendComment() {
+    const messageInput = this.elements['chat-message-input'];
+    const imageUrlInput = this.elements['chat-image-url-input'];
+    const sendButton = this.elements['chat-send-btn'];
+
+    const text = messageInput.value.trim();
+    const imageUrl = imageUrlInput.value.trim();
+
+    if (!text && !imageUrl) {
+      alert('Please enter a message or an image URL.');
+      return;
+    }
+
+    try {
+      sendButton.disabled = true;
+      sendButton.textContent = 'Sending...';
+
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, image_url: imageUrl })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        messageInput.value = '';
+        imageUrlInput.value = '';
+        if (!this.config.useSSE) {
+          await this.fetchComments();
+        }
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Send failed:', error);
+      alert('Error sending comment: ' + error.message);
+    } finally {
+      sendButton.disabled = false;
+      sendButton.textContent = 'Send';
+    }
+  }
+
+  async fetchComments() {
+    if (this.config.useSSE || this.elements['chat-container'].style.display === 'none') {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/comments?_=${Date.now()}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      const data = await response.json();
+      await this.renderComments(data);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      if (this.elements['chat-messages'].children.length <= 1) {
+        const loading = this.elements['chat-loading'];
+        loading.textContent = 'Error loading messages. Click to retry.';
+        loading.style.display = 'block';
+        loading.onclick = () => this.fetchComments();
+      }
+    }
+  }
+
+  async renderComments(comments) {
+    const messagesContainer = this.elements['chat-messages'];
+    
+    // Check for new messages
+    const newMessagesExist = comments.length && 
+      (!this.state.lastCommentTimestamp || 
+       new Date(comments[0].timestamp).getTime() > this.state.lastCommentTimestamp);
+
+    // Update timestamp
+    this.state.lastCommentTimestamp = comments.length ? 
+      new Date(comments[0].timestamp).getTime() : 
+      this.state.lastCommentTimestamp;
+
+    // Play beep for new messages if chat is visible
+    if (newMessagesExist && 
+        this.elements['chat-container'].style.display !== 'none' && 
+        this.state.beepEnabled) {
+      this.playBeep();
+    }
+
+    // Skip render if no changes
+    if (JSON.stringify(comments) === JSON.stringify(this.state.lastComments)) {
+      return;
+    }
+
+    // Create document fragment for better performance
+    const fragment = document.createDocumentFragment();
+
+    if (comments.length) {
+      comments.forEach(comment => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message${comment.is_admin ? ' admin-message' : ''}`;
+        messageDiv.dataset.commentId = comment.id;
+
+        // Create timestamp
+        const timestamp = document.createElement('span');
+        timestamp.className = 'timestamp';
+        timestamp.textContent = new Date(comment.timestamp)
+          .toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        messageDiv.appendChild(timestamp);
+
+        // Create message text (safely)
+        const messageText = document.createElement('span');
+        messageText.className = 'message-text';
+        messageText.textContent = comment.text;
+        messageDiv.appendChild(messageText);
+
+        // Add image if present
+        if (comment.image_url) {
+          const br = document.createElement('br');
+          const link = document.createElement('a');
+          link.href = comment.image_url;
+          link.target = '_blank';
+          
+          const img = document.createElement('img');
+          img.src = comment.image_url;
+          img.className = 'chat-image';
+          img.loading = 'lazy';
+          img.onerror = () => {
+            img.src = '/static/image-error.png';
+            img.alt = 'Image failed to load';
+          };
+          
+          link.appendChild(img);
+          messageDiv.appendChild(br);
+          messageDiv.appendChild(link);
+        }
+
+        // Add delete button for admin
+        if (this.state.isAdminMode) {
+          const deleteBtn = document.createElement('button');
+          deleteBtn.className = 'delete-comment-btn';
+          deleteBtn.dataset.commentId = comment.id;
+          deleteBtn.textContent = '❌';
+          deleteBtn.onclick = e => this.handleDelete(e);
+          messageDiv.appendChild(deleteBtn);
+        }
+
+        fragment.appendChild(messageDiv);
+      });
+    } else {
+      const noMessages = document.createElement('div');
+      noMessages.className = 'chat-message system-message';
+      noMessages.textContent = 'No messages yet.';
+      fragment.appendChild(noMessages);
+    }
+
+    // Update DOM
+    messagesContainer.innerHTML = '';
+    messagesContainer.appendChild(fragment);
+    this.state.lastComments = comments;
+  }
+
+  async handleDelete(e) {
+    const id = e.target.dataset.commentId;
+    if (!id) return;
+
+    if (!confirm('Are you sure you want to delete this comment?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${id}`, {
+        method: 'DELETE'
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        e.target.closest('.chat-message').remove();
+        if (!this.config.useSSE) {
+          await this.fetchComments();
+        }
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert('Error deleting comment: ' + error.message);
+    }
+  }
+
+  initializeSSE() {
+    if (!this.config.useSSE || 
+        this.state.eventSource || 
+        this.elements['chat-container'].style.display === 'none') {
+      return;
+    }
+
+    let retryCount = 0;
+    const connect = () => {
+      this.state.eventSource = new EventSource('/api/comments/stream');
+
+      this.state.eventSource.onopen = () => {
+        this.elements['chat-loading'].style.display = 'none';
+        retryCount = 0;
+      };
+
+      this.state.eventSource.onmessage = async e => {
+        try {
+          const data = JSON.parse(e.data);
+          await this.renderComments(data);
+        } catch (error) {
+          console.error('Error processing SSE message:', error);
+        }
+      };
+
+      this.state.eventSource.onerror = () => {
+        this.elements['chat-loading'].textContent = 'Connection error. Retrying...';
+        this.elements['chat-loading'].style.display = 'block';
+        
+        if (this.state.eventSource) {
+          this.state.eventSource.close();
+          this.state.eventSource = null;
+        }
+
+        if (retryCount < this.config.maxRetries) {
+          const delay = Math.min(
+            this.config.baseRetryDelay * Math.pow(2, retryCount),
+            this.config.maxRetryDelay
+          );
+          setTimeout(connect, delay);
+          retryCount++;
+        } else {
+          this.elements['chat-loading'].textContent = 
+            'Connection failed. Please refresh the page.';
+        }
+      };
+    };
+
+    connect();
+  }
+
+  closeChat() {
+    this.elements['chat-container'].style.display = 'none';
+    this.cleanup();
+  }
+
+  toggleChat() {
+    const container = this.elements['chat-container'];
+    const isHidden = container.style.display === 'none' || 
+                     container.style.display === '';
+    
+    container.style.display = isHidden ? 'flex' : 'none';
+
     if (isHidden) {
-      if (useSSE) initializeSSE();
-      else {
-        if (lastComments.length === 0 && loadingIndicator.style.display !== 'none') fetchComments();
-        if (!pollingTimer) pollingTimer = setInterval(fetchComments, pollingInterval);
+      if (this.config.useSSE) {
+        this.initializeSSE();
+      } else {
+        if (this.state.lastComments.length === 0 && 
+            this.elements['chat-loading'].style.display !== 'none') {
+          this.fetchComments();
+        }
+        if (!this.state.pollingTimer) {
+          this.state.pollingTimer = setInterval(
+            () => this.fetchComments(), 
+            this.config.pollingInterval
+          );
+        }
       }
     } else {
-      if (useSSE && eventSource) eventSource.close();
-      if (!useSSE && pollingTimer) { clearInterval(pollingTimer); pollingTimer = null; }
+      this.cleanup();
     }
-  });
-
-  // Polling
-  function fetchComments() {
-    if (useSSE || chatContainer.style.display === 'none') return;
-    const cacheBuster = Date.now();
-    fetch(`/api/comments?_=${cacheBuster}`)
-      .then(r => r.json())
-      .then(renderComments)
-      .catch(err => { console.error('Error fetching comments:', err); if (chatMessages.children.length <= 1) { loadingIndicator.textContent = 'Error loading messages.'; loadingIndicator.style.display = 'block'; }});
   }
 
-  // SSE
-  let sseReconnectTimer = null;
-  function initializeSSE() {
-    if (!useSSE || eventSource || chatContainer.style.display === 'none') return;
-    eventSource = new EventSource('/api/comments/stream');
-    eventSource.onopen = () => { loadingIndicator.style.display = 'none'; };
-    eventSource.onmessage = e => { renderComments(JSON.parse(e.data)); };
-    eventSource.onerror = () => { loadingIndicator.textContent = 'Connection error. Retrying...'; loadingIndicator.style.display = 'block'; eventSource.close(); eventSource = null; setTimeout(initializeSSE, 1000); };
+  cleanup() {
+    // Clean up SSE
+    if (this.config.useSSE && this.state.eventSource) {
+      this.state.eventSource.close();
+      this.state.eventSource = null;
+    }
+
+    // Clean up polling
+    if (!this.config.useSSE && this.state.pollingTimer) {
+      clearInterval(this.state.pollingTimer);
+      this.state.pollingTimer = null;
+    }
   }
 
-  // Render and delete
-  function renderComments(comments) {
-    let newMessagesExist = comments.length && (!lastCommentTimestamp || new Date(comments[0].timestamp).getTime() > lastCommentTimestamp);
-    lastCommentTimestamp = comments.length ? new Date(comments[0].timestamp).getTime() : lastCommentTimestamp;
-    if (newMessagesExist && chatContainer.style.display !== 'none') playBeep();
-    if (JSON.stringify(comments) === JSON.stringify(lastComments)) return;
-    let html = comments.length ? comments.map(c => `<div class="chat-message${c.is_admin?' admin-message':''}" data-comment-id="${c.id}"><span class="timestamp">${new Date(c.timestamp).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</span><span class="message-text">${c.text}</span>${c.image_url?`<br><a href="${c.image_url}" target="_blank"><img src="${c.image_url}" class="chat-image"></a>`:''}${isAdminMode?`<button class="delete-comment-btn" data-comment-id="${c.id}">❌</button>`:''}</div>`).join('') : '<div class="chat-message system-message">No messages yet.</div>';
-    chatMessages.innerHTML = html;
-    if (isAdminMode) document.querySelectorAll('.delete-comment-btn').forEach(btn => { btn.removeEventListener('click', handleDelete); btn.addEventListener('click', handleDelete); });
-    lastComments = comments;
+  playBeep() {
+    if (this.beepSound) {
+      this.beepSound.play().catch(console.error);
+    }
   }
-  function handleDelete(e) {
-    const id = e.target.getAttribute('data-comment-id'); if (!id) return;
-    if (confirm('Are you sure you want to delete this comment?')) fetch(`/api/comments/${id}`,{method:'DELETE'}).then(r=>r.json()).then(d=>{ if(d.success){e.target.closest('.chat-message').remove(); if (!useSSE) fetchComments();} else alert('Error deleting comment: '+(d.error||'Unknown')); }).catch(()=>alert('Error deleting comment.'));
+}
+
+// Initialize chat widget when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  const chat = new ChatWidget();
+  if (chat.init()) {
+    // Store instance for potential external access
+    window.chatWidget = chat;
   }
-  function playBeep() { beepSound.play().catch(console.error); }
-
-  // Image upload drag-drop
-  chatInputArea.addEventListener('dragover', e=>{e.preventDefault();chatInputArea.classList.add('dragover');});
-  chatInputArea.addEventListener('dragleave', e=>{e.preventDefault();chatInputArea.classList.remove('dragover');});
-  chatInputArea.addEventListener('drop', e=>{e.preventDefault();chatInputArea.classList.remove('dragover');if(e.dataTransfer.files[0])uploadImage(e.dataTransfer.files[0]);});
-  function uploadImage(file) {const allowed=['image/png','image/jpeg','image/gif','image/webp'];if(!allowed.includes(file.type)){alert('Invalid file type.');return;}if(file.size>5*1024*1024){alert('File too large.');return;}let fd=new FormData();fd.append('image',file);imageUrlInput.value='Uploading...';imageUrlInput.disabled=true;fetch('/api/upload_image',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{if(d.success&&d.url){imageUrlInput.value=d.url;}else{alert('Upload failed: '+(d.error||'Unknown'));imageUrlInput.value='';}}).catch(()=>{alert('Upload failed.');imageUrlInput.value='';}).finally(()=>{imageUrlInput.disabled=false;if(imageUrlInput.value==='Uploading...')imageUrlInput.value='';});}
-
-  sendButton.addEventListener('click', sendComment);
-  messageInput.addEventListener('keypress', e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendComment();}});
-  function sendComment(){const t=messageInput.value.trim(),u=imageUrlInput.value.trim();if(!t&&!u){alert('Please enter a message or an image URL.');return;}sendButton.disabled=true;sendButton.textContent='Sending...';fetch('/api/comments',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:t,image_url:u})}).then(r=>r.json()).then(d=>{if(d.success){messageInput.value='';imageUrlInput.value='';if(!useSSE)fetchComments();}else alert('Error sending comment: '+(d.error||'Unknown'));}).catch(()=>{alert('Error sending comment.');}).finally(()=>{sendButton.disabled=false;sendButton.textContent='Send';});}
-
-  console.log("Chat will not poll or fetch until made visible by user.");
 });
