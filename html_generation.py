@@ -16,11 +16,9 @@ from image_parser import custom_fetch_largest_image
 headline_template = Template("""
 <div class="linkclass">
 <center>
-<code>
 <a href="{{ url }}" target="_blank">
 <font size="5"><b>{{ title }}</b></font>
 </a>
-</code>
 {% if image_url %}
 <br/>
 <a href="{{ url }}" target="_blank">
