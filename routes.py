@@ -227,12 +227,8 @@ def init_app(flask_app):
         if request.method == 'GET':
             form = ConfigForm()
 
-            form.theme.data = request.cookies.get('Theme', 'light')
-
             no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
             form.no_underlines.data = no_underlines_cookie == "1"
-
-            form.font_family.data = request.cookies.get('FontFamily', 'system')
 
             form.admin_mode.data = is_admin
 

@@ -22,39 +22,6 @@ class CustomRSSForm(Form):
 # Form for managing overall configuration settings.
 class ConfigForm(Form):
     delete_cookie = BooleanField(label="Delete cookies")
-    theme = SelectField(label="Theme", choices=[
-        ('light','Light'),
-        ('paper','Paper'),
-        ('terminal','Terminal'),
-        ('neon','Neon'),
-        ('retro','Retro'),
-        ('dark','Dark'),
-        ('monokai','Monokai'),
-        ('futuristic','Futuristic'),
-        ('cyberpunk','Cyberpunk'),
-        ('midnight','Midnight'),
-        ('ocean','Ocean'),
-        ('nord','Nord'),
-        ('forest','Forest'),
-        ('steampunk','Steampunk'),
-        ('autumn','Autumn'),
-        ('sepia','Sepia'),
-        ('silver','Silver'),
-        ('solarized','Solarized'),
-        ('pastelle','Pastelle'),
-    ])
-    font_family = SelectField(label="Font", choices=[
-        ('system', 'System Default (Serif)'),
-        ('sans-serif', 'Sans Serif'),
-        ('monospace', 'Monospace (Drudge-style)'),
-        ('inter', 'Inter (Modern)'),
-        ('roboto', 'Roboto (Clean)'),
-        ('open-sans', 'Open Sans (Readable)'),
-        ('source-sans', 'Source Sans Pro (Professional)'),
-        ('noto-sans', 'Noto Sans (Universal)'),
-        ('lato', 'Lato (Elegant)'),
-        ('raleway', 'Raleway (Stylish)'),
-    ])
     no_underlines = BooleanField(label="No Underlines")
     admin_mode = BooleanField(label="Enable Admin Mode", default=False)
     admin_password = PasswordField(label="Admin Password", validators=[validators.Optional()])
