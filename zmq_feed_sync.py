@@ -74,13 +74,14 @@ def get_publisher():
             return None
     return _publisher
 
-def publish_feed_update(url, feed_data=None):
-    """Publish feed update notification to other servers
+def publish_feed_update(url, feed_content=None, feed_data=None):
+    """Publish feed update with full content to other servers
     
     Args:
         url: The feed URL that was updated
-        feed_data: Optional additional data about the update (timestamp, etc.)
-                  Set to None to just send notification without data
+        feed_content: The actual feed content that was fetched (parsed feed entries, HTML, etc.)
+                      This should be the complete data needed to update on the receiving end
+        feed_data: Optional additional metadata about the update (timestamp, etc.)
     """
     if not ZMQ_AVAILABLE or not ZMQ_ENABLED:
         return
@@ -91,6 +92,7 @@ def publish_feed_update(url, feed_data=None):
         
     data = {
         "url": url,
+        "feed_content": feed_content,  # Include the actual feed content
         "feed_data": feed_data,
         "server_id": os.getenv("SERVER_ID", "unknown"),
         "timestamp": time.time()
@@ -99,6 +101,7 @@ def publish_feed_update(url, feed_data=None):
     try:
         msg = json.dumps(data)
         pub.send_multipart([ZMQ_TOPIC, msg.encode("utf-8")], zmq.NOBLOCK)
+        print(f"ZMQ: Published feed update for {url} with {'full content' if feed_content else 'no content'}")
     except Exception as e:
         print(f"ZMQ publishing error for {url}: {e}")
 
@@ -109,7 +112,7 @@ def register_feed_update_callback(cb):
     """Register a callback function to be called when feed updates are received
     
     Args:
-        cb: Callback function that takes (url, feed_data) parameters
+        cb: Callback function that takes (url, feed_content, feed_data) parameters
     """
     if cb not in _feed_update_callbacks:
         _feed_update_callbacks.append(cb)
@@ -168,10 +171,16 @@ def feed_update_listener():
                 if data.get("server_id") == os.getenv("SERVER_ID", "unknown"):
                     continue
                     
-                print(f"ZMQ: Received feed update for {data['url']} from {data.get('server_id', 'unknown')}")
+                url = data["url"]
+                feed_content = data.get("feed_content")
+                feed_data = data.get("feed_data")
+                
+                print(f"ZMQ: Received feed update for {url} from {data.get('server_id', 'unknown')} with {'content' if feed_content else 'no content'}")
+                
                 for cb in _feed_update_callbacks:
                     try:
-                        cb(data["url"], data.get("feed_data"))
+                        # Pass both the feed content and metadata to callbacks
+                        cb(url, feed_content, feed_data)
                     except Exception as e:
                         print(f"Error in feed update callback: {e}")
         except zmq.error.Again:

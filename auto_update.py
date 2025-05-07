@@ -538,15 +538,26 @@ def main(mode, dry_run=False): # Add dry_run parameter
                     # Only import if ZeroMQ is installed
                     from zmq_feed_sync import publish_feed_update, ZMQ_ENABLED
                     if ZMQ_ENABLED:
-                        # Broadcast headline update to other servers
-                        publish_feed_update("headlines_update", {
-                            "mode": mode,
-                            "file": html_file,
-                            "action": "auto_update_headlines",
-                            "timestamp": datetime.datetime.now(TZ).isoformat(),
-                            "titles": [art["title"] for art in top_3_articles_match[:3]]
-                        })
-                        print("Broadcasted headline update via ZMQ to other servers")
+                        # Read the generated HTML file to include in the message
+                        try:
+                            with open(html_file, "r", encoding="utf-8") as f:
+                                html_content = f.read()
+                                print(f"Read HTML content from {html_file} ({len(html_content)} bytes)")
+                                
+                            # Just send the file content directly with minimal metadata
+                            # This eliminates duplicate work and ensures consistency across servers
+                            publish_feed_update("headlines_update", 
+                                feed_content=html_content,
+                                feed_data={
+                                    "mode": mode,
+                                    "file": html_file,
+                                    "action": "auto_update_headlines",
+                                    "content_type": "html",
+                                }
+                            )
+                            print("Broadcasted headline HTML file via ZMQ to other servers")
+                        except Exception as html_read_err:
+                            print(f"Error reading/sending HTML file via ZMQ: {html_read_err}")
                     else:
                         print("ZMQ is installed but disabled, skipping headline broadcast")
             except Exception as e:
