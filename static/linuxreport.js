@@ -26,6 +26,17 @@ document.addEventListener('DOMContentLoaded', function() {
   // Apply no-underlines setting (default ON)
   var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
   if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
+
+  // Restore scroll position if it exists
+  const savedPosition = localStorage.getItem('scrollPosition');
+  if (savedPosition) {
+    // Use requestAnimationFrame to ensure the page has rendered
+    requestAnimationFrame(() => {
+      window.scrollTo(0, parseInt(savedPosition));
+      // Clear the saved position after restoring
+      localStorage.removeItem('scrollPosition');
+    });
+  }
 });
 
 // Global flag to enable/disable weather widget toggle. Set to false to always show widget and hide toggle UI.
@@ -104,11 +115,16 @@ function autoRefresh(){self.location.reload();}
 
 // Change theme via cookie and reload
 function setTheme(theme) {
+  // Save current scroll position
+  localStorage.setItem('scrollPosition', window.scrollY);
   document.cookie = 'Theme=' + theme + ';path=/';
   window.location.reload();
 }
 // Change font via cookie and update dynamically
 function setFont(font) {
+  // Save current scroll position
+  localStorage.setItem('scrollPosition', window.scrollY);
+  
   // Set the cookie
   document.cookie = 'FontFamily=' + font + ';path=/';
   
