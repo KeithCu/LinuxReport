@@ -107,6 +107,7 @@ def init_app(flask_app):
 
         needed_urls = []
         need_fetch = False
+        last_fetch_cache = {}  # Cache for last_fetch results
 
         # 1. See if we need to fetch any RSS feeds
         for url in page_order:
@@ -116,7 +117,11 @@ def init_app(flask_app):
                 rss_info = RssInfo("Custom.png", "Custom site", url + "HTML")
                 ALL_URLS[url] = rss_info
 
-            expired_rss = g_c.has_feed_expired(url)
+            # Cache the last_fetch result for later use
+            last_fetch = g_c.get_last_fetch(url)
+            last_fetch_cache[url] = last_fetch
+            
+            expired_rss = g_c.has_feed_expired(url, last_fetch)
 
             if not g_c.has(url) or "placeintimeandspace.com" in url:
                 needed_urls.append(url)
@@ -137,7 +142,9 @@ def init_app(flask_app):
             template = g_cm.get(rss_info.site_url)
             if DEBUG or template is None:
                 feed = g_c.get(url)
-                last_fetch = g_c.get_last_fetch(url)
+                last_fetch = last_fetch_cache.get(url)  # Use cached value instead of calling get_last_fetch again
+                if last_fetch is None and feed is not None:  # We should have last_fetch in cache if we have a feed
+                    raise Exception(f"Last fetch missing from cache for URL {url} when feed exists")
                 last_fetch_str = format_last_updated(last_fetch)
                 if feed is not None:
                     entries = feed.entries

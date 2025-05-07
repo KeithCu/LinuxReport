@@ -127,9 +127,18 @@ class DiskCacheWrapper:
         """Check if a key exists in the cache."""
         return key in self.cache
 
-    def has_feed_expired(self, url: str) -> bool:
-        """Check if a feed has expired based on the last fetch time."""
-        last_fetch = self.get_last_fetch(url)
+    def has_feed_expired(self, url: str, last_fetch: Optional[datetime.datetime] = None) -> bool:
+        """Check if a feed has expired based on the last fetch time.
+        
+        Args:
+            url: The URL of the feed to check
+            last_fetch: Optional pre-fetched last_fetch timestamp to avoid duplicate calls
+        
+        Returns:
+            True if the feed has expired, False otherwise
+        """
+        if last_fetch is None:
+            last_fetch = self.get_last_fetch(url)
         if last_fetch is None:
             return True
         return history.has_expired(url, last_fetch)
