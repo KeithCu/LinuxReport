@@ -133,10 +133,15 @@ def load_url_worker(url):
             
             # Publish feed update notification via ZeroMQ
             try:
-                from zmq_feed_sync import publish_feed_update
-                # Send minimal information - just notify that the URL has been updated
-                # This will cause other servers to invalidate their template cache for this URL
-                publish_feed_update(url, {"timestamp": datetime.now(TZ).isoformat()})
+                # First check if zmq module is installed
+                import importlib.util
+                zmq_spec = importlib.util.find_spec("zmq")
+                if zmq_spec is not None:
+                    # Only import if ZeroMQ is installed
+                    from zmq_feed_sync import publish_feed_update
+                    # Send minimal information - just notify that the URL has been updated
+                    # This will cause other servers to invalidate their template cache for this URL
+                    publish_feed_update(url, {"timestamp": datetime.now(TZ).isoformat()})
             except Exception as e:
                 # Silently ignore errors to avoid disrupting the main workflow
                 pass

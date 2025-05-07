@@ -5,10 +5,28 @@ ZeroMQ-based publisher/subscriber for feed updates. Used to synchronize feed upd
 """
 import threading
 import time
-import zmq
 import json
 import os
 from urllib.parse import urlparse
+
+# Check if ZeroMQ is available
+ZMQ_AVAILABLE = False
+try:
+    import zmq
+    ZMQ_AVAILABLE = True
+except ImportError:
+    # Create a placeholder zmq module with NOBLOCK constant to avoid attribute errors
+    class PlaceholderZMQ:
+        NOBLOCK = 0
+        PUB = 0
+        SUB = 0
+        LINGER = 0
+        SNDHWM = 0
+        RCVHWM = 0
+        SUBSCRIBE = 0
+    
+    zmq = PlaceholderZMQ()
+    print("Warning: pyzmq is not installed. ZeroMQ feed synchronization will be disabled.")
 
 # ZeroMQ configuration
 ZMQ_ENABLED = False  # Global switch to enable/disable ZMQ functionality
@@ -29,6 +47,9 @@ _listener_thread = None
 def init_zmq():
     """Initialize ZMQ context if enabled"""
     global _context
+    if not ZMQ_AVAILABLE:
+        return False
+        
     if ZMQ_ENABLED and _context is None:
         _context = zmq.Context.instance()
         return True
@@ -38,7 +59,7 @@ def init_zmq():
 def get_publisher():
     """Get or create ZMQ publisher socket"""
     global _publisher
-    if not ZMQ_ENABLED or _context is None:
+    if not ZMQ_AVAILABLE or not ZMQ_ENABLED or _context is None:
         return None
         
     if _publisher is None:
@@ -61,7 +82,7 @@ def publish_feed_update(url, feed_data=None):
         feed_data: Optional additional data about the update (timestamp, etc.)
                   Set to None to just send notification without data
     """
-    if not ZMQ_ENABLED:
+    if not ZMQ_AVAILABLE or not ZMQ_ENABLED:
         return
         
     pub = get_publisher()
@@ -78,8 +99,6 @@ def publish_feed_update(url, feed_data=None):
     try:
         msg = json.dumps(data)
         pub.send_multipart([ZMQ_TOPIC, msg.encode("utf-8")], zmq.NOBLOCK)
-    except zmq.error.Again:
-        print(f"ZMQ: Buffer full when publishing update for {url}")
     except Exception as e:
         print(f"ZMQ publishing error for {url}: {e}")
 
@@ -98,7 +117,7 @@ def register_feed_update_callback(cb):
 def get_subscriber():
     """Get or create ZMQ subscriber socket"""
     global _subscriber
-    if not ZMQ_ENABLED or _context is None:
+    if not ZMQ_AVAILABLE or not ZMQ_ENABLED or _context is None:
         return None
         
     if _subscriber is None:
@@ -130,7 +149,7 @@ def get_subscriber():
 
 def feed_update_listener():
     """Background thread function to listen for feed updates"""
-    if not ZMQ_ENABLED:
+    if not ZMQ_AVAILABLE or not ZMQ_ENABLED:
         return
         
     sub = get_subscriber()
@@ -141,7 +160,7 @@ def feed_update_listener():
     while ZMQ_ENABLED:
         try:
             # Set a timeout for receiving so we can check if ZMQ_ENABLED changed
-            if sub.poll(1000):  # Poll with 1 second timeout
+            if hasattr(sub, "poll") and sub.poll(1000):  # Poll with 1 second timeout
                 topic, msg = sub.recv_multipart()
                 data = json.loads(msg.decode("utf-8"))
                 
@@ -165,7 +184,7 @@ def feed_update_listener():
 def start_feed_update_listener():
     """Start the background thread for listening to feed updates"""
     global _listener_thread
-    if not ZMQ_ENABLED:
+    if not ZMQ_AVAILABLE or not ZMQ_ENABLED:
         return False
         
     if _listener_thread is not None and _listener_thread.is_alive():
@@ -186,6 +205,13 @@ def configure_zmq(enabled=False, servers=None, port=None):
         port: Port to use for ZMQ communication
     """
     global ZMQ_ENABLED, ZMQ_SERVERS, ZMQ_FEED_PORT, ZMQ_FEED_ADDR
+    
+    # If ZMQ is not available, always force disabled
+    if not ZMQ_AVAILABLE:
+        ZMQ_ENABLED = False
+        if enabled:
+            print("Warning: ZeroMQ is not available (pyzmq not installed). Feed synchronization remains disabled.")
+        return False
     
     ZMQ_ENABLED = enabled
     
