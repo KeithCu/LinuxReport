@@ -1,18 +1,39 @@
+"""
+SqliteLock.py
 
-import datetime
+This module contains lock implementations using SQLite (via diskcache) and file-based locking.
+"""
+
 import os
 import threading
 import time
 import uuid
-from enum import Enum
-from typing import Any, Optional, Type
 from abc import ABC, abstractmethod
+from typing import Optional
 
 import diskcache
-from cacheout import Cache
 from filelock import FileLock, Timeout
 
-from models import LockBase
+class LockBase(ABC):
+    @abstractmethod
+    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+        pass
+
+    @abstractmethod
+    def release(self) -> bool:
+        pass
+
+    @abstractmethod
+    def __enter__(self):
+        pass
+
+    @abstractmethod
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    @abstractmethod
+    def locked(self) -> bool:
+        pass
 
 class DiskcacheSqliteLock(LockBase):
     """
@@ -20,8 +41,8 @@ class DiskcacheSqliteLock(LockBase):
     This lock supports waiting when a lock is unavailable and provides
     features for reliable multi-process and multi-threaded environments.
     """
-    def __init__(self, lock_name: str, owner_prefix: Optional[str] = None):
-        self.cache = g_cs
+    def __init__(self, lock_name: str, cache_instance: diskcache.Cache, owner_prefix: Optional[str] = None):
+        self.cache = cache_instance
         self.lock_key = f"lock::{lock_name}"
         if owner_prefix is None:
             owner_prefix = f"pid{os.getpid()}_tid{threading.get_ident()}"
@@ -54,10 +75,10 @@ class DiskcacheSqliteLock(LockBase):
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
         """Internal method that attempts to acquire the lock once."""
         try:
-            with self.cache.cache.transact():
+            with self.cache.transact():
                 now = time.monotonic()
                 current_value = self.cache.get(self.lock_key)
-                
+
                 # Lock exists and is still valid
                 if current_value is not None:
                     expiry_time = current_value[1]
@@ -65,17 +86,17 @@ class DiskcacheSqliteLock(LockBase):
                     if now < expiry_time:
                         return False
                     # Lock exists but has expired - we'll overwrite it
-                
+
                 # Set expiry and store our claim
                 expiry = now + timeout_seconds
-                self.cache.put(self.lock_key, (self.owner_id, expiry), timeout=timeout_seconds + 5)
-                
+                self.cache.set(self.lock_key, (self.owner_id, expiry), expire=timeout_seconds + 5)
+
                 # Verify our ownership
                 final_value = self.cache.get(self.lock_key)
                 if final_value is not None and final_value[0] == self.owner_id:
                     self._locked = True
                     return True
-                
+
                 self._locked = False
                 return False
         except (diskcache.Timeout, Timeout) as e:
@@ -99,7 +120,7 @@ class DiskcacheSqliteLock(LockBase):
 
         success = False
         try:
-            with self.cache.cache.transact():
+            with self.cache.transact():
                 # Verify ownership before deleting
                 current_value = self.cache.get(self.lock_key)
                 if current_value is not None and current_value[0] == self.owner_id:
@@ -109,7 +130,7 @@ class DiskcacheSqliteLock(LockBase):
             # Log error if needed
             print(f"Error releasing lock {self.lock_key}: {e}")
             success = False
-        
+
         # Whether successful or not, we're no longer locked
         self._locked = False
         return success
@@ -125,3 +146,40 @@ class DiskcacheSqliteLock(LockBase):
     def locked(self) -> bool:
         """Check if the lock is currently held by this instance."""
         return self._locked
+
+class FileLockWrapper(LockBase):
+    def __init__(self, lock_file_path: str):
+        self.lock_file_path = lock_file_path
+        self._lock = FileLock(lock_file_path)
+        self._is_locked = False
+
+    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+        try:
+            if wait:
+                self._lock.acquire(timeout=timeout_seconds)
+            else:
+                self._lock.acquire(timeout=0)
+            self._is_locked = True
+            return True
+        except Timeout:
+            self._is_locked = False
+            return False
+
+    def release(self) -> bool:
+        if self._is_locked:
+            self._lock.release()
+            self._is_locked = False
+            return True
+        return False
+
+    def __enter__(self):
+        acquired = self.acquire()
+        if not acquired:
+            raise TimeoutError("Failed to acquire lock within the specified timeout.")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
+
+    def locked(self) -> bool:
+        return self._is_locked
