@@ -6,7 +6,7 @@ This file contains WTForms classes for handling user input in forms, including U
 
 # Third-party imports
 from wtforms import (BooleanField, FieldList, Form, FormField, IntegerField,
-                     SelectField, StringField, TextAreaField, validators)
+                     SelectField, StringField, TextAreaField, validators, PasswordField)
 
 
 # Form for managing individual URLs.
@@ -56,7 +56,8 @@ class ConfigForm(Form):
         ('raleway', 'Raleway (Stylish)'),
     ])
     no_underlines = BooleanField(label="No Underlines")
-    admin_mode = BooleanField(label="Enable Admin Mode (allows deleting chat messages)", default=False)
+    admin_mode = BooleanField(label="Enable Admin Mode", default=False)
+    admin_password = PasswordField(label="Admin Password", validators=[validators.Optional()])
     headlines = TextAreaField(label="Headlines HTML", render_kw={"style": "width: 100%; height: 200px; font-family: monospace;"})
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))

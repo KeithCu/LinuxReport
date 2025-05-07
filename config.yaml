@@ -1,0 +1,6 @@
+# LinuxReport Configuration
+# IMPORTANT: Change this default password for security!
+
+# Admin settings
+admin:
+  password: "LinuxReportAdmin2024" 

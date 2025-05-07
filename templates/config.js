@@ -33,6 +33,20 @@ document.addEventListener('DOMContentLoaded', function() {
   const noUnderlines = getCookie('NoUnderlines');
   const noUnderlinesConfig = document.querySelector('.config-container input[name="no_underlines"]');
   if (noUnderlinesConfig) noUnderlinesConfig.checked = (!noUnderlines || noUnderlines === '1');
+  
+  // Admin password field visibility
+  const adminModeCheckbox = document.querySelector('.config-container input[name="admin_mode"]');
+  const adminPasswordField = document.querySelector('.admin-password-field');
+  
+  // Set initial visibility
+  if (adminModeCheckbox && adminPasswordField) {
+    adminPasswordField.style.display = adminModeCheckbox.checked ? 'block' : 'none';
+    
+    // Toggle visibility when checkbox changes
+    adminModeCheckbox.addEventListener('change', function() {
+      adminPasswordField.style.display = this.checked ? 'block' : 'none';
+    });
+  }
 
   // Drag and drop handling with cleanup
   let draggedItem = null;

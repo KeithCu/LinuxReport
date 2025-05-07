@@ -15,7 +15,7 @@ import ipaddress
 import time
 
 # Third-party imports
-from flask import g, jsonify, render_template, request, make_response, Response
+from flask import g, jsonify, render_template, request, make_response, Response, flash
 from markupsafe import Markup
 from werkzeug.utils import secure_filename
 
@@ -28,6 +28,7 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
+from config_utils import get_admin_password
 
 # Constants for Chat Feature
 MAX_COMMENTS = 1000
@@ -286,6 +287,30 @@ def init_app(flask_app):
                 resp.delete_cookie('isAdmin')
                 return resp
 
+            # Handle admin mode authentication
+            enable_admin = False
+            if form.admin_mode.data:
+                # Get password from config file
+                correct_password = get_admin_password()
+                
+                # Check if password matches
+                if form.admin_password.data == correct_password:
+                    enable_admin = True
+                else:
+                    # Invalid password
+                    template = render_template('configdone.html', 
+                                              message="Invalid admin password. Admin mode not enabled.")
+                    resp = make_response(template)
+                    # Update other cookies but not admin mode
+                    if form.theme.data is not None:
+                        resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
+                    resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
+                    resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
+                    return resp
+            
+            # Update is_admin based on authentication result
+            is_admin = enable_admin
+
             # Save headlines if in admin mode and headlines were provided
             if is_admin and form.headlines.data:
                 try:
@@ -358,7 +383,7 @@ def init_app(flask_app):
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
             resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
 
-            if form.admin_mode.data:
+            if enable_admin:
                 resp.set_cookie('isAdmin', '1', max_age=EXPIRE_YEARS)
             else:
                 resp.delete_cookie('isAdmin')
@@ -411,6 +436,7 @@ def init_app(flask_app):
         is_admin = request.cookies.get('isAdmin') == '1'
         if not is_admin:
             return jsonify({'error': 'Unauthorized'}), 403
+            
         data = request.get_json()
         url = data.get('url')
         timestamp = data.get('timestamp')

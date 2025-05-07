@@ -540,3 +540,25 @@ button[type="submit"]:hover {
   cursor: move;
   border-radius: 6px;
 }
+
+.admin-section {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-password-field {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 15px;
+}
+
+.admin-password-field input[type="password"] {
+  padding: 5px;
+  border: 1px solid var(--btn-border);
+  border-radius: 3px;
+  background-color: var(--btn-bg);
+  color: var(--text);
+}
