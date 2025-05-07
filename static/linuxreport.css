@@ -41,14 +41,6 @@ body.theme-monokai { --bg:#272822; --text:#e2e8f0; --link:#a6e22e; --btn-bg:#3e3
 body.theme-terminal { --bg:#000000; --text:#90ee90; --link:#90ee90; --btn-bg:#001100; --btn-border:#90ee90; --btn-text:#90ee90; --btn-hover-bg:#003300; --btn-hover-text:#90ee90; }
 body.theme-paper { --bg:#f5f5f5; --text:#333333; --link:#1a0dab; --btn-bg:#ffffff; --btn-border:#cccccc; --btn-text:#333333; --btn-hover-bg:#e6e6e6; --btn-hover-text:#333333; }
 
-/* Client-side dynamic sans-serif font */
-body.sans-serif { font-family: sans-serif; }
-
-/* Force sans-serif font everywhere when enabled */
-body.sans-serif, body.sans-serif * {
-  font-family: sans-serif !important;
-}
-
 * {
   box-sizing: border-box;
 }

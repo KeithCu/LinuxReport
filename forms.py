@@ -55,7 +55,6 @@ class ConfigForm(Form):
         ('raleway', 'Raleway (Stylish)'),
     ])
     no_underlines = BooleanField(label="No Underlines")
-    sans_serif = BooleanField(label="Sans Serif Font")
     admin_mode = BooleanField(label="Enable Admin Mode (allows deleting chat messages)", default=False)
     headlines = TextAreaField(label="Headlines HTML", render_kw={"style": "width: 100%; height: 200px; font-family: monospace;"})
     urls = FieldList(FormField(UrlForm))

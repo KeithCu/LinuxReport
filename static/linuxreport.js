@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Read font cookie or default
   var fontMatch = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
-  var font = fontMatch ? fontMatch[1] : 'system';
+  var font = fontMatch ? font[1] : 'system';
   // Apply font class to body
   document.body.classList.add('font-' + font);
   // Set dropdown to current font
@@ -20,9 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
   // Apply no-underlines setting (default ON)
   var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
   if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
-  // Apply sans-serif setting (default ON)
-  var ss = document.cookie.match(/(?:^|; )SansSerif=([^;]+)/);
-  if (!ss || ss[1] === '1') document.body.classList.add('sans-serif');
 });
 
 // Global flag to enable/disable weather widget toggle. Set to false to always show widget and hide toggle UI.
@@ -113,8 +110,7 @@ function setFont(font) {
   document.body.classList.remove(
     'font-system', 'font-monospace', 'font-inter',
     'font-roboto', 'font-open-sans', 'font-source-sans',
-    'font-noto-sans', 'font-lato', 'font-raleway',
-    'sans-serif'
+    'font-noto-sans', 'font-lato', 'font-raleway'
   );
   
   // Add the new font class
@@ -129,12 +125,7 @@ function setFont(font) {
   document.body.offsetHeight; // Force reflow
   document.body.style.display = '';
 
-  // Only add .sans-serif for 'system' font
-  if (font === 'system') {
-    document.body.classList.add('sans-serif');
-  } else {
-    document.body.classList.remove('sans-serif');
-  }
+  // No more sans-serif logic
 
   // Force font change on all elements
   const allElements = document.querySelectorAll('*');
@@ -788,12 +779,10 @@ document.addEventListener('DOMContentLoaded', function() {
   var theme = match ? match[1] : 'silver';
   document.body.classList.add('theme-' + theme);
   var fontMatch = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
-  var font = fontMatch ? fontMatch[1] : 'system';
+  var font = fontMatch ? font[1] : 'system';
   document.body.classList.add('font-' + font);
   var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
   if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
-  var ss = document.cookie.match(/(?:^|; )SansSerif=([^;]+)/);
-  if (!ss || ss[1] === '1') document.body.classList.add('sans-serif');
 
   // Drag-and-drop for URL entries
   const urlEntries = document.querySelectorAll('.url-entry');

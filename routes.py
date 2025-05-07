@@ -204,9 +204,6 @@ def init_app(flask_app):
             no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
             form.no_underlines.data = no_underlines_cookie == "1"
 
-            sans_serif_cookie = request.cookies.get('SansSerif', "1")
-            form.sans_serif.data = sans_serif_cookie == "1"
-
             form.font_family.data = request.cookies.get('FontFamily', 'system')
 
             form.admin_mode.data = is_admin
@@ -259,7 +256,6 @@ def init_app(flask_app):
                 resp.delete_cookie('RssUrls')
                 resp.delete_cookie('Theme')
                 resp.delete_cookie('NoUnderlines')
-                resp.delete_cookie('SansSerif')
                 resp.delete_cookie('isAdmin')
                 return resp
 
@@ -314,7 +310,6 @@ def init_app(flask_app):
                 resp.delete_cookie('Theme')
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
-            resp.set_cookie("SansSerif", "1" if form.sans_serif.data else "0", max_age=EXPIRE_YEARS)
             resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
 
             if form.admin_mode.data:
