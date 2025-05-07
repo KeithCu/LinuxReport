@@ -27,16 +27,8 @@ document.addEventListener('DOMContentLoaded', function() {
   var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
   if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
 
-  // Restore scroll position if it exists
-  const savedPosition = localStorage.getItem('scrollPosition');
-  if (savedPosition) {
-    // Use requestAnimationFrame to ensure the page has rendered
-    requestAnimationFrame(() => {
-      window.scrollTo(0, parseInt(savedPosition));
-      // Clear the saved position after restoring
-      localStorage.removeItem('scrollPosition');
-    });
-  }
+  // Restore scroll position
+  restoreScrollPosition();
 });
 
 // Global flag to enable/disable weather widget toggle. Set to false to always show widget and hide toggle UI.
@@ -115,15 +107,24 @@ function autoRefresh(){self.location.reload();}
 
 // Change theme via cookie and reload
 function setTheme(theme) {
-  // Save current scroll position
-  localStorage.setItem('scrollPosition', window.scrollY);
+  // Save current scroll position with timestamp
+  const scrollData = {
+    position: window.scrollY,
+    timestamp: Date.now()
+  };
+  localStorage.setItem('scrollPosition', JSON.stringify(scrollData));
   document.cookie = 'Theme=' + theme + ';path=/';
   window.location.reload();
 }
+
 // Change font via cookie and update dynamically
 function setFont(font) {
-  // Save current scroll position
-  localStorage.setItem('scrollPosition', window.scrollY);
+  // Save current scroll position with timestamp
+  const scrollData = {
+    position: window.scrollY,
+    timestamp: Date.now()
+  };
+  localStorage.setItem('scrollPosition', JSON.stringify(scrollData));
   
   // Set the cookie
   document.cookie = 'FontFamily=' + font + ';path=/';
@@ -152,6 +153,55 @@ function setFont(font) {
   allElements.forEach(element => {
     element.style.fontFamily = 'inherit';
   });
+
+  // Restore scroll position after font change
+  restoreScrollPosition();
+}
+
+// Function to restore scroll position
+function restoreScrollPosition() {
+  try {
+    const savedData = localStorage.getItem('scrollPosition');
+    if (!savedData) return;
+
+    const scrollData = JSON.parse(savedData);
+    const now = Date.now();
+    
+    // Only restore if the saved position is less than 5 seconds old
+    if (now - scrollData.timestamp > 5000) {
+      localStorage.removeItem('scrollPosition');
+      return;
+    }
+
+    // Try multiple approaches to ensure scroll restoration
+    const scrollToPosition = () => {
+      window.scrollTo(0, scrollData.position);
+      // Also try scrollIntoView as a backup
+      if (document.body.scrollHeight > scrollData.position) {
+        const tempElement = document.createElement('div');
+        tempElement.style.position = 'absolute';
+        tempElement.style.top = scrollData.position + 'px';
+        document.body.appendChild(tempElement);
+        tempElement.scrollIntoView();
+        document.body.removeChild(tempElement);
+      }
+    };
+
+    // Try immediate scroll
+    scrollToPosition();
+
+    // Also try after a short delay
+    setTimeout(scrollToPosition, 100);
+
+    // And try after images and other resources load
+    window.addEventListener('load', scrollToPosition);
+
+    // Clean up
+    localStorage.removeItem('scrollPosition');
+  } catch (error) {
+    console.error('Error restoring scroll position:', error);
+    localStorage.removeItem('scrollPosition');
+  }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
