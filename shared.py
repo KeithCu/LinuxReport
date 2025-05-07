@@ -82,6 +82,13 @@ WELCOME_HTML = (
 )
 STANDARD_ORDER_STR = str(SITE_URLS)
 
+# 1) Define the order of your js modules
+_JS_MODULES = [
+    'core.js',
+    'weather.js',
+    'chat.js',
+    'config.js'
+]
 
 # Classes
 class RssFeed:
