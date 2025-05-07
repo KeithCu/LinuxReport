@@ -12,7 +12,10 @@ class ChatWidget {
       lastCommentTimestamp: null,
       eventSource: null,
       pollingTimer: null,
-      beepEnabled: true
+      beepEnabled: true,
+      // Add debounce timers
+      fetchDebounceTimer: null,
+      renderDebounceTimer: null
     };
 
     // Configuration
@@ -21,12 +24,20 @@ class ChatWidget {
       pollingInterval: 15000,
       maxRetries: 5,
       baseRetryDelay: 1000,
-      maxRetryDelay: 30000
+      maxRetryDelay: 30000,
+      // Add configuration for debouncing and throttling
+      fetchDebounceDelay: 1000,
+      renderDebounceDelay: 100,
+      dragThrottleDelay: 16 // ~60fps
     };
 
     // Initialize beep sound with lazy loading
     this.beepSound = null;
     this.initBeepSound();
+
+    // Bind methods to prevent memory leaks
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+    this.handleResize = this.debounce(this.handleResize.bind(this), 250);
   }
 
   init() {
@@ -60,7 +71,62 @@ class ChatWidget {
     }
 
     this.setupEventListeners();
+    
+    // Add visibility and resize handlers
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+    window.addEventListener('resize', this.handleResize);
+    
     return true;
+  }
+
+  // Add utility methods for debouncing and throttling
+  debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  throttle(func, limit) {
+    let inThrottle;
+    return function executedFunction(...args) {
+      if (!inThrottle) {
+        func(...args);
+        inThrottle = true;
+        setTimeout(() => inThrottle = false, limit);
+      }
+    };
+  }
+
+  // Add handlers for visibility and resize
+  handleVisibilityChange() {
+    if (document.hidden) {
+      this.cleanup();
+    } else if (this.elements['chat-container'].style.display !== 'none') {
+      if (this.config.useSSE) {
+        this.initializeSSE();
+      } else {
+        this.fetchComments();
+      }
+    }
+  }
+
+  handleResize() {
+    const container = this.elements['chat-container'];
+    if (container.style.display === 'none') return;
+
+    // Ensure chat container stays within viewport
+    const rect = container.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width;
+    const maxY = window.innerHeight - rect.height;
+
+    if (rect.left > maxX) container.style.left = maxX + 'px';
+    if (rect.top > maxY) container.style.top = maxY + 'px';
   }
 
   initBeepSound() {
@@ -120,9 +186,13 @@ class ChatWidget {
       this.state.offsetY = e.clientY - container.offsetTop;
       container.style.cursor = 'grabbing';
       e.preventDefault();
+
+      // Add dragging class for styling
+      container.classList.add('dragging');
     };
 
-    const onMouseMove = e => {
+    // Throttle mouse move for better performance
+    const onMouseMove = this.throttle(e => {
       if (!this.state.isDragging) return;
       requestAnimationFrame(() => {
         const newX = Math.max(0, Math.min(e.clientX - this.state.offsetX, 
@@ -132,12 +202,13 @@ class ChatWidget {
         container.style.left = newX + 'px';
         container.style.top = newY + 'px';
       });
-    };
+    }, this.config.dragThrottleDelay);
 
     const onMouseUp = () => {
       if (this.state.isDragging) {
         this.state.isDragging = false;
         container.style.cursor = 'default';
+        container.classList.remove('dragging');
       }
     };
 
@@ -268,113 +339,147 @@ class ChatWidget {
       return;
     }
 
-    try {
-      const response = await fetch(`/api/comments?_=${Date.now()}`);
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      const data = await response.json();
-      await this.renderComments(data);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-      if (this.elements['chat-messages'].children.length <= 1) {
-        const loading = this.elements['chat-loading'];
-        loading.textContent = 'Error loading messages. Click to retry.';
-        loading.style.display = 'block';
-        loading.onclick = () => this.fetchComments();
-      }
+    // Debounce fetch requests
+    if (this.state.fetchDebounceTimer) {
+      clearTimeout(this.state.fetchDebounceTimer);
     }
+
+    this.state.fetchDebounceTimer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/comments?_=${Date.now()}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const data = await response.json();
+        await this.renderComments(data);
+      } catch (error) {
+        console.error('Error fetching comments:', error);
+        if (this.elements['chat-messages'].children.length <= 1) {
+          const loading = this.elements['chat-loading'];
+          loading.textContent = 'Error loading messages. Click to retry.';
+          loading.style.display = 'block';
+          loading.onclick = () => this.fetchComments();
+        }
+      }
+    }, this.config.fetchDebounceDelay);
   }
 
   async renderComments(comments) {
-    const messagesContainer = this.elements['chat-messages'];
-    
-    // Check for new messages
-    const newMessagesExist = comments.length && 
-      (!this.state.lastCommentTimestamp || 
-       new Date(comments[0].timestamp).getTime() > this.state.lastCommentTimestamp);
-
-    // Update timestamp
-    this.state.lastCommentTimestamp = comments.length ? 
-      new Date(comments[0].timestamp).getTime() : 
-      this.state.lastCommentTimestamp;
-
-    // Play beep for new messages if chat is visible
-    if (newMessagesExist && 
-        this.elements['chat-container'].style.display !== 'none' && 
-        this.state.beepEnabled) {
-      this.playBeep();
+    // Debounce render updates
+    if (this.state.renderDebounceTimer) {
+      clearTimeout(this.state.renderDebounceTimer);
     }
 
-    // Skip render if no changes
-    if (JSON.stringify(comments) === JSON.stringify(this.state.lastComments)) {
-      return;
-    }
+    this.state.renderDebounceTimer = setTimeout(() => {
+      const messagesContainer = this.elements['chat-messages'];
+      
+      // Check for new messages
+      const newMessagesExist = comments.length && 
+        (!this.state.lastCommentTimestamp || 
+         new Date(comments[0].timestamp).getTime() > this.state.lastCommentTimestamp);
 
-    // Create document fragment for better performance
-    const fragment = document.createDocumentFragment();
+      // Update timestamp
+      this.state.lastCommentTimestamp = comments.length ? 
+        new Date(comments[0].timestamp).getTime() : 
+        this.state.lastCommentTimestamp;
 
-    if (comments.length) {
-      comments.forEach(comment => {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `chat-message${comment.is_admin ? ' admin-message' : ''}`;
-        messageDiv.dataset.commentId = comment.id;
+      // Play beep for new messages if chat is visible
+      if (newMessagesExist && 
+          this.elements['chat-container'].style.display !== 'none' && 
+          this.state.beepEnabled &&
+          !document.hidden) {  // Only play when tab is visible
+        this.playBeep();
+      }
 
-        // Create timestamp
-        const timestamp = document.createElement('span');
-        timestamp.className = 'timestamp';
-        timestamp.textContent = new Date(comment.timestamp)
-          .toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-        messageDiv.appendChild(timestamp);
+      // Skip render if no changes
+      if (JSON.stringify(comments) === JSON.stringify(this.state.lastComments)) {
+        return;
+      }
 
-        // Create message text (safely)
-        const messageText = document.createElement('span');
-        messageText.className = 'message-text';
-        messageText.textContent = comment.text;
-        messageDiv.appendChild(messageText);
-
-        // Add image if present
-        if (comment.image_url) {
-          const br = document.createElement('br');
-          const link = document.createElement('a');
-          link.href = comment.image_url;
-          link.target = '_blank';
-          
-          const img = document.createElement('img');
-          img.src = comment.image_url;
-          img.className = 'chat-image';
-          img.loading = 'lazy';
-          img.onerror = () => {
-            img.src = '/static/image-error.png';
-            img.alt = 'Image failed to load';
-          };
-          
-          link.appendChild(img);
-          messageDiv.appendChild(br);
-          messageDiv.appendChild(link);
-        }
-
-        // Add delete button for admin
-        if (this.state.isAdminMode) {
-          const deleteBtn = document.createElement('button');
-          deleteBtn.className = 'delete-comment-btn';
-          deleteBtn.dataset.commentId = comment.id;
-          deleteBtn.textContent = '❌';
-          deleteBtn.onclick = e => this.handleDelete(e);
-          messageDiv.appendChild(deleteBtn);
-        }
-
-        fragment.appendChild(messageDiv);
+      // Use IntersectionObserver for lazy loading images
+      const imageObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            img.src = img.dataset.src;
+            observer.unobserve(img);
+          }
+        });
       });
-    } else {
-      const noMessages = document.createElement('div');
-      noMessages.className = 'chat-message system-message';
-      noMessages.textContent = 'No messages yet.';
-      fragment.appendChild(noMessages);
-    }
 
-    // Update DOM
-    messagesContainer.innerHTML = '';
-    messagesContainer.appendChild(fragment);
-    this.state.lastComments = comments;
+      // Create document fragment for better performance
+      const fragment = document.createDocumentFragment();
+
+      if (comments.length) {
+        comments.forEach(comment => {
+          const messageDiv = document.createElement('div');
+          messageDiv.className = `chat-message${comment.is_admin ? ' admin-message' : ''}`;
+          messageDiv.dataset.commentId = comment.id;
+
+          // Create timestamp
+          const timestamp = document.createElement('span');
+          timestamp.className = 'timestamp';
+          timestamp.textContent = new Date(comment.timestamp)
+            .toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+          messageDiv.appendChild(timestamp);
+
+          // Create message text (safely)
+          const messageText = document.createElement('span');
+          messageText.className = 'message-text';
+          messageText.textContent = comment.text;
+          messageDiv.appendChild(messageText);
+
+          // Add image if present
+          if (comment.image_url) {
+            const br = document.createElement('br');
+            const link = document.createElement('a');
+            link.href = comment.image_url;
+            link.target = '_blank';
+            link.rel = 'noopener'; // Security improvement
+            
+            const img = document.createElement('img');
+            img.dataset.src = comment.image_url; // Use data-src for lazy loading
+            img.className = 'chat-image';
+            img.loading = 'lazy';
+            img.alt = 'Chat image';
+            img.onerror = () => {
+              img.src = '/static/image-error.png';
+              img.alt = 'Image failed to load';
+            };
+            
+            link.appendChild(img);
+            messageDiv.appendChild(br);
+            messageDiv.appendChild(link);
+
+            // Observe image for lazy loading
+            imageObserver.observe(img);
+          }
+
+          // Add delete button for admin
+          if (this.state.isAdminMode) {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'delete-comment-btn';
+            deleteBtn.dataset.commentId = comment.id;
+            deleteBtn.textContent = '❌';
+            deleteBtn.onclick = e => this.handleDelete(e);
+            messageDiv.appendChild(deleteBtn);
+          }
+
+          fragment.appendChild(messageDiv);
+        });
+      } else {
+        const noMessages = document.createElement('div');
+        noMessages.className = 'chat-message system-message';
+        noMessages.textContent = 'No messages yet.';
+        fragment.appendChild(noMessages);
+      }
+
+      // Update DOM
+      messagesContainer.innerHTML = '';
+      messagesContainer.appendChild(fragment);
+      this.state.lastComments = comments;
+
+      // Disconnect observer after use
+      imageObserver.disconnect();
+    }, this.config.renderDebounceDelay);
   }
 
   async handleDelete(e) {
@@ -501,6 +606,18 @@ class ChatWidget {
       clearInterval(this.state.pollingTimer);
       this.state.pollingTimer = null;
     }
+
+    // Clean up debounce timers
+    if (this.state.fetchDebounceTimer) {
+      clearTimeout(this.state.fetchDebounceTimer);
+    }
+    if (this.state.renderDebounceTimer) {
+      clearTimeout(this.state.renderDebounceTimer);
+    }
+
+    // Remove event listeners
+    document.removeEventListener('visibilitychange', this.handleVisibilityChange);
+    window.removeEventListener('resize', this.handleResize);
   }
 
   playBeep() {
