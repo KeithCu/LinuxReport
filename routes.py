@@ -196,6 +196,17 @@ def init_app(flask_app):
         # Trigger background fetching if needed
         if need_fetch:
             fetch_urls_thread()
+            
+            # Notify other servers via ZeroMQ that feeds are being refreshed
+            try:
+                from zmq_feed_sync import publish_feed_update
+                # Notify about URLs that need refreshing
+                for url in page_order:
+                    if ALL_URLS.get(url) and g_c.has_feed_expired(url, last_fetch_cache.get(url)):
+                        publish_feed_update(url, {"action": "refresh_started", "timestamp": datetime.datetime.utcnow().isoformat()})
+            except Exception as e:
+                # Silently handle errors to avoid disrupting main workflow
+                pass
 
         return page
 
@@ -282,6 +293,20 @@ def init_app(flask_app):
                     del _file_cache[above_html_full_path]
                 # Clear all page caches since headlines have changed
                 clear_page_caches()
+                
+                # Notify other servers via ZeroMQ that headlines have been updated
+                try:
+                    from zmq_feed_sync import publish_feed_update
+                    # Special message type for headline updates
+                    publish_feed_update("headlines_update", {
+                        "mode": str(MODE),
+                        "file": ABOVE_HTML_FILE,
+                        "action": "headlines_updated",
+                        "timestamp": datetime.datetime.utcnow().isoformat()
+                    })
+                except Exception as e:
+                    # Silently handle errors to avoid disrupting main workflow
+                    pass
 
             page_order = []
 

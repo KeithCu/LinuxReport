@@ -7,55 +7,196 @@ import threading
 import time
 import zmq
 import json
+import os
+from urllib.parse import urlparse
 
 # ZeroMQ configuration
+ZMQ_ENABLED = False  # Global switch to enable/disable ZMQ functionality
+ZMQ_FEED_PORT = 5556  # Default port for feed sync
 ZMQ_FEED_ADDR = "tcp://*:5556"  # Publisher binds here
-ZMQ_FEED_SUB_ADDR = "tcp://localhost:5556"  # Subscriber connects here (change as needed)
 ZMQ_TOPIC = b"feed_update"
 
-_context = zmq.Context.instance()
+# List of servers to connect to (used by subscriber)
+# Format: ["tcp://server1:5556", "tcp://server2:5556"]
+# Note: Do not include the current server, as it will receive its own messages
+ZMQ_SERVERS = []
+
+_context = None
 _publisher = None
 _subscriber = None
+_listener_thread = None
+
+def init_zmq():
+    """Initialize ZMQ context if enabled"""
+    global _context
+    if ZMQ_ENABLED and _context is None:
+        _context = zmq.Context.instance()
+        return True
+    return False
 
 # --- Publisher ---
 def get_publisher():
+    """Get or create ZMQ publisher socket"""
     global _publisher
+    if not ZMQ_ENABLED or _context is None:
+        return None
+        
     if _publisher is None:
-        _publisher = _context.socket(zmq.PUB)
-        _publisher.bind(ZMQ_FEED_ADDR)
+        try:
+            _publisher = _context.socket(zmq.PUB)
+            _publisher.setsockopt(zmq.LINGER, 0)  # Don't wait for messages to be sent
+            _publisher.setsockopt(zmq.SNDHWM, 1000)  # High water mark to prevent memory bloat
+            _publisher.bind(ZMQ_FEED_ADDR)
+            print(f"ZMQ publisher bound to {ZMQ_FEED_ADDR}")
+        except Exception as e:
+            print(f"Error creating ZMQ publisher: {e}")
+            return None
     return _publisher
 
-def publish_feed_update(url, feed_data):
+def publish_feed_update(url, feed_data=None):
+    """Publish feed update notification to other servers
+    
+    Args:
+        url: The feed URL that was updated
+        feed_data: Optional additional data about the update (timestamp, etc.)
+                  Set to None to just send notification without data
+    """
+    if not ZMQ_ENABLED:
+        return
+        
     pub = get_publisher()
-    msg = json.dumps({"url": url, "feed_data": feed_data})
-    pub.send_multipart([ZMQ_TOPIC, msg.encode("utf-8")])
+    if pub is None:
+        return
+        
+    data = {
+        "url": url,
+        "feed_data": feed_data,
+        "server_id": os.getenv("SERVER_ID", "unknown"),
+        "timestamp": time.time()
+    }
+    
+    try:
+        msg = json.dumps(data)
+        pub.send_multipart([ZMQ_TOPIC, msg.encode("utf-8")], zmq.NOBLOCK)
+    except zmq.error.Again:
+        print(f"ZMQ: Buffer full when publishing update for {url}")
+    except Exception as e:
+        print(f"ZMQ publishing error for {url}: {e}")
 
 # --- Subscriber ---
 _feed_update_callbacks = []
 
 def register_feed_update_callback(cb):
-    _feed_update_callbacks.append(cb)
+    """Register a callback function to be called when feed updates are received
+    
+    Args:
+        cb: Callback function that takes (url, feed_data) parameters
+    """
+    if cb not in _feed_update_callbacks:
+        _feed_update_callbacks.append(cb)
 
 def get_subscriber():
+    """Get or create ZMQ subscriber socket"""
     global _subscriber
+    if not ZMQ_ENABLED or _context is None:
+        return None
+        
     if _subscriber is None:
-        _subscriber = _context.socket(zmq.SUB)
-        _subscriber.connect(ZMQ_FEED_SUB_ADDR)
-        _subscriber.setsockopt(zmq.SUBSCRIBE, ZMQ_TOPIC)
+        try:
+            _subscriber = _context.socket(zmq.SUB)
+            _subscriber.setsockopt(zmq.LINGER, 0)
+            _subscriber.setsockopt(zmq.RCVHWM, 1000)
+            _subscriber.setsockopt(zmq.SUBSCRIBE, ZMQ_TOPIC)
+            
+            # Connect to all configured server addresses
+            if ZMQ_SERVERS:
+                for server in ZMQ_SERVERS:
+                    current_host = urlparse(ZMQ_FEED_ADDR).netloc.split(':')[0]
+                    server_host = urlparse(server).netloc.split(':')[0]
+                    
+                    # Don't connect to self (avoid duplicate messages)
+                    if server_host != current_host and server_host != "*":
+                        _subscriber.connect(server)
+                        print(f"ZMQ subscriber connected to {server}")
+            else:
+                # Default to localhost if no servers specified
+                _subscriber.connect("tcp://localhost:5556")
+                print("ZMQ subscriber connected to localhost")
+                
+        except Exception as e:
+            print(f"Error creating ZMQ subscriber: {e}")
+            return None
     return _subscriber
 
 def feed_update_listener():
+    """Background thread function to listen for feed updates"""
+    if not ZMQ_ENABLED:
+        return
+        
     sub = get_subscriber()
-    while True:
+    if sub is None:
+        return
+        
+    print("ZMQ feed update listener thread started")
+    while ZMQ_ENABLED:
         try:
-            topic, msg = sub.recv_multipart()
-            data = json.loads(msg.decode("utf-8"))
-            for cb in _feed_update_callbacks:
-                cb(data["url"], data["feed_data"])
+            # Set a timeout for receiving so we can check if ZMQ_ENABLED changed
+            if sub.poll(1000):  # Poll with 1 second timeout
+                topic, msg = sub.recv_multipart()
+                data = json.loads(msg.decode("utf-8"))
+                
+                # Skip messages from self
+                if data.get("server_id") == os.getenv("SERVER_ID", "unknown"):
+                    continue
+                    
+                print(f"ZMQ: Received feed update for {data['url']} from {data.get('server_id', 'unknown')}")
+                for cb in _feed_update_callbacks:
+                    try:
+                        cb(data["url"], data.get("feed_data"))
+                    except Exception as e:
+                        print(f"Error in feed update callback: {e}")
+        except zmq.error.Again:
+            # Timeout on receive, just continue
+            pass
         except Exception as e:
             print(f"ZeroMQ feed update listener error: {e}")
             time.sleep(1)
 
-def start_feed_update_listener_thread():
-    t = threading.Thread(target=feed_update_listener, daemon=True)
-    t.start()
+def start_feed_update_listener():
+    """Start the background thread for listening to feed updates"""
+    global _listener_thread
+    if not ZMQ_ENABLED:
+        return False
+        
+    if _listener_thread is not None and _listener_thread.is_alive():
+        return True  # Already running
+        
+    if init_zmq():
+        _listener_thread = threading.Thread(target=feed_update_listener, daemon=True)
+        _listener_thread.start()
+        return True
+    return False
+
+def configure_zmq(enabled=False, servers=None, port=None):
+    """Configure ZMQ settings
+    
+    Args:
+        enabled: Whether to enable ZMQ functionality
+        servers: List of server addresses to connect to
+        port: Port to use for ZMQ communication
+    """
+    global ZMQ_ENABLED, ZMQ_SERVERS, ZMQ_FEED_PORT, ZMQ_FEED_ADDR
+    
+    ZMQ_ENABLED = enabled
+    
+    if servers is not None:
+        ZMQ_SERVERS = servers
+        
+    if port is not None:
+        ZMQ_FEED_PORT = port
+        ZMQ_FEED_ADDR = f"tcp://*:{port}"
+    
+    if ZMQ_ENABLED:
+        if init_zmq():
+            return start_feed_update_listener()
+    return False

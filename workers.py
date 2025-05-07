@@ -130,6 +130,16 @@ def load_url_worker(url):
 
         if len(entries) > 2:
             g_cm.delete(rss_info.site_url)
+            
+            # Publish feed update notification via ZeroMQ
+            try:
+                from zmq_feed_sync import publish_feed_update
+                # Send minimal information - just notify that the URL has been updated
+                # This will cause other servers to invalidate their template cache for this URL
+                publish_feed_update(url, {"timestamp": datetime.now(TZ).isoformat()})
+            except Exception as e:
+                # Silently ignore errors to avoid disrupting the main workflow
+                pass
 
         end = timer()
         print(f"Parsing from: {url}, in {end - start:f}.")
