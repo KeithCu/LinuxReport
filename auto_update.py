@@ -529,6 +529,30 @@ def main(mode, dry_run=False): # Add dry_run parameter
             print(f"Generating HTML file: {html_file}")
             # Pass headline_template to generate_headlines_html
             generate_headlines_html(top_3_articles_match, html_file)
+            
+            # ZMQ broadcast notification for headline updates
+            try:
+                # Check if ZeroMQ is available
+                zmq_spec = importlib.util.find_spec("zmq")
+                if zmq_spec is not None:
+                    # Only import if ZeroMQ is installed
+                    from zmq_feed_sync import publish_feed_update, ZMQ_ENABLED
+                    if ZMQ_ENABLED:
+                        # Broadcast headline update to other servers
+                        publish_feed_update("headlines_update", {
+                            "mode": mode,
+                            "file": html_file,
+                            "action": "auto_update_headlines",
+                            "timestamp": datetime.datetime.now(TZ).isoformat(),
+                            "titles": [art["title"] for art in top_3_articles_match[:3]]
+                        })
+                        print("Broadcasted headline update via ZMQ to other servers")
+                    else:
+                        print("ZMQ is installed but disabled, skipping headline broadcast")
+            except Exception as e:
+                # Log but don't interrupt main flow
+                print(f"ZMQ broadcast error (non-critical): {e}")
+            
             print(f"Appending to archive for mode: {mode}")
             append_to_archive(mode, top_3_articles_match)
             # Update selections cache only on successful normal run completion

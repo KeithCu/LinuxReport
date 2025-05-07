@@ -38,7 +38,7 @@ MODE_MAP = {mode: mode.value for mode in Mode}
 CONFIG_MODULES = {mode: f"{mode.value}_report_settings" for mode in Mode}
 
 # Path for code and cache
-PATH: str = "/srv/http/LinuxReport2"
+PATH: str = os.path.dirname(os.path.abspath(__file__))
 
 # Shared path for weather, etc.
 SPATH: str = "/run/linuxreport"
