@@ -35,50 +35,80 @@ document.addEventListener('DOMContentLoaded', function() {
   if (noUnderlinesConfig) noUnderlinesConfig.checked = (!noUnderlines || noUnderlines === '1');
 
   // Drag and drop handling with cleanup
-  const urlEntries = document.querySelectorAll('.url-entry');
   let draggedItem = null;
   const dragHandlers = new Map();
 
-  urlEntries.forEach(entry => {
-    const handlers = {
-      dragStart: function(e) {
-        draggedItem = this;
-        // Add dragging class for visual feedback
-        this.classList.add('dragging');
-        setTimeout(() => this.style.display = 'none', 0);
-      },
-      dragEnd: function(e) {
-        this.classList.remove('dragging');
-        setTimeout(() => {
-          this.style.display = 'block';
+  // Get current entries - this will be dynamic
+  function getCurrentEntries() {
+    return document.querySelectorAll('.url-entry');
+  }
+
+  // Setup drag handlers for each entry
+  function setupDragHandlers() {
+    const urlEntries = getCurrentEntries();
+    
+    // First remove any existing handlers to prevent duplicates
+    urlEntries.forEach(entry => {
+      const oldHandlers = dragHandlers.get(entry);
+      if (oldHandlers) {
+        entry.removeEventListener('dragstart', oldHandlers.dragStart);
+        entry.removeEventListener('dragend', oldHandlers.dragEnd);
+        entry.removeEventListener('dragover', oldHandlers.dragOver);
+        entry.removeEventListener('dragenter', oldHandlers.dragEnter);
+        entry.removeEventListener('dragleave', oldHandlers.dragLeave);
+        entry.removeEventListener('drop', oldHandlers.drop);
+      }
+    });
+    
+    // Clear map
+    dragHandlers.clear();
+    
+    // Setup new handlers
+    urlEntries.forEach(entry => {
+      const handlers = {
+        dragStart: function(e) {
+          // Store original display style if we need to restore it
+          this.dataset.originalDisplay = this.style.display || '';
+          
+          draggedItem = this;
+          // Add dragging class for visual feedback
+          this.classList.add('dragging');
+          
+          // Use opacity instead of display:none for more stable behavior
+          this.style.opacity = '0.9';
+        },
+        dragEnd: function(e) {
+          this.classList.remove('dragging');
+          
+          // Restore original appearance
+          this.style.opacity = '1';
+          
+          // Reset the dragged item reference
           draggedItem = null;
-        }, 0);
-      },
-      dragOver: function(e) {
-        e.preventDefault();
-        requestAnimationFrame(() => {
+        },
+        dragOver: function(e) {
+          e.preventDefault();
           if (!this.classList.contains('drag-over')) {
             this.classList.add('drag-over');
           }
-        });
-      },
-      dragEnter: function(e) {
-        e.preventDefault();
-      },
-      dragLeave: function(e) {
-        this.classList.remove('drag-over');
-      },
-      drop: function(e) {
-        e.preventDefault();
-        this.classList.remove('drag-over');
-        
-        if (this !== draggedItem) {
-          const allEntries = Array.from(urlEntries);
-          const draggedIndex = allEntries.indexOf(draggedItem);
-          const targetIndex = allEntries.indexOf(this);
+        },
+        dragEnter: function(e) {
+          e.preventDefault();
+        },
+        dragLeave: function(e) {
+          this.classList.remove('drag-over');
+        },
+        drop: function(e) {
+          e.preventDefault();
+          this.classList.remove('drag-over');
           
-          // Use requestAnimationFrame for smooth visual updates
-          requestAnimationFrame(() => {
+          if (this !== draggedItem) {
+            // Get current state of DOM
+            const allEntries = Array.from(getCurrentEntries());
+            const draggedIndex = allEntries.indexOf(draggedItem);
+            const targetIndex = allEntries.indexOf(this);
+            
+            // Update DOM
             if (draggedIndex < targetIndex) {
               this.parentNode.insertBefore(draggedItem, this.nextSibling);
             } else {
@@ -86,32 +116,41 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             // Update priorities
-            const updatedEntries = document.querySelectorAll('.url-entry');
-            updatedEntries.forEach((ent, idx) => {
-              const priorityInput = ent.querySelector('input[type="number"]');
-              if (priorityInput) {
-                priorityInput.value = (idx + 1) * 10;
-              }
-            });
-          });
+            updatePriorities();
+          }
         }
+      };
+
+      // Store handlers for cleanup
+      dragHandlers.set(entry, handlers);
+
+      // Add event listeners
+      entry.addEventListener('dragstart', handlers.dragStart);
+      entry.addEventListener('dragend', handlers.dragEnd);
+      entry.addEventListener('dragover', handlers.dragOver);
+      entry.addEventListener('dragenter', handlers.dragEnter);
+      entry.addEventListener('dragleave', handlers.dragLeave);
+      entry.addEventListener('drop', handlers.drop);
+    });
+  }
+  
+  // Function to update priorities based on current order
+  function updatePriorities() {
+    const updatedEntries = getCurrentEntries();
+    updatedEntries.forEach((entry, idx) => {
+      const priorityInput = entry.querySelector('input[type="number"]');
+      if (priorityInput) {
+        priorityInput.value = (idx + 1) * 10;
       }
-    };
-
-    // Store handlers for cleanup
-    dragHandlers.set(entry, handlers);
-
-    // Add event listeners
-    entry.addEventListener('dragstart', handlers.dragStart);
-    entry.addEventListener('dragend', handlers.dragEnd);
-    entry.addEventListener('dragover', handlers.dragOver);
-    entry.addEventListener('dragenter', handlers.dragEnter);
-    entry.addEventListener('dragleave', handlers.dragLeave);
-    entry.addEventListener('drop', handlers.drop);
-  });
-
+    });
+  }
+  
+  // Initial setup
+  setupDragHandlers();
+  
   // Cleanup on page unload
   window.addEventListener('unload', () => {
+    const urlEntries = getCurrentEntries();
     urlEntries.forEach(entry => {
       const handlers = dragHandlers.get(entry);
       if (handlers) {
