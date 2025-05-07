@@ -290,23 +290,27 @@ def init_app(flask_app):
             # Handle admin mode authentication
             enable_admin = False
             if form.admin_mode.data:
-                # Get password from config file
-                correct_password = get_admin_password()
-                
-                # Check if password matches
-                if form.admin_password.data == correct_password:
+                # First check if the user already has a valid admin cookie
+                if is_admin:
                     enable_admin = True
                 else:
-                    # Invalid password
-                    template = render_template('configdone.html', 
-                                              message="Invalid admin password. Admin mode not enabled.")
-                    resp = make_response(template)
-                    # Update other cookies but not admin mode
-                    if form.theme.data is not None:
-                        resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
-                    resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
-                    resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
-                    return resp
+                    # Get password from config file
+                    correct_password = get_admin_password()
+                    
+                    # Check if password matches
+                    if form.admin_password.data == correct_password:
+                        enable_admin = True
+                    else:
+                        # Invalid password
+                        template = render_template('configdone.html', 
+                                                  message="Invalid admin password. Admin mode not enabled.")
+                        resp = make_response(template)
+                        # Update other cookies but not admin mode
+                        if form.theme.data is not None:
+                            resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
+                        resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
+                        resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
+                        return resp
             
             # Update is_admin based on authentication result
             is_admin = enable_admin
