@@ -246,7 +246,7 @@ def init_app(flask_app):
                 rssf.pri = (i + 30) * 10
                 form.url_custom.append_entry(rssf)
 
-            page = render_template('config.html', form=form, is_admin=is_admin)
+            page = render_template('config.html', form=form, is_admin=is_admin, favicon=FAVICON)
             return page
         else:
             form = ConfigForm(request.form)
