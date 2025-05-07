@@ -99,6 +99,15 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 // --- End Weather Widget Toggle ---
 
+let pendingScrollRestoreAfterFontChange = false;
+
+function finalRestoreScroll() {
+  if (pendingScrollRestoreAfterFontChange) {
+    restoreScrollPosition();
+    pendingScrollRestoreAfterFontChange = false;
+  }
+}
+
 function redirect() {
   window.location = "/config"
 }
@@ -125,6 +134,7 @@ function setFont(font) {
     timestamp: Date.now()
   };
   localStorage.setItem('scrollPosition', JSON.stringify(scrollData));
+  pendingScrollRestoreAfterFontChange = true; // Indicate a restore is needed
   
   // Set the cookie
   document.cookie = 'FontFamily=' + font + ';path=/';
@@ -154,8 +164,8 @@ function setFont(font) {
     element.style.fontFamily = 'inherit';
   });
 
-  // Restore scroll position after font change
-  restoreScrollPosition();
+  // Always schedule finalRestoreScroll after 1 second
+  setTimeout(finalRestoreScroll, 1000);
 }
 
 // Function to restore scroll position
@@ -167,40 +177,18 @@ function restoreScrollPosition() {
     const scrollData = JSON.parse(savedData);
     const now = Date.now();
     
-    // Only restore if the saved position is less than 5 seconds old
-    if (now - scrollData.timestamp > 5000) {
+    // Only restore if the saved position is less than 10 seconds old
+    if (now - scrollData.timestamp > 10000) {
       localStorage.removeItem('scrollPosition');
       return;
     }
 
-    // Try multiple approaches to ensure scroll restoration
-    const scrollToPosition = () => {
-      window.scrollTo(0, scrollData.position);
-      // Also try scrollIntoView as a backup
-      if (document.body.scrollHeight > scrollData.position) {
-        const tempElement = document.createElement('div');
-        tempElement.style.position = 'absolute';
-        tempElement.style.top = scrollData.position + 'px';
-        document.body.appendChild(tempElement);
-        tempElement.scrollIntoView();
-        document.body.removeChild(tempElement);
-      }
-    };
-
-    // Try immediate scroll
-    scrollToPosition();
-
-    // Also try after a short delay
-    setTimeout(scrollToPosition, 100);
-
-    // And try after images and other resources load
-    window.addEventListener('load', scrollToPosition);
-
-    // Clean up
-    localStorage.removeItem('scrollPosition');
+    window.scrollTo(0, scrollData.position);
+    
+    localStorage.removeItem('scrollPosition'); // Clean up after attempting
   } catch (error) {
     console.error('Error restoring scroll position:', error);
-    localStorage.removeItem('scrollPosition');
+    localStorage.removeItem('scrollPosition'); // Ensure cleanup on error
   }
 }
 
@@ -311,7 +299,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const weatherForecast = document.getElementById('weather-forecast');
     const weatherLoading = document.getElementById('weather-loading');
     const weatherError = document.getElementById('weather-error');
-    if (!weatherForecast || !weatherLoading || !weatherError) return; // Ensure elements exist
+    if (!weatherForecast || !weatherLoading || !weatherError) return; 
+
     if (!data.daily || data.daily.length === 0) {
       weatherLoading.style.display = "none";
       weatherError.style.display = "block";
