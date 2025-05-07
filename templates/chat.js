@@ -394,17 +394,6 @@ class ChatWidget {
         return;
       }
 
-      // Use IntersectionObserver for lazy loading images
-      const imageObserver = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const img = entry.target;
-            img.src = img.dataset.src;
-            observer.unobserve(img);
-          }
-        });
-      });
-
       // Create document fragment for better performance
       const fragment = document.createDocumentFragment();
 
@@ -436,9 +425,8 @@ class ChatWidget {
             link.rel = 'noopener'; // Security improvement
             
             const img = document.createElement('img');
-            img.dataset.src = comment.image_url; // Use data-src for lazy loading
+            img.src = comment.image_url;
             img.className = 'chat-image';
-            img.loading = 'lazy';
             img.alt = 'Chat image';
             img.onerror = () => {
               img.src = '/static/image-error.png';
@@ -448,9 +436,6 @@ class ChatWidget {
             link.appendChild(img);
             messageDiv.appendChild(br);
             messageDiv.appendChild(link);
-
-            // Observe image for lazy loading
-            imageObserver.observe(img);
           }
 
           // Add delete button for admin
@@ -476,9 +461,6 @@ class ChatWidget {
       messagesContainer.innerHTML = '';
       messagesContainer.appendChild(fragment);
       this.state.lastComments = comments;
-
-      // Disconnect observer after use
-      imageObserver.disconnect();
     }, this.config.renderDebounceDelay);
   }
 
