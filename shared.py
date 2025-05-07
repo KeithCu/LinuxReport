@@ -132,7 +132,7 @@ class DiskCacheWrapper:
         cached_last_fetch = g_cm.get(cache_key)
         if cached_last_fetch is not None:
             return cached_last_fetch
-            
+
         # If not in cache, get from disk
         last_fetch = self.get(url + ":last_fetch")
         g_cm.set(cache_key, last_fetch, ttl=EXPIRE_HOUR)
@@ -142,7 +142,7 @@ class DiskCacheWrapper:
         """Set the last fetch time for a URL and cache it in memory."""
         # Store in disk cache
         self.put(url + ":last_fetch", timestamp, timeout)
-        
+
         # Also update the in-memory cache
         g_cm.set(f"last_fetch::{url}", timestamp, ttl=EXPIRE_HOUR)
 
@@ -230,7 +230,7 @@ class DiskcacheSqliteLock(LockBase):
             with self.cache.cache.transact():
                 now = time.monotonic()
                 current_value = self.cache.get(self.lock_key)
-                
+
                 # Lock exists and is still valid
                 if current_value is not None:
                     expiry_time = current_value[1]
@@ -238,17 +238,17 @@ class DiskcacheSqliteLock(LockBase):
                     if now < expiry_time:
                         return False
                     # Lock exists but has expired - we'll overwrite it
-                
+
                 # Set expiry and store our claim
                 expiry = now + timeout_seconds
                 self.cache.put(self.lock_key, (self.owner_id, expiry), timeout=timeout_seconds + 5)
-                
+
                 # Verify our ownership
                 final_value = self.cache.get(self.lock_key)
                 if final_value is not None and final_value[0] == self.owner_id:
                     self._locked = True
                     return True
-                
+
                 self._locked = False
                 return False
         except (diskcache.Timeout, Timeout) as e:
@@ -282,7 +282,7 @@ class DiskcacheSqliteLock(LockBase):
             # Log error if needed
             print(f"Error releasing lock {self.lock_key}: {e}")
             success = False
-        
+
         # Whether successful or not, we're no longer locked
         self._locked = False
         return success

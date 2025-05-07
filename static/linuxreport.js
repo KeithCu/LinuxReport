@@ -128,11 +128,9 @@ function setFont(font) {
   document.body.style.display = 'none';
   document.body.offsetHeight; // Force reflow
   document.body.style.display = '';
-  
-  // Also update the sans-serif setting based on the selected font
-  if (font === 'system' || font === 'inter' || font === 'roboto' || 
-      font === 'open-sans' || font === 'source-sans' || 
-      font === 'noto-sans' || font === 'lato' || font === 'raleway') {
+
+  // Only add .sans-serif for 'system' font
+  if (font === 'system') {
     document.body.classList.add('sans-serif');
   } else {
     document.body.classList.remove('sans-serif');
