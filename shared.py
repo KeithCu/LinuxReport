@@ -127,24 +127,14 @@ class DiskCacheWrapper:
         return history.has_expired(url, last_fetch)
 
     def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
-        """Get the last fetch time for a URL with caching."""
-        cache_key = f"last_fetch::{url}"
-        cached_last_fetch = g_cm.get(cache_key)
-        if cached_last_fetch is not None:
-            return cached_last_fetch
-
-        # If not in cache, get from disk
-        last_fetch = self.get(url + ":last_fetch")
-        g_cm.set(cache_key, last_fetch, ttl=EXPIRE_HOUR)
+        """Get the last fetch time for a URL from the shared disk cache."""
+        last_fetch = self.get(url + ":last_fetch") # self.get() uses self.cache (diskcache.Cache for g_c)
         return last_fetch
 
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
-        """Set the last fetch time for a URL and cache it in memory."""
-        # Store in disk cache
+        """Set the last fetch time for a URL in the shared disk cache."""
+        # Store in disk cache (g_c) - this is the shared, authoritative source.
         self.put(url + ":last_fetch", timestamp, timeout)
-
-        # Also update the in-memory cache
-        g_cm.set(f"last_fetch::{url}", timestamp, ttl=EXPIRE_HOUR)
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}.pickle")
