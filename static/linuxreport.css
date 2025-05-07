@@ -8,11 +8,12 @@ body.font-source-sans { font-family: 'Source Sans Pro', sans-serif !important; }
 body.font-noto-sans { font-family: 'Noto Sans', sans-serif !important; }
 body.font-lato { font-family: 'Lato', sans-serif !important; }
 body.font-raleway { font-family: 'Raleway', sans-serif !important; }
+body.font-sans-serif { font-family: Arial, Helvetica, 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', 'Segoe UI', 'sans-serif' !important; }
 
 /* Force font everywhere when enabled */
 body.font-system *, body.font-monospace *, body.font-inter *, 
 body.font-roboto *, body.font-open-sans *, body.font-source-sans *, 
-body.font-noto-sans *, body.font-lato *, body.font-raleway * {
+body.font-noto-sans *, body.font-lato *, body.font-raleway *, body.font-sans-serif * {
   font-family: inherit !important;
 }
 

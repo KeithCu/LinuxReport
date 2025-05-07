@@ -44,7 +44,8 @@ class ConfigForm(Form):
         ('pastelle','Pastelle'),
     ])
     font_family = SelectField(label="Font", choices=[
-        ('system', 'System Default (Sans-serif)'),
+        ('system', 'System Default (Serif)'),
+        ('sans-serif', 'Sans Serif'),
         ('monospace', 'Monospace (Drudge-style)'),
         ('inter', 'Inter (Modern)'),
         ('roboto', 'Roboto (Clean)'),

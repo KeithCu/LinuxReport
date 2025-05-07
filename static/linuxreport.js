@@ -8,10 +8,16 @@ document.addEventListener('DOMContentLoaded', function() {
   var select = document.getElementById('theme-select');
   if (select) select.value = theme;
 
-  // Read font cookie or default
+  // Read font cookie or default to 'sans-serif'
   var fontMatch = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
-  var font = fontMatch ? font[1] : 'system';
+  var font = fontMatch ? fontMatch[1] : 'sans-serif'; // Default to sans-serifif';
   // Apply font class to body
+  // Remove all existing font classes first to ensure a clean slate
+  document.body.classList.remove(
+    'font-system', 'font-monospace', 'font-inter',
+    'font-roboto', 'font-open-sans', 'font-source-sans',
+    'font-noto-sans', 'font-lato', 'font-raleway', 'font-sans-serif'
+  );
   document.body.classList.add('font-' + font);
   // Set dropdown to current font
   var fontSelect = document.getElementById('font-select');
@@ -110,7 +116,7 @@ function setFont(font) {
   document.body.classList.remove(
     'font-system', 'font-monospace', 'font-inter',
     'font-roboto', 'font-open-sans', 'font-source-sans',
-    'font-noto-sans', 'font-lato', 'font-raleway'
+    'font-noto-sans', 'font-lato', 'font-raleway', 'font-sans-serif'
   );
   
   // Add the new font class
@@ -124,8 +130,6 @@ function setFont(font) {
   document.body.style.display = 'none';
   document.body.offsetHeight; // Force reflow
   document.body.style.display = '';
-
-  // No more sans-serif logic
 
   // Force font change on all elements
   const allElements = document.querySelectorAll('*');
@@ -774,15 +778,25 @@ document.addEventListener('DOMContentLoaded', function() {
   // Only run on config page
   if (!document.querySelector('.config-container')) return;
 
-  // Apply theme and font classes
-  var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
-  var theme = match ? match[1] : 'silver';
-  document.body.classList.add('theme-' + theme);
-  var fontMatch = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
-  var font = fontMatch ? font[1] : 'system';
-  document.body.classList.add('font-' + font);
-  var nu = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
-  if (!nu || nu[1] === '1') document.body.classList.add('no-underlines');
+  // Theme and font classes are already applied by the main DOMContentLoaded listener.
+  // We just need to ensure the dropdowns on the config page reflect the cookie values.
+
+  var themeMatch = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
+  var currentTheme = themeMatch ? themeMatch[1] : 'silver';
+  var themeSelectConfig = document.querySelector('.config-container #theme-select'); // More specific selector
+  if (themeSelectConfig) themeSelectConfig.value = currentTheme;
+
+
+  var fontMatchCookie = document.cookie.match(/(?:^|; )FontFamily=([^;]+)/);
+  var currentFont = fontMatchCookie ? fontMatchCookie[1] : 'sans-serif';
+  var fontSelectConfig = document.querySelector('.config-container #font-select'); // More specific selector
+  if (fontSelectConfig) fontSelectConfig.value = currentFont;
+
+
+  var nuMatch = document.cookie.match(/(?:^|; )NoUnderlines=([^;]+)/);
+  var noUnderlinesConfig = document.querySelector('.config-container input[name="no_underlines"]'); // Adjust if selector is different
+  if (noUnderlinesConfig) noUnderlinesConfig.checked = (!nuMatch || nuMatch[1] === '1');
+
 
   // Drag-and-drop for URL entries
   const urlEntries = document.querySelectorAll('.url-entry');
