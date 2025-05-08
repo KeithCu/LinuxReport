@@ -116,6 +116,15 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
 - Single server (Linode Nanode 1GB/$5/month)
 - All components (web server, feed fetching, content generation) on one machine
 - Good performance for current traffic levels with existing Python page caching
+- Benchmark: ~350 requests per second on a single processor (CPU-saturated)
+  - Using standard CPython (not PyPy yet) with mod_wsgi and 2 worker processes
+  - Running on AMD EPYC processor (Linode's standard CPU)
+  - Performance scales near-linearly with additional CPUs/cores running their own processes
+  - Current configuration of 2 worker processes saturates a single CPU core
+- User capacity: Can handle approximately 2-3 million daily active users
+  - Assuming average user loads 2-3 pages per visit
+  - With typical diurnal traffic patterns (peak:average ratio of ~3:1)
+  - Translates to ~30 million daily page views
 
 ### Scaling Stages
 
@@ -123,7 +132,11 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
 - Remain on Nanode 1GB ($5) until necessary
 - Upgrade to Linode 2GB ($12) or 4GB ($24) when needed
 - Optimize WSGI configuration
-- Move static assets to CDN using URL_IMAGES variable for offloading bandwidth
+- **Foundational optimizations** that multiply the effectiveness of all other scaling strategies:
+  - Move static assets to CDN using URL_IMAGES variable for offloading bandwidth
+  - Implement PyPy instead of CPython for significant performance boost (3-5x for CPU-bound operations)
+  - These changes amplify the benefit of every subsequent scaling effort
+  - Worth implementing early as they require minimal code changes with maximum impact
 - **PyPy performance boost:** Consider using PyPy instead of CPython for a significant performance boost
   - Can provide 3-5x better throughput for CPU-bound operations
   - Compatible with most pure Python libraries used in LinuxReport
@@ -140,6 +153,37 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
 - Add Apache front-end caching for non-customized content
   - Cookie-based cache bypass for custom layouts and admin mode
   - Separate caches for mobile vs. desktop views
+- **Optional Simplified Front-End Architecture:**
+  - Deploy full application code to all front-end servers
+  - Two operational modes controlled by configuration:
+    - **Master mode**: Runs background threads for feed fetching and auto-updates
+    - **Front-end mode**: Disables background threads, fetches processed content from master
+  - Front-end servers fetch and cache pre-processed content from backend:
+    - Periodically retrieve already-fetched feed data from central backend
+    - No direct proxying of feed fetching requests
+    - Front-ends cache feed content until notified of updates
+    - Only the backend directly interacts with source websites
+  - Centralized backend responsibilities:
+    - Feed fetching from source websites (with proper rate limiting)
+      - Prevents IP bans from multiple servers hitting the same sources
+      - Uses specialized access methods where needed (e.g., TOR for Reddit)
+    - Auto-update process for headline generation
+    - Notifying front-ends when new content is available
+    - Weather data collection (centralized to minimize API requests)
+      - Aggregates requests for the same cities
+      - Maintains proper rate limiting for weather APIs
+      - Distributes weather data to front-ends
+  - Front-end servers handle everything else locally:
+    - Page rendering
+    - User customization
+    - Static assets
+    - Admin interface display
+  - Benefits:
+    - Simpler deployment (identical codebase with different mode settings)
+    - Lower latency for most operations
+    - Prevents getting banned by maintaining controlled access to source websites
+    - Front-ends operate independently except for content refreshes
+    - Easier fallback if backend goes down (can serve slightly stale content)
 - **Highly scalable:** Can support 20-30+ front-end servers with a single backend
 - **Cost:** $48+/month + CDN costs (scales with number of front-end servers)
 - **When to implement:** When Stage 1 server consistently exceeds 70% CPU
@@ -306,23 +350,6 @@ This approach works well with both caching strategies:
       return response
   ```
 
-- When the backend rebuilds CSS/JS files, it would also trigger the cache invalidation webhook:
-  ```python
-  # In backend when JS/CSS changes:
-  def rebuild_static_assets():
-      # Existing code to rebuild assets
-      compile_js_files()
-      
-      # No need to invalidate old versioned static files!
-      # The new version hash ensures clients request the new URL
-      # Old versions remain cached but unused
-      
-      # Only notify about the page HTML that includes the new static URLs
-      for server in front_end_servers:
-          requests.post(f"http://{server}/invalidate_cache", 
-                       json={"type": "html", "paths": ["/"]})
-  ```
-
 - **Graceful handling of outdated clients:**
   - Users with cached HTML pages from before an update will still request old JS/CSS versions
   - This approach serves those old versions from cache without hitting the backend
@@ -330,6 +357,57 @@ This approach works well with both caching strategies:
   - No forced refreshes or broken experiences for users with outdated cached pages
   - Server maintains ability to serve both old and new static asset versions simultaneously
   - Particularly helpful during gradual rollouts or when users have multiple tabs open
+
+#### CDN with Versioned Filenames
+
+For even better CDN performance, consider embedding the version hash directly in the filename instead of using query parameters:
+
+- **Implementation approach:**
+  - Modify the build process to generate versioned filenames:
+    ```
+    linuxreport-[hash].css
+    linuxreport-[hash].js
+    ```
+  - Update the Flask code to track these filenames and provide them to templates
+  - Benefits:
+    - Better caching with some CDNs that ignore query strings
+    - Longer cache lifetimes (set max-age to years)
+    - Eliminate edge case caching issues entirely
+  
+- **Example implementation:**
+  ```python
+  # During JS/CSS compilation
+  def compile_js_files():
+      file_hash = get_combined_hash()
+      output_file = f"linuxreport-{file_hash}.js"
+      # Store the current versioned filename
+      with open('static/js_version.json', 'w') as f:
+          json.dump({'current': output_file}, f)
+      # Write the combined JS to the versioned file
+      # ...
+  
+  # In Flask app
+  @lru_cache()
+  def get_versioned_static_file(base_name):
+      """Get the current versioned filename for a static asset"""
+      if base_name == 'linuxreport.js':
+          with open('static/js_version.json', 'r') as f:
+              return json.load(f)['current']
+      # Similar for CSS...
+      
+  # In Jinja template context
+  app.jinja_env.globals['versioned_static'] = get_versioned_static_file
+  
+  # In the template
+  # <script src="/static/{{ versioned_static('linuxreport.js') }}"></script>
+  ```
+
+- **CDN integration:**
+  - Configure CDN to pull from your origin server
+  - Set very long cache TTLs (1 year+) for versioned assets
+  - Content is naturally invalidated when new files with new names are requested
+  - Old versions can stay on the CDN indefinitely without any harm
+  - No need to purge or invalidate cache entries
 
 #### Gunicorn vs. mod_wsgi Considerations
 
@@ -423,3 +501,27 @@ For a 4GB RAM server running LinuxReport:
   - Cache hit/miss rates
 
 This scaling plan leverages your existing fast Python code and page caching in the early stages, deferring more complex infrastructure changes until they're truly needed. The focus is on maximizing current performance and only adding complexity when traffic demands require it.
+
+#### Specialized Data Handling Considerations
+
+##### Weather Data Management
+- **Challenge:** Weather data (weather.py) is city-specific but requires API request minimization
+- **Current approach:** Local caching per server instance
+- **Scaling solutions:**
+  - **Redis-based approach:**
+    - Central Redis instance stores weather data by city
+    - All front-ends query Redis instead of weather APIs directly
+    - Master server maintains Redis with fresh weather data
+    - Includes TTL (time-to-live) for automatic expiration
+    - Provides atomic operations for concurrent updates
+  - **Message queue approach:**
+    - Front-ends publish weather data requests to queue
+    - Master consumes queue, fetches data, publishes responses
+    - Handles request deduplication for same cities
+    - Options: RabbitMQ, ZeroMQ, or lightweight Redis-based queues
+  - **Libcloud/object storage approach:**
+    - Master writes weather data to object storage (S3-compatible)
+    - Front-ends periodically check and cache object storage
+    - Simple implementation with minimal dependencies
+    - Works well when weather update frequency is low (e.g., hourly)
+  - **Recommendation:** Start with the simplest approach (libcloud/object storage) and move to Redis if/when more real-time updates are needed
