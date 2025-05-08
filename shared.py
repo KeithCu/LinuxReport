@@ -157,7 +157,7 @@ class DiskCacheWrapper:
         self.put(url + ":last_fetch", timestamp, timeout)
 
 # Global Variables
-history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history{str(MODE)}")
+history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history-{str(MODE.value)}")
 g_c = DiskCacheWrapper(PATH) #Private cache for each instance
 g_cs = DiskCacheWrapper(SPATH) #Shared cache for all instances stored in /run/linuxreport, for weather, etc.
 g_cm = Cache(maxsize=100, ttl=3600)  # In-memory cache with per-item TTL (seconds)

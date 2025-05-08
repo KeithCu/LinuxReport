@@ -22,7 +22,7 @@ from werkzeug.utils import secure_filename
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo, DEBUG
 # Local imports
-from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_YEARS,
+from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, ENABLE_URL_CUSTOMIZATION)
