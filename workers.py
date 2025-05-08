@@ -197,9 +197,13 @@ def wait_and_set_fetch_mode():
         return None
 
 def get_domain(url):
-    """Extract domain from URL."""
+    """Extract base domain from URL."""
     try:
-        return urlparse(url).netloc
+        netloc = urlparse(url).netloc
+        # Split the netloc into parts
+        parts = netloc.split('.')
+        # Return the last two parts as the base domain (e.g., bandcamp.com)
+        return '.'.join(parts[-2:]) if len(parts) > 1 else netloc
     except:
         return url
 
