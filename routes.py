@@ -307,7 +307,6 @@ def init_app(flask_app):
                         resp = make_response(template)
                         # Update other cookies but not admin mode
                         resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
-                        resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
                         return resp
             
             # Update is_admin based on authentication result
@@ -383,7 +382,6 @@ def init_app(flask_app):
                 resp.delete_cookie('UrlsVer')
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
-            resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
 
             if enable_admin:
                 resp.set_cookie('isAdmin', '1', max_age=EXPIRE_YEARS)
