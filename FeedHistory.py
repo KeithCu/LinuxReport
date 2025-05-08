@@ -30,6 +30,9 @@ class FeedHistory:
             try:
                 with open(self.data_file, "r") as f:
                     loaded = json.load(f)
+                # Convert string dates back to datetime objects
+                for feed_data in loaded.values():
+                    feed_data["recent"] = [(datetime.fromisoformat(dt), n) for dt, n in feed_data.get("recent", [])]
                 # Ensure loaded is a dictionary
                 if not isinstance(loaded, dict):
                     return {}
@@ -64,9 +67,17 @@ class FeedHistory:
         return {}
 
     def _save_data(self):
-        """Save history to JSON file."""
+        """Save history to JSON file, converting datetime objects to strings."""
+        # Convert datetime objects to strings
+        serializable_data = {
+            url: {
+                **feed_data,
+                "recent": [(dt.isoformat(), n) for dt, n in feed_data.get("recent", [])]
+            }
+            for url, feed_data in self.data.items()
+        }
         with open(self.data_file, "w") as f:
-            json.dump(self.data, f)
+            json.dump(serializable_data, f)
 
     def update_fetch(self, url: str, new_articles: int):
         fetch_time = datetime.now(TZ)
