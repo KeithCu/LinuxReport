@@ -111,7 +111,46 @@ class FeedHistory:
                 print(f"[FeedHistory] ERROR: Unexpected exception during data loading: {str(e)}")
                 return {}
         
-        print(f"[FeedHistory] Data file does not exist, returning empty dictionary")
+        # JSON file doesn't exist, try loading from pickle file
+        pickle_file = self.data_file.with_suffix('.pickle')
+        print(f"[FeedHistory] JSON file does not exist, checking for pickle file: {pickle_file}")
+        
+        if pickle_file.exists():
+            try:
+                print(f"[FeedHistory] Attempting to load pickle from: {pickle_file}")
+                
+                with open(pickle_file, "rb") as f:
+                    loaded = pickle.load(f)
+                
+                print(f"[FeedHistory] Successfully loaded pickle data with {len(loaded)} feeds")
+                
+                # Ensure loaded is a dictionary
+                if not isinstance(loaded, dict):
+                    print(f"[FeedHistory] ERROR: Pickle data is not a dictionary, returning empty dict")
+                    return {}
+                
+                # If not empty, validate one feed's data has "weekday_buckets"
+                if loaded:
+                    first_key = next(iter(loaded.keys()))
+                    first_value = loaded[first_key]
+                    print(f"[FeedHistory] First feed in pickle data: {first_key}")
+                    
+                    if not (isinstance(first_value, dict) and "weekday_buckets" in first_value):
+                        print(f"[FeedHistory] ERROR: Pickle data validation failed")
+                        return {}
+                
+                # Save the loaded pickle data as JSON for future use
+                print(f"[FeedHistory] Converting pickle data to JSON format")
+                self.data = loaded
+                self._save_data()
+                return loaded
+            
+            except Exception as e:
+                # Loading failed (e.g., file corruption or unpickling error)
+                print(f"[FeedHistory] ERROR: Failed to load pickle data: {str(e)}")
+                return {}
+        
+        print(f"[FeedHistory] Neither JSON nor pickle file exists, returning empty dictionary")
         return {}
 
     def _save_data(self):
