@@ -47,6 +47,7 @@ def create_driver(use_tor, user_agent):
 class SharedSeleniumDriver:
     _instance = None
     _lock = threading.Lock()
+    _fetch_lock = threading.Lock()  # New lock for synchronizing fetch operations
     _timer = None
     _timeout = 300  # 5 minutes
 
@@ -69,6 +70,20 @@ class SharedSeleniumDriver:
             cls._instance.last_used = time.time()
             cls._reset_timer()
             return cls._instance.driver
+
+    @classmethod
+    def acquire_fetch_lock(cls):
+        """Acquire the fetch lock to synchronize fetch operations"""
+        return cls._fetch_lock.acquire()
+
+    @classmethod
+    def release_fetch_lock(cls):
+        """Release the fetch lock after fetch operation is complete"""
+        try:
+            cls._fetch_lock.release()
+        except RuntimeError:
+            # Lock was not acquired, ignore
+            pass
 
     @classmethod
     def _is_valid(cls, use_tor, user_agent):
@@ -165,30 +180,34 @@ def fetch_site_posts(url, user_agent):
     entries = []
 
     if config.get("needs_selenium", True):
-
         if "reddit" in base_domain:
             user_agent = g_cs.get("REDDIT_USER_AGENT")
-        driver = SharedSeleniumDriver.get_driver(config["needs_tor"], user_agent)
+        
+        # Acquire the fetch lock before starting the fetch operation
+        SharedSeleniumDriver.acquire_fetch_lock()
         try:
-            driver.get(url)
-            if base_domain == "reddit.com":
-                pass
-                #WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["title_selector"])))
-            else:
-                WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
-            print(f"Some content loaded for {url} with agent: {user_agent}")
-            posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
-            if not posts:
-                snippet = driver.page_source[:1000]
-                print("No posts found. Page source snippet:", snippet)
-                raise Exception("No posts found")
-            for post in posts:
-                entry = extract_post_data(post, config, url, use_selenium=True)
-                if entry:
-                    entries.append(entry)
-        except Exception as e:
-            print(f"Error on {url}: {e}")
-        # Do not quit driver here; managed by SharedSeleniumDriver
+            driver = SharedSeleniumDriver.get_driver(config["needs_tor"], user_agent)
+            try:
+                driver.get(url)
+                if base_domain == "reddit.com":
+                    pass
+                else:
+                    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                print(f"Some content loaded for {url} with agent: {user_agent}")
+                posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
+                if not posts:
+                    snippet = driver.page_source[:1000]
+                    print("No posts found. Page source snippet:", snippet)
+                    raise Exception("No posts found")
+                for post in posts:
+                    entry = extract_post_data(post, config, url, use_selenium=True)
+                    if entry:
+                        entries.append(entry)
+            except Exception as e:
+                print(f"Error on {url}: {e}")
+        finally:
+            # Always release the fetch lock, even if an error occurs
+            SharedSeleniumDriver.release_fetch_lock()
     else:
         print(f"Fetching {base_domain} using requests (no Selenium)")
         try:
@@ -202,7 +221,6 @@ def fetch_site_posts(url, user_agent):
                     entries.append(entry)
         except Exception as e:
             print(f"Error fetching {base_domain} with requests: {e}")
-            # posts = []  # Not needed, handled above
 
     result = {
         'entries': entries,
