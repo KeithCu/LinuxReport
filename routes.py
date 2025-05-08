@@ -306,8 +306,6 @@ def init_app(flask_app):
                                                   message="Invalid admin password. Admin mode not enabled.")
                         resp = make_response(template)
                         # Update other cookies but not admin mode
-                        if form.theme.data is not None:
-                            resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
                         resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
                         resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
                         return resp
@@ -383,11 +381,6 @@ def init_app(flask_app):
             else:
                 resp.delete_cookie('RssUrls')
                 resp.delete_cookie('UrlsVer')
-
-            if form.theme.data is not None:
-                resp.set_cookie('Theme', form.theme.data, max_age=EXPIRE_YEARS)
-            else:
-                resp.delete_cookie('Theme')
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
             resp.set_cookie("FontFamily", form.font_family.data, max_age=EXPIRE_YEARS)
