@@ -29,46 +29,89 @@ class FeedHistory:
 
     def _load_data(self):
         """Load history from JSON file or pickle file, converting pickle to JSON if necessary."""
+        print(f"[FeedHistory] Loading data from file: {self.data_file}")
+        
         if self.data_file.exists():
+            print(f"[FeedHistory] Data file exists: {self.data_file}")
             try:
+                print(f"[FeedHistory] Attempting to load JSON from: {self.data_file}")
                 with open(self.data_file, "r") as f:
                     loaded = json.load(f)
+                
+                print(f"[FeedHistory] Successfully loaded JSON data with {len(loaded)} feeds")
+                
                 # Convert string dates back to datetime objects and lists back to sets
-                for feed_data in loaded.values():
+                print(f"[FeedHistory] Converting date strings to datetime objects and lists to sets")
+                for feed_url, feed_data in loaded.items():
                     feed_data["recent"] = [(datetime.fromisoformat(dt), n) for dt, n in feed_data.get("recent", [])]
                     feed_data["weekday_buckets"] = set(feed_data.get("weekday_buckets", []))
                     feed_data["weekend_buckets"] = set(feed_data.get("weekend_buckets", []))
+                
                 # Ensure loaded is a dictionary
                 if not isinstance(loaded, dict):
+                    print(f"[FeedHistory] ERROR: Loaded data is not a dictionary, returning empty dict")
                     return {}
+                
                 # If not empty, validate one feed's data has "weekday_buckets"
                 if loaded:
-                    first_value = next(iter(loaded.values()))  # Get first feed's data
+                    first_key = next(iter(loaded.keys()))
+                    first_value = loaded[first_key]
+                    print(f"[FeedHistory] First feed in loaded data: {first_key}")
+                    
                     if not (isinstance(first_value, dict) and "weekday_buckets" in first_value):
+                        print(f"[FeedHistory] ERROR: Data validation failed, missing 'weekday_buckets' in feed data")
                         return {}
+                    
+                    # Print sample of data for one feed
+                    print(f"[FeedHistory] Sample data for first feed: recent={first_value.get('recent', [])[:2]}, "
+                          f"weekday_buckets={list(first_value.get('weekday_buckets', []))[:3]}")
+                
+                print(f"[FeedHistory] Successfully processed JSON data")
                 return loaded
+            
             except json.JSONDecodeError:
                 # JSON loading failed, try loading from pickle
+                print(f"[FeedHistory] JSON loading failed, attempting to load from pickle instead")
                 try:
-                    with open(self.data_file.with_suffix('.pickle'), "rb") as f:
+                    pickle_file = self.data_file.with_suffix('.pickle')
+                    print(f"[FeedHistory] Attempting to load pickle from: {pickle_file}")
+                    
+                    with open(pickle_file, "rb") as f:
                         loaded = pickle.load(f)
+                    
+                    print(f"[FeedHistory] Successfully loaded pickle data with {len(loaded)} feeds")
+                    
                     # Ensure loaded is a dictionary
                     if not isinstance(loaded, dict):
+                        print(f"[FeedHistory] ERROR: Pickle data is not a dictionary, returning empty dict")
                         return {}
+                    
                     # If not empty, validate one feed's data has "weekday_buckets"
                     if loaded:
-                        first_value = next(iter(loaded.values()))  # Get first feed's data
+                        first_key = next(iter(loaded.keys()))
+                        first_value = loaded[first_key]
+                        print(f"[FeedHistory] First feed in pickle data: {first_key}")
+                        
                         if not (isinstance(first_value, dict) and "weekday_buckets" in first_value):
+                            print(f"[FeedHistory] ERROR: Pickle data validation failed")
                             return {}
+                    
                     # Save the loaded pickle data as JSON
+                    print(f"[FeedHistory] Converting pickle data to JSON format")
                     self._save_data()
                     return loaded
-                except Exception:
+                
+                except Exception as e:
                     # Loading failed (e.g., file corruption or unpickling error)
+                    print(f"[FeedHistory] ERROR: Failed to load pickle data: {str(e)}")
                     return {}
-            except Exception:
+            
+            except Exception as e:
                 # Other exceptions
+                print(f"[FeedHistory] ERROR: Unexpected exception during data loading: {str(e)}")
                 return {}
+        
+        print(f"[FeedHistory] Data file does not exist, returning empty dictionary")
         return {}
 
     def _save_data(self):
