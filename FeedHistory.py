@@ -21,6 +21,9 @@ SMOOTHING_FACTOR = 0.7                # Weight for exponential smoothing (0-1)
 class FeedHistory:
     def __init__(self, data_file: str):
         self.data_file = Path(data_file)
+        # Ensure the data file has a .json extension
+        if not self.data_file.suffix == '.json':
+            self.data_file = self.data_file.with_suffix('.json')
         self.lock = threading.RLock()
         self.data: Dict[str, dict] = self._load_data()
 
@@ -47,7 +50,7 @@ class FeedHistory:
             except json.JSONDecodeError:
                 # JSON loading failed, try loading from pickle
                 try:
-                    with open(self.data_file, "rb") as f:
+                    with open(self.data_file.with_suffix('.pickle'), "rb") as f:
                         loaded = pickle.load(f)
                     # Ensure loaded is a dictionary
                     if not isinstance(loaded, dict):
