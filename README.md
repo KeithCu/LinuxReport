@@ -124,6 +124,11 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
 - Upgrade to Linode 2GB ($12) or 4GB ($24) when needed
 - Optimize WSGI configuration
 - Move static assets to CDN using URL_IMAGES variable for offloading bandwidth
+- **PyPy performance boost:** Consider using PyPy instead of CPython for a significant performance boost
+  - Can provide 3-5x better throughput for CPU-bound operations
+  - Compatible with most pure Python libraries used in LinuxReport
+  - Simple change that requires minimal code modifications
+  - Particularly effective for template rendering and feed processing
 - **Cost:** $5-24/month + $5 / month CDN costs
 - **When to implement:** When current server CPU consistently exceeds 70% during peak hours
 
@@ -325,6 +330,79 @@ This approach works well with both caching strategies:
   - No forced refreshes or broken experiences for users with outdated cached pages
   - Server maintains ability to serve both old and new static asset versions simultaneously
   - Particularly helpful during gradual rollouts or when users have multiple tabs open
+
+#### Gunicorn vs. mod_wsgi Considerations
+
+When scaling beyond a single server, choosing the right WSGI server becomes important. Here's how the two primary options compare:
+
+##### Gunicorn
+- **Standalone WSGI server** that can run independently or behind Apache/Nginx
+- **Worker flexibility:** Supports various worker types for different workloads
+- **Performance:** Good throughput with proper worker configuration
+- **Implementation:** Simpler setup with direct Python management
+- **Scaling advantages:**
+  - Configurable for different workload patterns
+  - Worker processes automatically restart if they crash
+  - Built-in load balancing between worker processes
+- **Worker types for consideration:**
+  - `sync`: Simple synchronous workers, good baseline option
+  - `threads`: Thread-based workers for I/O-bound applications
+  - `gthread`: Thread-based workers with a thread pool, better for more stable performance
+  - `preload`: Pre-loads your application to save memory across workers
+- **When to use:** Ideal when moving to Stage 2 with multiple front-ends and when you want more control over your Python processes
+
+##### mod_wsgi
+- **Apache module** that embeds Python within the Apache process
+- **Integration:** Tighter integration with Apache's features and security model
+- **Performance:** Good performance for CPU-bound applications
+- **Resource usage:** Can be more memory-efficient as it shares resources with Apache
+- **Scaling considerations:**
+  - Works well when you're already using Apache for other purposes
+  - Simplifies deployment with a single server process to manage
+  - Benefits from Apache's mature connection handling
+- **When to use:** Best for Stage 1 when you're on a single server and already using Apache
+
+##### Recommendation
+- **Stage 1 (single server):** mod_wsgi is simple and effective if you're already using Apache
+- **Stage 2 (multiple front-ends):** Consider switching to Gunicorn with thread-based workers (`threads` or `gthread`) for better handling of connections
+- **Worker count:** A good rule of thumb is (2 × CPU cores) + 1 for CPU-bound applications
+
+##### LinuxReport Worker Compatibility Analysis
+
+Based on the LinuxReport codebase structure:
+
+- **`sync` workers:** Fully compatible with your Flask application. Simple and reliable, but each worker is completely independent and handles one request at a time.
+
+- **`threads` workers:** Compatible with your codebase. Your Flask application doesn't appear to use any thread-unsafe components. The page caching with `lru_cache` and `cacheout` should work well with threaded workers, allowing better connection handling.
+
+- **`gthread` workers:** Recommended for your application. Similar to `threads` but with a more efficient thread pool, which should work well with your mixed I/O (feed fetching) and CPU (page rendering) workloads.
+
+- **`preload` option:** Highly recommended for your application. LinuxReport loads various modules at startup and compiles JS files. Using preload would share this memory across workers, reducing the overall memory footprint.
+
+##### Worker Count for 4GB RAM Server
+
+For a 4GB RAM server running LinuxReport:
+
+- **Memory analysis:**
+  - Base Flask application with dependencies: ~100-150MB per worker
+  - Page cache in memory: ~50-100MB (depending on number of feeds)
+  - OS and other processes: ~500MB
+
+- **Recommended configuration:**
+  - For a 2-core system: 3-4 workers (`(2 × 2) + 1 = 5`, but limited by RAM)
+  - With `preload` option: 4-5 workers (better memory efficiency)
+  - **Thread count per worker:** 2-4 threads per worker
+    - 2 threads: Conservative setting, minimal overhead (total: 6-16 concurrent requests)
+    - 4 threads: Better concurrency for I/O operations (total: 12-16 concurrent requests)
+    - Balance between: 3 worker processes with 4 threads each (12 concurrent requests)
+  - Set a per-worker memory limit to prevent memory exhaustion
+
+- **Example Gunicorn command for 4GB server:**
+  ```
+  gunicorn --workers=3 --threads=4 --worker-class=gthread --preload --max-requests=1000 --max-requests-jitter=100 app:app
+  ```
+
+- **Memory monitoring:** Implement monitoring to ensure workers aren't consuming too much memory. If memory usage grows over time, add `--max-requests` to recycle workers periodically.
 
 #### Multi-Server Caching Strategy
 - **Anonymous users:** Cache aggressively at Apache level (1 hour TTL)
