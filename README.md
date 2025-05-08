@@ -259,6 +259,73 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
       app.run(host='0.0.0.0', port=80)
   ```
 
+#### Handling Cache-Busting for Static Assets
+
+The application already utilizes cache-busting for CSS and JS files using version query parameters:
+
+```html
+<link rel="stylesheet" href="/static/linuxreport.css?v={{ static_file_hash('linuxreport.css') }}">
+<script src="/static/linuxreport.js?v={{ static_file_hash('linuxreport.js') }}"></script>
+```
+
+This approach works well with both caching strategies:
+
+##### With Apache-Based Caching
+- Apache will recognize the different URLs as separate resources
+- When files change, the `static_file_hash` function generates a new hash
+- Updated files automatically get a new URL, bypassing previously cached versions
+- No special configuration needed beyond the standard Apache cache setup
+
+##### With Python Caching Server
+- The caching server should preserve query parameters in cache keys
+- **Properly cache static files** to avoid unnecessary backend requests
+- Example implementation for static assets:
+  ```python
+  # Static file caching - efficient handling with version parameter
+  @app.route('/static/<path:filename>')
+  def serve_static(filename):
+      # Include version parameter in cache key
+      version = request.args.get('v', '')
+      cache_key = f"static:{filename}:{version}"
+      
+      # Return cached version if available
+      if cache_key in cache:
+          return cache[cache_key]
+      
+      # Only request from backend when not in cache
+      response = forward_to_backend(f"static/{filename}?{request.query_string.decode()}")
+      
+      # Cache indefinitely (static files with version params never change)
+      # The version parameter ensures we get fresh content when files change
+      cache[cache_key] = response
+      return response
+  ```
+
+- When the backend rebuilds CSS/JS files, it would also trigger the cache invalidation webhook:
+  ```python
+  # In backend when JS/CSS changes:
+  def rebuild_static_assets():
+      # Existing code to rebuild assets
+      compile_js_files()
+      
+      # No need to invalidate old versioned static files!
+      # The new version hash ensures clients request the new URL
+      # Old versions remain cached but unused
+      
+      # Only notify about the page HTML that includes the new static URLs
+      for server in front_end_servers:
+          requests.post(f"http://{server}/invalidate_cache", 
+                       json={"type": "html", "paths": ["/"]})
+  ```
+
+- **Graceful handling of outdated clients:**
+  - Users with cached HTML pages from before an update will still request old JS/CSS versions
+  - This approach serves those old versions from cache without hitting the backend
+  - As users naturally refresh or navigate, they'll get the latest HTML with updated references
+  - No forced refreshes or broken experiences for users with outdated cached pages
+  - Server maintains ability to serve both old and new static asset versions simultaneously
+  - Particularly helpful during gradual rollouts or when users have multiple tabs open
+
 #### Multi-Server Caching Strategy
 - **Anonymous users:** Cache aggressively at Apache level (1 hour TTL)
 - **Cookie checks:** Only forward to backend when:
