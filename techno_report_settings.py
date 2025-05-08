@@ -1,13 +1,13 @@
 from models import RssInfo, SiteConfig
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS = {
-        "http://detroiteq.com/feed": RssInfo("deq.png", "Detroit Electronic Quarterly", "http://detroiteq.com/"),
-        "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530": RssInfo("Google-NewsTechno.png", "Google Detroit Techno news", "https://news.google.com/search?q=detroit techno"),
-        "https://rocksteadydisco.bandcamp.com/fakefeed": RssInfo("RockSteadyDisco.png", "RockSteady Disco", "https://rocksteadydisco.bandcamp.com"),
-        "https://transmatdetroit.bandcamp.com/fakefeed": RssInfo("Transmat.png", "Transmat", "https://transmatdetroit.bandcamp.com"),
-        "https://pitsdetroit.bandcamp.com/fakefeed": RssInfo("pits.png", "Place In Time And Space", "https://pitsdetroit.bandcamp.com/"),
-        "https://planetecommunications.bandcamp.com/fakefeed": RssInfo("planete.png", "Planet-E Communications", "https://planetecommunications.bandcamp.com"),
-        "https://womenonwax.com/feed/": RssInfo("womenonwax.png", "Women On Wax", "https://womenonwax.com"),
+        "http://detroiteq.com/feed": RssInfo("deq.webp", "Detroit Electronic Quarterly", "http://detroiteq.com/"),
+        "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530": RssInfo("Google-NewsTechno.webp", "Google Detroit Techno news", "https://news.google.com/search?q=detroit techno"),
+        "https://rocksteadydisco.bandcamp.com/fakefeed": RssInfo("RockSteadyDisco.webp", "RockSteady Disco", "https://rocksteadydisco.bandcamp.com"),
+        "https://transmatdetroit.bandcamp.com/fakefeed": RssInfo("Transmat.webp", "Transmat", "https://transmatdetroit.bandcamp.com"),
+        "https://pitsdetroit.bandcamp.com/fakefeed": RssInfo("pits.webp", "Place In Time And Space", "https://pitsdetroit.bandcamp.com/"),
+        "https://planetecommunications.bandcamp.com/fakefeed": RssInfo("planete.webp", "Planet-E Communications", "https://planetecommunications.bandcamp.com"),
+        "https://womenonwax.com/feed/": RssInfo("womenonwax.webp", "Women On Wax", "https://womenonwax.com"),
     },
     USER_AGENT = "The Detroit Techno Report -- http://news.thedetroitilove.com/",
     SITE_URLS = [
@@ -21,7 +21,7 @@ CONFIG: SiteConfig = SiteConfig(
     ],
     URL_IMAGES = "http://news.thedetroitilove.com/static/images/",
     FAVICON = "http://news.thedetroitilove.com/static/images/technoreport.ico",
-    LOGO_URL = "http://news.thedetroitilove.com/static/images/TechnoReport.png",
+    LOGO_URL = "http://news.thedetroitilove.com/static/images/TechnoReport.webp",
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News",
     WEB_TITLE = "The Detroit Report",
 

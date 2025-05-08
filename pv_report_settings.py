@@ -2,15 +2,15 @@ from models import RssInfo, SiteConfig
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={
-        "https://www.pv-tech.org/feed": RssInfo("pv-tech-logo.png", "PV Tech", "https://www.pv-tech.org"),
+        "https://www.pv-tech.org/feed": RssInfo("pv-tech-logo.webp", "PV Tech", "https://www.pv-tech.org"),
         "https://www.solarpowerworldonline.com/feed/": RssInfo("solarpowerworld.svg", "Solar power World Online", "https://www.solarpowerworldonline.com"),
         "https://www.pv-magazine.com/feed/": RssInfo("pv-magazine-logo.png", "PV Magazine", "https://www.pv-magazine.com"),
        # "https://solartribune.com/fakefeed": RssInfo("solartribune.webp", "Solar Tribune", "https://solartribune.com"),
-        "https://solarmagazine.com/fakefeed": RssInfo("solar-magazine-logo.png", "Solar Magazine", "https://solarmagazine.com"),
+        "https://solarmagazine.com/fakefeed": RssInfo("solar-magazine-logo.webp", "Solar Magazine", "https://solarmagazine.com"),
         "https://cleantechnica.com/feed/": RssInfo("cleantechnica-logo.webp", "Clean Technica", "https://cleantechnica.com"),
         "https://www.renewableenergyworld.com/feed": RssInfo("renewableenergyworld-logo.svg", "Renewable Energy World", "https://www.renewableenergyworld.com"),
         "https://ases.org/feed/": RssInfo("ases-logo.svg", "American Solar Energy Society", "https://ases.org"),
-        "https://www.altenergymag.com/rss/news/": RssInfo("altenergymag.png", "Alternative Energy Magazine", "https://www.altenergymag.com"),
+        "https://www.altenergymag.com/rss/news/": RssInfo("altenergymag.webp", "Alternative Energy Magazine", "https://www.altenergymag.com"),
     },
     USER_AGENT="Solar Report -- https://pvreport.org",
     SITE_URLS=[

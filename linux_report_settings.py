@@ -10,7 +10,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://news.ycombinator.com/rss": RssInfo("hackernews.webp", "Ycombinator news", "http://news.ycombinator.com/"),
         "https://www.osnews.com/feed/": RssInfo("osnews-logo.webp", "OS News.com", "http://www.osnews.com/"),
         "https://www.geekwire.com/feed/": RssInfo("GeekWire.png", "GeekWire", "http://www.geekwire.com/"),
-        "http://feeds.feedburner.com/linuxtoday/linux": RssInfo("linuxtd_logo.png", "Linux Today", "http://www.linuxtoday.com/"),
+        "http://feeds.feedburner.com/linuxtoday/linux": RssInfo("linuxtd_logo.webp", "Linux Today", "http://www.linuxtoday.com/"),
         "https://planet.debian.org/rss20.xml": RssInfo("Debian-OpenLogo.svg", "Planet Debian", "http://planet.debian.org/"),
         "https://breitbart.com/fakefeed": RssInfo("breitbart.webp", "Breitbart Tech feed", "https://breitbart.com/tech/"),
     },
