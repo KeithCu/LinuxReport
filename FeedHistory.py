@@ -30,9 +30,11 @@ class FeedHistory:
             try:
                 with open(self.data_file, "r") as f:
                     loaded = json.load(f)
-                # Convert string dates back to datetime objects
+                # Convert string dates back to datetime objects and lists back to sets
                 for feed_data in loaded.values():
                     feed_data["recent"] = [(datetime.fromisoformat(dt), n) for dt, n in feed_data.get("recent", [])]
+                    feed_data["weekday_buckets"] = set(feed_data.get("weekday_buckets", []))
+                    feed_data["weekend_buckets"] = set(feed_data.get("weekend_buckets", []))
                 # Ensure loaded is a dictionary
                 if not isinstance(loaded, dict):
                     return {}
@@ -67,12 +69,14 @@ class FeedHistory:
         return {}
 
     def _save_data(self):
-        """Save history to JSON file, converting datetime objects to strings."""
-        # Convert datetime objects to strings
+        """Save history to JSON file, converting datetime objects to strings and sets to lists."""
+        # Convert datetime objects to strings and sets to lists
         serializable_data = {
             url: {
                 **feed_data,
-                "recent": [(dt.isoformat(), n) for dt, n in feed_data.get("recent", [])]
+                "recent": [(dt.isoformat(), n) for dt, n in feed_data.get("recent", [])],
+                "weekday_buckets": list(feed_data.get("weekday_buckets", [])),
+                "weekend_buckets": list(feed_data.get("weekend_buckets", []))
             }
             for url, feed_data in self.data.items()
         }
