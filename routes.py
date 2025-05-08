@@ -25,7 +25,7 @@ from models import RssInfo, DEBUG
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache)
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, ENABLE_URL_CUSTOMIZATION)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 from config_utils import get_admin_password
@@ -243,34 +243,38 @@ def init_app(flask_app):
                     print(f"Error reading headlines file: {e}")
                     form.headlines.data = ""
 
-            page_order = request.cookies.get('RssUrls')
-            if page_order is not None:
-                page_order = json.loads(page_order)
-            else:
-                page_order = SITE_URLS
-
-            custom_count = 0
-            for i, p_url in enumerate(page_order):
-                rss_info = ALL_URLS.get(p_url, None)
-                if rss_info is not None and rss_info.logo_url != "Custom.png":
-                    urlf = UrlForm()
-                    urlf.pri = (i + 1) * 10
-                    urlf.url = p_url
-                    form.urls.append_entry(urlf)
+            # Only add URL customization options if enabled
+            if ENABLE_URL_CUSTOMIZATION:
+                page_order = request.cookies.get('RssUrls')
+                if page_order is not None:
+                    page_order = json.loads(page_order)
                 else:
-                    custom_count += 1
+                    page_order = SITE_URLS
+
+                custom_count = 0
+                for i, p_url in enumerate(page_order):
+                    rss_info = ALL_URLS.get(p_url, None)
+                    if rss_info is not None and rss_info.logo_url != "Custom.png":
+                        urlf = UrlForm()
+                        urlf.pri = (i + 1) * 10
+                        urlf.url = p_url
+                        form.urls.append_entry(urlf)
+                    else:
+                        custom_count += 1
+                        rssf = CustomRSSForm()
+                        rssf.url = p_url
+                        rssf.pri = (i + 1) * 10
+                        form.url_custom.append_entry(rssf)
+
+                # Only add empty custom URL entries if customization is enabled
+                for i in range(custom_count, 5):
                     rssf = CustomRSSForm()
-                    rssf.url = p_url
-                    rssf.pri = (i + 1) * 10
+                    rssf.url = "http://"
+                    rssf.pri = (i + 30) * 10
                     form.url_custom.append_entry(rssf)
 
-            for i in range(custom_count, 5):
-                rssf = CustomRSSForm()
-                rssf.url = "http://"
-                rssf.pri = (i + 30) * 10
-                form.url_custom.append_entry(rssf)
-
-            page = render_template('config.html', form=form, is_admin=is_admin, favicon=FAVICON)
+            page = render_template('config.html', form=form, is_admin=is_admin, 
+                                  favicon=FAVICON, enable_url_customization=ENABLE_URL_CUSTOMIZATION)
             return page
         else:
             form = ConfigForm(request.form)
@@ -349,20 +353,25 @@ def init_app(flask_app):
 
             page_order = []
 
-            urls = list(form.urls)
+            # Only process URL customization if enabled
+            if ENABLE_URL_CUSTOMIZATION:
+                urls = list(form.urls)
+                url_custom = list(form.url_custom)
+                
+                for site in url_custom:
+                    if len(site.url.data) > 10 and len(site.url.data) < 120:
+                        urls.append(site)
 
-            url_custom = list(form.url_custom)
-            for site in url_custom:
-                if len(site.url.data) > 10 and len(site.url.data) < 120:
-                    urls.append(site)
+                urls.sort(key=lambda x: x.pri.data)
 
-            urls.sort(key=lambda x: x.pri.data)
-
-            for urlf in urls:
-                if isinstance(urlf.form, UrlForm):
-                    page_order.append(urlf.url.data)
-                elif isinstance(urlf.form, CustomRSSForm):
-                    page_order.append(urlf.url.data)
+                for urlf in urls:
+                    if isinstance(urlf.form, UrlForm):
+                        page_order.append(urlf.url.data)
+                    elif isinstance(urlf.form, CustomRSSForm):
+                        page_order.append(urlf.url.data)
+            else:
+                # Use default site URLs if customization is disabled
+                page_order = SITE_URLS
 
             template = render_template('configdone.html', message="Cookies saved for later.")
             resp = make_response(template)

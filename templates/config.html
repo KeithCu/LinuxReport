@@ -52,6 +52,7 @@
         </div>
         {% endif %}
 
+        {% if enable_url_customization %}
         <div><i>Drag and Drop to have a custom order.</i></div>
         <div class="url-list">
           {% for urlf in form.urls %}
@@ -68,6 +69,7 @@
           </div>
           {% endfor %}
         </div>
+        {% endif %}
         <button type="submit" name="save">Save</button>
       </form>
     </div>

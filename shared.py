@@ -53,6 +53,9 @@ MODE = Mode.AI_REPORT
 
 URLS_COOKIE_VERSION = "2"
 
+# Enable or disable URL customization functionality (both reordering and adding custom URLs)
+ENABLE_URL_CUSTOMIZATION = True
+
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
