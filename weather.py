@@ -24,11 +24,10 @@ from shared import g_cs as g_c, get_lock
 # Global flag to control whether to use LinuxReport.net API instead of OpenWeather
 # This allows to share data between servers and for better rate-limit support
 # Since all servers are in the same datacenter, it will be very fast.
-USE_LINUXREPORT_API = False
+USE_LINUXREPORT_API = False  # Set to True to use LinuxReport.net API, False to use OpenWeather
 
 # LinuxReport.net API endpoint
 LINUXREPORT_WEATHER_API = "https://linuxreport.net/api/weather"
-USE_LINUXREPORT_API = True
 from models import DEBUG
 
 # --- Arbitrary bucket resolution (miles-based) ---
@@ -65,7 +64,6 @@ def _get_geoip_db_path():
 
 GEOIP_DB_PATH = _get_geoip_db_path()
 
-_geoip_reader = None
 # Global reader for GeoIP database to avoid reopening the file
 _geoip_reader = None
 
