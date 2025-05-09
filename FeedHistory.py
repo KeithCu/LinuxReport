@@ -166,7 +166,7 @@ class FeedHistory:
             for url, feed_data in self.data.items()
         }
         with open(self.data_file, "w") as f:
-            json.dump(serializable_data, f)
+            json.dump(serializable_data, f, indent=4, sort_keys=True)
 
     def update_fetch(self, url: str, new_articles: int):
         fetch_time = datetime.now(TZ)
