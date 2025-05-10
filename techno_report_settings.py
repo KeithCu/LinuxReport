@@ -1,4 +1,5 @@
 from models import RssInfo, SiteConfig
+
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS = {
         "http://detroiteq.com/feed": RssInfo("deq.webp", "Detroit Electronic Quarterly", "http://detroiteq.com/"),
@@ -24,7 +25,9 @@ CONFIG: SiteConfig = SiteConfig(
     LOGO_URL = "TechnoReport.webp",
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News",
     WEB_TITLE = "The Detroit Report",
-
+    REPORT_PROMPT = "Detroit Techno fans and artists.",
+    PATH = "/srv/http/flask",
+    SCHEDULE = [0],
     CUSTOM_FETCH_CONFIG={
         "bandcamp.com": {
             "needs_selenium": True,

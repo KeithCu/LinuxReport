@@ -33,6 +33,9 @@ CONFIG: SiteConfig = SiteConfig(
 	LOGO_URL="aireportfancy.webp",
 	WEB_DESCRIPTION="AI News",
 	WEB_TITLE="AI Report",
+	REPORT_PROMPT="AI Language Model and Robotic Researchers. Nothing about AI security.",
+    PATH="/srv/http/aireport",
+    SCHEDULE=[7, 11, 15, 19, 23],
     CUSTOM_FETCH_CONFIG={
         "reddit.com": REDDIT_FETCH_CONFIG,
     }

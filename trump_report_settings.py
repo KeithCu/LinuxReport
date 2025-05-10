@@ -35,6 +35,8 @@ CONFIG: SiteConfig = SiteConfig(
 	LOGO_URL="TrumpReport.webp",
 	WEB_DESCRIPTION="Trump Report",
 	WEB_TITLE="TrumpReport",
+	REPORT_PROMPT="Trump's biggest fans",
+    PATH="/srv/http/trumpreport",
     CUSTOM_FETCH_CONFIG={
         "patriots.win": {
             "needs_selenium": True,

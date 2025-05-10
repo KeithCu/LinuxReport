@@ -19,7 +19,7 @@ from html_generation import (
     generate_headlines_html, refresh_images_only
 )
 
-from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c, MODE_MAP) # Import MODE_MAP
+from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c, MODE_MAP)
 
 # --- Configuration and Prompt Constants ---
 MAX_PREVIOUS_HEADLINES = 200
@@ -66,24 +66,6 @@ TIMEOUT = 60
 
 BASE = "/srv/http/"
 
-MODE_TO_PATH = {
-    Mode.LINUX_REPORT: BASE + "LinuxReport2",
-    Mode.AI_REPORT: BASE + "aireport",
-    Mode.COVID_REPORT: BASE + "CovidReport2",
-    Mode.TRUMP_REPORT: BASE + "trumpreport",
-    Mode.PV_REPORT: BASE + "pvreport",
-    Mode.TECHNO_REPORT: BASE + "flask",
-}
-
-MODE_TO_SCHEDULE = {
-    Mode.LINUX_REPORT: [0, 8, 12, 16, 20],
-    Mode.AI_REPORT: [7, 11, 15, 19, 23],
-    Mode.COVID_REPORT: [7, 11, 15, 19, 23],
-    Mode.TRUMP_REPORT: [0, 4, 8, 10, 12, 14, 16, 20],
-    Mode.PV_REPORT: [1, 7, 13, 19],
-    Mode.TECHNO_REPORT: [0, 12],
-}
-
 BANNED_WORDS = [
     "tmux",
     "redox",
@@ -92,21 +74,7 @@ BANNED_WORDS = [
     "mysql (mariadb is ok)",
 ]
 
-modetoprompt2 = {
-    Mode.LINUX_REPORT: f"""Arch and Debian Linux programmers and experienced users.
-    Prefer major news especially about important codebases. 
-    Avoid simple tutorials, error explanations, troubleshooting guides, or cheat sheets.
-    Nothing about Ubuntu or any other distro. Anything non-distro-specific is fine, but nothing about 
-    the following products:
-    {', '.join(BANNED_WORDS)}.\n""",
-    Mode.AI_REPORT : "AI Language Model and Robotic Researchers. Nothing about AI security.",
-    Mode.COVID_REPORT : "COVID-19 researchers",
-    Mode.TRUMP_REPORT : "Trump's biggest fans",
-    Mode.PV_REPORT: "Solar energy industry professionals and enthusiasts. Focus on major solar and battery technology, policy, and market news. Avoid basic installation guides, generic green energy content, or unrelated renewables.",
-    Mode.TECHNO_REPORT: "Detroit Techno fans and artists.",
-}
-
-PROMPT_AI = f""" Rank these article titles by relevance to {modetoprompt2[MODE]}
+PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
     Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
     Do not select headlines that are very similar or nearly duplicates; pick only distinct headlines/topics.
@@ -309,14 +277,17 @@ def _prepare_messages(prompt_mode, filtered_articles):
         def article_line(i, article):
             return f"{i}. {article['title']}"
 
+    # Get the mode instructions from the global REPORT_PROMPT
+    mode_instructions = REPORT_PROMPT
+
     if prompt_mode == "o3":
         user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [
             {"role": "system", "content": PROMPT_O3_SYSTEM},
-            {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=modetoprompt2[MODE]) + user_list},
+            {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
         ]
     else: # Default mode
-        prompt = PROMPT_AI + "\n" + "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
+        prompt = PROMPT_AI.format(mode_instructions=mode_instructions) + "\n" + "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [{"role": "user", "content": prompt}]
     return messages
 
@@ -464,17 +435,11 @@ def append_to_archive(mode, top_articles):
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 # --- Integration into the main pipeline ---
-def main(mode, dry_run=False): # Add dry_run parameter
-    global ALL_URLS
-
-    module_path = f"{mode}_report_settings.py"
-    if not os.path.isfile(module_path):
-        raise FileNotFoundError(f"Module file not found: {module_path}")
-
-    spec = importlib.util.spec_from_file_location("module_name", module_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    ALL_URLS = module.CONFIG.ALL_URLS
+def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run parameter
+    global ALL_URLS, REPORT_PROMPT
+    ALL_URLS = settings_config.ALL_URLS
+    REPORT_PROMPT = settings_config.REPORT_PROMPT
+    SITE_PATH = settings_config.PATH  # Get the site's path from its config
 
     html_file = f"{mode}reportabove.html"
 
@@ -619,31 +584,42 @@ if __name__ == "__main__":
     # Revert to CWD-based mode detection
     cwd = os.getcwd()
     selected_mode_enum = None
-    for mode_enum, path in MODE_TO_PATH.items():
-        # Check if the CWD matches the expected path for a mode
-        if cwd == path:
-            selected_mode_enum = mode_enum
-            break
+    selected_mode_str = None
+
+    # Try to find a matching settings file in the current directory
+    for mode_enum_val in Mode: # Renamed to avoid conflict with outer 'mode' variable
+        settings_file = f"{mode_enum_val.value}_report_settings.py"
+        if os.path.isfile(settings_file):
+            # Load the settings file to get its path
+            spec = importlib.util.spec_from_file_location("module_name", settings_file)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            # Check if the current directory matches the configured path
+            if cwd == module.CONFIG.PATH:
+                selected_mode_enum = mode_enum_val
+                selected_mode_str = mode_enum_val.value
+                # Store the loaded module and config
+                loaded_settings_module = module
+                loaded_settings_config = module.CONFIG
+                break
 
     if selected_mode_enum is None:
         print(f"Error: Could not determine mode from current directory: {cwd}")
-        print(f"Expected directories: {list(MODE_TO_PATH.values())}")
+        print("Expected to find a settings file with a matching PATH in the current directory.")
         sys.exit(1)
 
-    # Get the string representation for use in file paths etc.
-    selected_mode_str = MODE_MAP[selected_mode_enum]
     print(f"Detected mode '{selected_mode_str}' based on current directory.")
 
     if args.forceimage:
         refresh_images_only(selected_mode_str) # Pass string mode
     else:
-        # Check schedule using the Mode enum key
-        hours = MODE_TO_SCHEDULE.get(selected_mode_enum) # Use .get() for safety if a mode has a path but no schedule
+        # Check schedule using the config's SCHEDULE field
         current_hour = datetime.datetime.now(TZ).hour
         # Ensure dry-run/compare always run if specified, otherwise check schedule or force flag
-        should_run = args.force or (hours and current_hour in hours) or args.dry_run or RUN_MODE == "compare"
+        should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or RUN_MODE == "compare"
         if should_run:
-            main(selected_mode_str, dry_run=args.dry_run) # Pass string mode
+            main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run) # Pass string mode, loaded module and config
         else:
-            print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {hours}). Use --force to override.")
+            print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
 

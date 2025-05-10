@@ -76,6 +76,7 @@ WEB_DESCRIPTION = config_settings.CONFIG.WEB_DESCRIPTION
 WEB_TITLE = config_settings.CONFIG.WEB_TITLE
 ABOVE_HTML_FILE = f"{MODE.value}reportabove.html"
 CUSTOM_FETCH_CONFIG = config_settings.CONFIG.CUSTOM_FETCH_CONFIG
+SITE_PATH = config_settings.CONFIG.PATH
 
 # If CDN delivery is enabled, override URL_IMAGES with the CDN URL
 if ENABLE_URL_IMAGE_CDN_DELIVERY:

@@ -29,7 +29,9 @@ CONFIG: SiteConfig = SiteConfig(
     LOGO_URL="pvreport.webp",
     WEB_DESCRIPTION="Solar and Renewable Energy News",
     WEB_TITLE="Photovoltaic Report",
-
+    REPORT_PROMPT="Solar energy industry professionals and enthusiasts. Focus on major solar and battery technology, policy, and market news. Avoid basic installation guides, generic green energy content, or unrelated renewables.",
+    PATH="/srv/http/pvreport",
+    SCHEDULE=[1, 7, 13, 19],
     CUSTOM_FETCH_CONFIG={
         "solarmagazine.com": {
             "needs_selenium": False,

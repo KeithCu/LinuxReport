@@ -22,6 +22,9 @@ class SiteConfig:
     LOGO_URL: str
     WEB_DESCRIPTION: str
     WEB_TITLE: str
+    REPORT_PROMPT: str
+    PATH: str  # Base path for the site
+    SCHEDULE: List[int]  # List of hours when auto-updates should run
     CUSTOM_FETCH_CONFIG: dict = None
 
 class RssInfo:
