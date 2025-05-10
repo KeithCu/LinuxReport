@@ -180,7 +180,9 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 # Use LinuxReport.net API - already processes the data in the correct format
                 service_name = "LinuxReport.net"
                 url = f"{LINUXREPORT_WEATHER_API}?lat={lat}&lon={lon}&units=imperial"
+                start_time = time.time()
                 response = requests.get(url, timeout=10)
+                api_time = time.time() - start_time
                 response.raise_for_status()
                 processed_data = response.json()
                 
@@ -198,7 +200,9 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 rate_limit_check()
                 # Always fetch in imperial (Fahrenheit) for consistent caching
                 url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
+                start_time = time.time()
                 response = requests.get(url, timeout=10)
+                api_time = time.time() - start_time
                 response.raise_for_status()
                 weather_data = response.json()
                 # Determine city name for logging
@@ -256,10 +260,10 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 # Get the temp (already potentially converted)
                 current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
                 log_unit = 'C' if units == 'metric' else 'F'
-                print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}{log_unit}")
+                print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}{log_unit}, API time: {api_time:.2f}s")
             except (IndexError, KeyError, TypeError):
                  # Indicate error or missing data
-                print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A")
+                print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
 
             return processed_data, 200
 
