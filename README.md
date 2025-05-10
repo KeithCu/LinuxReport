@@ -1,8 +1,8 @@
-![LinuxReport logo](https://linuxreport.net/static/images/linuxreportfancy.webp)
+![LinuxReport logo](https://linuxreportstatic.us-ord-1.linodeobjects.com/linuxreportfancy.webp)
 **and**
-![CovidReport logo](https://covidreport.org/static/images/covidreportfancy.webp)
+![CovidReport logo](https://linuxreportstatic.us-ord-1.linodeobjects.com/covidreportfancy.webp)
 **and**
-![AIReport_logo](https://aireport.keithcu.com/static/images/aireportfancy.webp)
+![AIReport_logo](https://linuxreportstatic.us-ord-1.linodeobjects.com//aireportfancy.webp)
 --------------------------------------------------------------------------------
 Simple and fast news site based on Python / Flask. Meant to be a http://drudgereport.com/ clone for Linux or Covid-19 news, updated automatically 24/7, and customizable by the user, including custom feeds and the critically important dark mode.
 
@@ -85,9 +85,6 @@ Internationalization
 Containerization & CI/CD
 – Add a Dockerfile + docker‑compose, and set up GitHub Actions (lint, tests, build, deploy).
 
-#
-i'm ading a multiprocess lock but the code is not done yet. it needs to have same api as the base to be compatible and allow me to swap back and forth different implementations. can you make sure it implements the api and works similarly? if it doesn't handle ownership, that's fine, just make sure it handles timeouts, wait, max 
-#
 
 User-oriented features: 
 
@@ -133,7 +130,7 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
 - Upgrade to Linode 2GB ($12) or 4GB ($24) when needed
 - Optimize WSGI configuration
 - **Foundational optimizations** that multiply the effectiveness of all other scaling strategies:
-  - Move static assets to CDN using URL_IMAGES variable for offloading bandwidth
+  - Move static assets to CDN using URL_IMAGES variable for offloading bandwidth (DONE)
   - Implement PyPy instead of CPython for significant performance boost (3-5x for CPU-bound operations)
   - These changes amplify the benefit of every subsequent scaling effort
   - Worth implementing early as they require minimal code changes with maximum impact
@@ -205,7 +202,7 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
 #### Initial Optimization (Pre-scaling)
 - Ensure Python-level page caching is maximized
 - Profile application to identify bottlenecks
-- Move static assets to CDN using URL_IMAGES variable
+- Move static assets to CDN using URL_IMAGES variable (DONE)
 
 #### Custom Front-End Caching Options
 
