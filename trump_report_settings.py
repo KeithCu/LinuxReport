@@ -37,6 +37,7 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_TITLE="TrumpReport",
 	REPORT_PROMPT="Trump's biggest fans",
     PATH="/srv/http/trumpreport",
+    SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 20],
     CUSTOM_FETCH_CONFIG={
         "patriots.win": {
             "needs_selenium": True,

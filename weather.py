@@ -19,7 +19,7 @@ import geoip2.database
 import requests
 
 # Local imports
-from shared import g_cs as g_c, get_lock
+from shared import g_cs, get_lock
 
 # Global flag to control whether to use LinuxReport.net API instead of OpenWeather
 # This allows to share data between servers and for better rate-limit support
@@ -89,7 +89,7 @@ RATE_LIMIT_COUNT = 10   # calls per window
 def rate_limit_check():
     """Enforces RATE_LIMIT_COUNT calls per RATE_LIMIT_WINDOW seconds."""
     now = time.time()
-    timestamps = g_c.get(RL_KEY) or []
+    timestamps = g_cs.get(RL_KEY) or []
 
     valid_start_time = now - RATE_LIMIT_WINDOW
     start_index = bisect_left(timestamps, valid_start_time)
@@ -108,7 +108,7 @@ def rate_limit_check():
 
     timestamps_in_window.append(now)
 
-    g_c.put(RL_KEY, timestamps_in_window, timeout=RATE_LIMIT_WINDOW + 1)
+    g_cs.put(RL_KEY, timestamps_in_window, timeout=RATE_LIMIT_WINDOW + 1)
 
 CACHE_ENTRY_PREFIX = 'weather:cache_entry:'
 
@@ -118,12 +118,12 @@ def save_weather_cache_entry(lat, lon, data):
     now = time.time()
     today_str = date_obj.today().isoformat()
     entry = {'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str}
-    g_c.put(CACHE_ENTRY_PREFIX + key, entry, timeout=WEATHER_CACHE_TIMEOUT)
+    g_cs.put(CACHE_ENTRY_PREFIX + key, entry, timeout=WEATHER_CACHE_TIMEOUT)
 
 def get_bucketed_weather_cache(lat, lon):
     """Returns cached weather data for the bucketed (lat, lon) if present and same day."""
     key = _bucket_key(lat, lon)
-    entry = g_c.get(CACHE_ENTRY_PREFIX + key)
+    entry = g_cs.get(CACHE_ENTRY_PREFIX + key)
     today_str = date_obj.today().isoformat()
     now = time.time()
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:

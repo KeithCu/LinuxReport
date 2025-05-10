@@ -38,7 +38,7 @@ PATH: str = os.path.dirname(os.path.abspath(__file__))
 
 # Shared path for weather, etc.
 SPATH: str = "/run/linuxreport"
-TZ = FeedHistory.TZ
+TZ = FeedHistory.FeedConfig.TZ
 EXPIRE_MINUTES: int = 60 * 5
 EXPIRE_HOUR: int = 3600
 EXPIRE_DAY: int = 3600 * 12
