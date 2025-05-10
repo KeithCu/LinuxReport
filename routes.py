@@ -67,7 +67,8 @@ def get_cached_above_html():
 
 # Function to initialize routes
 def init_app(flask_app):
-
+    """Initialize Flask routes."""
+    
     # The main page of LinuxReport. Most of the time, it won't need to hit the disk to return the page
     # even if the page cache is expired.
     @flask_app.route('/')

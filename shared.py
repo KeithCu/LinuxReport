@@ -6,16 +6,12 @@ This module contains shared utilities, classes, and constants for the LinuxRepor
 
 import datetime
 import os
-import threading
 import time
-import uuid
 from enum import Enum
 from typing import Any, Optional, Type
-from abc import ABC, abstractmethod
 
 import diskcache
 from cacheout import Cache
-from filelock import FileLock, Timeout
 
 import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock, FileLockWrapper
@@ -56,6 +52,10 @@ URLS_COOKIE_VERSION = "2"
 # Enable or disable URL customization functionality (both reordering and adding custom URLs)
 ENABLE_URL_CUSTOMIZATION = True
 
+# Enable CDN delivery for images - overrides the URL_IMAGES path with CDN URL
+ENABLE_URL_IMAGE_CDN_DELIVERY = True
+CDN_IMAGE_URL = "https://linuxreportstatic.us-ord-1.linodeobjects.com/"
+
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
@@ -76,6 +76,10 @@ WEB_DESCRIPTION = config_settings.CONFIG.WEB_DESCRIPTION
 WEB_TITLE = config_settings.CONFIG.WEB_TITLE
 ABOVE_HTML_FILE = f"{MODE.value}reportabove.html"
 CUSTOM_FETCH_CONFIG = config_settings.CONFIG.CUSTOM_FETCH_CONFIG
+
+# If CDN delivery is enabled, override URL_IMAGES with the CDN URL
+if ENABLE_URL_IMAGE_CDN_DELIVERY:
+    URL_IMAGES = CDN_IMAGE_URL
 
 WELCOME_HTML = (
     '<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
@@ -148,7 +152,7 @@ class DiskCacheWrapper:
 
     def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
         """Get the last fetch time for a URL from the shared disk cache."""
-        last_fetch = self.get(url + ":last_fetch") # self.get() uses self.cache (diskcache.Cache for g_c)
+        last_fetch = self.get(url + ":last_fetch")
         return last_fetch
 
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
@@ -160,7 +164,7 @@ class DiskCacheWrapper:
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history-{str(MODE.value)}")
 g_c = DiskCacheWrapper(PATH) #Private cache for each instance
 g_cs = DiskCacheWrapper(SPATH) #Shared cache for all instances stored in /run/linuxreport, for weather, etc.
-g_cm = Cache(maxsize=100, ttl=3600)  # In-memory cache with per-item TTL (seconds)
+g_cm = Cache()  # In-memory cache with per-item TTL
 # --- Shared Keys ---
 GLOBAL_FETCH_MODE_LOCK_KEY = "global_fetch_mode"
 
