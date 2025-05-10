@@ -24,6 +24,9 @@ from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c, MODE_MAP)
 # --- Configuration and Prompt Constants ---
 MAX_PREVIOUS_HEADLINES = 200
 
+# Title marker used to separate reasoning from selected headlines
+TITLE_MARKER = "***"
+
 # How many articles from each feed to consider for the LLM
 MAX_ARTICLES_PER_FEED_FOR_LLM = 5
 
@@ -78,7 +81,7 @@ PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
     Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
     Do not select headlines that are very similar or nearly duplicates; pick only distinct headlines/topics.
-    When you are done discussing the titles, put *** and then list the top 3, using only the titles.
+    When you are done discussing the titles, put {TITLE_MARKER} and then list the top 3, using only the titles.
     """
 
 
@@ -86,12 +89,12 @@ PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
 PROMPT_O3_SYSTEM = """
 FORMAT:
 1. Exactly ONE paragraph (<= 40 words) explaining your choice.
-2. *** on its own line.
+2. {TITLE_MARKER} on its own line.
 3. Best headline.
 4. Second headline.
 5. Third headline.
 No other text.
-"""
+""".format(TITLE_MARKER=TITLE_MARKER)
 
 PROMPT_O3_USER_TEMPLATE = """
 <scratchpad>
@@ -245,11 +248,11 @@ def _try_call_model(client, model, messages, max_tokens, provider_label=""):
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model} ({provider_label})")
 
 def extract_top_titles_from_ai(text):
-    """Extracts top titles from AI-generated text after the first '***' marker."""
-    marker_index = text.find('***')
+    """Extracts top titles from AI-generated text after the first '{TITLE_MARKER}' marker."""
+    marker_index = text.find(TITLE_MARKER)
     if (marker_index != -1):
-        # Use the content after the first '***'
-        text = text[marker_index + 3:]
+        # Use the content after the first '{TITLE_MARKER}'
+        text = text[marker_index + len(TITLE_MARKER):]
     lines = text.splitlines()
     titles = []
 
@@ -291,6 +294,46 @@ def _prepare_messages(prompt_mode, filtered_articles):
         messages = [{"role": "user", "content": prompt}]
     return messages
 
+def call_llm_with_fallback(provider, model, messages, prompt_mode, label=""):
+    """Centralized function to call LLM with fallback handling.
+    
+    Args:
+        provider: The provider name (e.g., "together", "openrouter")
+        model: The model to use first
+        messages: The messages to send to the LLM
+        prompt_mode: The prompt mode used (for logging)
+        label: Optional label for logging
+        
+    Returns:
+        Tuple of (response_text, used_model) or (None, None) if all attempts fail
+    """
+    provider_config = PROVIDER_CONFIGS[provider]
+    
+    # Try primary model
+    primary_model = model or provider_config["models"]["primary"]
+    print(f"\n--- LLM Call: {provider} / {primary_model} / {prompt_mode} {label} ---")
+    
+    try:
+        client = get_provider_client(model=primary_model, use_cache=False)
+        response_text = _try_call_model(client, primary_model, messages, MAX_TOKENS, f"{label} ({provider})")
+        return response_text, primary_model
+    except Exception as e:
+        print(f"Error with model {primary_model} ({provider}): {e}")
+        traceback.print_exc()
+        
+        # Only try fallback if this is the primary model from the provider
+        if primary_model == provider_config["models"]["primary"]:
+            try:
+                fallback_model = provider_config["models"]["fallback"]
+                print(f"Trying fallback model: {fallback_model}")
+                fallback_client = get_provider_client(model=fallback_model, use_cache=False)
+                response_text = _try_call_model(fallback_client, fallback_model, messages, MAX_TOKENS, f"Fallback {label} ({provider})")
+                return response_text, fallback_model
+            except Exception as fallback_e:
+                print(f"Fallback model {fallback_model} also failed: {fallback_e}")
+                traceback.print_exc()
+    
+    return None, None
 
 def ask_ai_top_articles(articles):
     """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
@@ -315,33 +358,20 @@ def ask_ai_top_articles(articles):
     print(f"Constructed Prompt (Mode: {PROMPT_MODE_1}):")
     print(messages)
 
-    # --- Call Primary LLM ---
-    current_provider = CHAT_PROVIDER_1
-    current_model = get_current_model()
-    provider_config = PROVIDER_CONFIGS[current_provider]
-    response_text = None
-
-    try:
-        # Only use models for the selected provider
-        provider_config = PROVIDER_CONFIGS[CHAT_PROVIDER_1]
-        current_model = provider_config["models"]["primary"]
-        primary_client = get_provider_client(model=current_model, use_cache=True)
-        response_text = _try_call_model(primary_client, current_model, messages, MAX_TOKENS, f"Primary ({CHAT_PROVIDER_1})")
-        update_model_cache(current_model)
-    except Exception as e:
-        print(f"Error with model {current_model} ({CHAT_PROVIDER_1}): {e}")
-        traceback.print_exc()
-        # Try fallback model for the same provider only
-        try:
-            fallback_model = provider_config["models"]["fallback"]
-            fallback_client = get_provider_client(model=fallback_model, use_cache=False)
-            print(f"Trying fallback model: {fallback_model}")
-            response_text = _try_call_model(fallback_client, fallback_model, messages, MAX_TOKENS, f"Fallback ({CHAT_PROVIDER_1})")
-            update_model_cache(fallback_model)
-        except Exception as fallback_e:
-            print(f"Fallback model {fallback_model} also failed: {fallback_e}")
-            traceback.print_exc()
-            return "LLM models failed due to error (all models for selected provider).", filtered_articles, previous_selections
+    # --- Call Primary LLM using the centralized function ---
+    response_text, used_model = call_llm_with_fallback(
+        CHAT_PROVIDER_1, 
+        get_current_model(), 
+        messages, 
+        PROMPT_MODE_1,
+        "Primary"
+    )
+    
+    # Update model cache if we got a valid response
+    if response_text and used_model:
+        update_model_cache(used_model)
+    else:
+        return "LLM models failed due to error (all models for selected provider).", filtered_articles, previous_selections
 
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
         return "No response from LLM models.", filtered_articles, previous_selections
@@ -379,29 +409,30 @@ def run_comparison(articles):
         return
 
     # --- Config 1 ---
-    print("\n--- Configuration 1 ---")
-    print(f"Provider: {CHAT_PROVIDER_1}, Model: {MODEL_1}, Prompt Mode: {PROMPT_MODE_1}")
     messages1 = _prepare_messages(PROMPT_MODE_1, filtered_articles)
-    print("Messages 1:")
-    # Corrected get_provider_client call: infer provider from model name
-    try:
-        client1 = get_provider_client(model=MODEL_1, use_cache=False) # Use renamed parameter
-        _try_call_model(client1, MODEL_1, messages1, MAX_TOKENS, f"Comparison ({CHAT_PROVIDER_1})")
-    except Exception as e: # Keep general
-        print(f"Error during Comparison Call 1 ({CHAT_PROVIDER_1} / {MODEL_1}): {e}")
-
+    response_text1, _ = call_llm_with_fallback(
+        CHAT_PROVIDER_1,
+        MODEL_1,
+        messages1,
+        PROMPT_MODE_1,
+        "Comparison 1"
+    )
+    
+    if not response_text1:
+        print(f"Comparison 1 failed for {CHAT_PROVIDER_1} / {MODEL_1}")
 
     # --- Config 2 ---
-    print("\n--- Configuration 2 ---")
-    print(f"Provider: {CHAT_PROVIDER_2}, Model: {MODEL_2}, Prompt Mode: {PROMPT_MODE_2}")
     messages2 = _prepare_messages(PROMPT_MODE_2, filtered_articles)
-    print("Messages 2:")
-    # Corrected get_provider_client call: infer provider from model name
-    try:
-        client2 = get_provider_client(model=MODEL_2, use_cache=False) # Use renamed parameter
-        _try_call_model(client2, MODEL_2, messages2, MAX_TOKENS, f"Comparison ({CHAT_PROVIDER_2})")
-    except Exception as e: # Keep general
-        print(f"Error during Comparison Call 2 ({CHAT_PROVIDER_2} / {MODEL_2}): {e}")
+    response_text2, _ = call_llm_with_fallback(
+        CHAT_PROVIDER_2,
+        MODEL_2,
+        messages2,
+        PROMPT_MODE_2,
+        "Comparison 2"
+    )
+    
+    if not response_text2:
+        print(f"Comparison 2 failed for {CHAT_PROVIDER_2} / {MODEL_2}")
 
     print("\n--- Comparison Mode Finished ---")
 
