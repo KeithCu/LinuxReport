@@ -9,6 +9,8 @@ from timeit import default_timer as timer
 import json
 import traceback
 import time
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Tuple, Any
 
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
@@ -30,42 +32,10 @@ TITLE_MARKER = "***"
 # How many articles from each feed to consider for the LLM
 MAX_ARTICLES_PER_FEED_FOR_LLM = 5
 
-# Provider configurations
-PROVIDER_CONFIGS = {
-    "together": {
-        "api_key_env_var": "TOGETHER_API_KEY_LINUXREPORT",
-        "base_url": "https://api.together.xyz/v1",
-        "models": {
-            "primary": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
-            "fallback": "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-        }
-    },
-    "openrouter": {
-        "api_key_env_var": "OPENROUTER_API_KEY",
-        "base_url": "https://openrouter.ai/api/v1",
-        "models": {
-            "primary": "meta-llama/llama-3.3-70b-instruct:free",
-            "fallback": "meta-llama/llama-3.3-70b-instruct:floor",
-            "primary_compare": "x-ai/grok-3-mini-beta",
-            "fallback_compare": "google/gemini-2.5-flash-preview"
-
-        },
-        "headers": {
-            "HTTP-Referer": "https://linuxreport.net",
-            "X-Title": "LinuxReport"
-        }
-    }
-}
-
-# Default to Together AI's primary model
-PRIMARY_MODEL = PROVIDER_CONFIGS["together"]["models"]["primary"]
-FALLBACK_MODEL = PROVIDER_CONFIGS["together"]["models"]["fallback"]
-
-MODEL_CACHE_DURATION = EXPIRE_DAY * 7
-
 # === Global LLM/AI config ===
 MAX_TOKENS = 5000
 TIMEOUT = 60
+MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
 BASE = "/srv/http/"
 
@@ -125,7 +95,7 @@ MODEL_1 = None
 # Configuration for the secondary provider/model (for comparison mode)
 CHAT_PROVIDER_2 = "openrouter" # options: "together", "openrouter"
 PROMPT_MODE_2 = "default"      # options: "default", "o3"
-MODEL_2 = PROVIDER_CONFIGS["openrouter"]["models"]["primary"] # Model for provider 2
+MODEL_2 = None  # Will be set based on provider
 
 # Add unified provider client cache (for normal mode)
 provider_client_cache = None
@@ -133,33 +103,185 @@ provider_client_cache = None
 # Optional: include more article data (summary, etc) in LLM prompt
 INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
 
-# Helper: Map model name to provider info
-def get_provider_info_from_model(model_name):
-    """Get provider configuration based on model name or provider name."""
-    # First try to find provider by model name
-    for provider, config in PROVIDER_CONFIGS.items():
-        if any(model_name == model for model in config["models"].values()):
-            return {
-                "provider": provider,
-                "api_key_env_var": config["api_key_env_var"],
-                "base_url": config["base_url"]
-            }
+# Provider class hierarchy
+class LLMProvider(ABC):
+    """Abstract base class for LLM providers."""
     
-    # If not found by model name, try by provider name
-    if model_name in PROVIDER_CONFIGS:
-        config = PROVIDER_CONFIGS[model_name]
-        return {
-            "provider": model_name,
-            "api_key_env_var": config["api_key_env_var"],
-            "base_url": config["base_url"]
+    def __init__(self, name: str):
+        self.name = name
+        self._client = None
+    
+    @property
+    @abstractmethod
+    def api_key_env_var(self) -> str:
+        """Get the environment variable name for the API key."""
+        pass
+    
+    @property
+    @abstractmethod
+    def base_url(self) -> str:
+        """Get the base URL for the API."""
+        pass
+    
+    @property
+    @abstractmethod
+    def primary_model(self) -> str:
+        """Get the primary model name."""
+        pass
+    
+    @property
+    @abstractmethod
+    def fallback_model(self) -> str:
+        """Get the fallback model name."""
+        pass
+    
+    def get_comparison_models(self) -> Tuple[str, str]:
+        """Get models for comparison mode (default to primary/fallback)."""
+        return self.primary_model, self.fallback_model
+    
+    def get_api_key(self) -> str:
+        """Get the API key from environment variables."""
+        api_key = os.environ.get(self.api_key_env_var)
+        if not api_key:
+            raise ValueError(f"API key {self.api_key_env_var} not set for provider {self.name}")
+        return api_key
+    
+    def get_client(self, use_cache: bool = True):
+        """Get an API client for this provider."""
+        global provider_client_cache
+        
+        # Use cached client if available and requested
+        if use_cache and provider_client_cache is not None:
+            return provider_client_cache
+        
+        # Import here to avoid circular imports
+        from openai import OpenAI
+        
+        # Create new client
+        client = OpenAI(
+            api_key=self.get_api_key(),
+            base_url=self.base_url
+        )
+        
+        # Apply any provider-specific configuration
+        self._configure_client(client)
+        
+        # Cache the client if requested
+        if use_cache:
+            provider_client_cache = client
+        
+        return client
+    
+    def _configure_client(self, client):
+        """Configure the client with provider-specific settings."""
+        pass  # Default implementation does nothing
+    
+    def call_model(self, model: str, messages: List[Dict[str, str]], max_tokens: int, label: str = "") -> str:
+        """Call the model with retry logic, timeout, and logging."""
+        client = self.get_client(use_cache=False)
+        return _try_call_model(client, model, messages, max_tokens, f"{label} ({self.name})")
+    
+    def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
+        """Call the primary model with fallback to secondary if needed."""
+        # Try primary model
+        primary_model = self.primary_model
+        print(f"\n--- LLM Call: {self.name} / {primary_model} / {prompt_mode} {label} ---")
+        
+        try:
+            response_text = self.call_model(primary_model, messages, MAX_TOKENS, f"{label}")
+            return response_text, primary_model
+        except Exception as e:
+            print(f"Error with model {primary_model} ({self.name}): {e}")
+            traceback.print_exc()
+            
+            # Try fallback model
+            try:
+                fallback_model = self.fallback_model
+                print(f"Trying fallback model: {fallback_model}")
+                response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback {label}")
+                return response_text, fallback_model
+            except Exception as fallback_e:
+                print(f"Fallback model {fallback_model} also failed: {fallback_e}")
+                traceback.print_exc()
+        
+        return None, None
+    
+    def __str__(self) -> str:
+        return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
+
+
+class TogetherProvider(LLMProvider):
+    """Provider implementation for Together AI."""
+    
+    def __init__(self):
+        super().__init__("together")
+    
+    @property
+    def api_key_env_var(self) -> str:
+        return "TOGETHER_API_KEY_LINUXREPORT"
+    
+    @property
+    def base_url(self) -> str:
+        return "https://api.together.xyz/v1"
+    
+    @property
+    def primary_model(self) -> str:
+        return "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+    
+    @property
+    def fallback_model(self) -> str:
+        return "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+
+
+class OpenRouterProvider(LLMProvider):
+    """Provider implementation for OpenRouter."""
+    
+    def __init__(self):
+        super().__init__("openrouter")
+    
+    @property
+    def api_key_env_var(self) -> str:
+        return "OPENROUTER_API_KEY"
+    
+    @property
+    def base_url(self) -> str:
+        return "https://openrouter.ai/api/v1"
+    
+    @property
+    def primary_model(self) -> str:
+        return "meta-llama/llama-3.3-70b-instruct:free"
+    
+    @property
+    def fallback_model(self) -> str:
+        return "meta-llama/llama-3.3-70b-instruct:floor"
+    
+    def get_comparison_models(self) -> Tuple[str, str]:
+        """Get models specific for comparison mode."""
+        return "x-ai/grok-3-mini-beta", "google/gemini-2.5-flash-preview"
+    
+    def _configure_client(self, client):
+        """Add OpenRouter-specific headers."""
+        headers = {
+            "HTTP-Referer": "https://linuxreport.net",
+            "X-Title": "LinuxReport"
         }
-    
-    # Default to Together AI if no match found
-    return {
-        "provider": "together",
-        "api_key_env_var": PROVIDER_CONFIGS["together"]["api_key_env_var"],
-        "base_url": PROVIDER_CONFIGS["together"]["base_url"]
-    }
+        for header, value in headers.items():
+            client._client.headers[header] = value
+        print(f"[OpenRouter] Using headers: {headers}")
+
+
+# Provider registry
+PROVIDERS = {
+    "together": TogetherProvider(),
+    "openrouter": OpenRouterProvider()
+}
+
+# Helper function to get provider
+def get_provider(name: str) -> LLMProvider:
+    """Get a provider by name."""
+    if name not in PROVIDERS:
+        raise ValueError(f"Unknown provider: {name}")
+    return PROVIDERS[name]
 
 def get_current_model():
     """Get the current working model, with fallback mechanism."""
@@ -169,8 +291,8 @@ def get_current_model():
         return cached_model
     
     # Get the current provider's primary model
-    provider_config = PROVIDER_CONFIGS.get(CHAT_PROVIDER_1, PROVIDER_CONFIGS["together"])
-    return provider_config["models"]["primary"]
+    provider = get_provider(CHAT_PROVIDER_1)
+    return provider.primary_model
 
 def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
@@ -178,45 +300,6 @@ def update_model_cache(model):
     if current_model == model:
         return
     g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
-
-def get_provider_client(model=None, use_cache=True):
-    """Get a client for the specified model or provider."""
-    global provider_client_cache
-    
-    if model is None:
-        model = get_current_model()
-    
-    info = get_provider_info_from_model(model)
-    from openai import OpenAI
-    
-    # Get API key from environment
-    api_key = os.environ.get(info["api_key_env_var"])
-    if not api_key:
-        raise ValueError(f"API key {info['api_key_env_var']} not set for provider {info['provider']}")
-    
-    # If using cache and we have a cached client for this provider
-    if use_cache and provider_client_cache is not None:
-        return provider_client_cache
-    
-    # Create new client with provider-specific configuration
-    client = OpenAI(
-        api_key=api_key,
-        base_url=info["base_url"]
-    )
-    
-    # Add OpenRouter-specific headers if needed
-    if info["provider"] == "openrouter" and "headers" in PROVIDER_CONFIGS["openrouter"]:
-        for header, value in PROVIDER_CONFIGS["openrouter"]["headers"].items():
-            client._client.headers[header] = value
-        print(f"[OpenRouter] Using headers: {PROVIDER_CONFIGS['openrouter']['headers']}")
-    
-    print(f"[get_provider_client] Provider: {info['provider']}, Model: {model}, Base URL: {info['base_url']}")
-    
-    # Cache the client if requested
-    if use_cache:
-        provider_client_cache = client
-    
-    return client
 
 def _try_call_model(client, model, messages, max_tokens, provider_label=""):
     """Helper to call a model with retry logic, timeout, and logging."""
@@ -294,47 +377,6 @@ def _prepare_messages(prompt_mode, filtered_articles):
         messages = [{"role": "user", "content": prompt}]
     return messages
 
-def call_llm_with_fallback(provider, model, messages, prompt_mode, label=""):
-    """Centralized function to call LLM with fallback handling.
-    
-    Args:
-        provider: The provider name (e.g., "together", "openrouter")
-        model: The model to use first
-        messages: The messages to send to the LLM
-        prompt_mode: The prompt mode used (for logging)
-        label: Optional label for logging
-        
-    Returns:
-        Tuple of (response_text, used_model) or (None, None) if all attempts fail
-    """
-    provider_config = PROVIDER_CONFIGS[provider]
-    
-    # Try primary model
-    primary_model = model or provider_config["models"]["primary"]
-    print(f"\n--- LLM Call: {provider} / {primary_model} / {prompt_mode} {label} ---")
-    
-    try:
-        client = get_provider_client(model=primary_model, use_cache=False)
-        response_text = _try_call_model(client, primary_model, messages, MAX_TOKENS, f"{label} ({provider})")
-        return response_text, primary_model
-    except Exception as e:
-        print(f"Error with model {primary_model} ({provider}): {e}")
-        traceback.print_exc()
-        
-        # Only try fallback if this is the primary model from the provider
-        if primary_model == provider_config["models"]["primary"]:
-            try:
-                fallback_model = provider_config["models"]["fallback"]
-                print(f"Trying fallback model: {fallback_model}")
-                fallback_client = get_provider_client(model=fallback_model, use_cache=False)
-                response_text = _try_call_model(fallback_client, fallback_model, messages, MAX_TOKENS, f"Fallback {label} ({provider})")
-                return response_text, fallback_model
-            except Exception as fallback_e:
-                print(f"Fallback model {fallback_model} also failed: {fallback_e}")
-                traceback.print_exc()
-    
-    return None, None
-
 def ask_ai_top_articles(articles):
     """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
     # --- Deduplication (remains the same) ---
@@ -358,10 +400,9 @@ def ask_ai_top_articles(articles):
     print(f"Constructed Prompt (Mode: {PROMPT_MODE_1}):")
     print(messages)
 
-    # --- Call Primary LLM using the centralized function ---
-    response_text, used_model = call_llm_with_fallback(
-        CHAT_PROVIDER_1, 
-        get_current_model(), 
+    # --- Call Primary LLM using the provider class ---
+    provider = get_provider(CHAT_PROVIDER_1)
+    response_text, used_model = provider.call_with_fallback(
         messages, 
         PROMPT_MODE_1,
         "Primary"
@@ -410,29 +451,27 @@ def run_comparison(articles):
 
     # --- Config 1 ---
     messages1 = _prepare_messages(PROMPT_MODE_1, filtered_articles)
-    response_text1, _ = call_llm_with_fallback(
-        CHAT_PROVIDER_1,
-        MODEL_1,
+    provider1 = get_provider(CHAT_PROVIDER_1)
+    response_text1, _ = provider1.call_with_fallback(
         messages1,
         PROMPT_MODE_1,
         "Comparison 1"
     )
     
     if not response_text1:
-        print(f"Comparison 1 failed for {CHAT_PROVIDER_1} / {MODEL_1}")
+        print(f"Comparison 1 failed for {CHAT_PROVIDER_1}")
 
     # --- Config 2 ---
     messages2 = _prepare_messages(PROMPT_MODE_2, filtered_articles)
-    response_text2, _ = call_llm_with_fallback(
-        CHAT_PROVIDER_2,
-        MODEL_2,
+    provider2 = get_provider(CHAT_PROVIDER_2)
+    response_text2, _ = provider2.call_with_fallback(
         messages2,
         PROMPT_MODE_2,
         "Comparison 2"
     )
     
     if not response_text2:
-        print(f"Comparison 2 failed for {CHAT_PROVIDER_2} / {MODEL_2}")
+        print(f"Comparison 2 failed for {CHAT_PROVIDER_2}")
 
     print("\n--- Comparison Mode Finished ---")
 
@@ -593,20 +632,25 @@ if __name__ == "__main__":
 
     # Configure primary provider from CLI
     CHAT_PROVIDER_1 = args.provider
-    # Set MODEL_1 dynamically based on selected provider
-    MODEL_1 = PROVIDER_CONFIGS[CHAT_PROVIDER_1]["models"]["primary"]
-
-    # Set MODEL_2 dynamically to fallback model for selected provider (for comparison mode)
-    MODEL_2 = PROVIDER_CONFIGS[CHAT_PROVIDER_1]["models"].get("fallback", MODEL_1)
+    # Set MODEL_1 based on selected provider
+    provider1 = get_provider(CHAT_PROVIDER_1)
+    MODEL_1 = provider1.primary_model
+    
+    # Set MODEL_2 for comparison mode
+    provider2 = get_provider(CHAT_PROVIDER_1)
+    MODEL_2 = provider2.fallback_model
 
     # Set RUN_MODE to 'compare' if --compare is specified
     if args.compare:
         RUN_MODE = "compare"
         # In compare mode, use openrouter for both, but with dedicated comparison models
         CHAT_PROVIDER_1 = "openrouter"
-        MODEL_1 = PROVIDER_CONFIGS["openrouter"]["models"]["primary_compare"]
         CHAT_PROVIDER_2 = "openrouter"
-        MODEL_2 = PROVIDER_CONFIGS["openrouter"]["models"]["fallback_compare"]
+        
+        provider = get_provider("openrouter")
+        comparison_models = provider.get_comparison_models()
+        MODEL_1 = comparison_models[0]
+        MODEL_2 = comparison_models[1]
 
     # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
     if args.include_summary:
