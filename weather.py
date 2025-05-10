@@ -184,8 +184,8 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 response.raise_for_status()
                 processed_data = response.json()
                 
-                # Logging info
-                city_name = "Via LinuxReport.net"
+                # Extract city name from the API response if available
+                city_name = processed_data.get("city_name", "Unknown Location")
                 
             else:
                 # Original OpenWeather API implementation
@@ -239,6 +239,9 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                     })
                     days_added += 1
 
+            # Add city information to processed data
+            processed_data['city_name'] = city_name
+            
             # Save to cache regardless of which API was used
             save_weather_cache_entry(lat, lon, processed_data)
 
