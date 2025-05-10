@@ -395,7 +395,19 @@ def init_app(flask_app):
     def get_weather():
         ip = request.remote_addr
         units = request.args.get('units', 'imperial')
-        weather_data, status_code = get_weather_data(ip=ip, units=units)
+        lat = request.args.get('lat')
+        lon = request.args.get('lon')
+        
+        # Convert lat/lon to float if provided
+        if lat is not None and lon is not None:
+            try:
+                lat = float(lat)
+                lon = float(lon)
+            except ValueError:
+                # If conversion fails, fall back to IP-based location
+                lat = lon = None
+        
+        weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
         return jsonify(weather_data), status_code
 
     @flask_app.route('/old_headlines')
