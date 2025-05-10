@@ -19,7 +19,7 @@ import geoip2.database
 import requests
 
 # Local imports
-from shared import g_cs, get_lock
+from shared import g_cs, get_lock, USER_AGENT
 
 # Global flag to control whether to use LinuxReport.net API instead of OpenWeather
 # This allows to share data between servers and for better rate-limit support
@@ -181,7 +181,7 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 service_name = "LinuxReport.net"
                 url = f"{LINUXREPORT_WEATHER_API}?lat={lat}&lon={lon}&units=imperial"
                 start_time = time.time()
-                response = requests.get(url, timeout=10)
+                response = requests.get(url, timeout=10, headers={'User-Agent': USER_AGENT})
                 api_time = time.time() - start_time
                 response.raise_for_status()
                 processed_data = response.json()
