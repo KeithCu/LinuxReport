@@ -70,8 +70,8 @@ ALL_URLS = config_settings.CONFIG.ALL_URLS
 SITE_URLS = config_settings.CONFIG.SITE_URLS
 USER_AGENT = config_settings.CONFIG.USER_AGENT
 URL_IMAGES = config_settings.CONFIG.URL_IMAGES
-FAVICON = config_settings.CONFIG.FAVICON
-LOGO_URL = config_settings.CONFIG.LOGO_URL
+FAVICON = URL_IMAGES + config_settings.CONFIG.FAVICON
+LOGO_URL = URL_IMAGES + config_settings.CONFIG.LOGO_URL
 WEB_DESCRIPTION = config_settings.CONFIG.WEB_DESCRIPTION
 WEB_TITLE = config_settings.CONFIG.WEB_TITLE
 ABOVE_HTML_FILE = f"{MODE.value}reportabove.html"
@@ -80,6 +80,9 @@ CUSTOM_FETCH_CONFIG = config_settings.CONFIG.CUSTOM_FETCH_CONFIG
 # If CDN delivery is enabled, override URL_IMAGES with the CDN URL
 if ENABLE_URL_IMAGE_CDN_DELIVERY:
     URL_IMAGES = CDN_IMAGE_URL
+    FAVICON = CDN_IMAGE_URL + config_settings.CONFIG.FAVICON
+    LOGO_URL = CDN_IMAGE_URL + config_settings.CONFIG.LOGO_URL
+
 
 WELCOME_HTML = (
     '<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'

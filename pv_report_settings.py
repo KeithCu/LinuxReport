@@ -25,9 +25,9 @@ CONFIG: SiteConfig = SiteConfig(
         "https://www.altenergymag.com/rss/news/",
     ],
     URL_IMAGES="https://pvreport.org/static/images/",
-    FAVICON="https://pvreport.org/static/images/pvreport.ico",
-    LOGO_URL="https://pvreport.org/static/images/pvreport.webp",
-    WEB_DESCRIPTION="Solar News",
+    FAVICON="pvreport.ico",
+    LOGO_URL="pvreport.webp",
+    WEB_DESCRIPTION="Solar and Renewable Energy News",
     WEB_TITLE="Photovoltaic Report",
 
     CUSTOM_FETCH_CONFIG={

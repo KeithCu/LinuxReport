@@ -19,8 +19,8 @@ CONFIG: SiteConfig = SiteConfig(
         "https://www.youtube.com/feeds/videos.xml?channel_id=UCF9IOB2TExg3QIBupFtBDxg",
     ],
     URL_IMAGES="https://covidreport.org/static/images/",
-    FAVICON="https://covidreport.org/static/images/covidreport192.ico",
-    LOGO_URL="https://covidreport.org/static/images/covidreportfancy.webp",
+    FAVICON="covidreport192.ico",
+    LOGO_URL="covidreportfancy.webp",
     WEB_DESCRIPTION="COVID-19 and Infectious Disease News",
     WEB_TITLE="COVID-19 Report",
     CUSTOM_FETCH_CONFIG={

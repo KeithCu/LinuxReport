@@ -29,8 +29,8 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://planetpython.org/rss20.xml",
 	],
 	URL_IMAGES="https://aireport.keithcu.com/static/images/",
-	FAVICON="https://aireport.keithcu.com/static/images/covidreport192.ico",
-	LOGO_URL="https://aireport.keithcu.com/static/images/aireportfancy.webp",
+	FAVICON="covidreport192.ico",
+	LOGO_URL="aireportfancy.webp",
 	WEB_DESCRIPTION="AI News",
 	WEB_TITLE="AI Report",
     CUSTOM_FETCH_CONFIG={

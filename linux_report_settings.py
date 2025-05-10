@@ -28,8 +28,8 @@ CONFIG: SiteConfig = SiteConfig(
         "https://planet.debian.org/rss20.xml",
     ],
     URL_IMAGES="https://linuxreport.net/static/images/",
-    FAVICON="https://linuxreport.net/static/images/linuxreport192.ico",
-    LOGO_URL="https://linuxreport.net/static/images/linuxreportfancy.webp",
+    FAVICON="linuxreport192.ico",
+    LOGO_URL="linuxreportfancy.webp",
     WEB_DESCRIPTION="Linux News",
     WEB_TITLE="Linux Report",
     CUSTOM_FETCH_CONFIG={

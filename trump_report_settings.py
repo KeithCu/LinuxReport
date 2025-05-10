@@ -31,8 +31,8 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://conservativereview.com/feeds/feed.rss",
 	],
 	URL_IMAGES="https://trumpreport.info/static/images/",
-	FAVICON="https://trumpreport.info/static/images/TrumpReport.webp",
-	LOGO_URL="https://trumpreport.info/static/images/TrumpReport.webp",
+	FAVICON="TrumpReport.webp",
+	LOGO_URL="TrumpReport.webp",
 	WEB_DESCRIPTION="Trump Report",
 	WEB_TITLE="TrumpReport",
     CUSTOM_FETCH_CONFIG={

@@ -20,8 +20,8 @@ CONFIG: SiteConfig = SiteConfig(
         "https://pitsdetroit.bandcamp.com/fakefeed",
     ],
     URL_IMAGES = "http://news.thedetroitilove.com/static/images/",
-    FAVICON = "http://news.thedetroitilove.com/static/images/technoreport.ico",
-    LOGO_URL = "http://news.thedetroitilove.com/static/images/TechnoReport.webp",
+    FAVICON = "technoreport.ico",
+    LOGO_URL = "TechnoReport.webp",
     WEB_DESCRIPTION = "Detroit Techno, Arts and Events News",
     WEB_TITLE = "The Detroit Report",
 
