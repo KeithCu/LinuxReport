@@ -17,14 +17,18 @@ from bisect import bisect_left
 import geoip2.database
 # Third-party imports
 import requests
+import zoneinfo
 
 # Local imports
-from shared import g_cs, get_lock, USER_AGENT, TZ
+from shared import g_cs, get_lock, USER_AGENT
 
 # Global flag to control whether to use LinuxReport.net API instead of OpenWeather
 # This allows to share data between servers and for better rate-limit support
 # Since all servers are in the same datacenter, it will be very fast.
 USE_LINUXREPORT_API = False  # Set to True to use LinuxReport.net API, False to use OpenWeather
+
+# Define the timezone
+TZ = zoneinfo.ZoneInfo("US/Eastern")
 
 # LinuxReport.net API endpoint
 LINUXREPORT_WEATHER_API = "https://linuxreport.net/api/weather"
@@ -88,7 +92,7 @@ RATE_LIMIT_COUNT = 10   # calls per window
 
 def rate_limit_check():
     """Enforces RATE_LIMIT_COUNT calls per RATE_LIMIT_WINDOW seconds."""
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(TZ).timestamp()
     timestamps = g_cs.get(RL_KEY) or []
 
     valid_start_time = now - RATE_LIMIT_WINDOW
@@ -104,7 +108,7 @@ def rate_limit_check():
         if wait_time > 0:
             time.sleep(wait_time)
             print(f"Weather API rate limit exceeded. Sleeping for {wait_time:.2f} seconds. Consider increasing WEATHER_BUCKET_SIZE_MILES.")
-            now = datetime.now(timezone.utc).timestamp()
+            now = datetime.now(TZ).timestamp()
 
     timestamps_in_window.append(now)
 
@@ -115,17 +119,25 @@ CACHE_ENTRY_PREFIX = 'weather:cache_entry:'
 def save_weather_cache_entry(lat, lon, data):
     """Saves a weather data entry to the cache with timestamp and date, using bucketed key."""
     key = _bucket_key(lat, lon)
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(TZ).timestamp()
     today_str = date_obj.today().isoformat()
+    
+    # Calculate remaining cache time based on fetch_time if available
+    fetch_time = data.get('fetch_time', now)
+    time_since_fetch = now - fetch_time
+    
+    # Adjust timeout based on data age (remaining = total - elapsed)
+    remaining_timeout = max(WEATHER_CACHE_TIMEOUT - time_since_fetch, 300)  # Minimum 5 minutes
+    
     entry = {'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str}
-    g_cs.put(CACHE_ENTRY_PREFIX + key, entry, timeout=WEATHER_CACHE_TIMEOUT)
+    g_cs.put(CACHE_ENTRY_PREFIX + key, entry, timeout=remaining_timeout)
 
 def get_bucketed_weather_cache(lat, lon):
     """Returns cached weather data for the bucketed (lat, lon) if present and same day."""
     key = _bucket_key(lat, lon)
     entry = g_cs.get(CACHE_ENTRY_PREFIX + key)
     today_str = date_obj.today().isoformat()
-    now = datetime.now(timezone.utc).timestamp()
+    now = datetime.now(TZ).timestamp()
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
         return entry['data']
     return None
@@ -138,7 +150,7 @@ def fahrenheit_to_celsius(f_temp):
 
 def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     """Fetches weather data for given coordinates or IP address, using cache or API.
-    Returns a tuple of (data, status_code, fetch_time) where fetch_time is the UTC timestamp
+    Returns a tuple of (data, status_code) where data includes 'fetch_time'
     when the data was fetched from the API."""
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
@@ -159,7 +171,10 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
             for day in bucketed_weather['daily']:
                 day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
                 day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
-        return bucketed_weather, 200, datetime.now(timezone.utc).timestamp()
+        # Add fetch_time to the cached data if not already present (it should be)
+        if 'fetch_time' not in bucketed_weather:
+            bucketed_weather['fetch_time'] = datetime.now(TZ).timestamp() # Fallback, though unlikely needed
+        return bucketed_weather, 200
 
     # Acquire lock specific to this location bucket
     # The 'with' statement handles waiting and acquisition via __enter__
@@ -173,23 +188,28 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 for day in bucketed_weather['daily']:
                     day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
                     day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
-            return bucketed_weather, 200, datetime.now(timezone.utc).timestamp()
+            # Add fetch_time to the cached data if not already present
+            if 'fetch_time' not in bucketed_weather:
+                bucketed_weather['fetch_time'] = datetime.now(TZ).timestamp() # Fallback
+            return bucketed_weather, 200
 
         # Cache miss and lock acquired, proceed with API call
+        # Record a preliminary fetch_time, to be overwritten by API if possible or firmed up later
+        fetch_time = datetime.now(TZ).timestamp() 
         try:
             # Decide whether to use LinuxReport API or OpenWeather
             if USE_LINUXREPORT_API:
                 # Use LinuxReport.net API - already processes the data in the correct format
                 service_name = "LinuxReport.net"
                 url = f"{LINUXREPORT_WEATHER_API}?lat={lat}&lon={lon}&units=imperial"
-                start_time = datetime.now(timezone.utc).timestamp()
+                start_time = datetime.now(TZ).timestamp()
                 response = requests.get(url, timeout=10, headers={'User-Agent': USER_AGENT})
-                api_time = datetime.now(timezone.utc).timestamp() - start_time
+                api_time = datetime.now(TZ).timestamp() - start_time
                 response.raise_for_status()
                 processed_data = response.json()
                 
-                # Get fetch time from API response, ensuring it's UTC
-                fetch_time = processed_data.get('fetch_time', datetime.now(timezone.utc).timestamp())
+                # This will be the definitive fetch_time for this path
+                fetch_time = processed_data.get('fetch_time', fetch_time)
                 
                 # Extract city name from the API response if available
                 city_name = processed_data.get("city_name", "Unknown Location")
@@ -197,18 +217,19 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
             else:
                 # Original OpenWeather API implementation
                 service_name = "OpenWeather"
-                fetch_time = datetime.now(timezone.utc).timestamp()  # Record the fetch time in UTC
+                # fetch_time is already set before the try block for OpenWeather
                 # Check for valid API key before proceeding
                 if not WEATHER_API_KEY or len(WEATHER_API_KEY) < 10:
                     print("Weather API error: WEATHER_API_KEY is missing or too short.")
-                    return {"error": "Weather API key is not configured"}, 500, fetch_time
+                    error_data = {"error": "Weather API key is not configured", "fetch_time": fetch_time}
+                    return error_data, 500
                 
                 rate_limit_check()
                 # Always fetch in imperial (Fahrenheit) for consistent caching
                 url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
-                start_time = datetime.now(timezone.utc).timestamp()
+                start_time = datetime.now(TZ).timestamp()
                 response = requests.get(url, timeout=10)
-                api_time = datetime.now(timezone.utc).timestamp() - start_time
+                api_time = datetime.now(TZ).timestamp() - start_time
                 response.raise_for_status()
                 weather_data = response.json()
                 # Determine city name for logging
@@ -251,6 +272,9 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
 
             # Add city information to processed data
             processed_data['city_name'] = city_name
+            # Add fetch_time to processed_data so it's included in the cache
+            # and available if this instance acts as the API provider.
+            processed_data['fetch_time'] = fetch_time
             
             # Save to cache regardless of which API was used
             save_weather_cache_entry(lat, lon, processed_data)
@@ -271,15 +295,17 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                  # Indicate error or missing data
                 print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
 
-            return processed_data, 200, fetch_time
+            return processed_data, 200
 
         except requests.exceptions.RequestException as e:
             print(f"Weather API error: Failed to fetch weather data from API: {e}")
-            return {"error": "Failed to fetch weather data from API"}, 500, fetch_time
+            error_data = {"error": "Failed to fetch weather data from API", "fetch_time": fetch_time}
+            return error_data, 500
         except (ValueError, KeyError, TypeError) as e:
             # Always log error result
             print(f"Weather API error: Failed to process weather data: {e}")
-            return {"error": "Failed to process weather data"}, 500, fetch_time
+            error_data = {"error": "Failed to process weather data", "fetch_time": fetch_time}
+            return error_data, 500
         # Lock is automatically released by the 'with' statement
 
 
@@ -300,7 +326,7 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
 # Separate page cache entries would be necessary for server-side rendering.
 # Data is cached on client and server, so not a priority.
 def get_weather_html(ip):
-    weather_data, status_code, fetch_time = get_weather_data(ip=ip)
+    weather_data, status_code = get_weather_data(ip=ip)
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
         forecast_html = '<div id="weather-forecast" class="weather-forecast">'
         for i, day in enumerate(weather_data["daily"]):
@@ -356,8 +382,11 @@ def test_weather_api_with_ips():
     for ip in test_ips:
         lat, lon = get_location_from_ip(ip)
         print(f"IP: {ip} => lat: {lat}, lon: {lon}")
-        data, status, fetch_time = get_weather_data(ip=ip)
-        print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time:.2f}s")
+        data, status = get_weather_data(ip=ip)
+        fetch_time_from_data = data.get('fetch_time', 'N/A')
+        if isinstance(fetch_time_from_data, float):
+            fetch_time_from_data = f"{fetch_time_from_data:.2f}s"
+        print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
 
 if __name__ == "__main__":
     print("Running weather API tests with test IP addresses...")
