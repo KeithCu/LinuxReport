@@ -1,4 +1,3 @@
-import threading
 import time
 import json
 import os
@@ -29,17 +28,6 @@ except ImportError:
     class ObjectDoesNotExistError(Exception): pass
     class Object: pass
     class LibcloudError(Exception): pass
-
-# Watchdog imports for availability check
-try:
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-    WATCHDOG_AVAILABLE = True
-except ImportError:
-    WATCHDOG_AVAILABLE = False
-    # Forward declarations for type hints if WATCHDOG_AVAILABLE is False
-    class Observer: pass
-    class FileSystemEventHandler: pass
 
 # Custom exceptions
 class StorageError(Exception):
@@ -79,26 +67,16 @@ STORAGE_BUCKET_NAME = "feed-sync"
 STORAGE_ACCESS_KEY = ""  # Loaded from config.yaml
 STORAGE_SECRET_KEY = ""  # Loaded from config.yaml
 STORAGE_HOST = "s3.linode.com"
-STORAGE_CHECK_INTERVAL = 30
 STORAGE_CACHE_DIR = "/tmp/feed_cache"
 STORAGE_SYNC_PREFIX = "feed-updates/"
 
 # Sync configuration
-CHECK_INTERVAL = 30  # Default interval to check for updates (seconds)
 SERVER_ID = hashlib.md5(os.uname().nodename.encode()).hexdigest()[:8] if hasattr(os, 'uname') else "default_server_id"
-CACHE_DIR = "/tmp/feed_cache"  # Local cache directory
 
 # Internal state
 _storage_driver = None
 _storage_container = None
-_watcher_thread = None
-_observer = None
-_file_event_handler = None
-_last_check_time = time.time()
-_last_known_objects = {}  # Cache of known objects
-_sync_running = False
 _secrets_loaded = False
-_feed_update_callbacks = []
 
 def load_storage_secrets():
     """Load storage secrets from config.yaml"""
@@ -197,7 +175,3 @@ def init_storage() -> bool:
             raise StorageConnectionError(f"Error initializing storage driver: {e}")
     
     return True
-
-# Potential future additions:
-# - Function to get logger instance
-# - Functions to manage _feed_update_callbacks if they become complex
