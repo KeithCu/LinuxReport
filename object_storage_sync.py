@@ -1,5 +1,5 @@
 """
-object_storage_sync.py
+object_storage_sync.py (Not used yet)
 
 Object Storage-based publisher/subscriber for feed updates. Used to synchronize feed updates across multiple servers.
 Uses libcloud to interface with object storage providers (like Linode Object Storage).
@@ -11,6 +11,7 @@ import os
 import hashlib
 from datetime import datetime
 import logging
+from typing import Any, Optional
 
 # Set up logging
 logging.basicConfig(
@@ -42,6 +43,255 @@ try:
     WATCHDOG_AVAILABLE = True
 except ImportError:
     logger.warning("watchdog is not installed. File change monitoring will be disabled.")
+
+class ObjectStorageCacheWrapper:
+    """Wrapper for object storage to manage caching operations with libcloud.
+    
+    This class provides a compatible interface with DiskCacheWrapper but uses object storage
+    as the backend instead of local disk cache. It integrates with the existing file
+    synchronization and metadata handling functionality.
+    """
+    def __init__(self, cache_dir: str) -> None:
+        """Initialize the object storage cache wrapper.
+        
+        Args:
+            cache_dir: Base directory for local cache operations (used for temporary storage)
+        """
+        self.cache_dir = cache_dir
+        self._ensure_cache_dir()
+        
+    def _ensure_cache_dir(self) -> None:
+        """Ensure the cache directory exists."""
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+            
+    def _get_object_name(self, key: str) -> str:
+        """Generate a unique object name for a cache key."""
+        return f"{SYNC_PREFIX}cache/{SERVER_ID}/{hashlib.md5(key.encode()).hexdigest()}"
+        
+    def get(self, key: str) -> Any:
+        """Get a value from the cache.
+        
+        Args:
+            key: The cache key to retrieve
+            
+        Returns:
+            The cached value or None if not found
+        """
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+            return None
+            
+        if not init_storage():
+            return None
+            
+        try:
+            object_name = self._get_object_name(key)
+            versions = list_file_versions(object_name)
+            
+            if not versions:
+                return None
+                
+            # Get the latest version
+            latest_version = max(versions, key=lambda x: x['timestamp'])
+            
+            # Use existing fetch_file_stream for better integration
+            stream, metadata = fetch_file_stream(object_name, force=True)
+            if stream is None:
+                return None
+                
+            # Read and parse the content
+            data = json.loads(stream.read().decode('utf-8'))
+            
+            # Check expiration
+            expires = float(metadata.get('expires', 'inf'))
+            if expires != float('inf') and time.time() > expires:
+                self.delete(key)  # Clean up expired entry
+                return None
+                
+            return data.get('value')
+        except Exception as e:
+            logger.error(f"Error getting cache value for {key}: {e}")
+            return None
+            
+    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
+        """Store a value in the cache.
+        
+        Args:
+            key: The cache key
+            value: The value to store
+            timeout: Optional expiration time in seconds
+        """
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+            return
+            
+        if not init_storage():
+            return
+            
+        try:
+            object_name = self._get_object_name(key)
+            
+            # Prepare the data
+            data = {
+                'value': value,
+                'timestamp': time.time(),
+                'expires': time.time() + timeout if timeout else None
+            }
+            
+            # Write to temporary file
+            temp_path = os.path.join(self.cache_dir, f"temp_{int(time.time())}")
+            with open(temp_path, 'w') as f:
+                json.dump(data, f)
+                
+            # Use existing publish_file for better integration
+            metadata = {
+                'cache_key': key,
+                'timestamp': str(time.time()),
+                'expires': str(data['expires']) if data['expires'] else 'never',
+                'type': 'cache_entry',
+                'server_id': SERVER_ID
+            }
+            
+            publish_file(temp_path, metadata)
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+                
+        except Exception as e:
+            logger.error(f"Error putting cache value for {key}: {e}")
+            
+    def delete(self, key: str) -> None:
+        """Delete a value from the cache.
+        
+        Args:
+            key: The cache key to delete
+        """
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+            return
+            
+        if not init_storage():
+            return
+            
+        try:
+            object_name = self._get_object_name(key)
+            versions = list_file_versions(object_name)
+            
+            for version in versions:
+                delete_file_version(version['object_name'])
+                
+        except Exception as e:
+            logger.error(f"Error deleting cache value for {key}: {e}")
+            
+    def has(self, key: str) -> bool:
+        """Check if a key exists in the cache.
+        
+        Args:
+            key: The cache key to check
+            
+        Returns:
+            True if the key exists and is not expired, False otherwise
+        """
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+            return False
+            
+        if not init_storage():
+            return False
+            
+        try:
+            object_name = self._get_object_name(key)
+            versions = list_file_versions(object_name)
+            
+            if not versions:
+                return False
+                
+            # Get the latest version
+            latest_version = max(versions, key=lambda x: x['timestamp'])
+            
+            # Check expiration
+            expires = float(latest_version.get('expires', 'inf'))
+            if expires != float('inf') and time.time() > expires:
+                self.delete(key)  # Clean up expired entry
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking cache for {key}: {e}")
+            return False
+            
+    def list_versions(self, key: str) -> list:
+        """List all versions of a cache entry.
+        
+        Args:
+            key: The cache key to list versions for
+            
+        Returns:
+            List of version objects with metadata
+        """
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+            return []
+            
+        if not init_storage():
+            return []
+            
+        try:
+            object_name = self._get_object_name(key)
+            return list_file_versions(object_name)
+        except Exception as e:
+            logger.error(f"Error listing versions for {key}: {e}")
+            return []
+            
+    def cleanup_expired(self) -> None:
+        """Clean up expired cache entries."""
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+            return
+            
+        if not init_storage():
+            return
+            
+        try:
+            # List all cache objects
+            prefix = f"{SYNC_PREFIX}cache/"
+            objects = list(_storage_container.list_objects(prefix=prefix))
+            current_time = time.time()
+            
+            for obj in objects:
+                try:
+                    # Check expiration
+                    expires = float(obj.meta_data.get('expires', 'inf'))
+                    if expires != float('inf') and current_time > expires:
+                        delete_file_version(obj.name)
+                except:
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"Error cleaning up expired cache entries: {e}")
+            
+    def start_watcher(self) -> bool:
+        """Start the background watcher for cache updates.
+        
+        Returns:
+            True if watcher was started successfully
+        """
+        return start_storage_watcher()
+        
+    def stop_watcher(self) -> None:
+        """Stop the background watcher."""
+        stop_storage_watcher()
+        
+    def configure(self, enabled: bool = False, **kwargs) -> bool:
+        """Configure the cache wrapper.
+        
+        Args:
+            enabled: Whether to enable object storage functionality
+            **kwargs: Additional configuration options passed to configure_storage
+            
+        Returns:
+            True if configuration was successful
+        """
+        return configure_storage(enabled=enabled, **kwargs)
 
 # Object Storage configuration
 STORAGE_ENABLED = False  # Global switch to enable/disable object storage functionality
@@ -482,4 +732,294 @@ def configure_storage(enabled=False, provider=None, region=None, bucket_name=Non
     else:
         if was_enabled:
             stop_storage_watcher()
+        return False
+
+def get_file_metadata(file_path):
+    """Get metadata for a file including hash and timestamp
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        dict: File metadata including hash and timestamp
+    """
+    try:
+        with open(file_path, 'rb') as f:
+            content = f.read()
+            file_hash = hashlib.sha256(content).hexdigest()
+            stat = os.stat(file_path)
+            return {
+                'hash': file_hash,
+                'size': stat.st_size,
+                'mtime': stat.st_mtime,
+                'ctime': stat.st_ctime,
+                'content': content  # Include content for in-memory operations
+            }
+    except Exception as e:
+        logger.error(f"Error getting file metadata for {file_path}: {e}")
+        return None
+
+def generate_file_object_name(file_path):
+    """Generate a unique object name for a file
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        str: Unique object name for storage
+    """
+    file_hash = hashlib.md5(file_path.encode()).hexdigest()
+    timestamp = int(time.time())
+    return f"{SYNC_PREFIX}files/{SERVER_ID}/{file_hash}_{timestamp}"
+
+def publish_file(file_path, metadata=None):
+    """Publish a file to object storage
+    
+    Args:
+        file_path: Path to the file to publish
+        metadata: Optional additional metadata about the file
+        
+    Returns:
+        Object: The uploaded storage object or None if failed
+    """
+    if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        return None
+        
+    if not init_storage():
+        return None
+    
+    try:
+        # Get file metadata
+        file_metadata = get_file_metadata(file_path)
+        if not file_metadata:
+            return None
+            
+        # Generate object name
+        object_name = generate_file_object_name(file_path)
+        
+        # Prepare metadata
+        extra_metadata = {
+            'meta_data': {
+                'server_id': SERVER_ID,
+                'file_path': file_path,
+                'file_hash': file_metadata['hash'],
+                'file_size': str(file_metadata['size']),
+                'mtime': str(file_metadata['mtime']),
+                'timestamp': str(time.time())
+            }
+        }
+        
+        if metadata:
+            extra_metadata['meta_data'].update(metadata)
+            
+        # Create a BytesIO object for streaming
+        from io import BytesIO
+        content_stream = BytesIO(file_metadata['content'])
+        
+        # Upload using streaming
+        obj = _storage_driver.upload_object_via_stream(
+            iterator=content_stream,
+            container=_storage_container,
+            object_name=object_name,
+            extra=extra_metadata
+        )
+            
+        logger.info(f"Published file {file_path} to object storage as {object_name}")
+        return obj
+    except Exception as e:
+        logger.error(f"Error publishing file to object storage: {e}")
+        return None
+
+def fetch_file(file_path, force=False):
+    """Fetch a file from object storage if it has changed
+    
+    Args:
+        file_path: Path to the file to fetch
+        force: If True, fetch regardless of changes
+        
+    Returns:
+        tuple: (content, metadata) if successful, (None, None) if failed
+    """
+    if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        return None, None
+        
+    if not init_storage():
+        return None, None
+    
+    try:
+        # Get current file metadata if it exists
+        current_metadata = None
+        if os.path.exists(file_path):
+            current_metadata = get_file_metadata(file_path)
+            
+        # List objects with matching prefix
+        file_hash = hashlib.md5(file_path.encode()).hexdigest()
+        prefix = f"{SYNC_PREFIX}files/"
+        objects = list(_storage_container.list_objects(prefix=prefix))
+        
+        # Find the latest version of the file
+        latest_obj = None
+        latest_timestamp = 0
+        
+        for obj in objects:
+            try:
+                # Extract metadata
+                meta = obj.meta_data
+                if meta.get('file_path') == file_path:
+                    timestamp = float(meta.get('timestamp', 0))
+                    if timestamp > latest_timestamp:
+                        latest_obj = obj
+                        latest_timestamp = timestamp
+            except:
+                continue
+                
+        if not latest_obj:
+            logger.info(f"No version found for file {file_path}")
+            return None, None
+            
+        # Check if we need to update
+        if not force and current_metadata:
+            latest_hash = latest_obj.meta_data.get('file_hash')
+            if latest_hash == current_metadata['hash']:
+                logger.info(f"File {file_path} is up to date")
+                return current_metadata['content'], latest_obj.meta_data
+                
+        # Download the content using streaming
+        from io import BytesIO
+        content_buffer = BytesIO()
+        latest_obj.download(content_buffer)
+        content = content_buffer.getvalue()
+        
+        logger.info(f"Fetched updated version of {file_path}")
+        return content, latest_obj.meta_data
+    except Exception as e:
+        logger.error(f"Error fetching file from object storage: {e}")
+        return None, None
+
+def fetch_file_stream(file_path, force=False):
+    """Fetch a file from object storage as a stream if it has changed
+    
+    Args:
+        file_path: Path to the file to fetch
+        force: If True, fetch regardless of changes
+        
+    Returns:
+        tuple: (stream, metadata) if successful, (None, None) if failed
+    """
+    if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        return None, None
+        
+    if not init_storage():
+        return None, None
+    
+    try:
+        # Get current file metadata if it exists
+        current_metadata = None
+        if os.path.exists(file_path):
+            current_metadata = get_file_metadata(file_path)
+            
+        # List objects with matching prefix
+        file_hash = hashlib.md5(file_path.encode()).hexdigest()
+        prefix = f"{SYNC_PREFIX}files/"
+        objects = list(_storage_container.list_objects(prefix=prefix))
+        
+        # Find the latest version of the file
+        latest_obj = None
+        latest_timestamp = 0
+        
+        for obj in objects:
+            try:
+                # Extract metadata
+                meta = obj.meta_data
+                if meta.get('file_path') == file_path:
+                    timestamp = float(meta.get('timestamp', 0))
+                    if timestamp > latest_timestamp:
+                        latest_obj = obj
+                        latest_timestamp = timestamp
+            except:
+                continue
+                
+        if not latest_obj:
+            logger.info(f"No version found for file {file_path}")
+            return None, None
+            
+        # Check if we need to update
+        if not force and current_metadata:
+            latest_hash = latest_obj.meta_data.get('file_hash')
+            if latest_hash == current_metadata['hash']:
+                logger.info(f"File {file_path} is up to date")
+                # Return a BytesIO stream of the current content
+                from io import BytesIO
+                return BytesIO(current_metadata['content']), latest_obj.meta_data
+                
+        # Get the object's stream
+        stream = latest_obj.as_stream()
+        
+        logger.info(f"Fetched updated version of {file_path} as stream")
+        return stream, latest_obj.meta_data
+    except Exception as e:
+        logger.error(f"Error fetching file stream from object storage: {e}")
+        return None, None
+
+def list_file_versions(file_path):
+    """List all versions of a file in storage
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        list: List of version objects with metadata
+    """
+    if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        return []
+        
+    if not init_storage():
+        return []
+    
+    try:
+        versions = []
+        prefix = f"{SYNC_PREFIX}files/"
+        objects = list(_storage_container.list_objects(prefix=prefix))
+        
+        for obj in objects:
+            try:
+                if obj.meta_data.get('file_path') == file_path:
+                    versions.append({
+                        'object_name': obj.name,
+                        'timestamp': float(obj.meta_data.get('timestamp', 0)),
+                        'hash': obj.meta_data.get('file_hash'),
+                        'size': int(obj.meta_data.get('file_size', 0)),
+                        'server_id': obj.meta_data.get('server_id')
+                    })
+            except:
+                continue
+                
+        # Sort by timestamp descending
+        versions.sort(key=lambda x: x['timestamp'], reverse=True)
+        return versions
+    except Exception as e:
+        logger.error(f"Error listing file versions: {e}")
+        return []
+
+def delete_file_version(object_name):
+    """Delete a specific version of a file
+    
+    Args:
+        object_name: Name of the object to delete
+        
+    Returns:
+        bool: True if deletion was successful
+    """
+    if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        return False
+        
+    if not init_storage():
+        return False
+    
+    try:
+        _storage_container.delete_object(object_name)
+        logger.info(f"Deleted file version: {object_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Error deleting file version: {e}")
         return False 
