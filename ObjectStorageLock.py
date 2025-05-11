@@ -233,3 +233,116 @@ class ObjectStorageLock(LockBase):
     def locked(self) -> bool:
         """Check if the lock is currently held by this instance."""
         return self._locked 
+
+if __name__ == '__main__':
+    import unittest
+    from unittest.mock import MagicMock, patch
+    import time
+    
+    class TestObjectStorageLock(unittest.TestCase):
+        def setUp(self):
+            # Mock the storage container and driver
+            self.mock_container = MagicMock()
+            self.mock_driver = MagicMock()
+            
+            # Patch the storage configuration
+            self.patcher = patch('object_storage_config')
+            self.mock_config = self.patcher.start()
+            
+            # Configure the mock
+            self.mock_config.LIBCLOUD_AVAILABLE = True
+            self.mock_config.STORAGE_ENABLED = True
+            self.mock_config.SERVER_ID = 'test-server'
+            self.mock_config.STORAGE_SYNC_PREFIX = 'test-prefix/'
+            self.mock_config._storage_container = self.mock_container
+            self.mock_config._storage_driver = self.mock_driver
+            self.mock_config.init_storage = MagicMock(return_value=True)
+            self.mock_config.ObjectDoesNotExistError = Exception
+            
+            # Create a test lock
+            self.lock = ObjectStorageLock('test-lock')
+            
+        def tearDown(self):
+            self.patcher.stop()
+            
+        def test_lock_initialization(self):
+            """Test that lock initializes correctly"""
+            self.assertFalse(self.lock.locked())
+            self.assertEqual(self.lock.lock_name, 'test-lock')
+            self.assertTrue(self.lock.lock_key.startswith('lock::'))
+            
+        def test_lock_acquisition(self):
+            """Test basic lock acquisition"""
+            # Mock successful lock acquisition
+            self.mock_driver.download_object_as_stream.return_value = []
+            self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
+            
+            # Try to acquire the lock
+            result = self.lock.acquire(timeout_seconds=10)
+            self.assertTrue(result)
+            self.assertTrue(self.lock.locked())
+            
+        def test_lock_release(self):
+            """Test lock release"""
+            # First acquire the lock
+            self.mock_driver.download_object_as_stream.return_value = []
+            self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
+            self.lock.acquire()
+            
+            # Then release it
+            result = self.lock.release()
+            self.assertTrue(result)
+            self.assertFalse(self.lock.locked())
+            
+        def test_context_manager(self):
+            """Test lock as context manager"""
+            self.mock_driver.download_object_as_stream.return_value = []
+            self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
+            
+            with self.lock:
+                self.assertTrue(self.lock.locked())
+            self.assertFalse(self.lock.locked())
+            
+        def test_lock_expiry(self):
+            """Test that locks expire correctly"""
+            # Create expired lock data
+            expired_time = time.monotonic() - 100
+            expired_lock_data = {
+                'owner_id': 'other-owner',
+                'expiry': expired_time,
+                'created': expired_time - 10,
+                'lock_name': 'test-lock'
+            }
+            
+            # Mock the storage to return expired lock
+            mock_stream = MagicMock()
+            mock_stream.__iter__.return_value = [json.dumps(expired_lock_data).encode('utf-8')]
+            self.mock_driver.download_object_as_stream.return_value = mock_stream
+            
+            # Should be able to acquire the lock since it's expired
+            result = self.lock.acquire()
+            self.assertTrue(result)
+            self.assertTrue(self.lock.locked())
+            
+        def test_concurrent_locks(self):
+            """Test that concurrent locks are handled correctly"""
+            # Mock existing valid lock
+            current_time = time.monotonic()
+            valid_lock_data = {
+                'owner_id': 'other-owner',
+                'expiry': current_time + 100,
+                'created': current_time,
+                'lock_name': 'test-lock'
+            }
+            
+            mock_stream = MagicMock()
+            mock_stream.__iter__.return_value = [json.dumps(valid_lock_data).encode('utf-8')]
+            self.mock_driver.download_object_as_stream.return_value = mock_stream
+            
+            # Should not be able to acquire the lock
+            result = self.lock.acquire()
+            self.assertFalse(result)
+            self.assertFalse(self.lock.locked())
+            
+    # Run the tests
+    unittest.main() 
