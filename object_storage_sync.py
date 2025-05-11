@@ -16,6 +16,38 @@ from dataclasses import dataclass
 from enum import Enum
 import os.path
 from pathlib import Path
+from config_utils import load_config
+
+# Object Storage configuration
+STORAGE_ENABLED = False
+STORAGE_PROVIDER = "s3"  # options: "s3", "linode", "local"
+STORAGE_REGION = "us-east-1"
+STORAGE_BUCKET_NAME = "feed-sync"
+STORAGE_ACCESS_KEY = ""  # Loaded from config.yaml
+STORAGE_SECRET_KEY = ""  # Loaded from config.yaml
+STORAGE_HOST = "s3.linode.com"
+STORAGE_CHECK_INTERVAL = 30
+STORAGE_CACHE_DIR = "/tmp/feed_cache"
+STORAGE_SYNC_PREFIX = "feed-updates/"
+
+# Sync configuration
+SYNC_PREFIX = "feed-updates/"  # Prefix for feed updates
+CHECK_INTERVAL = 30  # Default interval to check for updates (seconds)
+SERVER_ID = hashlib.md5(os.uname().nodename.encode()).hexdigest()[:8]
+CACHE_DIR = "/tmp/feed_cache"  # Local cache directory
+
+# Internal state
+_storage_driver = None
+_storage_container = None
+_watcher_thread = None
+_observer = None
+_file_event_handler = None
+_last_check_time = time.time()
+_last_known_objects = {}  # Cache of known objects
+_sync_running = False
+
+# Callbacks for feed updates
+_feed_update_callbacks = []
 
 # Custom exceptions
 class StorageError(Exception):
@@ -40,35 +72,26 @@ class StorageProvider(Enum):
     LINODE = "linode"
     LOCAL = "local"
 
-@dataclass
-class StorageConfig:
-    """Configuration for object storage"""
-    enabled: bool = False
-    provider: StorageProvider = StorageProvider.S3
-    region: str = "us-east-1"
-    bucket_name: str = "feed-sync"
-    access_key: str = ""
-    secret_key: str = ""
-    host: str = "s3.linode.com"
-    check_interval: int = 30
-    cache_dir: str = "/tmp/feed_cache"
-    sync_prefix: str = "feed-updates/"
-    
-    @classmethod
-    def from_env(cls) -> 'StorageConfig':
-        """Create configuration from environment variables"""
-        return cls(
-            enabled=os.getenv('STORAGE_ENABLED', 'false').lower() == 'true',
-            provider=StorageProvider(os.getenv('STORAGE_PROVIDER', 's3')),
-            region=os.getenv('STORAGE_REGION', 'us-east-1'),
-            bucket_name=os.getenv('STORAGE_BUCKET_NAME', 'feed-sync'),
-            access_key=os.getenv('STORAGE_ACCESS_KEY', ''),
-            secret_key=os.getenv('STORAGE_SECRET_KEY', ''),
-            host=os.getenv('STORAGE_HOST', 's3.linode.com'),
-            check_interval=int(os.getenv('STORAGE_CHECK_INTERVAL', '30')),
-            cache_dir=os.getenv('STORAGE_CACHE_DIR', '/tmp/feed_cache'),
-            sync_prefix=os.getenv('STORAGE_SYNC_PREFIX', 'feed-updates/')
-        )
+def load_storage_secrets():
+    """Load storage secrets from config.yaml"""
+    try:
+        config = load_config()
+        storage_config = config.get('storage')
+        
+        if not storage_config:
+            raise ConfigurationError("Missing 'storage' section in config.yaml")
+            
+        # Only load secrets
+        global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY
+        STORAGE_ACCESS_KEY = storage_config.get('access_key', '')
+        STORAGE_SECRET_KEY = storage_config.get('secret_key', '')
+        
+        if STORAGE_ENABLED and (not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY):
+            raise ConfigurationError("Storage access key and secret key must be provided in config.yaml")
+            
+    except Exception as e:
+        logger.error(f"Error loading storage secrets: {e}")
+        raise
 
 # Set up logging with structured format
 logging.basicConfig(
@@ -78,7 +101,10 @@ logging.basicConfig(
 logger = logging.getLogger("object_storage_sync")
 
 # Initialize configuration
-config = StorageConfig.from_env()
+try:
+    load_storage_secrets()
+except Exception as e:
+    logger.error(f"Error loading storage secrets: {e}")
 
 # Check if libcloud is available
 LIBCLOUD_AVAILABLE = False
@@ -144,7 +170,7 @@ class ObjectStorageCacheWrapper:
         Returns:
             str: Unique object name for storage
         """
-        return f"{config.sync_prefix}cache/{SERVER_ID}/{hashlib.md5(key.encode()).hexdigest()}"
+        return f"{STORAGE_SYNC_PREFIX}cache/{SERVER_ID}/{hashlib.md5(key.encode()).hexdigest()}"
         
     def get(self, key: str) -> Any:
         """Get a value from the cache.
@@ -158,7 +184,7 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not config.enabled:
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
             return None
             
         if not init_storage():
@@ -206,7 +232,7 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not config.enabled:
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
             return
             
         if not init_storage():
@@ -258,7 +284,7 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not config.enabled:
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
             return
             
         if not init_storage():
@@ -286,7 +312,7 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not config.enabled:
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
             return False
             
         if not init_storage():
@@ -325,7 +351,7 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not config.enabled:
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
             return []
             
         if not init_storage():
@@ -343,7 +369,7 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not config.enabled:
+        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
             return
             
         if not init_storage():
@@ -352,7 +378,7 @@ class ObjectStorageCacheWrapper:
         with self._cleanup_lock:
             try:
                 # List all cache objects
-                prefix = f"{config.sync_prefix}cache/"
+                prefix = f"{STORAGE_SYNC_PREFIX}cache/"
                 objects = list(_storage_container.list_objects(prefix=prefix))
                 current_time = time.time()
                 
@@ -399,34 +425,6 @@ class ObjectStorageCacheWrapper:
         except Exception as e:
             raise ConfigurationError(f"Failed to configure cache wrapper: {e}")
 
-# Object Storage configuration
-STORAGE_ENABLED = False  # Global switch to enable/disable object storage functionality
-STORAGE_PROVIDER = Provider.S3  # Default provider (S3 protocol)
-STORAGE_REGION = "us-east-1"  # Default region
-STORAGE_BUCKET_NAME = "feed-sync"  # Default bucket name
-STORAGE_ACCESS_KEY = ""
-STORAGE_SECRET_KEY = ""
-STORAGE_HOST = "s3.linode.com"  # For Linode Object Storage
-
-# Sync configuration
-SYNC_PREFIX = "feed-updates/"  # Prefix for feed updates
-CHECK_INTERVAL = 30  # Default interval to check for updates (seconds)
-SERVER_ID = os.getenv("SERVER_ID", hashlib.md5(os.uname().nodename.encode()).hexdigest()[:8])
-CACHE_DIR = "/tmp/feed_cache"  # Local cache directory
-
-# Internal state
-_storage_driver = None
-_storage_container = None
-_watcher_thread = None
-_observer = None
-_file_event_handler = None
-_last_check_time = time.time()
-_last_known_objects = {}  # Cache of known objects
-_sync_running = False
-
-# Callbacks for feed updates
-_feed_update_callbacks = []
-
 def init_storage() -> bool:
     """Initialize storage driver if enabled.
     
@@ -442,38 +440,38 @@ def init_storage() -> bool:
     if not LIBCLOUD_AVAILABLE:
         return False
         
-    if not config.enabled:
+    if not STORAGE_ENABLED:
         return False
     
     if _storage_driver is None:
         try:
             # Validate configuration
-            if not config.access_key or not config.secret_key:
+            if not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY:
                 raise ConfigurationError("Storage access key and secret key must be provided")
                 
             # Get driver class
-            cls = get_driver(config.provider.value)
+            cls = get_driver(STORAGE_PROVIDER)
             
             # Initialize driver with connection pooling
             _storage_driver = cls(
-                config.access_key, 
-                config.secret_key,
-                region=config.region,
-                host=config.host,
+                STORAGE_ACCESS_KEY, 
+                STORAGE_SECRET_KEY,
+                region=STORAGE_REGION,
+                host=STORAGE_HOST,
                 secure=True  # Always use SSL
             )
-            logger.info(f"Storage driver initialized for provider {config.provider.value}")
+            logger.info(f"Storage driver initialized for provider {STORAGE_PROVIDER}")
             
             # Create or get container
             try:
-                _storage_container = _storage_driver.get_container(container_name=config.bucket_name)
-                logger.info(f"Using existing storage container: {config.bucket_name}")
+                _storage_container = _storage_driver.get_container(container_name=STORAGE_BUCKET_NAME)
+                logger.info(f"Using existing storage container: {STORAGE_BUCKET_NAME}")
             except ContainerDoesNotExistError:
-                _storage_container = _storage_driver.create_container(container_name=config.bucket_name)
-                logger.info(f"Created new storage container: {config.bucket_name}")
+                _storage_container = _storage_driver.create_container(container_name=STORAGE_BUCKET_NAME)
+                logger.info(f"Created new storage container: {STORAGE_BUCKET_NAME}")
                 
             # Make sure cache directory exists
-            cache_path = Path(config.cache_dir)
+            cache_path = Path(STORAGE_CACHE_DIR)
             cache_path.mkdir(parents=True, exist_ok=True)
                 
             return True
@@ -497,7 +495,7 @@ def generate_object_name(url):
     """Generate a unique object name for a feed URL"""
     url_hash = hashlib.md5(url.encode()).hexdigest()
     timestamp = int(time.time())
-    return f"{SYNC_PREFIX}{SERVER_ID}/{url_hash}_{timestamp}.json"
+    return f"{STORAGE_SYNC_PREFIX}{SERVER_ID}/{url_hash}_{timestamp}.json"
 
 def publish_feed_update(url, feed_content=None, feed_data=None):
     """Publish feed update to object storage
@@ -575,7 +573,7 @@ def check_for_updates():
     
     try:
         # List objects with our prefix
-        objects = list(_storage_container.list_objects(prefix=SYNC_PREFIX))
+        objects = list(_storage_container.list_objects(prefix=STORAGE_SYNC_PREFIX))
         current_time = time.time()
         
         # Filter out our own updates and process only new ones
@@ -770,7 +768,7 @@ def cleanup_old_updates(max_age_hours=24):
     
     try:
         # List objects with our prefix
-        objects = list(_storage_container.list_objects(prefix=SYNC_PREFIX))
+        objects = list(_storage_container.list_objects(prefix=STORAGE_SYNC_PREFIX))
         current_time = time.time()
         max_age_seconds = max_age_hours * 3600
         
@@ -804,7 +802,9 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
     Raises:
         ConfigurationError: If configuration is invalid
     """
-    global config
+    global STORAGE_ENABLED, STORAGE_PROVIDER, STORAGE_REGION, STORAGE_BUCKET_NAME
+    global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, STORAGE_HOST, STORAGE_CHECK_INTERVAL
+    global STORAGE_CACHE_DIR, STORAGE_SYNC_PREFIX
     
     # If libcloud is not available, always force disabled
     if not LIBCLOUD_AVAILABLE:
@@ -814,20 +814,37 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
     
     try:
         # Update configuration
-        new_config = StorageConfig(
-            enabled=enabled,
-            **{k: v for k, v in kwargs.items() if k in StorageConfig.__dataclass_fields__}
-        )
+        new_config = {
+            'enabled': enabled,
+            'provider': STORAGE_PROVIDER,
+            'region': STORAGE_REGION,
+            'bucket_name': STORAGE_BUCKET_NAME,
+            'access_key': STORAGE_ACCESS_KEY,
+            'secret_key': STORAGE_SECRET_KEY,
+            'host': STORAGE_HOST,
+            'check_interval': STORAGE_CHECK_INTERVAL,
+            'cache_dir': STORAGE_CACHE_DIR,
+            'sync_prefix': STORAGE_SYNC_PREFIX
+        }
         
         # Validate configuration if enabled
-        if new_config.enabled:
-            if not new_config.access_key or not new_config.secret_key:
+        if new_config['enabled']:
+            if not new_config['access_key'] or not new_config['secret_key']:
                 raise ConfigurationError("Storage access key and secret key must be provided")
-            if not new_config.bucket_name:
+            if not new_config['bucket_name']:
                 raise ConfigurationError("Storage bucket name must be provided")
         
-        # Update global configuration
-        config = new_config
+        # Update global variables
+        STORAGE_ENABLED = new_config['enabled']
+        STORAGE_PROVIDER = new_config['provider']
+        STORAGE_REGION = new_config['region']
+        STORAGE_BUCKET_NAME = new_config['bucket_name']
+        STORAGE_ACCESS_KEY = new_config['access_key']
+        STORAGE_SECRET_KEY = new_config['secret_key']
+        STORAGE_HOST = new_config['host']
+        STORAGE_CHECK_INTERVAL = new_config['check_interval']
+        STORAGE_CACHE_DIR = new_config['cache_dir']
+        STORAGE_SYNC_PREFIX = new_config['sync_prefix']
         
         # Reset driver when configuration changes
         global _storage_driver, _storage_container
@@ -835,7 +852,7 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
         _storage_container = None
         
         # Start or stop services based on enabled state
-        if config.enabled:
+        if STORAGE_ENABLED:
             return start_storage_watcher()
         else:
             stop_storage_watcher()
@@ -901,7 +918,7 @@ def generate_file_object_name(file_path):
     """
     file_hash = hashlib.md5(file_path.encode()).hexdigest()
     timestamp = int(time.time())
-    return f"{SYNC_PREFIX}files/{SERVER_ID}/{file_hash}_{timestamp}"
+    return f"{STORAGE_SYNC_PREFIX}files/{SERVER_ID}/{file_hash}_{timestamp}"
 
 def publish_file(file_path, metadata=None):
     """Publish a file to object storage
@@ -985,7 +1002,7 @@ def fetch_file(file_path, force=False):
             
         # List objects with matching prefix
         file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        prefix = f"{SYNC_PREFIX}files/"
+        prefix = f"{STORAGE_SYNC_PREFIX}files/"
         objects = list(_storage_container.list_objects(prefix=prefix))
         
         # Find the latest version of the file
@@ -1051,7 +1068,7 @@ def fetch_file_stream(file_path, force=False):
             
         # List objects with matching prefix
         file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        prefix = f"{SYNC_PREFIX}files/"
+        prefix = f"{STORAGE_SYNC_PREFIX}files/"
         objects = list(_storage_container.list_objects(prefix=prefix))
         
         # Find the latest version of the file
@@ -1109,7 +1126,7 @@ def list_file_versions(file_path):
     
     try:
         versions = []
-        prefix = f"{SYNC_PREFIX}files/"
+        prefix = f"{STORAGE_SYNC_PREFIX}files/"
         objects = list(_storage_container.list_objects(prefix=prefix))
         
         for obj in objects:
