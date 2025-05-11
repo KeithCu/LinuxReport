@@ -293,6 +293,57 @@ class ObjectStorageCacheWrapper:
             oss_config.logger.error(f"Generic error in has() for key {key} (object {object_name}): {e}")
             raise oss_config.StorageOperationError(f"Error checking cache for {key}: {e}")
 
+    def has_feed_expired(self, url: str, last_fetch: Optional[datetime] = None) -> bool:
+        """Check if a feed has expired based on the last fetch time.
+        
+        Args:
+            url: The URL of the feed to check
+            last_fetch: Optional pre-fetched last_fetch timestamp to avoid duplicate calls
+        
+        Returns:
+            True if the feed has expired, False otherwise
+        """
+        if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
+            return True
+            
+        # Get the last fetch time if not provided
+        if last_fetch is None:
+            last_fetch = self.get_last_fetch(url)
+            
+        # If no last fetch time found, the feed has expired
+        if last_fetch is None:
+            return True
+            
+        # We need to import the global history variable from shared module
+        # This is similar to how DiskCacheWrapper handles it
+        from shared import history
+        return history.has_expired(url, last_fetch)
+        
+    def get_last_fetch(self, url: str) -> Optional[datetime]:
+        """Get the last fetch time for a URL from object storage.
+        
+        Args:
+            url: The URL to get the last fetch time for
+            
+        Returns:
+            datetime: The last fetch time or None if not found
+        """
+        # Last fetch is stored with a specific key format
+        last_fetch_key = url + ":last_fetch"
+        return self.get(last_fetch_key)
+        
+    def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
+        """Set the last fetch time for a URL in object storage.
+        
+        Args:
+            url: The URL to set the last fetch time for
+            timestamp: The timestamp to store
+            timeout: Optional expiration time in seconds
+        """
+        # Last fetch is stored with a specific key format
+        last_fetch_key = url + ":last_fetch"
+        self.put(last_fetch_key, timestamp, timeout)
+
     def list_versions(self, key: str) -> List[Dict[str, Any]]:
         """List all versions of a cache entry (not typically supported by simple key-value object storage).
         This method might be a misnomer if the backend doesn't support versioning for these cache objects.
@@ -302,98 +353,7 @@ class ObjectStorageCacheWrapper:
         oss_config.logger.warning("list_versions is not meaningfully implemented for ObjectStorageCacheWrapper as cache objects are typically not versioned this way.")
         return []
 
-    def cleanup_expired(self) -> None:
-        """Clean up expired cache objects from storage.
-        This requires listing objects and checking their metadata or content.
-        """
-        if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
-            return
-        if not oss_config.init_storage():
-            return
-
-        oss_config.logger.info("Starting cleanup of expired cache objects...")
-        cleaned_count = 0
-        try:
-            # Prefix for all cache objects managed by this wrapper logic.
-            # Note: This will list objects across all server_ids if not further filtered by metadata.
-            # The _get_object_name format is f"{oss_config.STORAGE_SYNC_PREFIX}cache/{oss_config.SERVER_ID}/{key_hash}"
-            # So, to cleanup for *this* server_id, the prefix should include it.
-            # Or, we can list broadly and then filter by 'server_id' in metadata if that's reliable.
-            # For simplicity, let's list all under .../cache/ and check metadata.
             
-            # A safer prefix if we only want to clean THIS server's cache entries:
-            # list_prefix = f"{oss_config.STORAGE_SYNC_PREFIX}cache/{oss_config.SERVER_ID}/"
-            # Broad prefix to check all cache entries (might be slow, needs filtering)
-            list_prefix = f"{oss_config.STORAGE_SYNC_PREFIX}cache/"
-
-            objects = oss_config._storage_container.list_objects(prefix=list_prefix)
-            
-            current_timestamp = time.time()
-            for obj in objects:
-                # Only process objects that look like cache entries based on our naming or metadata
-                if not obj.name.startswith(list_prefix): # Basic sanity check
-                    continue
-
-                expired = False
-                obj_meta = obj.meta_data
-                if obj_meta:
-                    # Check 'type' metadata if we set it reliably
-                    if obj_meta.get('type') == 'cache_entry':
-                        expires_str = obj_meta.get('expires')
-                        if expires_str:
-                            try:
-                                expires = float(expires_str)
-                                if expires != float('inf') and current_timestamp > expires:
-                                    expired = True
-                            except ValueError:
-                                oss_config.logger.warning(f"Invalid 'expires' metadata '{expires_str}' for object {obj.name} during cleanup. Skipping.")
-                                continue # Skip this object if metadata is corrupt
-                        else:
-                            # No 'expires' metadata, can't determine expiry from metadata alone.
-                            # Could attempt to download and check content, but that's expensive for cleanup.
-                            # For now, only delete if 'expires' metadata says so.
-                            # oss_config.logger.debug(f"Object {obj.name} has no 'expires' metadata. Skipping cleanup for this object.")
-                            continue
-                    else:
-                        # Not marked as a cache_entry by this wrapper, skip.
-                        # oss_config.logger.debug(f"Object {obj.name} is not of type 'cache_entry' by metadata. Skipping cleanup.")
-                        continue
-                else:
-                    # No metadata, cannot safely determine if it's an expired cache entry we manage.
-                    # oss_config.logger.debug(f"Object {obj.name} has no metadata. Skipping cleanup for this object.")
-                    continue
-
-                if expired:
-                    try:
-                        oss_config.logger.info(f"Deleting expired cache object: {obj.name}")
-                        oss_config._storage_container.delete_object(obj)
-                        cleaned_count += 1
-                    except oss_config.ObjectDoesNotExistError:
-                        oss_config.logger.debug(f"Cache object {obj.name} already deleted during cleanup scan.")
-                    except oss_config.LibcloudError as e:
-                        oss_config.logger.error(f"Libcloud error deleting expired cache object {obj.name}: {e}")
-                    except Exception as e:
-                        oss_config.logger.error(f"Unexpected error deleting expired cache object {obj.name}: {e}")
-            
-            oss_config.logger.info(f"Cache cleanup finished. Deleted {cleaned_count} expired objects.")
-
-        except oss_config.LibcloudError as e:
-            oss_config.logger.error(f"Libcloud error during cache cleanup: {e}")
-        except Exception as e:
-            oss_config.logger.error(f"Unexpected error during cache cleanup: {e}")
-            
-    def start_watcher(self) -> bool:
-        """Start a watcher for cache changes (Not typically applicable for object storage cache).
-        This seems like a remnant from a file-based cache.
-        Object storage cache updates are explicit (put, delete).
-        """
-        oss_config.logger.warning("start_watcher is not applicable for ObjectStorageCacheWrapper and has no effect.")
-        return False # Or True, but indicate it does nothing.
-
-    def stop_watcher(self) -> None:
-        """Stop the cache watcher (Not applicable)."""
-        oss_config.logger.warning("stop_watcher is not applicable for ObjectStorageCacheWrapper and has no effect.")
-
     def configure(self, enabled: bool = False, **kwargs) -> bool:
         """Configure cache-specific settings or re-initialize based on global config.
         This method primarily ensures that the cache reflects the global STORAGE_ENABLED state.
