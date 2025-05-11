@@ -194,6 +194,7 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
     - Can support dozens of backend servers with minimal overhead
     - Acceptable for feeds that update hourly
   - **Real-time approach:** Implement ZMQ for immediate feed update notifications
+    - Note: A prototype ZMQ implementation was developed but removed from the repository as Object Storage was chosen as the preferred solution. The ZMQ approach remains viable for future implementations if real-time updates become a priority.
 - **Cost:** $96+/month + storage and CDN costs
 - **When to implement:** When approaching 20-30 front-end servers or when a single backend server reaches 70-80% CPU usage
 

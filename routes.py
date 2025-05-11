@@ -39,7 +39,7 @@ UPLOAD_FOLDER = PATH + WEB_UPLOAD_PATH # Define absolute upload folder for serve
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'} # Allowed image types
 MAX_IMAGE_SIZE = 5 * 1024 * 1024 # 5 MB
 
-# Common web bot user agents that should not trigger background refreshes
+# Common webbot user agents that should not trigger background refreshes
 WEB_BOT_USER_AGENTS = [
     # Google Crawlers
     "Googlebot",
@@ -248,22 +248,6 @@ def init_app(flask_app):
             if not is_web_bot:
                 fetch_urls_thread()
                 
-                # Notify other servers via ZeroMQ that feeds are being refreshed
-                try:
-                    # First check if zmq module is installed
-                    import importlib.util
-                    zmq_spec = importlib.util.find_spec("zmq")
-                    if zmq_spec is not None:
-                        # Only import if ZeroMQ is installed
-                        from zmq_feed_sync import publish_feed_update
-                        # Notify about URLs that need refreshing
-                        for url in page_order:
-                            if ALL_URLS.get(url) and g_c.has_feed_expired(url, last_fetch_cache.get(url)):
-                                publish_feed_update(url, {"action": "refresh_started", "timestamp": datetime.datetime.utcnow().isoformat()})
-                except Exception as e:
-                    # Silently handle errors to avoid disrupting main workflow
-                    pass
-
         return page
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
@@ -375,25 +359,6 @@ def init_app(flask_app):
                 # Clear all page caches since headlines have changed
                 clear_page_caches()
                 
-                # Notify other servers via ZeroMQ that headlines have been updated
-                try:
-                    # First check if zmq module is installed
-                    import importlib.util
-                    zmq_spec = importlib.util.find_spec("zmq")
-                    if zmq_spec is not None:
-                        # Only import if ZeroMQ is installed
-                        from zmq_feed_sync import publish_feed_update
-                        # Special message type for headline updates
-                        publish_feed_update("headlines_update", {
-                            "mode": str(MODE),
-                            "file": ABOVE_HTML_FILE,
-                            "action": "headlines_updated",
-                            "timestamp": datetime.datetime.utcnow().isoformat()
-                        })
-                except Exception as e:
-                    # Silently handle errors to avoid disrupting main workflow
-                    pass
-
             page_order = []
 
             # Only process URL customization if enabled
