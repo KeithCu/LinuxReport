@@ -30,6 +30,9 @@ from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 from config_utils import get_admin_password
 
+# Global setting for background refreshes
+ENABLE_BACKGROUND_REFRESH = os.environ.get('ENABLE_BACKGROUND_REFRESH', '1') == '1'
+
 # Constants for Chat Feature
 MAX_COMMENTS = 1000
 COMMENTS_KEY = "chat_comments"
@@ -245,7 +248,7 @@ def init_app(flask_app):
             user_agent = request.headers.get('User-Agent', '')
             is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
             
-            if not is_web_bot:
+            if not is_web_bot and ENABLE_BACKGROUND_REFRESH:
                 fetch_urls_thread()
                 
         return page
