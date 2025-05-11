@@ -3,4 +3,9 @@
 
 # Admin settings
 admin:
-  password: "LinuxReportAdmin2024" 
+  password: "LinuxReportAdmin2024"
+
+# Storage settings - only secrets here
+storage:
+  access_key: ""  # Add your access key here
+  secret_key: ""  # Add your secret key here 
