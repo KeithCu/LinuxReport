@@ -11,14 +11,74 @@ import os
 import hashlib
 from datetime import datetime
 import logging
-from typing import Any, Optional
+from typing import Any, Optional, Dict, List
+from dataclasses import dataclass
+from enum import Enum
+import os.path
+from pathlib import Path
 
-# Set up logging
+# Custom exceptions
+class StorageError(Exception):
+    """Base exception for storage-related errors"""
+    pass
+
+class ConfigurationError(StorageError):
+    """Raised when there are issues with configuration"""
+    pass
+
+class StorageConnectionError(StorageError):
+    """Raised when there are issues connecting to storage"""
+    pass
+
+class StorageOperationError(StorageError):
+    """Raised when storage operations fail"""
+    pass
+
+# Storage provider enum
+class StorageProvider(Enum):
+    S3 = "s3"
+    LINODE = "linode"
+    LOCAL = "local"
+
+@dataclass
+class StorageConfig:
+    """Configuration for object storage"""
+    enabled: bool = False
+    provider: StorageProvider = StorageProvider.S3
+    region: str = "us-east-1"
+    bucket_name: str = "feed-sync"
+    access_key: str = ""
+    secret_key: str = ""
+    host: str = "s3.linode.com"
+    check_interval: int = 30
+    cache_dir: str = "/tmp/feed_cache"
+    sync_prefix: str = "feed-updates/"
+    
+    @classmethod
+    def from_env(cls) -> 'StorageConfig':
+        """Create configuration from environment variables"""
+        return cls(
+            enabled=os.getenv('STORAGE_ENABLED', 'false').lower() == 'true',
+            provider=StorageProvider(os.getenv('STORAGE_PROVIDER', 's3')),
+            region=os.getenv('STORAGE_REGION', 'us-east-1'),
+            bucket_name=os.getenv('STORAGE_BUCKET_NAME', 'feed-sync'),
+            access_key=os.getenv('STORAGE_ACCESS_KEY', ''),
+            secret_key=os.getenv('STORAGE_SECRET_KEY', ''),
+            host=os.getenv('STORAGE_HOST', 's3.linode.com'),
+            check_interval=int(os.getenv('STORAGE_CHECK_INTERVAL', '30')),
+            cache_dir=os.getenv('STORAGE_CACHE_DIR', '/tmp/feed_cache'),
+            sync_prefix=os.getenv('STORAGE_SYNC_PREFIX', 'feed-updates/')
+        )
+
+# Set up logging with structured format
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger("object_storage_sync")
+
+# Initialize configuration
+config = StorageConfig.from_env()
 
 # Check if libcloud is available
 LIBCLOUD_AVAILABLE = False
@@ -56,18 +116,35 @@ class ObjectStorageCacheWrapper:
         
         Args:
             cache_dir: Base directory for local cache operations (used for temporary storage)
+            
+        Raises:
+            ConfigurationError: If cache directory cannot be created
         """
-        self.cache_dir = cache_dir
+        self.cache_dir = Path(cache_dir)
         self._ensure_cache_dir()
+        self._cleanup_lock = threading.Lock()
         
     def _ensure_cache_dir(self) -> None:
-        """Ensure the cache directory exists."""
-        if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+        """Ensure the cache directory exists.
+        
+        Raises:
+            ConfigurationError: If directory cannot be created
+        """
+        try:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            raise ConfigurationError(f"Failed to create cache directory: {e}")
             
     def _get_object_name(self, key: str) -> str:
-        """Generate a unique object name for a cache key."""
-        return f"{SYNC_PREFIX}cache/{SERVER_ID}/{hashlib.md5(key.encode()).hexdigest()}"
+        """Generate a unique object name for a cache key.
+        
+        Args:
+            key: The cache key
+            
+        Returns:
+            str: Unique object name for storage
+        """
+        return f"{config.sync_prefix}cache/{SERVER_ID}/{hashlib.md5(key.encode()).hexdigest()}"
         
     def get(self, key: str) -> Any:
         """Get a value from the cache.
@@ -77,8 +154,11 @@ class ObjectStorageCacheWrapper:
             
         Returns:
             The cached value or None if not found
+            
+        Raises:
+            StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        if not LIBCLOUD_AVAILABLE or not config.enabled:
             return None
             
         if not init_storage():
@@ -109,9 +189,11 @@ class ObjectStorageCacheWrapper:
                 return None
                 
             return data.get('value')
-        except Exception as e:
-            logger.error(f"Error getting cache value for {key}: {e}")
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON in cache for key {key}: {e}")
             return None
+        except Exception as e:
+            raise StorageOperationError(f"Error getting cache value for {key}: {e}")
             
     def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
         """Store a value in the cache.
@@ -120,13 +202,17 @@ class ObjectStorageCacheWrapper:
             key: The cache key
             value: The value to store
             timeout: Optional expiration time in seconds
+            
+        Raises:
+            StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        if not LIBCLOUD_AVAILABLE or not config.enabled:
             return
             
         if not init_storage():
             return
             
+        temp_path = None
         try:
             object_name = self._get_object_name(key)
             
@@ -138,7 +224,7 @@ class ObjectStorageCacheWrapper:
             }
             
             # Write to temporary file
-            temp_path = os.path.join(self.cache_dir, f"temp_{int(time.time())}")
+            temp_path = self.cache_dir / f"temp_{int(time.time())}"
             with open(temp_path, 'w') as f:
                 json.dump(data, f)
                 
@@ -151,24 +237,28 @@ class ObjectStorageCacheWrapper:
                 'server_id': SERVER_ID
             }
             
-            publish_file(temp_path, metadata)
-            
-            # Clean up temp file
-            try:
-                os.remove(temp_path)
-            except:
-                pass
+            publish_file(str(temp_path), metadata)
                 
         except Exception as e:
-            logger.error(f"Error putting cache value for {key}: {e}")
+            raise StorageOperationError(f"Error putting cache value for {key}: {e}")
+        finally:
+            # Clean up temp file
+            if temp_path and temp_path.exists():
+                try:
+                    temp_path.unlink()
+                except Exception as e:
+                    logger.warning(f"Failed to clean up temporary file {temp_path}: {e}")
             
     def delete(self, key: str) -> None:
         """Delete a value from the cache.
         
         Args:
             key: The cache key to delete
+            
+        Raises:
+            StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        if not LIBCLOUD_AVAILABLE or not config.enabled:
             return
             
         if not init_storage():
@@ -182,7 +272,7 @@ class ObjectStorageCacheWrapper:
                 delete_file_version(version['object_name'])
                 
         except Exception as e:
-            logger.error(f"Error deleting cache value for {key}: {e}")
+            raise StorageOperationError(f"Error deleting cache value for {key}: {e}")
             
     def has(self, key: str) -> bool:
         """Check if a key exists in the cache.
@@ -192,8 +282,11 @@ class ObjectStorageCacheWrapper:
             
         Returns:
             True if the key exists and is not expired, False otherwise
+            
+        Raises:
+            StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        if not LIBCLOUD_AVAILABLE or not config.enabled:
             return False
             
         if not init_storage():
@@ -218,10 +311,9 @@ class ObjectStorageCacheWrapper:
             return True
             
         except Exception as e:
-            logger.error(f"Error checking cache for {key}: {e}")
-            return False
+            raise StorageOperationError(f"Error checking cache for {key}: {e}")
             
-    def list_versions(self, key: str) -> list:
+    def list_versions(self, key: str) -> List[Dict[str, Any]]:
         """List all versions of a cache entry.
         
         Args:
@@ -229,8 +321,11 @@ class ObjectStorageCacheWrapper:
             
         Returns:
             List of version objects with metadata
+            
+        Raises:
+            StorageOperationError: If there are issues with storage operations
         """
-        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        if not LIBCLOUD_AVAILABLE or not config.enabled:
             return []
             
         if not init_storage():
@@ -240,34 +335,39 @@ class ObjectStorageCacheWrapper:
             object_name = self._get_object_name(key)
             return list_file_versions(object_name)
         except Exception as e:
-            logger.error(f"Error listing versions for {key}: {e}")
-            return []
+            raise StorageOperationError(f"Error listing versions for {key}: {e}")
             
     def cleanup_expired(self) -> None:
-        """Clean up expired cache entries."""
-        if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        """Clean up expired cache entries.
+        
+        Raises:
+            StorageOperationError: If there are issues with storage operations
+        """
+        if not LIBCLOUD_AVAILABLE or not config.enabled:
             return
             
         if not init_storage():
             return
             
-        try:
-            # List all cache objects
-            prefix = f"{SYNC_PREFIX}cache/"
-            objects = list(_storage_container.list_objects(prefix=prefix))
-            current_time = time.time()
-            
-            for obj in objects:
-                try:
-                    # Check expiration
-                    expires = float(obj.meta_data.get('expires', 'inf'))
-                    if expires != float('inf') and current_time > expires:
-                        delete_file_version(obj.name)
-                except:
-                    continue
-                    
-        except Exception as e:
-            logger.error(f"Error cleaning up expired cache entries: {e}")
+        with self._cleanup_lock:
+            try:
+                # List all cache objects
+                prefix = f"{config.sync_prefix}cache/"
+                objects = list(_storage_container.list_objects(prefix=prefix))
+                current_time = time.time()
+                
+                for obj in objects:
+                    try:
+                        # Check expiration
+                        expires = float(obj.meta_data.get('expires', 'inf'))
+                        if expires != float('inf') and current_time > expires:
+                            delete_file_version(obj.name)
+                    except Exception as e:
+                        logger.warning(f"Error processing object during cleanup: {e}")
+                        continue
+                        
+            except Exception as e:
+                raise StorageOperationError(f"Error cleaning up expired cache entries: {e}")
             
     def start_watcher(self) -> bool:
         """Start the background watcher for cache updates.
@@ -290,8 +390,14 @@ class ObjectStorageCacheWrapper:
             
         Returns:
             True if configuration was successful
+            
+        Raises:
+            ConfigurationError: If configuration fails
         """
-        return configure_storage(enabled=enabled, **kwargs)
+        try:
+            return configure_storage(enabled=enabled, **kwargs)
+        except Exception as e:
+            raise ConfigurationError(f"Failed to configure cache wrapper: {e}")
 
 # Object Storage configuration
 STORAGE_ENABLED = False  # Global switch to enable/disable object storage functionality
@@ -321,44 +427,60 @@ _sync_running = False
 # Callbacks for feed updates
 _feed_update_callbacks = []
 
-def init_storage():
-    """Initialize storage driver if enabled"""
+def init_storage() -> bool:
+    """Initialize storage driver if enabled.
+    
+    Returns:
+        bool: True if initialization was successful
+        
+    Raises:
+        StorageConnectionError: If there are issues connecting to storage
+        ConfigurationError: If configuration is invalid
+    """
     global _storage_driver, _storage_container
     
     if not LIBCLOUD_AVAILABLE:
         return False
         
-    if not STORAGE_ENABLED:
+    if not config.enabled:
         return False
     
     if _storage_driver is None:
         try:
-            cls = get_driver(STORAGE_PROVIDER)
+            # Validate configuration
+            if not config.access_key or not config.secret_key:
+                raise ConfigurationError("Storage access key and secret key must be provided")
+                
+            # Get driver class
+            cls = get_driver(config.provider.value)
+            
+            # Initialize driver with connection pooling
             _storage_driver = cls(
-                STORAGE_ACCESS_KEY, 
-                STORAGE_SECRET_KEY,
-                region=STORAGE_REGION,
-                host=STORAGE_HOST
+                config.access_key, 
+                config.secret_key,
+                region=config.region,
+                host=config.host,
+                secure=True  # Always use SSL
             )
-            logger.info(f"Storage driver initialized for provider {STORAGE_PROVIDER}")
+            logger.info(f"Storage driver initialized for provider {config.provider.value}")
             
             # Create or get container
             try:
-                _storage_container = _storage_driver.get_container(container_name=STORAGE_BUCKET_NAME)
-                logger.info(f"Using existing storage container: {STORAGE_BUCKET_NAME}")
+                _storage_container = _storage_driver.get_container(container_name=config.bucket_name)
+                logger.info(f"Using existing storage container: {config.bucket_name}")
             except ContainerDoesNotExistError:
-                _storage_container = _storage_driver.create_container(container_name=STORAGE_BUCKET_NAME)
-                logger.info(f"Created new storage container: {STORAGE_BUCKET_NAME}")
+                _storage_container = _storage_driver.create_container(container_name=config.bucket_name)
+                logger.info(f"Created new storage container: {config.bucket_name}")
                 
             # Make sure cache directory exists
-            if not os.path.exists(CACHE_DIR):
-                os.makedirs(CACHE_DIR)
+            cache_path = Path(config.cache_dir)
+            cache_path.mkdir(parents=True, exist_ok=True)
                 
             return True
         except Exception as e:
-            logger.error(f"Error initializing storage driver: {e}")
             _storage_driver = None
-            return False
+            _storage_container = None
+            raise StorageConnectionError(f"Error initializing storage driver: {e}")
     
     return True
 
@@ -669,70 +791,79 @@ def cleanup_old_updates(max_age_hours=24):
     except Exception as e:
         logger.error(f"Error cleaning up old updates: {e}")
 
-def configure_storage(enabled=False, provider=None, region=None, bucket_name=None, 
-                     access_key=None, secret_key=None, host=None, check_interval=None):
-    """Configure object storage settings
+def configure_storage(enabled: bool = False, **kwargs) -> bool:
+    """Configure object storage settings.
     
     Args:
         enabled: Whether to enable object storage functionality
-        provider: Storage provider (Provider.S3, etc.)
-        region: Storage region
-        bucket_name: Storage bucket name
-        access_key: Storage access key
-        secret_key: Storage secret key
-        host: Storage host (for S3-compatible storage)
-        check_interval: Interval to check for updates (seconds)
+        **kwargs: Additional configuration options
+        
+    Returns:
+        bool: True if configuration was successful
+        
+    Raises:
+        ConfigurationError: If configuration is invalid
     """
-    global STORAGE_ENABLED, STORAGE_PROVIDER, STORAGE_REGION, STORAGE_BUCKET_NAME
-    global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, STORAGE_HOST, CHECK_INTERVAL
+    global config
     
     # If libcloud is not available, always force disabled
     if not LIBCLOUD_AVAILABLE:
-        STORAGE_ENABLED = False
         if enabled:
             logger.warning("apache-libcloud is not installed. Feed synchronization remains disabled.")
         return False
     
-    was_enabled = STORAGE_ENABLED
-    STORAGE_ENABLED = enabled
+    try:
+        # Update configuration
+        new_config = StorageConfig(
+            enabled=enabled,
+            **{k: v for k, v in kwargs.items() if k in StorageConfig.__dataclass_fields__}
+        )
+        
+        # Validate configuration if enabled
+        if new_config.enabled:
+            if not new_config.access_key or not new_config.secret_key:
+                raise ConfigurationError("Storage access key and secret key must be provided")
+            if not new_config.bucket_name:
+                raise ConfigurationError("Storage bucket name must be provided")
+        
+        # Update global configuration
+        config = new_config
+        
+        # Reset driver when configuration changes
+        global _storage_driver, _storage_container
+        _storage_driver = None
+        _storage_container = None
+        
+        # Start or stop services based on enabled state
+        if config.enabled:
+            return start_storage_watcher()
+        else:
+            stop_storage_watcher()
+            return True
+            
+    except Exception as e:
+        raise ConfigurationError(f"Failed to configure storage: {e}")
+
+def cleanup_storage() -> None:
+    """Clean up storage resources.
     
-    # Update configuration if provided
-    if provider is not None:
-        STORAGE_PROVIDER = provider
-    
-    if region is not None:
-        STORAGE_REGION = region
-    
-    if bucket_name is not None:
-        STORAGE_BUCKET_NAME = bucket_name
-    
-    if access_key is not None:
-        STORAGE_ACCESS_KEY = access_key
-    
-    if secret_key is not None:
-        STORAGE_SECRET_KEY = secret_key
-    
-    if host is not None:
-        STORAGE_HOST = host
-    
-    if check_interval is not None:
-        CHECK_INTERVAL = check_interval
-    
-    # Reset driver when configuration changes
+    This should be called when shutting down the application.
+    """
     global _storage_driver, _storage_container
-    _storage_driver = None
-    _storage_container = None
     
-    # Start or stop services based on enabled state
-    if STORAGE_ENABLED:
-        if was_enabled:
-            # If it was already enabled, restart services
-            stop_storage_watcher()
-        return start_storage_watcher()
-    else:
-        if was_enabled:
-            stop_storage_watcher()
-        return False
+    try:
+        stop_storage_watcher()
+        stop_file_watcher()
+        
+        # Close any open connections
+        if _storage_driver is not None:
+            _storage_driver = None
+        if _storage_container is not None:
+            _storage_container = None
+            
+        logger.info("Storage resources cleaned up")
+    except Exception as e:
+        logger.error(f"Error cleaning up storage resources: {e}")
 
 def get_file_metadata(file_path):
     """Get metadata for a file including hash and timestamp
