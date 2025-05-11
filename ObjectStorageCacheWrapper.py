@@ -32,10 +32,20 @@ class ObjectStorageCacheWrapper:
         Args:
             cache_dir: Base directory for local cache operations (used for temporary storage)
             local_cache_expiry: Time in seconds for local in-memory cache entries to expire
+            
+        Raises:
+            ConfigurationError: If object storage is not available or not properly configured
         """
         self.cache_dir = Path(cache_dir)
         self._ensure_cache_dir()
         self.local_cache_expiry = local_cache_expiry
+        
+        # Check storage configuration upfront
+        if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
+            raise oss_config.ConfigurationError("Object storage is not available or not enabled")
+            
+        if not oss_config.init_storage():
+            raise oss_config.ConfigurationError("Failed to initialize object storage")
         
     def _ensure_cache_dir(self) -> None:
         """Ensure the cache directory exists."""
@@ -63,13 +73,6 @@ class ObjectStorageCacheWrapper:
         cached_value = g_cm.get(memory_cache_key)
         if cached_value is not None:
             return cached_value
-            
-        # Not found in memory cache, try object storage
-        if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
-            return None
-            
-        if not oss_config.init_storage():
-            return None
             
         try:
             object_name = self._get_object_name(key)
@@ -116,12 +119,6 @@ class ObjectStorageCacheWrapper:
         memory_cache_key = self._get_memory_cache_key(key)
         g_cm.set(memory_cache_key, value, ttl=self.local_cache_expiry)
         
-        if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
-            return
-            
-        if not oss_config.init_storage():
-            return
-            
         object_name = self._get_object_name(key)
         data_stream = None
         try:
@@ -161,12 +158,6 @@ class ObjectStorageCacheWrapper:
         memory_cache_key = self._get_memory_cache_key(key)
         g_cm.delete(memory_cache_key)
         
-        if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
-            return
-            
-        if not oss_config.init_storage():
-            return
-            
         object_name = self._get_object_name(key)
         try:
             obj_to_delete = oss_config._storage_container.get_object(object_name=object_name)
@@ -182,13 +173,7 @@ class ObjectStorageCacheWrapper:
         memory_cache_key = self._get_memory_cache_key(key)
         if g_cm.has(memory_cache_key):
             return True
-            
-        if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
-            return False
-            
-        if not oss_config.init_storage():
-            return False
-            
+        
         object_name = self._get_object_name(key)
         try:
             oss_config._storage_container.get_object(object_name=object_name)
