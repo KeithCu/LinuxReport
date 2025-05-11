@@ -10,148 +10,31 @@ import json
 import os
 import hashlib
 from datetime import datetime
-import logging
-from typing import Any, Optional, Dict, List
-from dataclasses import dataclass
-from enum import Enum
 import os.path
 from pathlib import Path
+from io import BytesIO
 from config_utils import load_config
-from io import BytesIO # Ensure BytesIO is imported for fetch_file_stream if used directly for content
-from libcloud.common.types import LibcloudError # For more specific exception handling
+from typing import Any, Optional, Dict, List
 
-
-# Callbacks for feed updates
-_feed_update_callbacks = []
-
-# Custom exceptions
-class StorageError(Exception):
-    """Base exception for storage-related errors"""
-    pass
-
-class ConfigurationError(StorageError):
-    """Raised when there are issues with configuration"""
-    pass
-
-class StorageConnectionError(StorageError):
-    """Raised when there are issues connecting to storage"""
-    pass
-
-class StorageOperationError(StorageError):
-    """Raised when storage operations fail"""
-    pass
-
-# Storage provider enum
-class StorageProvider(Enum):
-    S3 = "s3"
-    LINODE = "linode"
-    LOCAL = "local"
-
-
-# Set up logging with structured format
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# Import from object_storage_config
+from object_storage_config import (
+    logger, LIBCLOUD_AVAILABLE, WATCHDOG_AVAILABLE, STORAGE_ENABLED,
+    StorageError, ConfigurationError, StorageConnectionError, StorageOperationError,
+    StorageProvider, init_storage, SERVER_ID, STORAGE_SYNC_PREFIX,
+    CHECK_INTERVAL, STORAGE_CACHE_DIR, STORAGE_BUCKET_NAME, STORAGE_ACCESS_KEY,
+    STORAGE_SECRET_KEY, STORAGE_PROVIDER, STORAGE_REGION, STORAGE_HOST,
+    STORAGE_CHECK_INTERVAL, STORAGE_SYNC_PREFIX,
+    _feed_update_callbacks, _storage_driver, _storage_container,
+    _last_check_time, _last_known_objects, _sync_running, _secrets_loaded,
+    _watcher_thread, _observer, _file_event_handler
 )
-logger = logging.getLogger("object_storage_sync")
 
-# Initialize configuration
-# try:
-#     load_storage_secrets() # Removed top-level call for II.1
-# except Exception as e:
-#     logger.error(f"Error loading storage secrets: {e}")
-
-# Check if libcloud is available
-LIBCLOUD_AVAILABLE = False
-try:
+# Ensure libcloud imports are available when needed
+if LIBCLOUD_AVAILABLE:
     from libcloud.storage.types import Provider, ContainerDoesNotExistError, ObjectDoesNotExistError
     from libcloud.storage.providers import get_driver
     from libcloud.storage.base import Object
-    import libcloud.security
-    
-    # Disable SSL verification for development
-    # libcloud.security.VERIFY_SSL_CERT = False
-    
-    LIBCLOUD_AVAILABLE = True
-except ImportError:
-    logger.warning("apache-libcloud is not installed. Object Storage feed synchronization will be disabled.")
-
-# Check if watchdog is available for file change monitoring
-WATCHDOG_AVAILABLE = False
-try:
-    from watchdog.observers import Observer
-    from watchdog.events import FileSystemEventHandler
-    WATCHDOG_AVAILABLE = True
-except ImportError:
-    logger.warning("watchdog is not installed. File change monitoring will be disabled.")
-
-
-def init_storage() -> bool:
-    """Initialize storage driver if enabled.
-    
-    Returns:
-        bool: True if initialization was successful
-        
-    Raises:
-        StorageConnectionError: If there are issues connecting to storage
-        ConfigurationError: If configuration is invalid
-    """
-    global _storage_driver, _storage_container
-    
-    if not LIBCLOUD_AVAILABLE:
-        logger.info("Libcloud not available. Storage functionality disabled.")
-        return False
-        
-    if not STORAGE_ENABLED:
-        logger.info("Storage is not enabled in configuration.")
-        return False
-    
-    if _storage_driver is None:
-        try:
-            # Validate configuration
-            if not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY:
-                raise ConfigurationError("Storage access key and secret key must be provided")
-                
-            # Get driver class
-            cls = get_driver(STORAGE_PROVIDER)
-            
-            # Initialize driver with connection pooling
-            _storage_driver = cls(
-                STORAGE_ACCESS_KEY, 
-                STORAGE_SECRET_KEY,
-                region=STORAGE_REGION,
-                host=STORAGE_HOST,
-                secure=True  # Always use SSL
-            )
-            logger.info(f"Storage driver initialized for provider {STORAGE_PROVIDER}")
-            
-            # Create or get container
-            try:
-                _storage_container = _storage_driver.get_container(container_name=STORAGE_BUCKET_NAME)
-                logger.info(f"Using existing storage container: {STORAGE_BUCKET_NAME}")
-            except ContainerDoesNotExistError:
-                _storage_container = _storage_driver.create_container(container_name=STORAGE_BUCKET_NAME)
-                logger.info(f"Created new storage container: {STORAGE_BUCKET_NAME}")
-                
-            # Make sure cache directory exists
-            cache_path = Path(STORAGE_CACHE_DIR)
-            cache_path.mkdir(parents=True, exist_ok=True)
-                
-            return True
-        except LibcloudError as e: # Catch specific libcloud errors during driver init/container ops
-            _storage_driver = None
-            _storage_container = None
-            raise StorageConnectionError(f"Libcloud error initializing storage driver: {e}")
-        except OSError as e: # Catch errors related to cache_path.mkdir
-            _storage_driver = None
-            _storage_container = None
-            raise ConfigurationError(f"Failed to create cache directory during storage init {STORAGE_CACHE_DIR}: {e}")
-        except Exception as e: # General fallback for other init issues
-            _storage_driver = None
-            _storage_container = None
-            raise StorageConnectionError(f"Error initializing storage driver: {e}")
-    
-    return True
+    from libcloud.common.types import LibcloudError
 
 def register_feed_update_callback(cb):
     """Register a callback function to be called when feed updates are received
@@ -170,7 +53,6 @@ def generate_object_name(url):
 
 def check_for_updates():
     """Check object storage for new feed updates from other servers"""
-    global _last_check_time, _last_known_objects
     
     if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
         return
@@ -213,7 +95,6 @@ def check_for_updates():
 
 def _process_single_remote_update(obj: Object, current_time: float): # Added V.2
     """Helper function to process a single object update from storage."""
-    global _last_known_objects
     try:
         # Download and process the object
         process_update_object(obj) # process_update_object already handles download, parse, callbacks
@@ -277,12 +158,12 @@ def process_update_object(obj):
 
 def storage_watcher_thread():
     """Background thread function to periodically check for updates"""
-    global _sync_running
     
     if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
         return
         
     logger.info("Storage watcher thread started")
+    global _sync_running
     _sync_running = True
     
     while _sync_running:
@@ -317,13 +198,12 @@ class FeedFileEventHandler(FileSystemEventHandler):
                     publish_feed_update(feed_url, feed_content)
                     logger.info(f"Published feed update for {feed_url} triggered by file change")
             except IOError as e: # For file read error
-                logger.error(f"I/O error handling file modification for {feed_url}: {e}")
+                logger.error(f"I/O error handling file modification for {event.src_path}: {e}")
             except Exception as e:
                 logger.error(f"Error handling file modification: {e}")
 
 def start_file_watcher(watch_dir):
     """Start watching a directory for file changes to automatically publish feed updates"""
-    global _observer, _file_event_handler
     
     if not WATCHDOG_AVAILABLE:
         logger.warning("Cannot start file watcher: watchdog module not available")
@@ -334,6 +214,7 @@ def start_file_watcher(watch_dir):
         return True
     
     try:
+        global _file_event_handler, _observer
         _file_event_handler = FeedFileEventHandler()
         _observer = Observer()
         _observer.schedule(_file_event_handler, watch_dir, recursive=False)
@@ -347,17 +228,16 @@ def start_file_watcher(watch_dir):
 
 def stop_file_watcher():
     """Stop the file watcher"""
-    global _observer
     
     if _observer is not None:
         _observer.stop()
         _observer.join()
+        global _observer
         _observer = None
         logger.info("File watcher stopped")
 
 def start_storage_watcher():
     """Start the background thread for checking storage updates"""
-    global _watcher_thread
     
     if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
         return False
@@ -366,6 +246,7 @@ def start_storage_watcher():
         return True  # Already running
         
     if init_storage():
+        global _watcher_thread
         _watcher_thread = threading.Thread(target=storage_watcher_thread, daemon=True)
         _watcher_thread.start()
         logger.info("Storage watcher started")
@@ -375,8 +256,8 @@ def start_storage_watcher():
 
 def stop_storage_watcher():
     """Stop the storage watcher thread"""
-    global _sync_running
     
+    global _sync_running
     _sync_running = False
     if _watcher_thread is not None:
         # Wait for thread to finish
@@ -441,11 +322,6 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
     Raises:
         ConfigurationError: If configuration is invalid
     """
-    global STORAGE_ENABLED, STORAGE_PROVIDER, STORAGE_REGION, STORAGE_BUCKET_NAME
-    global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, STORAGE_HOST, STORAGE_CHECK_INTERVAL
-    global STORAGE_CACHE_DIR, STORAGE_SYNC_PREFIX
-    global _secrets_loaded
-
     # If libcloud is not available, always force disabled
     if not LIBCLOUD_AVAILABLE:
         if enabled:
@@ -474,17 +350,18 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
             if not new_config['bucket_name']:
                 raise ConfigurationError("Storage bucket name must be provided")
         
-        # Update global variables
-        STORAGE_ENABLED = new_config['enabled']
-        STORAGE_PROVIDER = new_config['provider']
-        STORAGE_REGION = new_config['region']
-        STORAGE_BUCKET_NAME = new_config['bucket_name']
-        STORAGE_ACCESS_KEY = new_config['access_key']
-        STORAGE_SECRET_KEY = new_config['secret_key']
-        STORAGE_HOST = new_config['host']
-        STORAGE_CHECK_INTERVAL = new_config['check_interval']
-        STORAGE_CACHE_DIR = new_config['cache_dir']
-        STORAGE_SYNC_PREFIX = new_config['sync_prefix']
+        # Update global variables in object_storage_config module
+        import object_storage_config
+        object_storage_config.STORAGE_ENABLED = new_config['enabled']
+        object_storage_config.STORAGE_PROVIDER = new_config['provider']
+        object_storage_config.STORAGE_REGION = new_config['region']
+        object_storage_config.STORAGE_BUCKET_NAME = new_config['bucket_name']
+        object_storage_config.STORAGE_ACCESS_KEY = new_config['access_key']
+        object_storage_config.STORAGE_SECRET_KEY = new_config['secret_key']
+        object_storage_config.STORAGE_HOST = new_config['host']
+        object_storage_config.STORAGE_CHECK_INTERVAL = new_config['check_interval']
+        object_storage_config.STORAGE_CACHE_DIR = new_config['cache_dir']
+        object_storage_config.STORAGE_SYNC_PREFIX = new_config['sync_prefix']
         
         # Reset driver when configuration changes
         global _storage_driver, _storage_container
@@ -492,17 +369,17 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
         _storage_container = None
         
         # If enabling, secrets might need to be re-evaluated or re-loaded.
-        if STORAGE_ENABLED:
-            if not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY:
+        if object_storage_config.STORAGE_ENABLED:
+            if not object_storage_config.STORAGE_ACCESS_KEY or not object_storage_config.STORAGE_SECRET_KEY:
                  logger.info("Storage enabled. Access/secret keys will be loaded by init_storage if not already set.")
 
             if kwargs.get('access_key') or kwargs.get('secret_key'):
                 _secrets_loaded = True 
-            elif STORAGE_ENABLED and (not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY):
+            elif object_storage_config.STORAGE_ENABLED and (not object_storage_config.STORAGE_ACCESS_KEY or not object_storage_config.STORAGE_SECRET_KEY):
                  _secrets_loaded = False 
 
         # Start or stop services based on enabled state
-        if STORAGE_ENABLED:
+        if object_storage_config.STORAGE_ENABLED:
             return start_storage_watcher()
         else:
             stop_storage_watcher()
@@ -518,13 +395,13 @@ def cleanup_storage() -> None:
     
     This should be called when shutting down the application.
     """
-    global _storage_driver, _storage_container
     
     try:
         stop_storage_watcher()
         stop_file_watcher()
         
         # Close any open connections
+        global _storage_driver, _storage_container
         if _storage_driver is not None:
             _storage_driver = None
         if _storage_container is not None:
