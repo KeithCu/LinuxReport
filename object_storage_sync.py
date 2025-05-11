@@ -17,7 +17,6 @@ from enum import Enum
 import os.path
 from pathlib import Path
 from config_utils import load_config
-import tempfile # Added for IV.1
 from io import BytesIO # Ensure BytesIO is imported for fetch_file_stream if used directly for content
 from libcloud.common.types import LibcloudError # For more specific exception handling
 
@@ -283,7 +282,6 @@ class ObjectStorageCacheWrapper:
         if not init_storage():
             return
             
-        temp_path = None
         object_name = self._get_object_name(key)
         
         try:
@@ -295,10 +293,12 @@ class ObjectStorageCacheWrapper:
                 'expires': expires_at 
             }
             
-            # Write to temporary file
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, dir=self.cache_dir, suffix='.json', encoding='utf-8') as tmp_file:
-                json.dump(data_to_store, tmp_file)
-                temp_path = Path(tmp_file.name)
+            # Convert data to JSON string and then to bytes
+            json_data_str = json.dumps(data_to_store)
+            json_data_bytes = json_data_str.encode('utf-8')
+            
+            # Use BytesIO for in-memory stream
+            data_stream = BytesIO(json_data_bytes)
             
             # Metadata for the object storage
             metadata = {
@@ -309,14 +309,13 @@ class ObjectStorageCacheWrapper:
                 'server_id': SERVER_ID
             }
             
-            # Upload the file
-            with open(temp_path, 'rb') as iterator:
-                _storage_driver.upload_object_via_stream(
-                    iterator=iterator,
-                    container=_storage_container,
-                    object_name=object_name,
-                    extra={'meta_data': metadata, 'content_type': 'application/json'}
-                )
+            # Upload the stream
+            _storage_driver.upload_object_via_stream(
+                iterator=data_stream,
+                container=_storage_container,
+                object_name=object_name,
+                extra={'meta_data': metadata, 'content_type': 'application/json'}
+            )
             logger.info(f"Stored cache entry for key {key} as object {object_name}")
                 
         except LibcloudError as e: # Libcloud specific errors
@@ -328,11 +327,9 @@ class ObjectStorageCacheWrapper:
         except Exception as e: # General fallback
             raise StorageOperationError(f"Error putting cache value for {key} (object {object_name}): {e}")
         finally:
-            if temp_path and temp_path.exists():
-                try:
-                    temp_path.unlink()
-                except OSError as e:
-                    logger.warning(f"Failed to clean up temporary file {temp_path}: {e}")
+            # No temporary file to clean up
+            if 'data_stream' in locals() and data_stream: # Check if data_stream was defined
+                data_stream.close() # Good practice to close BytesIO objects
             
     def delete(self, key: str) -> None:
         """Delete a value from the cache.
@@ -629,35 +626,32 @@ def publish_feed_update(url, feed_content=None, feed_data=None):
         "timestamp": time.time()
     }
     
-    temp_file_path_obj = None # For tempfile management
     try:
         # Create a unique object name
         object_name = generate_object_name(url)
         
-        # Create a JSON string from the data
-        json_data = json.dumps(data)
+        # Create a JSON string from the data and encode to bytes
+        json_data_str = json.dumps(data)
+        json_data_bytes = json_data_str.encode('utf-8')
         
-        # Create a temporary file using tempfile
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, dir=CACHE_DIR, suffix='.json', encoding='utf-8') as tmp_file:
-            tmp_file.write(json_data)
-            temp_file_path_obj = Path(tmp_file.name)
+        # Use BytesIO for in-memory stream
+        data_stream = BytesIO(json_data_bytes)
         
-        # Upload the file
-        with open(temp_file_path_obj, 'rb') as iterator:
-            extra = {
-                'meta_data': {
-                    'server_id': SERVER_ID,
-                    'feed_url': url,
-                    'timestamp': str(time.time()) # Ensure this timestamp is what cleanup_old_updates expects
-                },
-                'content_type': 'application/json'
-            }
-            obj = _storage_driver.upload_object_via_stream(
-                iterator=iterator,
-                container=_storage_container,
-                object_name=object_name,
-                extra=extra
-            )
+        # Upload the stream
+        extra = {
+            'meta_data': {
+                'server_id': SERVER_ID,
+                'feed_url': url,
+                'timestamp': str(time.time()) # Ensure this timestamp is what cleanup_old_updates expects
+            },
+            'content_type': 'application/json'
+        }
+        obj = _storage_driver.upload_object_via_stream(
+            iterator=data_stream,
+            container=_storage_container,
+            object_name=object_name,
+            extra=extra
+        )
             
         logger.info(f"Published feed update for {url} to object storage as {object_name}")
         return obj
@@ -674,12 +668,9 @@ def publish_feed_update(url, feed_content=None, feed_data=None):
         logger.error(f"Error publishing feed update to object storage: {e}")
         return None
     finally:
-        # Clean up the temporary file
-        if temp_file_path_obj and temp_file_path_obj.exists():
-            try:
-                temp_file_path_obj.unlink()
-            except OSError as e: # Log specific error for cleanup failure (III.2)
-                logger.warning(f"Failed to remove temporary file {temp_file_path_obj}: {e}")
+        # Clean up the BytesIO stream
+        if 'data_stream' in locals() and data_stream:
+            data_stream.close()
 
 def check_for_updates():
     """Check object storage for new feed updates from other servers"""
@@ -744,29 +735,17 @@ def _process_single_remote_update(obj: Object, current_time: float): # Added V.2
 
 def process_update_object(obj):
     """Process a feed update object"""
-    temp_file_path_obj = None # For tempfile management
     try:
-        # Download the object to a temporary file using tempfile
-        with tempfile.NamedTemporaryFile(mode='wb', delete=False, dir=CACHE_DIR, suffix='.json') as tmp_file:
-            # No, download method needs a path string.
-            # obj.download(tmp_file) # This won't work directly if download expects path
-            temp_file_path_obj = Path(tmp_file.name)
-            # We need to close it before libcloud writes to it, or ensure download can take a file object.
-            # Most download methods expect a path.
+        # Download the object content into a BytesIO buffer
+        content_buffer = BytesIO()
+        _storage_driver.download_object_as_stream(obj, content_buffer)
+        content_buffer.seek(0) # Reset buffer position to the beginning for reading
         
-        # Ensure temp_file_path_obj is set for download
-        if not temp_file_path_obj: # Should have been created by NamedTemporaryFile
-             raise StorageOperationError("Failed to create temporary file path for download.")
+        # Parse the JSON data directly from the buffer
+        # The content is bytes, so decode to string before json.loads
+        data = json.loads(content_buffer.read().decode('utf-8'))
+        content_buffer.close() # Close the buffer
 
-        obj.download(destination_path=str(temp_file_path_obj), overwrite_existing=True)
-        
-        # Parse the JSON data
-        with open(temp_file_path_obj, 'r', encoding='utf-8') as f: # Read in text mode
-            data = json.loads(f.read())
-        
-        # Clean up the temporary file
-        # Moved to finally block
-        
         # Skip updates from our own server
         if data.get("server_id") == SERVER_ID:
             return
@@ -797,11 +776,8 @@ def process_update_object(obj):
         logger.error(f"Error processing update object: {e}")
     finally:
         # Clean up the temporary file
-        if temp_file_path_obj and temp_file_path_obj.exists():
-            try:
-                temp_file_path_obj.unlink()
-            except OSError as e: # Log specific error for cleanup failure (III.2)
-                logger.warning(f"Failed to remove temporary download file {temp_file_path_obj}: {e}")
+        # No longer needed as we are using BytesIO
+        pass
 
 def storage_watcher_thread():
     """Background thread function to periodically check for updates"""
