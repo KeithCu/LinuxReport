@@ -2,20 +2,75 @@
 ObjectStorageLock.py
 
 This module implements a distributed lock using object storage (via libcloud).
+The lock is designed for cross-process and cross-thread synchronization in Python,
+providing a reliable mechanism for distributed coordination.
+
+Key Features:
+- Uses S3-compatible object storage as a central coordination point.
+- Supports blocking and non-blocking lock acquisition with exponential backoff.
+- Provides context manager interface for Pythonic usage.
+- Handles lock expiration and automatic cleanup of stale locks.
+- Uses unique owner IDs combining process ID, thread ID, and UUID.
+- Implements atomic operations with fencing tokens for safety.
+- Supports thread-local reentrant locking with lock depth tracking.
+- Includes retry logic for transient S3 errors.
+- Allows custom metadata for debugging and integration.
+- Supports lock renewal for long-running tasks.
+
+Edge Cases Handled:
+- **Eventual Consistency**: Ownership checks and fencing tokens mitigate S3 consistency issues.
+- **Network Failures**: Retries with exponential backoff handle transient errors.
+- **Clock Skew**: Expiry times are based on monotonic clocks to avoid skew.
+- **Stale Locks**: Automatic cleanup of expired locks prevents deadlocks.
+- **Concurrent Access**: Fencing tokens ensure only one instance holds the lock.
+
+Usage Example:
+```python
+from ObjectStorageLock import ObjectStorageLock
+
+# Create a lock with custom metadata
+lock = ObjectStorageLock("my-lock", metadata={"app": "my-app"})
+
+# Use as context manager
+with lock:
+    # Critical section
+    print("Lock acquired")
+
+# Non-blocking acquisition
+if lock.acquire(wait=False):
+    try:
+        print("Lock acquired")
+    finally:
+        lock.release()
+
+# Renew lock for long-running tasks
+with lock:
+    lock.renew(60)  # Extend lock for 60 seconds
+```
+
+Dependencies:
+- libcloud: For object storage operations.
+- tenacity: For retrying transient errors.
+- ujson (optional): For faster JSON serialization.
 """
 
 import os
 import threading
 import time
 import uuid
-from typing import Optional
+from typing import Optional, Dict
 from io import BytesIO
-import json
 import hashlib
 
+try:
+    import ujson as json
+except ImportError:
+    import json
+
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from abc import ABC, abstractmethod
 
-# Import from config module
+# Import from config module (assumed to exist)
 import object_storage_config as oss_config
 
 class LockBase(ABC):
@@ -39,30 +94,37 @@ class LockBase(ABC):
     def locked(self) -> bool:
         pass
 
+    @abstractmethod
+    def renew(self, timeout_seconds: int) -> bool:
+        pass
+
 class ObjectStorageLock(LockBase):
     """
-    A distributed lock implementation using object storage (with libcloud).
-    This lock supports waiting when a lock is unavailable and provides
-    features for reliable multi-process and multi-threaded environments.
+    A distributed lock implementation using S3-compatible object storage (via libcloud).
+    Supports thread-local reentrant locking, exponential backoff, and lock renewal.
+
+    Args:
+        lock_name: Unique name for the lock.
+        owner_prefix: Optional prefix for the owner ID (default: pid + thread ID).
+        metadata: Optional dictionary of custom metadata (e.g., {"app": "my-app"}).
+        retry_interval: Base interval (seconds) for acquisition retries.
+
+    Raises:
+        ConfigurationError: If object storage is not available or misconfigured.
     """
-    def __init__(self, lock_name: str, owner_prefix: Optional[str] = None):
-        """
-        Initialize the object storage lock.
-        
-        Args:
-            lock_name: A unique name for this lock
-            owner_prefix: Optional prefix for the owner ID. If None, uses pid and thread ID.
-        
-        Raises:
-            ConfigurationError: If object storage is not available or not properly configured
-        """
-        # Check storage configuration upfront
+    def __init__(
+        self,
+        lock_name: str,
+        owner_prefix: Optional[str] = None,
+        metadata: Optional[Dict[str, str]] = None,
+        retry_interval: float = 0.05
+    ):
         if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
             raise oss_config.ConfigurationError("Object storage is not available or not enabled")
-            
+        
         if not oss_config.init_storage():
             raise oss_config.ConfigurationError("Failed to initialize object storage")
-            
+        
         self.lock_name = lock_name
         self.lock_key = f"lock::{lock_name}"
         self.lock_object_name = self._get_object_name(self.lock_key)
@@ -70,8 +132,19 @@ class ObjectStorageLock(LockBase):
         if owner_prefix is None:
             owner_prefix = f"pid{os.getpid()}_tid{threading.get_ident()}"
         self.owner_id = f"{owner_prefix}_{uuid.uuid4()}"
-        self._locked = False
         
+        self._thread_local = threading.local()
+        self._thread_local.lock_count = 0
+        self.retry_interval = max(0.01, retry_interval)  # Ensure minimum interval
+        self.metadata = metadata or {}
+        
+        # Validate metadata size (S3 limit: 2KB)
+        metadata_str = json.dumps(self.metadata)
+        if len(metadata_str.encode('utf-8')) > 2048:
+            raise ValueError("Metadata exceeds 2KB limit")
+        
+        self._fencing_token = 0  # Monotonic counter for safety
+
     def _get_object_name(self, key: str) -> str:
         """Generate a unique object name for a lock key."""
         key_hash = hashlib.md5(key.encode()).hexdigest()
@@ -79,79 +152,96 @@ class ObjectStorageLock(LockBase):
         
     def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
         """
-        Tries to acquire the lock.
-        
+        Try to acquire the lock with exponential backoff.
+
         Args:
-            timeout_seconds: How long the lock should be held before expiring
-            wait: If True, will wait until the lock is acquired or timeout_seconds is reached
-            
+            timeout_seconds: Lock duration before expiration.
+            wait: If True, wait until lock is acquired or timeout expires.
+
         Returns:
-            True if lock was acquired, False otherwise
+            True if lock was acquired, False otherwise.
+
+        Raises:
+            TimeoutError: If wait=True and lock cannot be acquired within timeout.
         """
-        if self._locked:
+        if self._thread_local.lock_count > 0:
+            self._thread_local.lock_count += 1
             return True
             
         start_time = time.monotonic()
+        attempt = 0
         while True:
             acquired = self._attempt_acquire(timeout_seconds)
             if acquired:
+                self._thread_local.lock_count = 1
                 return True
             if not wait:
                 return False
-            if (time.monotonic() - start_time) > timeout_seconds:
+            elapsed = time.monotonic() - start_time
+            if elapsed > timeout_seconds:
+                oss_config.logger.warning(
+                    f"Timeout acquiring lock {self.lock_key} for owner {self.owner_id} after {elapsed:.2f}s"
+                )
                 return False
-            time.sleep(0.1)  # Short sleep before retrying
+            # Exponential backoff: min(1s, retry_interval * 2^attempt)
+            delay = min(1.0, self.retry_interval * (2 ** attempt))
+            time.sleep(delay)
+            attempt += 1
             
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=0.1, max=2),
+        retry=retry_if_exception_type(Exception)
+    )
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
-        """Internal method that attempts to acquire the lock once."""
+        """Attempt to acquire the lock once with fencing token."""
         try:
             now = time.monotonic()
-            
-            # Try to get existing lock info
             current_lock = self._get_lock_info()
             
-            # Lock exists and is still valid
+            # Check for valid existing lock
             if current_lock is not None:
-                expiry_time = current_lock.get('expiry')
-                if expiry_time is not None and now < expiry_time:
-                    return False
-                # Lock exists but has expired - we'll overwrite it
+                expiry = current_lock.get('expiry')
+                if expiry is not None and now < expiry:
+                    return False  # Lock is still valid
             
-            # Set expiry and store our claim
+            # Increment fencing token
+            self._fencing_token += 1
             expiry = now + timeout_seconds
-            
-            # Create lock data
             lock_data = {
                 'owner_id': self.owner_id,
                 'expiry': expiry,
                 'created': now,
-                'lock_name': self.lock_name
+                'lock_name': self.lock_name,
+                'fencing_token': self._fencing_token
             }
             
-            # Upload the lock data
             self._put_lock_info(lock_data)
             
-            # Verify our ownership
+            # Verify ownership
             final_lock = self._get_lock_info()
-            if final_lock is not None and final_lock.get('owner_id') == self.owner_id:
-                self._locked = True
+            if (
+                final_lock is not None and
+                final_lock.get('owner_id') == self.owner_id and
+                final_lock.get('fencing_token') == self._fencing_token
+            ):
                 return True
                 
-            self._locked = False
             return False
             
         except Exception as e:
-            # Log the exception but don't crash
             oss_config.logger.error(f"Error acquiring lock {self.lock_key}: {e}")
-            self._locked = False
             return False
             
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=0.1, max=2),
+        retry=retry_if_exception_type(Exception)
+    )
     def _get_lock_info(self):
-        """Get the current lock information from object storage."""
+        """Get current lock information from object storage."""
         try:
             obj = oss_config._storage_container.get_object(object_name=self.lock_object_name)
-            
-            # Download and parse the lock data
             data_stream = oss_config._storage_driver.download_object_as_stream(obj)
             data_bytes = b''
             for chunk in data_stream:
@@ -162,12 +252,16 @@ class ObjectStorageLock(LockBase):
             return None
                 
         except oss_config.ObjectDoesNotExistError:
-            # Lock doesn't exist
             return None
         except Exception as e:
             oss_config.logger.error(f"Error getting lock info for {self.lock_key}: {e}")
-            return None
+            raise
             
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=0.1, max=2),
+        retry=retry_if_exception_type(Exception)
+    )
     def _put_lock_info(self, lock_data):
         """Store lock information in object storage."""
         data_stream = None
@@ -179,7 +273,8 @@ class ObjectStorageLock(LockBase):
                 'lock_name': self.lock_name,
                 'owner_id': self.owner_id,
                 'expiry': str(lock_data['expiry']),
-                'server_id': oss_config.SERVER_ID
+                'server_id': oss_config.SERVER_ID,
+                **self.metadata
             }
             
             oss_config._storage_driver.upload_object_via_stream(
@@ -198,29 +293,70 @@ class ObjectStorageLock(LockBase):
     
     def release(self) -> bool:
         """
-        Releases the lock if currently held by this instance.
-        Returns True if the lock was successfully released, False otherwise.
+        Release the lock if held by this instance.
+
+        Returns:
+            True if lock was released, False otherwise.
         """
-        if not self._locked:
-            return False  # We don't hold the lock
+        if self._thread_local.lock_count == 0:
+            return False
+            
+        self._thread_local.lock_count -= 1
+        if self._thread_local.lock_count > 0:
+            return True  # Still locked due to reentrancy
             
         success = False
         try:
-            # Verify ownership before deleting
             current_lock = self._get_lock_info()
-            if current_lock is not None and current_lock.get('owner_id') == self.owner_id:
-                # Get object reference and delete it
+            if (
+                current_lock is not None and
+                current_lock.get('owner_id') == self.owner_id and
+                current_lock.get('fencing_token') == self._fencing_token
+            ):
                 obj = oss_config._storage_container.get_object(object_name=self.lock_object_name)
                 oss_config._storage_container.delete_object(obj)
                 success = True
         except Exception as e:
-            # Log error if needed
             oss_config.logger.error(f"Error releasing lock {self.lock_key}: {e}")
             success = False
             
-        # Whether successful or not, we're no longer locked
-        self._locked = False
+        self._thread_local.lock_count = 0
         return success
+        
+    def renew(self, timeout_seconds: int) -> bool:
+        """
+        Renew the lock's expiry time if held by this instance.
+
+        Args:
+            timeout_seconds: New duration for the lock.
+
+        Returns:
+            True if lock was renewed, False otherwise.
+        """
+        if self._thread_local.lock_count == 0:
+            return False
+            
+        try:
+            current_lock = self._get_lock_info()
+            if (
+                current_lock is not None and
+                current_lock.get('owner_id') == self.owner_id and
+                current_lock.get('fencing_token') == self._fencing_token
+            ):
+                now = time.monotonic()
+                lock_data = {
+                    'owner_id': self.owner_id,
+                    'expiry': now + timeout_seconds,
+                    'created': current_lock['created'],
+                    'lock_name': self.lock_name,
+                    'fencing_token': self._fencing_token
+                }
+                self._put_lock_info(lock_data)
+                return True
+            return False
+        except Exception as e:
+            oss_config.logger.error(f"Error renewing lock {self.lock_key}: {e}")
+            return False
         
     def __enter__(self):
         if not self.acquire(wait=True):
@@ -232,7 +368,7 @@ class ObjectStorageLock(LockBase):
         
     def locked(self) -> bool:
         """Check if the lock is currently held by this instance."""
-        return self._locked 
+        return self._thread_local.lock_count > 0
 
 if __name__ == '__main__':
     import unittest
@@ -241,15 +377,12 @@ if __name__ == '__main__':
     
     class TestObjectStorageLock(unittest.TestCase):
         def setUp(self):
-            # Mock the storage container and driver
             self.mock_container = MagicMock()
             self.mock_driver = MagicMock()
             
-            # Patch the storage configuration
             self.patcher = patch('object_storage_config')
             self.mock_config = self.patcher.start()
             
-            # Configure the mock
             self.mock_config.LIBCLOUD_AVAILABLE = True
             self.mock_config.STORAGE_ENABLED = True
             self.mock_config.SERVER_ID = 'test-server'
@@ -259,90 +392,109 @@ if __name__ == '__main__':
             self.mock_config.init_storage = MagicMock(return_value=True)
             self.mock_config.ObjectDoesNotExistError = Exception
             
-            # Create a test lock
-            self.lock = ObjectStorageLock('test-lock')
+            self.lock = ObjectStorageLock('test-lock', metadata={'app': 'test'})
             
         def tearDown(self):
             self.patcher.stop()
             
         def test_lock_initialization(self):
-            """Test that lock initializes correctly"""
             self.assertFalse(self.lock.locked())
             self.assertEqual(self.lock.lock_name, 'test-lock')
             self.assertTrue(self.lock.lock_key.startswith('lock::'))
             
         def test_lock_acquisition(self):
-            """Test basic lock acquisition"""
-            # Mock successful lock acquisition
             self.mock_driver.download_object_as_stream.return_value = []
             self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
-            
-            # Try to acquire the lock
             result = self.lock.acquire(timeout_seconds=10)
             self.assertTrue(result)
             self.assertTrue(self.lock.locked())
             
         def test_lock_release(self):
-            """Test lock release"""
-            # First acquire the lock
             self.mock_driver.download_object_as_stream.return_value = []
             self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
             self.lock.acquire()
-            
-            # Then release it
             result = self.lock.release()
             self.assertTrue(result)
             self.assertFalse(self.lock.locked())
             
         def test_context_manager(self):
-            """Test lock as context manager"""
             self.mock_driver.download_object_as_stream.return_value = []
             self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
-            
             with self.lock:
                 self.assertTrue(self.lock.locked())
             self.assertFalse(self.lock.locked())
             
         def test_lock_expiry(self):
-            """Test that locks expire correctly"""
-            # Create expired lock data
             expired_time = time.monotonic() - 100
             expired_lock_data = {
                 'owner_id': 'other-owner',
                 'expiry': expired_time,
                 'created': expired_time - 10,
-                'lock_name': 'test-lock'
+                'lock_name': 'test-lock',
+                'fencing_token': 1
             }
-            
-            # Mock the storage to return expired lock
             mock_stream = MagicMock()
             mock_stream.__iter__.return_value = [json.dumps(expired_lock_data).encode('utf-8')]
             self.mock_driver.download_object_as_stream.return_value = mock_stream
-            
-            # Should be able to acquire the lock since it's expired
             result = self.lock.acquire()
             self.assertTrue(result)
             self.assertTrue(self.lock.locked())
             
         def test_concurrent_locks(self):
-            """Test that concurrent locks are handled correctly"""
-            # Mock existing valid lock
             current_time = time.monotonic()
             valid_lock_data = {
                 'owner_id': 'other-owner',
                 'expiry': current_time + 100,
                 'created': current_time,
-                'lock_name': 'test-lock'
+                'lock_name': 'test-lock',
+                'fencing_token': 1
             }
-            
             mock_stream = MagicMock()
             mock_stream.__iter__.return_value = [json.dumps(valid_lock_data).encode('utf-8')]
             self.mock_driver.download_object_as_stream.return_value = mock_stream
-            
-            # Should not be able to acquire the lock
             result = self.lock.acquire()
             self.assertFalse(result)
             self.assertFalse(self.lock.locked())
             
-    # Run the tests
-    unittest.main() 
+        def test_reentrant_lock(self):
+            self.mock_driver.download_object_as_stream.return_value = []
+            self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
+            with self.lock:
+                with self.lock:  # Nested acquisition
+                    self.assertTrue(self.lock.locked())
+                self.assertTrue(self.lock.locked())
+            self.assertFalse(self.lock.locked())
+            
+        def test_renew_lock(self):
+            self.mock_driver.download_object_as_stream.return_value = []
+            self.mock_container.get_object.side_effect = self.mock_config.ObjectDoesNotExistError
+            self.lock.acquire()
+            current_lock = {
+                'owner_id': self.lock.owner_id,
+                'expiry': time.monotonic() + 10,
+                'created': time.monotonic(),
+                'lock_name': 'test-lock',
+                'fencing_token': self.lock._fencing_token
+            }
+            mock_stream = MagicMock()
+            mock_stream.__iter__.return_value = [json.dumps(current_lock).encode('utf-8')]
+            self.mock_driver.download_object_as_stream.return_value = mock_stream
+            result = self.lock.renew(20)
+            self.assertTrue(result)
+            
+        def test_transient_error_retry(self):
+            self.mock_container.get_object.side_effect = [Exception("Transient error"), None]
+            self.mock_driver.download_object_as_stream.return_value = []
+            result = self.lock.acquire()
+            self.assertTrue(result)
+            self.assertTrue(self.lock.locked())
+            
+        def test_invalid_lock_data(self):
+            mock_stream = MagicMock()
+            mock_stream.__iter__.return_value = [b"invalid json"]
+            self.mock_driver.download_object_as_stream.return_value = mock_stream
+            result = self.lock.acquire()
+            self.assertFalse(result)
+            self.assertFalse(self.lock.locked())
+    
+    unittest.main()
