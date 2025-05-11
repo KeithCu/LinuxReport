@@ -34,7 +34,6 @@ STORAGE_CACHE_DIR = "/tmp/feed_cache"
 STORAGE_SYNC_PREFIX = "feed-updates/"
 
 # Sync configuration
-SYNC_PREFIX = "feed-updates/"  # Prefix for feed updates
 CHECK_INTERVAL = 30  # Default interval to check for updates (seconds)
 SERVER_ID = hashlib.md5(os.uname().nodename.encode()).hexdigest()[:8]
 CACHE_DIR = "/tmp/feed_cache"  # Local cache directory
@@ -210,6 +209,29 @@ class ObjectStorageCacheWrapper:
             object_name = self._get_object_name(key)
             obj = _storage_container.get_object(object_name=object_name)
             
+            # Check expiration from metadata first (if available and reliable)
+            obj_meta = obj.meta_data
+            if obj_meta:
+                expires_str_meta = obj_meta.get('expires') # Match key used in put()
+                if expires_str_meta:
+                    try:
+                        expires_meta = float(expires_str_meta)
+                        if expires_meta != float('inf') and time.time() > expires_meta:
+                            logger.info(f"Cache entry for key {key} (object {object_name}) expired based on metadata. Deleting.")
+                            # Use self.delete() to ensure proper deletion logic is called
+                            # Be careful of potential recursion if delete() also calls get() or has()
+                            # For now, directly delete from storage, assuming delete() is robust
+                            try:
+                                obj_to_delete = _storage_container.get_object(object_name=object_name) # Re-fetch in case it was deleted by another process
+                                _storage_container.delete_object(obj_to_delete)
+                            except ObjectDoesNotExistError:
+                                logger.debug(f"Object {object_name} already deleted, possibly by another process or self.delete.")
+                            except LibcloudError as del_e:
+                                logger.warning(f"Libcloud error deleting metadata-expired object {object_name}: {del_e}")
+                            return None
+                    except ValueError:
+                        logger.warning(f"Invalid 'expires' metadata '{expires_str_meta}' for object {object_name} during get(). Proceeding with content download.")
+
             # Download content
             temp_download_path = self.cache_dir / f"temp_cache_get_{hashlib.md5(object_name.encode()).hexdigest()}"
             try:
@@ -329,11 +351,13 @@ class ObjectStorageCacheWrapper:
             
         object_name = self._get_object_name(key)
         try:
-            _storage_container.delete_object(object_name)
+            # Retrieve the object first
+            obj_to_delete = _storage_container.get_object(object_name=object_name)
+            _storage_container.delete_object(obj_to_delete) # Pass the Object instance
             logger.info(f"Deleted cache entry for key {key} (object {object_name})")
         except ObjectDoesNotExistError:
             logger.debug(f"Attempted to delete non-existent cache object {object_name} for key {key}")
-        except LibcloudError as e: # Libcloud specific errors
+        except LibcloudError as e:
             raise StorageOperationError(f"Libcloud error deleting cache value for {key} (object {object_name}): {e}")
         except Exception as e: # General fallback
             raise StorageOperationError(f"Error deleting cache value for {key} (object {object_name}): {e}")
@@ -1165,27 +1189,23 @@ def fetch_file(file_path, force=False):
         # Get current file metadata if it exists
         current_metadata_content = None # Store content to avoid re-reading
         current_file_hash = None
-        if os.path.exists(file_path):
+        if not force and os.path.exists(file_path):
             current_file_meta = get_file_metadata(file_path)
             if current_file_meta:
                 current_metadata_content = current_file_meta['content']
                 current_file_hash = current_file_meta['hash']
             
-        # Find the latest version of the file using the helper (V.2)
-        # The prefix for 'files' is f"{STORAGE_SYNC_PREFIX}files/"
-        file_prefix = f"{STORAGE_SYNC_PREFIX}files/"
-        latest_obj = _find_latest_object_version(file_path, file_prefix)
+        # Use the helper function
+        latest_obj, use_local_content = _prepare_file_fetch(file_path, current_file_hash if not force else None)
                 
         if not latest_obj:
-            logger.info(f"No version found for file {file_path} in object storage.")
+            # _prepare_file_fetch already logs if no version is found
             return None, None
             
-        # Check if we need to update
-        if not force and current_file_hash:
-            latest_hash_from_meta = latest_obj.meta_data.get('file_hash')
-            if latest_hash_from_meta == current_file_hash:
-                logger.info(f"File {file_path} is up to date (hash match). Returning local content.")
-                return current_metadata_content, latest_obj.meta_data
+        # Check if we need to update based on helper's output
+        if use_local_content:
+            logger.info(f"File {file_path} is up to date (hash match). Returning local content.")
+            return current_metadata_content, latest_obj.meta_data
                 
         # Download the content using streaming
         content_buffer = BytesIO()
@@ -1223,26 +1243,23 @@ def fetch_file_stream(file_path, force=False):
         # Get current file metadata if it exists
         current_metadata_content = None # Store content for BytesIO stream
         current_file_hash = None
-        if os.path.exists(file_path):
+        if not force and os.path.exists(file_path):
             current_file_meta = get_file_metadata(file_path)
             if current_file_meta:
                 current_metadata_content = current_file_meta['content']
                 current_file_hash = current_file_meta['hash']
             
-        # Find the latest version of the file using the helper (V.2)
-        file_prefix = f"{STORAGE_SYNC_PREFIX}files/"
-        latest_obj = _find_latest_object_version(file_path, file_prefix)
+        # Use the helper function
+        latest_obj, use_local_content = _prepare_file_fetch(file_path, current_file_hash if not force else None)
                 
         if not latest_obj:
-            logger.info(f"No version found for file {file_path} in object storage (for stream).")
+            # _prepare_file_fetch already logs if no version is found
             return None, None
             
-        # Check if we need to update
-        if not force and current_file_hash:
-            latest_hash_from_meta = latest_obj.meta_data.get('file_hash')
-            if latest_hash_from_meta == current_file_hash:
-                logger.info(f"File {file_path} is up to date (hash match). Returning stream of local content.")
-                return BytesIO(current_metadata_content) if current_metadata_content else None, latest_obj.meta_data
+        # Check if we need to update based on helper's output
+        if use_local_content:
+            logger.info(f"File {file_path} is up to date (hash match). Returning stream of local content.")
+            return BytesIO(current_metadata_content) if current_metadata_content else None, latest_obj.meta_data
                 
         # Get the object's stream
         # Ensure latest_obj is not None. Covered by the check above.
@@ -1290,7 +1307,8 @@ def list_file_versions(file_path):
                         'size': int(obj.meta_data.get('file_size', 0)),
                         'server_id': obj.meta_data.get('server_id')
                     })
-            except:
+            except (KeyError, ValueError, TypeError) as e: # More specific exceptions
+                logger.warning(f"Skipping object {obj.name} in list_file_versions due to metadata issue: {e}")
                 continue
                 
         # Sort by timestamp descending
@@ -1319,17 +1337,43 @@ def delete_file_version(object_name):
         return False
     
     try:
-        _storage_container.delete_object(object_name)
+        # Retrieve the object first
+        obj_to_delete = _storage_container.get_object(object_name=object_name)
+        _storage_container.delete_object(obj_to_delete) # Pass the Object instance
         logger.info(f"Deleted file version: {object_name}")
         return True
+    except ObjectDoesNotExistError: # Specific exception if object not found for deletion
+        logger.warning(f"Attempted to delete non-existent object {object_name} during delete_file_version.")
+        return False
     except LibcloudError as e:
         logger.error(f"Libcloud error deleting file version {object_name}: {e}")
         return False
-    except Exception as e:
-        logger.error(f"Error deleting file version: {e}")
-        return False
 
 # Helper function for V.2 (fetch_file and fetch_file_stream)
+def _prepare_file_fetch(file_path: str, current_file_hash: Optional[str]):
+    """Helper to prepare for fetching a file, returns (latest_obj, use_local_content_flag)."""
+    if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
+        return None, False
+        
+    if not init_storage():
+        return None, False
+
+    file_prefix = f"{STORAGE_SYNC_PREFIX}files/"
+    latest_obj = _find_latest_object_version(file_path, file_prefix)
+            
+    if not latest_obj:
+        logger.info(f"No version found for file {file_path} in object storage.")
+        return None, False
+        
+    # Check if we can use local content (if not forcing and hash matches)
+    use_local_content = False
+    if current_file_hash: # current_file_hash will be None if force=True in calling function, or file doesn't exist
+        latest_hash_from_meta = latest_obj.meta_data.get('file_hash')
+        if latest_hash_from_meta == current_file_hash:
+            use_local_content = True
+            
+    return latest_obj, use_local_content
+
 def _find_latest_object_version(metadata_file_path_match: str, prefix: str) -> Optional[Object]:
     """Finds the latest version of an object in storage based on metadata file_path and timestamp."""
     if not _storage_container: # Should be initialized by init_storage
