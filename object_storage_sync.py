@@ -17,6 +17,9 @@ from enum import Enum
 import os.path
 from pathlib import Path
 from config_utils import load_config
+import tempfile # Added for IV.1
+from io import BytesIO # Ensure BytesIO is imported for fetch_file_stream if used directly for content
+from libcloud.common.types import LibcloudError # For more specific exception handling
 
 # Object Storage configuration
 STORAGE_ENABLED = False
@@ -45,6 +48,7 @@ _file_event_handler = None
 _last_check_time = time.time()
 _last_known_objects = {}  # Cache of known objects
 _sync_running = False
+_secrets_loaded = False
 
 # Callbacks for feed updates
 _feed_update_callbacks = []
@@ -74,6 +78,7 @@ class StorageProvider(Enum):
 
 def load_storage_secrets():
     """Load storage secrets from config.yaml"""
+    global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, _secrets_loaded
     try:
         config = load_config()
         storage_config = config.get('storage')
@@ -82,16 +87,25 @@ def load_storage_secrets():
             raise ConfigurationError("Missing 'storage' section in config.yaml")
             
         # Only load secrets
-        global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY
         STORAGE_ACCESS_KEY = storage_config.get('access_key', '')
         STORAGE_SECRET_KEY = storage_config.get('secret_key', '')
+        _secrets_loaded = True
         
         if STORAGE_ENABLED and (not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY):
-            raise ConfigurationError("Storage access key and secret key must be provided in config.yaml")
+            logger.warning("Storage is enabled but access key or secret key might be missing after loading.")
             
-    except Exception as e:
+    except FileNotFoundError as e: # Specific exception
+        _secrets_loaded = False
+        logger.error(f"Configuration file not found: {e}")
+        raise ConfigurationError(f"Configuration file not found: {e}")
+    except KeyError as e: # Specific exception for missing keys in config
+        _secrets_loaded = False
+        logger.error(f"Missing key in configuration data: {e}")
+        raise ConfigurationError(f"Missing key in configuration data: {e}")
+    except Exception as e: # Fallback for other load_config or parsing issues
+        _secrets_loaded = False
         logger.error(f"Error loading storage secrets: {e}")
-        raise
+        raise ConfigurationError(f"Error loading storage secrets: {e}") # Wrap in custom error
 
 # Set up logging with structured format
 logging.basicConfig(
@@ -101,15 +115,15 @@ logging.basicConfig(
 logger = logging.getLogger("object_storage_sync")
 
 # Initialize configuration
-try:
-    load_storage_secrets()
-except Exception as e:
-    logger.error(f"Error loading storage secrets: {e}")
+# try:
+#     load_storage_secrets() # Removed top-level call for II.1
+# except Exception as e:
+#     logger.error(f"Error loading storage secrets: {e}")
 
 # Check if libcloud is available
 LIBCLOUD_AVAILABLE = False
 try:
-    from libcloud.storage.types import Provider, ContainerDoesNotExistError
+    from libcloud.storage.types import Provider, ContainerDoesNotExistError, ObjectDoesNotExistError
     from libcloud.storage.providers import get_driver
     from libcloud.storage.base import Object
     import libcloud.security
@@ -158,8 +172,10 @@ class ObjectStorageCacheWrapper:
         """
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as e: # Specific exception for directory creation
+            raise ConfigurationError(f"Failed to create cache directory {self.cache_dir}: {e}")
         except Exception as e:
-            raise ConfigurationError(f"Failed to create cache directory: {e}")
+            raise ConfigurationError(f"Error creating cache directory: {e}")
             
     def _get_object_name(self, key: str) -> str:
         """Generate a unique object name for a cache key.
@@ -192,34 +208,41 @@ class ObjectStorageCacheWrapper:
             
         try:
             object_name = self._get_object_name(key)
-            versions = list_file_versions(object_name)
+            obj = _storage_container.get_object(object_name=object_name)
             
-            if not versions:
-                return None
-                
-            # Get the latest version
-            latest_version = max(versions, key=lambda x: x['timestamp'])
+            # Download content
+            temp_download_path = self.cache_dir / f"temp_cache_get_{hashlib.md5(object_name.encode()).hexdigest()}"
+            try:
+                obj.download(destination_path=str(temp_download_path), overwrite_existing=True)
+                with open(temp_download_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            finally:
+                if temp_download_path.exists():
+                    try:
+                        temp_download_path.unlink()
+                    except OSError as e:
+                        logger.warning(f"Failed to remove temporary download file {temp_download_path}: {e}")
+
+            # Check expiration from metadata (stored by put)
+            expires_str = data.get('expires')
+            if expires_str is not None:
+                expires = float(expires_str)
+                if expires != float('inf') and time.time() > expires:
+                    logger.info(f"Cache entry for key {key} (object {object_name}) expired.")
+                    self.delete(key)  # Clean up expired entry
+                    return None
             
-            # Use existing fetch_file_stream for better integration
-            stream, metadata = fetch_file_stream(object_name, force=True)
-            if stream is None:
-                return None
-                
-            # Read and parse the content
-            data = json.loads(stream.read().decode('utf-8'))
-            
-            # Check expiration
-            expires = float(metadata.get('expires', 'inf'))
-            if expires != float('inf') and time.time() > expires:
-                self.delete(key)  # Clean up expired entry
-                return None
-                
             return data.get('value')
-        except json.JSONDecodeError as e:
-            logger.error(f"Invalid JSON in cache for key {key}: {e}")
+            
+        except ObjectDoesNotExistError:
+            logger.debug(f"Cache miss for key {key} (object {object_name})")
             return None
-        except Exception as e:
-            raise StorageOperationError(f"Error getting cache value for {key}: {e}")
+        except LibcloudError as e: # Libcloud specific errors
+            raise StorageOperationError(f"Libcloud error getting cache value for {key} (object {object_name}): {e}")
+        except IOError as e: # Errors related to temp file IO
+            raise StorageOperationError(f"I/O error getting cache value for {key} (object {object_name}): {e}")
+        except Exception as e: # General fallback
+            raise StorageOperationError(f"Error getting cache value for {key} (object {object_name}): {e}")
             
     def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
         """Store a value in the cache.
@@ -239,40 +262,54 @@ class ObjectStorageCacheWrapper:
             return
             
         temp_path = None
+        object_name = self._get_object_name(key)
+        
         try:
-            object_name = self._get_object_name(key)
-            
             # Prepare the data
-            data = {
+            expires_at = (time.time() + timeout) if timeout is not None else float('inf')
+            data_to_store = {
                 'value': value,
                 'timestamp': time.time(),
-                'expires': time.time() + timeout if timeout else None
+                'expires': expires_at 
             }
             
             # Write to temporary file
-            temp_path = self.cache_dir / f"temp_{int(time.time())}"
-            with open(temp_path, 'w') as f:
-                json.dump(data, f)
-                
-            # Use existing publish_file for better integration
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, dir=self.cache_dir, suffix='.json', encoding='utf-8') as tmp_file:
+                json.dump(data_to_store, tmp_file)
+                temp_path = Path(tmp_file.name)
+            
+            # Metadata for the object storage
             metadata = {
                 'cache_key': key,
-                'timestamp': str(time.time()),
-                'expires': str(data['expires']) if data['expires'] else 'never',
+                'timestamp': str(data_to_store['timestamp']),
+                'expires': str(data_to_store['expires']),
                 'type': 'cache_entry',
                 'server_id': SERVER_ID
             }
             
-            publish_file(str(temp_path), metadata)
+            # Upload the file
+            with open(temp_path, 'rb') as iterator:
+                _storage_driver.upload_object_via_stream(
+                    iterator=iterator,
+                    container=_storage_container,
+                    object_name=object_name,
+                    extra={'meta_data': metadata, 'content_type': 'application/json'}
+                )
+            logger.info(f"Stored cache entry for key {key} as object {object_name}")
                 
-        except Exception as e:
-            raise StorageOperationError(f"Error putting cache value for {key}: {e}")
+        except LibcloudError as e: # Libcloud specific errors
+            raise StorageOperationError(f"Libcloud error putting cache value for {key} (object {object_name}): {e}")
+        except IOError as e: # Errors related to temp file IO (e.g., NamedTemporaryFile, open)
+            raise StorageOperationError(f"I/O error putting cache value for {key} (object {object_name}): {e}")
+        except json.JSONDecodeError as e: # Should not happen here with dump, but for completeness
+            raise StorageOperationError(f"JSON encoding error for key {key}: {e}")
+        except Exception as e: # General fallback
+            raise StorageOperationError(f"Error putting cache value for {key} (object {object_name}): {e}")
         finally:
-            # Clean up temp file
             if temp_path and temp_path.exists():
                 try:
                     temp_path.unlink()
-                except Exception as e:
+                except OSError as e:
                     logger.warning(f"Failed to clean up temporary file {temp_path}: {e}")
             
     def delete(self, key: str) -> None:
@@ -290,15 +327,16 @@ class ObjectStorageCacheWrapper:
         if not init_storage():
             return
             
+        object_name = self._get_object_name(key)
         try:
-            object_name = self._get_object_name(key)
-            versions = list_file_versions(object_name)
-            
-            for version in versions:
-                delete_file_version(version['object_name'])
-                
-        except Exception as e:
-            raise StorageOperationError(f"Error deleting cache value for {key}: {e}")
+            _storage_container.delete_object(object_name)
+            logger.info(f"Deleted cache entry for key {key} (object {object_name})")
+        except ObjectDoesNotExistError:
+            logger.debug(f"Attempted to delete non-existent cache object {object_name} for key {key}")
+        except LibcloudError as e: # Libcloud specific errors
+            raise StorageOperationError(f"Libcloud error deleting cache value for {key} (object {object_name}): {e}")
+        except Exception as e: # General fallback
+            raise StorageOperationError(f"Error deleting cache value for {key} (object {object_name}): {e}")
             
     def has(self, key: str) -> bool:
         """Check if a key exists in the cache.
@@ -318,26 +356,37 @@ class ObjectStorageCacheWrapper:
         if not init_storage():
             return False
             
+        object_name = self._get_object_name(key)
         try:
-            object_name = self._get_object_name(key)
-            versions = list_file_versions(object_name)
+            obj = _storage_container.get_object(object_name=object_name)
             
-            if not versions:
-                return False
+            obj_meta = obj.meta_data 
+            if not obj_meta:
+                logger.warning(f"No metadata found for object {object_name} during 'has' check. Assuming not expired but this is risky.")
                 
-            # Get the latest version
-            latest_version = max(versions, key=lambda x: x['timestamp'])
-            
-            # Check expiration
-            expires = float(latest_version.get('expires', 'inf'))
-            if expires != float('inf') and time.time() > expires:
-                self.delete(key)  # Clean up expired entry
-                return False
-                
+            expires_str = obj_meta.get('expires')
+            if expires_str:
+                try:
+                    expires = float(expires_str)
+                    if expires != float('inf') and time.time() > expires:
+                        logger.info(f"Cache entry for key {key} (object {object_name}) found but expired. Deleting.")
+                        self.delete(key)  # Clean up expired entry
+                        return False
+                except ValueError:
+                    logger.error(f"Invalid 'expires' metadata '{expires_str}' for object {object_name}. Treating as error or non-existent.")
+                    return False
+
             return True
             
-        except Exception as e:
-            raise StorageOperationError(f"Error checking cache for {key}: {e}")
+        except ObjectDoesNotExistError:
+            return False
+        except LibcloudError as e: # Libcloud specific errors
+            raise StorageOperationError(f"Libcloud error checking cache for {key} (object {object_name}): {e}")
+        except ValueError as e: # For float conversion of expires_str
+             logger.error(f"Invalid 'expires' metadata format for {object_name}: {e}")
+             raise StorageOperationError(f"Invalid metadata format for {key}: {e}")
+        except Exception as e: # General fallback
+            raise StorageOperationError(f"Error checking cache for {key} (object {object_name}): {e}")
             
     def list_versions(self, key: str) -> List[Dict[str, Any]]:
         """List all versions of a cache entry.
@@ -357,11 +406,29 @@ class ObjectStorageCacheWrapper:
         if not init_storage():
             return []
             
+        object_name = self._get_object_name(key)
         try:
-            object_name = self._get_object_name(key)
-            return list_file_versions(object_name)
-        except Exception as e:
-            raise StorageOperationError(f"Error listing versions for {key}: {e}")
+            obj = _storage_container.get_object(object_name=object_name)
+            
+            version_info = {
+                'object_name': obj.name,
+                'timestamp': obj.meta_data.get('timestamp'),
+                'size': obj.size,
+                'hash': obj.hash,
+                'metadata': obj.meta_data
+            }
+            if 'server_id' in obj.meta_data:
+                 version_info['server_id'] = obj.meta_data['server_id']
+            if 'cache_key' in obj.meta_data:
+                 version_info['cache_key'] = obj.meta_data['cache_key']
+
+            return [version_info]
+        except ObjectDoesNotExistError:
+            return []
+        except LibcloudError as e: # Libcloud specific errors
+            raise StorageOperationError(f"Libcloud error listing versions for {key} (object {object_name}): {e}")
+        except Exception as e: # General fallback
+            raise StorageOperationError(f"Error listing versions for {key} (object {object_name}): {e}")
             
     def cleanup_expired(self) -> None:
         """Clean up expired cache entries.
@@ -388,10 +455,18 @@ class ObjectStorageCacheWrapper:
                         expires = float(obj.meta_data.get('expires', 'inf'))
                         if expires != float('inf') and current_time > expires:
                             delete_file_version(obj.name)
-                    except Exception as e:
-                        logger.warning(f"Error processing object during cleanup: {e}")
+                    except (ValueError, TypeError) as e: # Specific error for float conversion or missing keys in metadata
+                        logger.warning(f"Error processing object {obj.name} metadata during cleanup: {e}")
+                        continue
+                    except LibcloudError as e: # Libcloud error during delete_file_version or accessing obj properties
+                        logger.warning(f"Libcloud error processing object {obj.name} during cleanup: {e}")
+                        continue
+                    except Exception as e: # Broader catch for unexpected issues with one object
+                        logger.warning(f"Unexpected error processing object {obj.name} during cleanup: {e}")
                         continue
                         
+            except LibcloudError as e: # Error listing objects
+                raise StorageOperationError(f"Libcloud error during cache cleanup (listing objects): {e}")
             except Exception as e:
                 raise StorageOperationError(f"Error cleaning up expired cache entries: {e}")
             
@@ -438,9 +513,11 @@ def init_storage() -> bool:
     global _storage_driver, _storage_container
     
     if not LIBCLOUD_AVAILABLE:
+        logger.info("Libcloud not available. Storage functionality disabled.")
         return False
         
     if not STORAGE_ENABLED:
+        logger.info("Storage is not enabled in configuration.")
         return False
     
     if _storage_driver is None:
@@ -475,7 +552,15 @@ def init_storage() -> bool:
             cache_path.mkdir(parents=True, exist_ok=True)
                 
             return True
-        except Exception as e:
+        except LibcloudError as e: # Catch specific libcloud errors during driver init/container ops
+            _storage_driver = None
+            _storage_container = None
+            raise StorageConnectionError(f"Libcloud error initializing storage driver: {e}")
+        except OSError as e: # Catch errors related to cache_path.mkdir
+            _storage_driver = None
+            _storage_container = None
+            raise ConfigurationError(f"Failed to create cache directory during storage init {STORAGE_CACHE_DIR}: {e}")
+        except Exception as e: # General fallback for other init issues
             _storage_driver = None
             _storage_container = None
             raise StorageConnectionError(f"Error initializing storage driver: {e}")
@@ -520,6 +605,7 @@ def publish_feed_update(url, feed_content=None, feed_data=None):
         "timestamp": time.time()
     }
     
+    temp_file_path_obj = None # For tempfile management
     try:
         # Create a unique object name
         object_name = generate_object_name(url)
@@ -527,18 +613,18 @@ def publish_feed_update(url, feed_content=None, feed_data=None):
         # Create a JSON string from the data
         json_data = json.dumps(data)
         
-        # Create a temporary file
-        temp_file_path = os.path.join(CACHE_DIR, f"temp_{SERVER_ID}_{int(time.time())}.json")
-        with open(temp_file_path, 'w') as f:
-            f.write(json_data)
+        # Create a temporary file using tempfile
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, dir=CACHE_DIR, suffix='.json', encoding='utf-8') as tmp_file:
+            tmp_file.write(json_data)
+            temp_file_path_obj = Path(tmp_file.name)
         
         # Upload the file
-        with open(temp_file_path, 'rb') as iterator:
+        with open(temp_file_path_obj, 'rb') as iterator:
             extra = {
                 'meta_data': {
                     'server_id': SERVER_ID,
                     'feed_url': url,
-                    'timestamp': str(time.time())
+                    'timestamp': str(time.time()) # Ensure this timestamp is what cleanup_old_updates expects
                 },
                 'content_type': 'application/json'
             }
@@ -549,17 +635,27 @@ def publish_feed_update(url, feed_content=None, feed_data=None):
                 extra=extra
             )
             
-        # Clean up the temporary file
-        try:
-            os.remove(temp_file_path)
-        except:
-            pass
-            
         logger.info(f"Published feed update for {url} to object storage as {object_name}")
         return obj
-    except Exception as e:
+    except LibcloudError as e:
+        logger.error(f"Libcloud error publishing feed update to object storage for {url}: {e}")
+        return None
+    except IOError as e: # For temp file issues
+        logger.error(f"I/O error publishing feed update for {url}: {e}")
+        return None
+    except json.JSONDecodeError as e: # Should not happen with dumps, but for safety
+        logger.error(f"JSON encoding error publishing feed update for {url}: {e}")
+        return None
+    except Exception as e: 
         logger.error(f"Error publishing feed update to object storage: {e}")
         return None
+    finally:
+        # Clean up the temporary file
+        if temp_file_path_obj and temp_file_path_obj.exists():
+            try:
+                temp_file_path_obj.unlink()
+            except OSError as e: # Log specific error for cleanup failure (III.2)
+                logger.warning(f"Failed to remove temporary file {temp_file_path_obj}: {e}")
 
 def check_for_updates():
     """Check object storage for new feed updates from other servers"""
@@ -581,26 +677,18 @@ def check_for_updates():
             # Skip if we already know about this object
             if obj.name in _last_known_objects:
                 continue
-                
-            # Parse server ID from object name
-            try:
-                parts = obj.name.split('/')
-                if len(parts) >= 2:
-                    obj_server_id = parts[1].split('/')[0]
-                    
-                    # Skip our own updates
-                    if obj_server_id == SERVER_ID:
-                        _last_known_objects[obj.name] = current_time
-                        continue
-            except:
-                # If we can't parse the server ID, still process it
-                pass
             
-            # Download and process the object
-            process_update_object(obj)
+            # Use metadata for server ID (VI.1)
+            obj_server_id = None
+            if obj.meta_data:
+                obj_server_id = obj.meta_data.get('server_id')
+
+            if obj_server_id == SERVER_ID:
+                _last_known_objects[obj.name] = current_time
+                continue
             
-            # Mark as known
-            _last_known_objects[obj.name] = current_time
+            # Delegate processing to a helper function (V.2)
+            _process_single_remote_update(obj, current_time)
         
         # Clean up old entries from our cache
         expired_time = current_time - 3600  # 1 hour expiration
@@ -612,22 +700,48 @@ def check_for_updates():
     except Exception as e:
         logger.error(f"Error checking for updates: {e}")
 
+def _process_single_remote_update(obj: Object, current_time: float): # Added V.2
+    """Helper function to process a single object update from storage."""
+    global _last_known_objects
+    try:
+        # Download and process the object
+        process_update_object(obj) # process_update_object already handles download, parse, callbacks
+        
+        # Mark as known
+        _last_known_objects[obj.name] = current_time
+    except LibcloudError as e:
+        logger.error(f"Libcloud error in _process_single_remote_update for {obj.name}: {e}")
+    except IOError as e: # from process_update_object if it has file IO issues
+        logger.error(f"I/O error in _process_single_remote_update for {obj.name}: {e}")
+    except json.JSONDecodeError as e: # from process_update_object
+        logger.error(f"JSON decode error in _process_single_remote_update for {obj.name}: {e}")
+    except Exception as e:
+        logger.error(f"Error processing remote update for object {obj.name}: {e}")
+
 def process_update_object(obj):
     """Process a feed update object"""
+    temp_file_path_obj = None # For tempfile management
     try:
-        # Download the object to a temporary file
-        temp_file_path = os.path.join(CACHE_DIR, f"temp_download_{int(time.time())}.json")
-        obj.download(temp_file_path)
+        # Download the object to a temporary file using tempfile
+        with tempfile.NamedTemporaryFile(mode='wb', delete=False, dir=CACHE_DIR, suffix='.json') as tmp_file:
+            # No, download method needs a path string.
+            # obj.download(tmp_file) # This won't work directly if download expects path
+            temp_file_path_obj = Path(tmp_file.name)
+            # We need to close it before libcloud writes to it, or ensure download can take a file object.
+            # Most download methods expect a path.
+        
+        # Ensure temp_file_path_obj is set for download
+        if not temp_file_path_obj: # Should have been created by NamedTemporaryFile
+             raise StorageOperationError("Failed to create temporary file path for download.")
+
+        obj.download(destination_path=str(temp_file_path_obj), overwrite_existing=True)
         
         # Parse the JSON data
-        with open(temp_file_path, 'r') as f:
+        with open(temp_file_path_obj, 'r', encoding='utf-8') as f: # Read in text mode
             data = json.loads(f.read())
         
         # Clean up the temporary file
-        try:
-            os.remove(temp_file_path)
-        except:
-            pass
+        # Moved to finally block
         
         # Skip updates from our own server
         if data.get("server_id") == SERVER_ID:
@@ -647,8 +761,23 @@ def process_update_object(obj):
                 cb(url, feed_content, feed_data)
             except Exception as e:
                 logger.error(f"Error in feed update callback: {e}")
-    except Exception as e:
+    except LibcloudError as e:
+        logger.error(f"Libcloud error processing update object {obj.name}: {e}")
+    except FileNotFoundError as e: # For temp file not found after creation (unlikely with NamedTemporaryFile)
+        logger.error(f"Temporary file not found for {obj.name}: {e}")
+    except IOError as e: # For temp file read/write issues
+        logger.error(f"I/O error processing update object {obj.name}: {e}")
+    except json.JSONDecodeError as e: # For JSON parsing issues
+        logger.error(f"JSON decode error processing update object {obj.name}: {e}")
+    except Exception as e: 
         logger.error(f"Error processing update object: {e}")
+    finally:
+        # Clean up the temporary file
+        if temp_file_path_obj and temp_file_path_obj.exists():
+            try:
+                temp_file_path_obj.unlink()
+            except OSError as e: # Log specific error for cleanup failure (III.2)
+                logger.warning(f"Failed to remove temporary download file {temp_file_path_obj}: {e}")
 
 def storage_watcher_thread():
     """Background thread function to periodically check for updates"""
@@ -663,6 +792,8 @@ def storage_watcher_thread():
     while _sync_running:
         try:
             check_for_updates()
+        except StorageError as e: # Catch our custom storage errors
+            logger.error(f"Storage error in watcher: {e}")
         except Exception as e:
             logger.error(f"Error in storage watcher: {e}")
             
@@ -689,6 +820,8 @@ class FeedFileEventHandler(FileSystemEventHandler):
                     # Publish the update
                     publish_feed_update(feed_url, feed_content)
                     logger.info(f"Published feed update for {feed_url} triggered by file change")
+            except IOError as e: # For file read error
+                logger.error(f"I/O error handling file modification for {feed_url}: {e}")
             except Exception as e:
                 logger.error(f"Error handling file modification: {e}")
 
@@ -711,7 +844,7 @@ def start_file_watcher(watch_dir):
         _observer.start()
         logger.info(f"File watcher started for directory: {watch_dir}")
         return True
-    except Exception as e:
+    except Exception as e: # Watchdog specific exceptions could be caught here if known
         logger.error(f"Error starting file watcher: {e}")
         _observer = None
         return False
@@ -774,18 +907,28 @@ def cleanup_old_updates(max_age_hours=24):
         
         for obj in objects:
             try:
-                # Extract timestamp from object name
-                parts = obj.name.split('_')
-                if len(parts) > 1:
-                    timestamp = int(parts[-1].split('.')[0])
+                # Use metadata for timestamp (VI.1)
+                timestamp_str = None
+                if obj.meta_data:
+                    timestamp_str = obj.meta_data.get('timestamp')
+                
+                if timestamp_str:
+                    timestamp = float(timestamp_str)
                     age = current_time - timestamp
                     
                     if age > max_age_seconds:
                         # Delete old object
-                        _storage_container.delete_object(obj)
-                        logger.info(f"Cleaned up old update object: {obj.name}")
+                        _storage_container.delete_object(obj) # This should be obj.name or obj itself depending on API
+                                                              # _storage_container.delete_object(obj) is usually correct for libcloud
+                        logger.info(f"Cleaned up old update object: {obj.name} (age: {age/3600:.2f} hours)")
+                else:
+                    # Fallback or warning if timestamp metadata is missing
+                    logger.warning(f"Object {obj.name} is missing timestamp metadata during cleanup. Skipping.")
+
+            except ValueError:
+                logger.warning(f"Could not parse timestamp for object {obj.name} during cleanup. Skipping.")
             except Exception as e:
-                logger.warning(f"Error processing object during cleanup: {e}")
+                logger.warning(f"Error processing object {obj.name} during cleanup: {e}")
     except Exception as e:
         logger.error(f"Error cleaning up old updates: {e}")
 
@@ -805,7 +948,8 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
     global STORAGE_ENABLED, STORAGE_PROVIDER, STORAGE_REGION, STORAGE_BUCKET_NAME
     global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, STORAGE_HOST, STORAGE_CHECK_INTERVAL
     global STORAGE_CACHE_DIR, STORAGE_SYNC_PREFIX
-    
+    global _secrets_loaded
+
     # If libcloud is not available, always force disabled
     if not LIBCLOUD_AVAILABLE:
         if enabled:
@@ -816,15 +960,15 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
         # Update configuration
         new_config = {
             'enabled': enabled,
-            'provider': STORAGE_PROVIDER,
-            'region': STORAGE_REGION,
-            'bucket_name': STORAGE_BUCKET_NAME,
-            'access_key': STORAGE_ACCESS_KEY,
-            'secret_key': STORAGE_SECRET_KEY,
-            'host': STORAGE_HOST,
-            'check_interval': STORAGE_CHECK_INTERVAL,
-            'cache_dir': STORAGE_CACHE_DIR,
-            'sync_prefix': STORAGE_SYNC_PREFIX
+            'provider': kwargs.get('provider', STORAGE_PROVIDER),
+            'region': kwargs.get('region', STORAGE_REGION),
+            'bucket_name': kwargs.get('bucket_name', STORAGE_BUCKET_NAME),
+            'access_key': kwargs.get('access_key', STORAGE_ACCESS_KEY),
+            'secret_key': kwargs.get('secret_key', STORAGE_SECRET_KEY),
+            'host': kwargs.get('host', STORAGE_HOST),
+            'check_interval': kwargs.get('check_interval', STORAGE_CHECK_INTERVAL),
+            'cache_dir': kwargs.get('cache_dir', STORAGE_CACHE_DIR),
+            'sync_prefix': kwargs.get('sync_prefix', STORAGE_SYNC_PREFIX)
         }
         
         # Validate configuration if enabled
@@ -851,6 +995,16 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
         _storage_driver = None
         _storage_container = None
         
+        # If enabling, secrets might need to be re-evaluated or re-loaded.
+        if STORAGE_ENABLED:
+            if not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY:
+                 logger.info("Storage enabled. Access/secret keys will be loaded by init_storage if not already set.")
+
+            if kwargs.get('access_key') or kwargs.get('secret_key'):
+                _secrets_loaded = True 
+            elif STORAGE_ENABLED and (not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY):
+                 _secrets_loaded = False 
+
         # Start or stop services based on enabled state
         if STORAGE_ENABLED:
             return start_storage_watcher()
@@ -858,6 +1012,8 @@ def configure_storage(enabled: bool = False, **kwargs) -> bool:
             stop_storage_watcher()
             return True
             
+    except ConfigurationError as e: # Catch our own config errors
+        raise # Re-raise if already specific
     except Exception as e:
         raise ConfigurationError(f"Failed to configure storage: {e}")
 
@@ -879,7 +1035,7 @@ def cleanup_storage() -> None:
             _storage_container = None
             
         logger.info("Storage resources cleaned up")
-    except Exception as e:
+    except Exception as e: # General catch for cleanup, could be libcloud client closing issues etc.
         logger.error(f"Error cleaning up storage resources: {e}")
 
 def get_file_metadata(file_path):
@@ -903,6 +1059,12 @@ def get_file_metadata(file_path):
                 'ctime': stat.st_ctime,
                 'content': content  # Include content for in-memory operations
             }
+    except FileNotFoundError as e:
+        logger.error(f"File not found for metadata: {file_path}: {e}")
+        return None
+    except IOError as e: # Broader I/O errors (e.g. permission denied)
+        logger.error(f"I/O error getting file metadata for {file_path}: {e}")
+        return None
     except Exception as e:
         logger.error(f"Error getting file metadata for {file_path}: {e}")
         return None
@@ -961,7 +1123,6 @@ def publish_file(file_path, metadata=None):
             extra_metadata['meta_data'].update(metadata)
             
         # Create a BytesIO object for streaming
-        from io import BytesIO
         content_stream = BytesIO(file_metadata['content'])
         
         # Upload using streaming
@@ -974,6 +1135,12 @@ def publish_file(file_path, metadata=None):
             
         logger.info(f"Published file {file_path} to object storage as {object_name}")
         return obj
+    except LibcloudError as e:
+        logger.error(f"Libcloud error publishing file {file_path} to object storage: {e}")
+        return None
+    except IOError as e: # For BytesIO or file_metadata content issues
+        logger.error(f"I/O error publishing file {file_path}: {e}")
+        return None
     except Exception as e:
         logger.error(f"Error publishing file to object storage: {e}")
         return None
@@ -996,52 +1163,44 @@ def fetch_file(file_path, force=False):
     
     try:
         # Get current file metadata if it exists
-        current_metadata = None
+        current_metadata_content = None # Store content to avoid re-reading
+        current_file_hash = None
         if os.path.exists(file_path):
-            current_metadata = get_file_metadata(file_path)
+            current_file_meta = get_file_metadata(file_path)
+            if current_file_meta:
+                current_metadata_content = current_file_meta['content']
+                current_file_hash = current_file_meta['hash']
             
-        # List objects with matching prefix
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        prefix = f"{STORAGE_SYNC_PREFIX}files/"
-        objects = list(_storage_container.list_objects(prefix=prefix))
-        
-        # Find the latest version of the file
-        latest_obj = None
-        latest_timestamp = 0
-        
-        for obj in objects:
-            try:
-                # Extract metadata
-                meta = obj.meta_data
-                if meta.get('file_path') == file_path:
-                    timestamp = float(meta.get('timestamp', 0))
-                    if timestamp > latest_timestamp:
-                        latest_obj = obj
-                        latest_timestamp = timestamp
-            except:
-                continue
+        # Find the latest version of the file using the helper (V.2)
+        # The prefix for 'files' is f"{STORAGE_SYNC_PREFIX}files/"
+        file_prefix = f"{STORAGE_SYNC_PREFIX}files/"
+        latest_obj = _find_latest_object_version(file_path, file_prefix)
                 
         if not latest_obj:
-            logger.info(f"No version found for file {file_path}")
+            logger.info(f"No version found for file {file_path} in object storage.")
             return None, None
             
         # Check if we need to update
-        if not force and current_metadata:
-            latest_hash = latest_obj.meta_data.get('file_hash')
-            if latest_hash == current_metadata['hash']:
-                logger.info(f"File {file_path} is up to date")
-                return current_metadata['content'], latest_obj.meta_data
+        if not force and current_file_hash:
+            latest_hash_from_meta = latest_obj.meta_data.get('file_hash')
+            if latest_hash_from_meta == current_file_hash:
+                logger.info(f"File {file_path} is up to date (hash match). Returning local content.")
+                return current_metadata_content, latest_obj.meta_data
                 
         # Download the content using streaming
-        from io import BytesIO
         content_buffer = BytesIO()
-        latest_obj.download(content_buffer)
+        # Ensure latest_obj is not None before download. Covered by the check above.
+        _storage_driver.download_object_as_stream(latest_obj, content_buffer) # Use download_object_as_stream
         content = content_buffer.getvalue()
+        content_buffer.close() # Close the buffer
         
-        logger.info(f"Fetched updated version of {file_path}")
+        logger.info(f"Fetched updated version of {file_path} from object storage.")
         return content, latest_obj.meta_data
+    except LibcloudError as e: # More specific exception
+        logger.error(f"Libcloud error fetching file {file_path} from object storage: {e}")
+        return None, None
     except Exception as e:
-        logger.error(f"Error fetching file from object storage: {e}")
+        logger.error(f"Generic error fetching file {file_path} from object storage: {e}")
         return None, None
 
 def fetch_file_stream(file_path, force=False):
@@ -1062,51 +1221,43 @@ def fetch_file_stream(file_path, force=False):
     
     try:
         # Get current file metadata if it exists
-        current_metadata = None
+        current_metadata_content = None # Store content for BytesIO stream
+        current_file_hash = None
         if os.path.exists(file_path):
-            current_metadata = get_file_metadata(file_path)
+            current_file_meta = get_file_metadata(file_path)
+            if current_file_meta:
+                current_metadata_content = current_file_meta['content']
+                current_file_hash = current_file_meta['hash']
             
-        # List objects with matching prefix
-        file_hash = hashlib.md5(file_path.encode()).hexdigest()
-        prefix = f"{STORAGE_SYNC_PREFIX}files/"
-        objects = list(_storage_container.list_objects(prefix=prefix))
-        
-        # Find the latest version of the file
-        latest_obj = None
-        latest_timestamp = 0
-        
-        for obj in objects:
-            try:
-                # Extract metadata
-                meta = obj.meta_data
-                if meta.get('file_path') == file_path:
-                    timestamp = float(meta.get('timestamp', 0))
-                    if timestamp > latest_timestamp:
-                        latest_obj = obj
-                        latest_timestamp = timestamp
-            except:
-                continue
+        # Find the latest version of the file using the helper (V.2)
+        file_prefix = f"{STORAGE_SYNC_PREFIX}files/"
+        latest_obj = _find_latest_object_version(file_path, file_prefix)
                 
         if not latest_obj:
-            logger.info(f"No version found for file {file_path}")
+            logger.info(f"No version found for file {file_path} in object storage (for stream).")
             return None, None
             
         # Check if we need to update
-        if not force and current_metadata:
-            latest_hash = latest_obj.meta_data.get('file_hash')
-            if latest_hash == current_metadata['hash']:
-                logger.info(f"File {file_path} is up to date")
-                # Return a BytesIO stream of the current content
-                from io import BytesIO
-                return BytesIO(current_metadata['content']), latest_obj.meta_data
+        if not force and current_file_hash:
+            latest_hash_from_meta = latest_obj.meta_data.get('file_hash')
+            if latest_hash_from_meta == current_file_hash:
+                logger.info(f"File {file_path} is up to date (hash match). Returning stream of local content.")
+                return BytesIO(current_metadata_content) if current_metadata_content else None, latest_obj.meta_data
                 
         # Get the object's stream
-        stream = latest_obj.as_stream()
+        # Ensure latest_obj is not None. Covered by the check above.
+        stream = _storage_driver.download_object_as_stream(latest_obj) # download_object_as_stream returns an iterator
         
-        logger.info(f"Fetched updated version of {file_path} as stream")
+        logger.info(f"Fetched updated version of {file_path} as stream from object storage.")
         return stream, latest_obj.meta_data
+    except LibcloudError as e: # More specific exception
+        logger.error(f"Libcloud error fetching file stream for {file_path} from object storage: {e}")
+        return None, None
+    except IOError as e: # For BytesIO issues if current_metadata_content is bad
+        logger.error(f"I/O error with local content stream for {file_path}: {e}")
+        return None, None
     except Exception as e:
-        logger.error(f"Error fetching file stream from object storage: {e}")
+        logger.error(f"Generic error fetching file stream for {file_path} from object storage: {e}")
         return None, None
 
 def list_file_versions(file_path):
@@ -1145,6 +1296,9 @@ def list_file_versions(file_path):
         # Sort by timestamp descending
         versions.sort(key=lambda x: x['timestamp'], reverse=True)
         return versions
+    except LibcloudError as e:
+        logger.error(f"Libcloud error listing file versions for {file_path}: {e}")
+        return []
     except Exception as e:
         logger.error(f"Error listing file versions: {e}")
         return []
@@ -1168,6 +1322,32 @@ def delete_file_version(object_name):
         _storage_container.delete_object(object_name)
         logger.info(f"Deleted file version: {object_name}")
         return True
+    except LibcloudError as e:
+        logger.error(f"Libcloud error deleting file version {object_name}: {e}")
+        return False
     except Exception as e:
         logger.error(f"Error deleting file version: {e}")
-        return False 
+        return False
+
+# Helper function for V.2 (fetch_file and fetch_file_stream)
+def _find_latest_object_version(metadata_file_path_match: str, prefix: str) -> Optional[Object]:
+    """Finds the latest version of an object in storage based on metadata file_path and timestamp."""
+    if not _storage_container: # Should be initialized by init_storage
+        return None
+
+    objects = list(_storage_container.list_objects(prefix=prefix))
+    latest_obj = None
+    latest_timestamp = 0
+    
+    for obj_item in objects:
+        try:
+            meta = obj_item.meta_data
+            if meta and meta.get('file_path') == metadata_file_path_match:
+                timestamp = float(meta.get('timestamp', 0))
+                if timestamp > latest_timestamp:
+                    latest_obj = obj_item
+                    latest_timestamp = timestamp
+        except (ValueError, TypeError) as e: # Catch issues with float conversion or missing keys
+            logger.warning(f"Could not parse metadata for object {obj_item.name} while finding latest: {e}")
+            continue
+    return latest_obj 
