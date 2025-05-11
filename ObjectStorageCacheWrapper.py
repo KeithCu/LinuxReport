@@ -22,6 +22,12 @@ from libcloud.common.types import LibcloudError # For more specific exception ha
 # Import from our new config module
 import object_storage_config as oss_config
 
+# Import in-memory cache from shared
+from shared import g_cm
+
+# Default local cache expiration time (15 minutes)
+DEFAULT_LOCAL_CACHE_EXPIRY = 15 * 60  # 15 minutes in seconds
+
 class ObjectStorageCacheWrapper:
     """Wrapper for object storage to manage caching operations with libcloud.
     
@@ -29,11 +35,12 @@ class ObjectStorageCacheWrapper:
     as the backend instead of local disk cache. It integrates with the existing file
     synchronization and metadata handling functionality.
     """
-    def __init__(self, cache_dir: str) -> None:
+    def __init__(self, cache_dir: str, local_cache_expiry: int = DEFAULT_LOCAL_CACHE_EXPIRY) -> None:
         """Initialize the object storage cache wrapper.
         
         Args:
             cache_dir: Base directory for local cache operations (used for temporary storage)
+            local_cache_expiry: Time in seconds for local in-memory cache entries to expire
             
         Raises:
             ConfigurationError: If cache directory cannot be created
@@ -41,6 +48,7 @@ class ObjectStorageCacheWrapper:
         self.cache_dir = Path(cache_dir)
         self._ensure_cache_dir()
         self._cleanup_lock = threading.Lock()
+        self.local_cache_expiry = local_cache_expiry
         
     def _ensure_cache_dir(self) -> None:
         """Ensure the cache directory exists.
@@ -72,8 +80,21 @@ class ObjectStorageCacheWrapper:
         key_hash = oss_config.hashlib.md5(key.encode()).hexdigest()
         return f"{oss_config.STORAGE_SYNC_PREFIX}cache/{oss_config.SERVER_ID}/{key_hash}"
         
+    def _get_memory_cache_key(self, key: str) -> str:
+        """Generate a unique memory cache key.
+        
+        Args:
+            key: The original cache key
+            
+        Returns:
+            str: Memory cache key with prefix
+        """
+        return f"objstorage_cache:{key}"
+        
     def get(self, key: str) -> Any:
         """Get a value from the cache.
+        
+        First checks in-memory cache, then falls back to object storage if not found.
         
         Args:
             key: The cache key to retrieve
@@ -84,6 +105,14 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
+        # First check in-memory cache
+        memory_cache_key = self._get_memory_cache_key(key)
+        cached_value = g_cm.get(memory_cache_key)
+        if cached_value is not None:
+            oss_config.logger.debug(f"Cache hit in memory for key {key}")
+            return cached_value
+            
+        # Not found in memory cache, try object storage
         if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
             return None
             
@@ -138,7 +167,13 @@ class ObjectStorageCacheWrapper:
                 except ValueError:
                     oss_config.logger.warning(f"Invalid 'expires' in content for object {object_name} ('{expires_str}').")
 
-            return data.get('value')
+            value = data.get('value')
+            
+            # Store in memory cache
+            g_cm.set(memory_cache_key, value, ttl=self.local_cache_expiry)
+            oss_config.logger.debug(f"Cached key {key} in memory for {self.local_cache_expiry} seconds")
+            
+            return value
             
         except oss_config.ObjectDoesNotExistError: # Libcloud's specific error
             oss_config.logger.debug(f"Cache miss for key {key} (object {object_name})")
@@ -153,6 +188,8 @@ class ObjectStorageCacheWrapper:
     def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
         """Store a value in the cache.
         
+        Stores in both in-memory cache and object storage.
+        
         Args:
             key: The cache key
             value: The value to store
@@ -161,6 +198,10 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
+        # Store in memory cache first
+        memory_cache_key = self._get_memory_cache_key(key)
+        g_cm.set(memory_cache_key, value, ttl=self.local_cache_expiry)
+        
         if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
             return
             
@@ -214,12 +255,18 @@ class ObjectStorageCacheWrapper:
     def delete(self, key: str) -> None:
         """Delete a value from the cache.
         
+        Deletes from both in-memory cache and object storage.
+        
         Args:
             key: The cache key to delete
             
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
+        # Delete from memory cache first
+        memory_cache_key = self._get_memory_cache_key(key)
+        g_cm.delete(memory_cache_key)
+        
         if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
             return
             
@@ -241,6 +288,8 @@ class ObjectStorageCacheWrapper:
     def has(self, key: str) -> bool:
         """Check if a key exists in the cache.
         
+        First checks in-memory cache, then falls back to object storage if not found.
+        
         Args:
             key: The cache key to check
             
@@ -250,6 +299,11 @@ class ObjectStorageCacheWrapper:
         Raises:
             StorageOperationError: If there are issues with storage operations
         """
+        # First check in-memory cache
+        memory_cache_key = self._get_memory_cache_key(key)
+        if g_cm.has(memory_cache_key):
+            return True
+            
         if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
             return False
             
@@ -278,10 +332,10 @@ class ObjectStorageCacheWrapper:
                     except ValueError:
                          oss_config.logger.warning(f"Invalid 'expires' metadata in has() for {object_name}: '{expires_str}'. Assuming not expired by metadata alone.")
             
-            # If not expired by metadata, we assume it exists. 
-            # A full check would involve downloading and checking content expiration,
-            # but 'has' is often expected to be cheaper.
-            # For this implementation, metadata check is sufficient for 'has'.
+            # If not expired by metadata, we assume it exists.
+            # Cache the existence so future has() calls don't need to hit storage
+            g_cm.set(memory_cache_key, None, ttl=self.local_cache_expiry)
+            
             return True
         except oss_config.ObjectDoesNotExistError:
             return False
@@ -354,18 +408,24 @@ class ObjectStorageCacheWrapper:
         return []
 
             
-    def configure(self, enabled: bool = False, **kwargs) -> bool:
+    def configure(self, enabled: bool = False, local_cache_expiry: Optional[int] = None, **kwargs) -> bool:
         """Configure cache-specific settings or re-initialize based on global config.
         This method primarily ensures that the cache reflects the global STORAGE_ENABLED state.
         Other configurations (keys, bucket) are managed globally by object_storage_config.
         
         Args:
             enabled: Explicitly enable/disable the cache (reflects global STORAGE_ENABLED)
+            local_cache_expiry: Optional time in seconds for local in-memory cache entries to expire
             **kwargs: Potentially cache-specific tunables in the future.
             
         Returns:
             bool: True if configuration/re-check was successful in terms of this cache instance.
         """
+        # Update local cache expiry if provided
+        if local_cache_expiry is not None:
+            self.local_cache_expiry = local_cache_expiry
+            oss_config.logger.info(f"Updated local cache expiry to {local_cache_expiry} seconds")
+        
         # This cache wrapper's 'enabled' status is tied to the global STORAGE_ENABLED
         # and LIBCLOUD_AVAILABLE.
         # The main configuration (keys, bucket, etc.) is handled by object_storage_config.configure_storage
