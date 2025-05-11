@@ -31,7 +31,7 @@ from workers import fetch_urls_parallel, fetch_urls_thread
 from config_utils import get_admin_password
 
 # Global setting for background refreshes
-ENABLE_BACKGROUND_REFRESH = os.environ.get('ENABLE_BACKGROUND_REFRESH', '1') == '1'
+ENABLE_BACKGROUND_REFRESH = True
 
 # Constants for Chat Feature
 MAX_COMMENTS = 1000
