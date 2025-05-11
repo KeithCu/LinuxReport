@@ -43,12 +43,19 @@ _JS_MODULES = [
     'config.js'
 ]
 
-def get_combined_hash():
-    """Get hash of all source files combined"""
-    templates_dir = os.path.join(PATH, 'templates')
+def get_combined_hash(files, base_path):
+    """Get hash of all source files combined
+    
+    Args:
+        files (list): List of filenames to hash
+        base_path (str): Base directory path containing the files
+        
+    Returns:
+        str: MD5 hash of combined files, or None if any file can't be read
+    """
     combined_hash = hashlib.md5()
-    for module_file in _JS_MODULES:
-        file_path = os.path.join(templates_dir, module_file)
+    for file in files:
+        file_path = os.path.join(base_path, file)
         try:
             with open(file_path, 'rb') as f:
                 combined_hash.update(f.read())
@@ -63,7 +70,7 @@ def compile_js_files():
     output_file = os.path.join(static_dir, 'linuxreport.js')
     
     # Get hash and timestamp for header
-    file_hash = get_combined_hash()
+    file_hash = get_combined_hash(_JS_MODULES, templates_dir)
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
     # Read and combine all files
@@ -106,7 +113,7 @@ def static_file_hash(filename):
     
     # Special handling for linuxreport.js - hash all source files
     if filename == 'linuxreport.js':
-        file_hash = get_combined_hash()
+        file_hash = get_combined_hash(_JS_MODULES, os.path.join(PATH, 'templates'))
         if file_hash is None:
             # If any file can't be read, use timestamp
             now = datetime.datetime.now()
