@@ -153,6 +153,12 @@ function renderWeatherData(data, useMetric) {
     return;
   }
 
+  // Add this line to update the header with city name
+  const weatherHeader = document.querySelector('#weather-container h3');
+  if (weatherHeader && data.city_name) {
+    weatherHeader.textContent = `5-Day Weather (${data.city_name})`;
+  }
+
   if (!data.daily || data.daily.length === 0) {
     weatherLoading.style.display = "none";
     weatherError.style.display = "block";
