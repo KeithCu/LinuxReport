@@ -18,6 +18,7 @@ import time
 from flask import g, jsonify, render_template, request, make_response, Response, flash
 from markupsafe import Markup
 from werkzeug.utils import secure_filename
+from flask_cors import CORS
 
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo, DEBUG
@@ -25,7 +26,9 @@ from models import RssInfo, DEBUG
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, ENABLE_URL_CUSTOMIZATION)
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, 
+                    get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, 
+                    ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 from config_utils import get_admin_password
@@ -111,7 +114,25 @@ def get_cached_above_html():
 # Function to initialize routes
 def init_app(flask_app):
     """Initialize Flask routes."""
-    
+    # Configure CORS only if enabled
+    if ENABLE_CORS:
+        CORS(flask_app, resources={
+            r"/api/*": {
+                "origins": ALLOWED_DOMAINS,
+                "methods": ["GET", "POST", "OPTIONS"],
+                "allow_headers": ["Content-Type"]
+            }
+        })
+        
+        # Add security headers to all responses when CORS is enabled
+        @flask_app.after_request
+        def add_security_headers(response):
+            # Add other security headers
+            response.headers['X-Content-Type-Options'] = 'nosniff'
+            response.headers['X-Frame-Options'] = 'DENY'
+            response.headers['X-XSS-Protection'] = '1; mode=block'
+            return response
+
     # The main page of LinuxReport. Most of the time, it won't need to hit the disk to return the page
     # even if the page cache is expired.
     @flask_app.route('/')
@@ -140,7 +161,12 @@ def init_app(flask_app):
         cache_key = f"page-cache:{page_order_s}{suffix}"
         full_page = g_cm.get(cache_key)
         if not DEBUG and full_page is not None:
-            return full_page
+            response = make_response(full_page)
+            # Add CSP header only to the main page if CORS is enabled
+            if ENABLE_CORS:
+                csp_domains = " ".join(ALLOWED_DOMAINS)
+                response.headers['Content-Security-Policy'] = f"default-src 'self'; connect-src 'self' {csp_domains}; frame-ancestors 'none';"
+            return response
 
         # Prepare the page layout.
         if single_column:
@@ -250,8 +276,13 @@ def init_app(flask_app):
             
             if not is_web_bot and ENABLE_BACKGROUND_REFRESH:
                 fetch_urls_thread()
-                
-        return page
+        
+        response = make_response(page)
+        # Add CSP header only to the main page if CORS is enabled
+        if ENABLE_CORS:
+            csp_domains = " ".join(ALLOWED_DOMAINS)
+            response.headers['Content-Security-Policy'] = f"default-src 'self'; connect-src 'self' {csp_domains}; frame-ancestors 'none';"
+        return response
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
     def config():
