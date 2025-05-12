@@ -26,18 +26,15 @@ class ObjectStorageCacheWrapper:
     This class provides a compatible interface with DiskCacheWrapper but uses object storage
     as the backend instead of local disk cache.
     """
-    def __init__(self, cache_dir: str, local_cache_expiry: int = DEFAULT_LOCAL_CACHE_EXPIRY) -> None:
+    def __init__(self, local_cache_expiry: int = DEFAULT_LOCAL_CACHE_EXPIRY) -> None:
         """Initialize the object storage cache wrapper.
         
         Args:
-            cache_dir: Base directory for local cache operations (used for temporary storage)
             local_cache_expiry: Time in seconds for local in-memory cache entries to expire
             
         Raises:
             ConfigurationError: If object storage is not available or not properly configured
         """
-        self.cache_dir = Path(cache_dir)
-        self._ensure_cache_dir()
         self.local_cache_expiry = local_cache_expiry
         
         # Check storage configuration upfront
@@ -69,47 +66,32 @@ class ObjectStorageCacheWrapper:
         First checks in-memory cache, then falls back to object storage if not found.
         """
         # First check in-memory cache
-        memory_cache_key = self._get_memory_cache_key(key)
-        cached_value = g_cm.get(memory_cache_key)
-        if cached_value is not None:
-            return cached_value
-            
+        memory_key = self._get_memory_cache_key(key)
+        if self.g_cm.exists(memory_key):
+            return self.g_cm.get(memory_key)
+        
+        # Get object from object storage
+        obj_name = self._get_object_name(key)
         try:
-            object_name = self._get_object_name(key)
-            obj = oss_config._storage_container.get_object(object_name=object_name)
-            
-            # Download the object to a temporary file
-            temp_download_path = self.cache_dir / f"temp_{hashlib.md5(object_name.encode()).hexdigest()}"
-            try:
-                obj.download(destination_path=str(temp_download_path), overwrite_existing=True)
-                with open(temp_download_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            finally:
-                if temp_download_path.exists():
-                    try:
-                        temp_download_path.unlink()
-                    except OSError:
-                        pass
-
-            # Check if expired
-            expires = data.get('expires')
-            if expires is not None and expires != float('inf') and time.time() > expires:
-                self.delete(key)
+            obj = self._storage_container.get_object(obj_name)
+            if obj:
+                # Download as stream
+                stream = self._storage_driver.download_object_as_stream(obj)
+                # Read stream into string (assuming UTF-8 for JSON)
+                data_str = b''.join(stream).decode('utf-8')
+                # Parse JSON
+                data = json.loads(data_str)
+                # Store in in-memory cache with TTL
+                self.g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
+                return data
+            else:
                 return None
-
-            value = data.get('value')
-            
-            # Store in memory cache
-            g_cm.set(memory_cache_key, value, ttl=self.local_cache_expiry)
-            
-            return value
-            
-        except oss_config.ObjectDoesNotExistError:
+        except ObjectDoesNotExistError:
             return None
         except Exception as e:
-            oss_config.logger.error(f"Error getting cache value for {key}: {e}")
+            logger.error(f"Error getting object {obj_name}: {e}")
             return None
-            
+
     def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
         """Store a value in the cache.
         
