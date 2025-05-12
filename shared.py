@@ -38,6 +38,16 @@ ALLOWED_DOMAINS = [
     'http://127.0.0.1:5000',
 ]
 
+# Domains allowed to make requests to this server
+ALLOWED_REQUESTER_DOMAINS = [
+    'https://covidreport.org',
+    'https://aireport.keithcu.com',
+    'https://pvreport.org',
+    'https://trumpreport.info',
+    'https://news.thedetroitilove.com',
+    # Add more domains as needed
+]
+
 ENABLE_CORS = False
 
 # Simple map from Mode enum to URL identifiers - identical to enum values
