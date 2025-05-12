@@ -61,13 +61,12 @@ logger = logging.getLogger("object_storage_config")
 
 # Object Storage configuration
 STORAGE_ENABLED = False
-STORAGE_PROVIDER = "s3"  # options: "s3", "linode", "local"
+STORAGE_PROVIDER = "linode"  # options: "s3", "linode", "local"
 STORAGE_REGION = "us-east-1"
 STORAGE_BUCKET_NAME = "feed-sync"
 STORAGE_ACCESS_KEY = ""  # Loaded from config.yaml
 STORAGE_SECRET_KEY = ""  # Loaded from config.yaml
 STORAGE_HOST = "s3.linode.com"
-STORAGE_CACHE_DIR = "/tmp/feed_cache"
 STORAGE_SYNC_PREFIX = "feed-updates/"
 
 # Sync configuration
@@ -155,20 +154,12 @@ def init_storage() -> bool:
             except ContainerDoesNotExistError:
                 _storage_container = _storage_driver.create_container(container_name=STORAGE_BUCKET_NAME)
                 logger.info(f"Created new storage container: {STORAGE_BUCKET_NAME}")
-                
-            # Make sure cache directory exists
-            cache_path = Path(STORAGE_CACHE_DIR)
-            cache_path.mkdir(parents=True, exist_ok=True)
-                
+                                
             return True
         except LibcloudError as e: # Catch specific libcloud errors during driver init/container ops
             _storage_driver = None
             _storage_container = None
             raise StorageConnectionError(f"Libcloud error initializing storage driver: {e}")
-        except OSError as e: # Catch errors related to cache_path.mkdir
-            _storage_driver = None
-            _storage_container = None
-            raise ConfigurationError(f"Failed to create cache directory during storage init {STORAGE_CACHE_DIR}: {e}")
         except Exception as e: # General fallback for other init issues
             _storage_driver = None
             _storage_container = None

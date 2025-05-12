@@ -3,7 +3,6 @@ ObjectStorageCacheWrapper.py
 
 Object Storage-based cache wrapper for feed updates. Used to manage cache operations with libcloud.
 """
-import time
 import json
 import hashlib
 from datetime import datetime
@@ -15,7 +14,7 @@ from io import BytesIO
 import object_storage_config as oss_config
 
 # Import in-memory cache from shared
-from shared import g_cm, TZ
+from shared import g_cm, TZ, EXPIRE_HOUR
 
 # Default local cache expiration time (15 minutes)
 DEFAULT_LOCAL_CACHE_EXPIRY = 15 * 60  # 15 minutes in seconds
@@ -110,26 +109,19 @@ class ObjectStorageCacheWrapper:
             data_to_store = {
                 'value': value,
                 'timestamp': datetime.datetime.now(TZ).timestamp(),
-                'expires': expires_at
+                'expires': expires_at,
+                'server_id': oss_config.SERVER_ID
             }
             
             json_data = json.dumps(data_to_store).encode('utf-8')
             data_stream = BytesIO(json_data)
-            
-            metadata = {
-                'cache_key': key,
-                'timestamp': str(data_to_store['timestamp']),
-                'expires': str(data_to_store['expires']),
-                'server_id': oss_config.SERVER_ID
-            }
-            
+                        
             oss_config._storage_driver.upload_object_via_stream(
                 iterator=data_stream,
                 container=oss_config._storage_container,
                 object_name=object_name,
-                extra={'meta_data': metadata, 'content_type': 'application/json'}
+                extra={'content_type': 'application/json'}
             )
-                
         except Exception as e:
             oss_config.logger.error(f"Error putting cache value for {key}: {e}")
         finally:
@@ -203,7 +195,7 @@ def migrate_from_disk_cache() -> None:
     for key in old_cache.cache.iterkeys():  # Iterate through keys in the old cache
         if old_cache.has(key):
             value = old_cache.get(key)  # Get value from old cache
-            new_cache.put(key, value)  # Put value into new cache
+            new_cache.put(key, value, timeout = EXPIRE_HOUR) #Fixme, grab the proper timeout 
             print(f'Migrated key: {key}')  # Optional logging
     print('Migration completed.')
 
