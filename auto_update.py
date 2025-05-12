@@ -10,7 +10,7 @@ import json
 import traceback
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
@@ -21,7 +21,7 @@ from html_generation import (
     generate_headlines_html, refresh_images_only
 )
 
-from shared import (EXPIRE_DAY, EXPIRE_WEEK, MODE, TZ, Mode, g_c, MODE_MAP)
+from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 
 # --- Configuration and Prompt Constants ---
 MAX_PREVIOUS_HEADLINES = 200

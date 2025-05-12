@@ -11,24 +11,20 @@ import time
 from collections import defaultdict
 # Standard library imports
 from datetime import date as date_obj
-from datetime import datetime, timezone
+from datetime import datetime
 from bisect import bisect_left
 
 import geoip2.database
 # Third-party imports
 import requests
-import zoneinfo
 
 # Local imports
-from shared import g_cs, get_lock, USER_AGENT
+from shared import g_cs, get_lock, USER_AGENT, TZ
 
 # Global flag to control whether to use LinuxReport.net API instead of OpenWeather
 # This allows to share data between servers and for better rate-limit support
 # Since all servers are in the same datacenter, it will be very fast.
 USE_LINUXREPORT_API = False  # Set to True to use LinuxReport.net API, False to use OpenWeather
-
-# Define the timezone
-TZ = zoneinfo.ZoneInfo("US/Eastern")
 
 # LinuxReport.net API endpoint
 LINUXREPORT_WEATHER_API = "https://linuxreport.net/api/weather"

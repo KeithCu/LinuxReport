@@ -70,7 +70,7 @@ class DiskcacheSqliteLock(LockBase):
                 return False
             if (time.monotonic() - start_time) > timeout_seconds:
                 return False
-            time.sleep(0.1)  # Short sleep before retrying
+            time.sleep(0.5)  # Short sleep before retrying
 
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
         """Internal method that attempts to acquire the lock once."""

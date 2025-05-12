@@ -73,6 +73,13 @@ from abc import ABC, abstractmethod
 # Import from config module (assumed to exist)
 import object_storage_config as oss_config
 
+# Global constants for backoff and retry configuration
+DEFAULT_RETRY_INTERVAL = 1.0  # Base interval for lock acquisition retries
+MIN_RETRY_INTERVAL = 1.0      # Minimum retry interval in seconds
+MAX_RETRY_INTERVAL = 10.0     # Maximum retry interval in seconds
+MAX_RETRY_ATTEMPTS = 3        # Maximum number of retry attempts for S3 operations
+RETRY_MULTIPLIER = 1.0        # Multiplier for exponential backoff
+
 class LockBase(ABC):
     @abstractmethod
     def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
@@ -117,7 +124,7 @@ class ObjectStorageLock(LockBase):
         lock_name: str,
         owner_prefix: Optional[str] = None,
         metadata: Optional[Dict[str, str]] = None,
-        retry_interval: float = 0.05
+        retry_interval: float = DEFAULT_RETRY_INTERVAL
     ):
         if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
             raise oss_config.ConfigurationError("Object storage is not available or not enabled")
@@ -135,7 +142,7 @@ class ObjectStorageLock(LockBase):
         
         self._thread_local = threading.local()
         self._thread_local.lock_count = 0
-        self.retry_interval = max(0.01, retry_interval)  # Ensure minimum interval
+        self.retry_interval = max(MIN_RETRY_INTERVAL, retry_interval)  # Ensure minimum interval
         self.metadata = metadata or {}
         
         # Validate metadata size (S3 limit: 2KB)
@@ -179,18 +186,16 @@ class ObjectStorageLock(LockBase):
                 return False
             elapsed = time.monotonic() - start_time
             if elapsed > timeout_seconds:
-                oss_config.logger.warning(
-                    f"Timeout acquiring lock {self.lock_key} for owner {self.owner_id} after {elapsed:.2f}s"
-                )
+                print(f"Timeout acquiring lock {self.lock_key} for owner {self.owner_id} after {elapsed:.2f}s")
                 return False
-            # Exponential backoff: min(1s, retry_interval * 2^attempt)
-            delay = min(1.0, self.retry_interval * (2 ** attempt))
+            # Exponential backoff using global constants
+            delay = min(MAX_RETRY_INTERVAL, self.retry_interval * (2 ** attempt))
             time.sleep(delay)
             attempt += 1
             
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=0.1, max=2),
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, min=MIN_RETRY_INTERVAL, max=MAX_RETRY_INTERVAL),
         retry=retry_if_exception_type(Exception)
     )
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
@@ -230,7 +235,7 @@ class ObjectStorageLock(LockBase):
             return False
             
         except Exception as e:
-            oss_config.logger.error(f"Error acquiring lock {self.lock_key}: {e}")
+            print(f"Error acquiring lock {self.lock_key}: {e}")
             return False
             
     @retry(
@@ -254,7 +259,7 @@ class ObjectStorageLock(LockBase):
         except oss_config.ObjectDoesNotExistError:
             return None
         except Exception as e:
-            oss_config.logger.error(f"Error getting lock info for {self.lock_key}: {e}")
+            print(f"Error getting lock info for {self.lock_key}: {e}")
             raise
             
     @retry(
@@ -285,7 +290,7 @@ class ObjectStorageLock(LockBase):
             )
                 
         except Exception as e:
-            oss_config.logger.error(f"Error putting lock info for {self.lock_key}: {e}")
+            print(f"Error putting lock info for {self.lock_key}: {e}")
             raise
         finally:
             if data_stream:
@@ -317,7 +322,7 @@ class ObjectStorageLock(LockBase):
                 oss_config._storage_container.delete_object(obj)
                 success = True
         except Exception as e:
-            oss_config.logger.error(f"Error releasing lock {self.lock_key}: {e}")
+            print(f"Error releasing lock {self.lock_key}: {e}")
             success = False
             
         self._thread_local.lock_count = 0
@@ -355,7 +360,7 @@ class ObjectStorageLock(LockBase):
                 return True
             return False
         except Exception as e:
-            oss_config.logger.error(f"Error renewing lock {self.lock_key}: {e}")
+            print(f"Error renewing lock {self.lock_key}: {e}")
             return False
         
     def __enter__(self):

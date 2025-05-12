@@ -34,10 +34,6 @@ As LinuxReport grows in popularity, this scaling plan provides a roadmap for eff
 - Split into dedicated servers:
   - Web server(s) (Linode 4GB/$24 each)
   - Single backend/feed processing server (Linode 4GB/$24 or 8GB/$48)
-- No ZMQ needed at this stage (only one backend server)
-- Add Apache front-end caching for non-customized content
-  - Cookie-based cache bypass for custom layouts and admin mode
-  - Separate caches for mobile vs. desktop views
 
 ### Implementation Details
 
