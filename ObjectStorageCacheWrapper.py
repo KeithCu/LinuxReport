@@ -15,7 +15,7 @@ from io import BytesIO
 import object_storage_config as oss_config
 
 # Import in-memory cache from shared
-from shared import g_cm
+from shared import g_cm, TZ
 
 # Default local cache expiration time (15 minutes)
 DEFAULT_LOCAL_CACHE_EXPIRY = 15 * 60  # 15 minutes in seconds
@@ -81,9 +81,11 @@ class ObjectStorageCacheWrapper:
                 data_str = b''.join(stream).decode('utf-8')
                 # Parse JSON
                 data = json.loads(data_str)
-                # Store in in-memory cache with TTL
-                self.g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
-                return data
+                if datetime.datetime.now(TZ).timestamp() > data.get('expires', float('inf')):
+                    return None
+                else:
+                    self.g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
+                    return data
             else:
                 return None
         except ObjectDoesNotExistError:
@@ -104,11 +106,11 @@ class ObjectStorageCacheWrapper:
         object_name = self._get_object_name(key)
         data_stream = None
         try:
-            expires_at = (time.time() + timeout) if timeout is not None else float('inf')
+            expires_at = (datetime.datetime.now(TZ).timestamp() + timeout) if timeout is not None else float('inf')
             data_to_store = {
                 'value': value,
-                'timestamp': time.time(),
-                'expires': expires_at 
+                'timestamp': datetime.datetime.now(TZ).timestamp(),
+                'expires': expires_at
             }
             
             json_data = json.dumps(data_to_store).encode('utf-8')
@@ -190,3 +192,20 @@ class ObjectStorageCacheWrapper:
         """Set the last fetch time for a URL in object storage."""
         last_fetch_key = url + ":last_fetch"
         self.put(last_fetch_key, timestamp, timeout)
+
+def migrate_from_disk_cache() -> None:
+    import shared  # Import to access DiskCacheWrapper
+    from shared import g_c  # Assuming g_c is the instance from shared.py
+    
+    old_cache = g_c  # Reference to the existing DiskCacheWrapper instance
+    new_cache = ObjectStorageCacheWrapper()  # Create an instance of the new cache
+    
+    for key in old_cache.cache.iterkeys():  # Iterate through keys in the old cache
+        if old_cache.has(key):
+            value = old_cache.get(key)  # Get value from old cache
+            new_cache.put(key, value)  # Put value into new cache
+            print(f'Migrated key: {key}')  # Optional logging
+    print('Migration completed.')
+
+if __name__ == "__main__":
+    migrate_from_disk_cache()  # Trigger migration when run directly
