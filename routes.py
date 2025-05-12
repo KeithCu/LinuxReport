@@ -28,7 +28,7 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, 
                     get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, 
-                    ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS)
+                    ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 from config_utils import get_admin_password
@@ -114,23 +114,39 @@ def get_cached_above_html():
 # Function to initialize routes
 def init_app(flask_app):
     """Initialize Flask routes."""
-    # Configure CORS only if enabled
+    # Configure CORS and security headers only if enabled
     if ENABLE_CORS:
+        # Configure CORS to allow requests from specified domains
         CORS(flask_app, resources={
             r"/api/*": {
-                "origins": ALLOWED_DOMAINS,
+                "origins": ALLOWED_REQUESTER_DOMAINS,
                 "methods": ["GET", "POST", "OPTIONS"],
-                "allow_headers": ["Content-Type"]
+                "allow_headers": ["Content-Type"],
+                "expose_headers": ["Content-Type"],
+                "supports_credentials": True,
+                "max_age": 3600  # Cache preflight requests for 1 hour
             }
         })
         
-        # Add security headers to all responses when CORS is enabled
+        # Add security headers to all responses
         @flask_app.after_request
         def add_security_headers(response):
+            # Add CORS headers
+            origin = request.headers.get('Origin')
+            if origin in ALLOWED_REQUESTER_DOMAINS:
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            
             # Add other security headers
             response.headers['X-Content-Type-Options'] = 'nosniff'
             response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
+            
+            # Add CSP header that allows connections to this domain
+            response.headers['Content-Security-Policy'] = "default-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+            
             return response
 
     # The main page of LinuxReport. Most of the time, it won't need to hit the disk to return the page
