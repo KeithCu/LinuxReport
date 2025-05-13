@@ -195,7 +195,11 @@ def migrate_from_disk_cache() -> None:
     for key in old_cache.cache.iterkeys():  # Iterate through keys in the old cache
         if old_cache.has(key):
             value = old_cache.get(key)  # Get value from old cache
-            new_cache.put(key, value, timeout = EXPIRE_HOUR) #Fixme, grab the proper timeout 
+            metadata = old_cache.get(key, read=False)  # Fetch metadata to get expire_time
+            expire_time = metadata['expire_time']
+            current_time = datetime.datetime.now(TZ).timestamp()
+            timeout = expire_time - current_time if expire_time > current_time else EXPIRE_HOUR
+            new_cache.put(key, value, timeout=timeout)  # Use calculated timeout
             print(f'Migrated key: {key}')  # Optional logging
     print('Migration completed.')
 
