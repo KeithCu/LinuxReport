@@ -24,7 +24,10 @@ from html_generation import (
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 
 # --- Configuration and Prompt Constants ---
-MAX_PREVIOUS_HEADLINES = 200
+MAX_PREVIOUS_HEADLINES = 200 # Number of headlines to remember and filter out to the AI
+
+MAX_ARCHIVE_HEADLINES = 50 # Size of Headlines Archive page
+
 
 # Title marker used to separate reasoning from selected headlines
 TITLE_MARKER = "***"
@@ -37,23 +40,24 @@ MAX_TOKENS = 5000
 TIMEOUT = 60
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
-BASE = "/srv/http/"
-
-BANNED_WORDS = [
-    "tmux",
-    "redox",
-    "java",
-    "javascript",
-    "mysql (mariadb is ok)",
-]
-
 PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
     Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
-    Do not select headlines that are very similar or nearly duplicates; pick only distinct headlines/topics.
+    Do not select top 3 headlines that are similar; pick only distinct headlines/topics.
     When you are done discussing the titles, put {TITLE_MARKER} and then list the top 3, using only the titles.
     """
 
+
+PROMPT_30B = f""" Prompt:
+Given a list of news headlines, follow these steps:
+Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
+From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
+Think deeply, using as many tokens as needed to reason about relevance, interest, and topic distinction for the best selections.
+After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no reasoning or extra text:
+1. [Title 1]
+2. [Title 2]
+3. [Title 3]
+"""
 
 #O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = """
@@ -96,6 +100,13 @@ MODEL_1 = None
 CHAT_PROVIDER_2 = "openrouter" # options: "together", "openrouter"
 PROMPT_MODE_2 = "default"      # options: "default", "o3"
 MODEL_2 = None  # Will be set based on provider
+
+MISTRAL_EXTRA_PARAMS = {
+    "provider": {
+        "order": ["Mistral"], # Try to send the request to Mistral first
+        "allow_fallbacks": True
+    }
+}
 
 # Add unified provider client cache (for normal mode)
 provider_client_cache = None
@@ -257,7 +268,7 @@ class OpenRouterProvider(LLMProvider):
     
     def get_comparison_models(self) -> Tuple[str, str]:
         """Get models specific for comparison mode."""
-        return "x-ai/grok-3-mini-beta", "google/gemini-2.5-flash-preview"
+        return "google/gemma-3-27b-it", "mistralai/mistral-small-3.1-24b-instruct"
     
     def _configure_client(self, client):
         """Add OpenRouter-specific headers."""
@@ -308,11 +319,16 @@ def _try_call_model(client, model, messages, max_tokens, provider_label=""):
         start = timer()
         print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model} ({provider_label})")
         try:
+            if "mistral" in model.lower():
+                extra_params = MISTRAL_EXTRA_PARAMS
+            else:
+                extra_params = {}
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
-                timeout=TIMEOUT
+                timeout=TIMEOUT,
+                **extra_params  # Include extra params if model is Mistral
             )
             end = timer()
             choice = response.choices[0]
@@ -371,6 +387,12 @@ def _prepare_messages(prompt_mode, filtered_articles):
         messages = [
             {"role": "system", "content": PROMPT_O3_SYSTEM},
             {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
+        ]
+    elif prompt_mode == "30b":
+        mode_instructions = REPORT_PROMPT
+        user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
+        messages = [
+            {"role": "user", "content": PROMPT_30B.format(mode_instructions=mode_instructions) + "\n" + user_list}
         ]
     else: # Default mode
         prompt = PROMPT_AI.format(mode_instructions=mode_instructions) + "\n" + "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
@@ -475,8 +497,6 @@ def run_comparison(articles):
 
     print("\n--- Comparison Mode Finished ---")
 
-
-MAX_ARCHIVE_HEADLINES = 50
 
 def append_to_archive(mode, top_articles):
     """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
@@ -617,6 +637,8 @@ if __name__ == "__main__":
         comparison_models = provider.get_comparison_models()
         MODEL_1 = comparison_models[0]
         MODEL_2 = comparison_models[1]
+        PROMPT_MODE_1 = "30b"
+        PROMPT_MODE_2 = "30b"
 
     # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
     if args.include_summary:
