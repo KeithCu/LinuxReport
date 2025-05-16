@@ -91,14 +91,14 @@ ALL_URLS = {} # Initialized here, passed to utils
 # --- Global Configuration (Replaces Environment Variables except API Keys) ---
 RUN_MODE = "normal"  # options: "normal", "compare"
 
+PROVIDER = "openrouter"
+
+PROMPT_MODE = "default"  # Global default for prompt mode if not overridden
+
 # Configuration for the primary provider/model
-CHAT_PROVIDER_1 = "openrouter"  # options: "together", "openrouter"
-PROMPT_MODE_1 = "default"     # options: "default", "o3"
 MODEL_1 = None
 
 # Configuration for the secondary provider/model (for comparison mode)
-CHAT_PROVIDER_2 = "openrouter" # options: "together", "openrouter"
-PROMPT_MODE_2 = "default"      # options: "default", "o3"
 MODEL_2 = None  # Will be set based on provider
 
 MISTRAL_EXTRA_PARAMS = {
@@ -113,6 +113,7 @@ provider_client_cache = None
 
 # Optional: include more article data (summary, etc) in LLM prompt
 INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
+
 
 # Provider class hierarchy
 class LLMProvider(ABC):
@@ -190,7 +191,7 @@ class LLMProvider(ABC):
     def call_model(self, model: str, messages: List[Dict[str, str]], max_tokens: int, label: str = "") -> str:
         """Call the model with retry logic, timeout, and logging."""
         client = self.get_client(use_cache=False)
-        return _try_call_model(client, model, messages, max_tokens, f"{label} ({self.name})")
+        return _try_call_model(client, model, messages, max_tokens)
     
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call the primary model with fallback to secondary if needed."""
@@ -219,29 +220,6 @@ class LLMProvider(ABC):
     
     def __str__(self) -> str:
         return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
-
-
-class TogetherProvider(LLMProvider):
-    """Provider implementation for Together AI."""
-    
-    def __init__(self):
-        super().__init__("together")
-    
-    @property
-    def api_key_env_var(self) -> str:
-        return "TOGETHER_API_KEY_LINUXREPORT"
-    
-    @property
-    def base_url(self) -> str:
-        return "https://api.together.xyz/v1"
-    
-    @property
-    def primary_model(self) -> str:
-        return "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
-    
-    @property
-    def fallback_model(self) -> str:
-        return "meta-llama/Llama-3.3-70B-Instruct-Turbo"
 
 
 class OpenRouterProvider(LLMProvider):
@@ -283,7 +261,6 @@ class OpenRouterProvider(LLMProvider):
 
 # Provider registry
 PROVIDERS = {
-    "together": TogetherProvider(),
     "openrouter": OpenRouterProvider()
 }
 
@@ -302,8 +279,7 @@ def get_current_model():
         return cached_model
     
     # Get the current provider's primary model
-    provider = get_provider(CHAT_PROVIDER_1)
-    return provider.primary_model
+    return get_provider(PROVIDER)
 
 def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
@@ -312,14 +288,13 @@ def update_model_cache(model):
         return
     g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
 
-def _try_call_model(client, model, messages, max_tokens, provider_label=""):
-    """Helper to call a model with retry logic, timeout, and logging."""
+def _try_call_model(client, model, messages, max_tokens):
     max_retries = 2
     for attempt in range(1, max_retries + 1):
         start = timer()
-        print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model} ({provider_label})")
+        print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model}")
         try:
-            if "mistral" in model.lower():
+            if 'mistral' in model.lower():
                 extra_params = MISTRAL_EXTRA_PARAMS
             else:
                 extra_params = {}
@@ -334,17 +309,15 @@ def _try_call_model(client, model, messages, max_tokens, provider_label=""):
             choice = response.choices[0]
             response_text = choice.message.content
             finish_reason = choice.finish_reason
-            print(f"[_try_call_model] Response from {provider_label} ({model}) in {end - start:.3f}s, finish_reason: {finish_reason}")
-            if finish_reason != "stop":
-                print(f"Warning: Response finish_reason is {finish_reason}")
+            print(f"[_try_call_model] Response in {end - start:.3f}s, finish_reason: {finish_reason}")
             print(f"[_try_call_model] Model response (Attempt {attempt}):\n{response_text}\n{'-'*40}")
             return response_text
         except Exception as e:
-            print(f"Error on attempt {attempt} for model {model} ({provider_label}): {e}")
+            print(f"Error on attempt {attempt} for model {model}: {e}")
             traceback.print_exc()
             if attempt < max_retries:
                 time.sleep(1)
-    raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model} ({provider_label})")
+    raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
 
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text after the first '{TITLE_MARKER}' marker."""
@@ -418,15 +391,15 @@ def ask_ai_top_articles(articles):
         return "No new articles to rank.", [], previous_selections
 
     # --- Prepare Messages ---
-    messages = _prepare_messages(PROMPT_MODE_1, filtered_articles)
-    print(f"Constructed Prompt (Mode: {PROMPT_MODE_1}):")
+    messages = _prepare_messages(PROMPT_MODE, filtered_articles)
+    print(f"Constructed Prompt (Mode: {PROMPT_MODE}):")
     print(messages)
 
     # --- Call Primary LLM using the provider class ---
-    provider = get_provider(CHAT_PROVIDER_1)
-    response_text, used_model = provider.call_with_fallback(
+    provider1 = get_provider(PROVIDER)
+    response_text, used_model = provider1.call_with_fallback(
         messages, 
-        PROMPT_MODE_1,
+        PROMPT_MODE,
         "Primary"
     )
     
@@ -473,19 +446,19 @@ def run_comparison(articles):
 
     # --- Config 1 ---
     messages1 = _prepare_messages(PROMPT_MODE_1, filtered_articles)
-    provider1 = get_provider(CHAT_PROVIDER_1)
+    provider1 = get_provider(PROVIDER)
     response_text1 = provider1.call_model(MODEL_1, messages1, MAX_TOKENS, 'Comparison 1')
     
     if not response_text1:
-        print(f"Comparison 1 failed for {CHAT_PROVIDER_1}")
+        print(f"Comparison 1 failed for {PROVIDER}")
 
     # --- Config 2 ---
     messages2 = _prepare_messages(PROMPT_MODE_2, filtered_articles)
-    provider2 = get_provider(CHAT_PROVIDER_2)
+    provider2 = get_provider(PROVIDER)
     response_text2 = provider2.call_model(MODEL_2, messages2, MAX_TOKENS, 'Comparison 2')
     
     if not response_text2:
-        print(f"Comparison 2 failed for {CHAT_PROVIDER_2}")
+        print(f"Comparison 2 failed for {PROVIDER}")
 
     print("\n--- Comparison Mode Finished ---")
 
@@ -603,29 +576,24 @@ if __name__ == "__main__":
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
-    parser.add_argument('--provider', choices=['together','openrouter'], default='openrouter', help='Primary chat provider: together or openrouter')
-    parser.add_argument('--compare', action='store_true', help='Run in comparison mode (compare two providers/models)')
+    parser.add_argument('--compare', action='store_true', help='Run in comparison mode')
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
+    parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., default, o3)')
     args = parser.parse_args()
 
     # Configure primary provider from CLI
-    CHAT_PROVIDER_1 = args.provider
     # Set MODEL_1 based on selected provider
-    provider1 = get_provider(CHAT_PROVIDER_1)
-    MODEL_1 = provider1.primary_model
+    provider = get_provider(PROVIDER)
+    MODEL_1 = provider.primary_model
     
     # Set MODEL_2 for comparison mode
-    provider2 = get_provider(CHAT_PROVIDER_1)
-    MODEL_2 = provider2.fallback_model
+    MODEL_2 = provider.fallback_model
 
     # Set RUN_MODE to 'compare' if --compare is specified
     if args.compare:
         RUN_MODE = "compare"
         # In compare mode, use openrouter for both, but with dedicated comparison models
-        CHAT_PROVIDER_1 = "openrouter"
-        CHAT_PROVIDER_2 = "openrouter"
         
-        provider = get_provider("openrouter")
         comparison_models = provider.get_comparison_models()
         MODEL_1 = comparison_models[0]
         MODEL_2 = comparison_models[1]
@@ -674,7 +642,10 @@ if __name__ == "__main__":
         # Ensure dry-run/compare always run if specified, otherwise check schedule or force flag
         should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or RUN_MODE == "compare"
         if should_run:
+            if args.prompt_mode:
+                PROMPT_MODE = args.prompt_mode
             main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run) # Pass string mode, loaded module and config
         else:
             print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
+
 
