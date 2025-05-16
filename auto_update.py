@@ -445,17 +445,17 @@ def run_comparison(articles):
         return
 
     # --- Config 1 ---
-    messages1 = _prepare_messages(PROMPT_MODE_1, filtered_articles)
-    provider1 = get_provider(PROVIDER)
-    response_text1 = provider1.call_model(MODEL_1, messages1, MAX_TOKENS, 'Comparison 1')
+    provider = get_provider(PROVIDER)
+    model1, model2 = provider.get_comparison_models()
+    messages1 = _prepare_messages(PROMPT_MODE, filtered_articles)
+    response_text1 = provider.call_model(model1, messages1, MAX_TOKENS, 'Comparison 1')
     
     if not response_text1:
         print(f"Comparison 1 failed for {PROVIDER}")
 
     # --- Config 2 ---
-    messages2 = _prepare_messages(PROMPT_MODE_2, filtered_articles)
-    provider2 = get_provider(PROVIDER)
-    response_text2 = provider2.call_model(MODEL_2, messages2, MAX_TOKENS, 'Comparison 2')
+    messages2 = _prepare_messages(PROMPT_MODE, filtered_articles)
+    response_text2 = provider.call_model(model2, messages2, MAX_TOKENS, 'Comparison 2')
     
     if not response_text2:
         print(f"Comparison 2 failed for {PROVIDER}")
@@ -594,11 +594,6 @@ if __name__ == "__main__":
         RUN_MODE = "compare"
         # In compare mode, use openrouter for both, but with dedicated comparison models
         
-        comparison_models = provider.get_comparison_models()
-        MODEL_1 = comparison_models[0]
-        MODEL_2 = comparison_models[1]
-        PROMPT_MODE_1 = "30b"
-        PROMPT_MODE_2 = "30b"
 
     # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
     if args.include_summary:
