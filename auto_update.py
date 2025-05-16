@@ -474,11 +474,7 @@ def run_comparison(articles):
     # --- Config 1 ---
     messages1 = _prepare_messages(PROMPT_MODE_1, filtered_articles)
     provider1 = get_provider(CHAT_PROVIDER_1)
-    response_text1, _ = provider1.call_with_fallback(
-        messages1,
-        PROMPT_MODE_1,
-        "Comparison 1"
-    )
+    response_text1, _ = provider1.call_model(MODEL_1, messages1, MAX_TOKENS, 'Comparison 1')
     
     if not response_text1:
         print(f"Comparison 1 failed for {CHAT_PROVIDER_1}")
@@ -486,11 +482,7 @@ def run_comparison(articles):
     # --- Config 2 ---
     messages2 = _prepare_messages(PROMPT_MODE_2, filtered_articles)
     provider2 = get_provider(CHAT_PROVIDER_2)
-    response_text2, _ = provider2.call_with_fallback(
-        messages2,
-        PROMPT_MODE_2,
-        "Comparison 2"
-    )
+    response_text2, _ = provider2.call_model(MODEL_2, messages2, MAX_TOKENS, 'Comparison 2')
     
     if not response_text2:
         print(f"Comparison 2 failed for {CHAT_PROVIDER_2}")
