@@ -96,15 +96,13 @@ def get_file_metadata(file_path):
         logger.error(f"Error getting file metadata for {file_path}: {e}")
         return None
 
-def _prepare_file_fetch(file_path: str, current_file_hash: Optional[str]):
+def _prepare_fetch(prefix: str, key: str, current_hash: Optional[str] = None):
     if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
         return None, False
     if not init_storage():
         return None, False
-    file_prefix = f"{STORAGE_SYNC_PREFIX}files/"
-    objects = list(_storage_container.list_objects(prefix=file_prefix))
+    objects = list(_storage_container.list_objects(prefix=f'{STORAGE_SYNC_PREFIX}{prefix}/'))
     if objects:
-        # Simplified to always retrieve; assuming the list provides the needed object
         return objects[-1], False  # Return the last object and force fetch
     return None, False
 
@@ -142,7 +140,13 @@ def fetch_file(file_path, force=False):
         return None, None
     
     try:
-        return fetch_bytes(file_path, force)  # Use the new function with file_path as key
+        latest_obj, use_local_content = _prepare_fetch('files', file_path, current_hash if not force else None)
+        if latest_obj and not use_local_content:
+            content_buffer = BytesIO()
+            _storage_driver.download_object_as_stream(latest_obj, content_buffer)
+            content = content_buffer.getvalue()
+            return content, latest_obj.meta_data
+        return None, None
     except Exception as e:
         raise
 
@@ -202,18 +206,6 @@ def publish_bytes(bytes_data: bytes, key: str, metadata: Optional[Dict] = None):
     except Exception as e:
         raise
 
-def _prepare_bytes_fetch(key: str, current_hash: Optional[str]):
-    if not LIBCLOUD_AVAILABLE or not STORAGE_ENABLED:
-        return None, False
-    if not init_storage():
-        return None, False
-    bytes_prefix = f"{STORAGE_SYNC_PREFIX}bytes/"
-    objects = list(_storage_container.list_objects(prefix=bytes_prefix))
-    if objects:
-        # Simplified to always retrieve; assuming the list provides the needed object
-        return objects[-1], False  # Return the last object and force fetch
-    return None, False
-
 @retry(
     stop=stop_after_attempt(oss_config.MAX_RETRY_ATTEMPTS),
     wait=wait_exponential(multiplier=oss_config.RETRY_MULTIPLIER, min=oss_config.MIN_RETRY_INTERVAL, max=oss_config.MAX_RETRY_INTERVAL),
@@ -227,7 +219,7 @@ def fetch_bytes(key: str, force=False):
         return None, None
     
     try:
-        latest_obj, use_local_content = _prepare_bytes_fetch(key, current_hash if not force else None)  # Use new helper
+        latest_obj, use_local_content = _prepare_fetch('bytes', key, current_hash if not force else None)
         if latest_obj and not use_local_content:
             content_buffer = BytesIO()
             _storage_driver.download_object_as_stream(latest_obj, content_buffer)
