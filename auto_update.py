@@ -328,7 +328,7 @@ def _try_call_model(client, model, messages, max_tokens, provider_label=""):
                 messages=messages,
                 max_tokens=max_tokens,
                 timeout=TIMEOUT,
-                **extra_params  # Include extra params if model is Mistral
+                extra_body=extra_params
             )
             end = timer()
             choice = response.choices[0]
