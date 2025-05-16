@@ -11,15 +11,18 @@ from pathlib import Path
 from config_utils import load_config
 from io import BytesIO
 
+
+#https://linuxreportstatic.us-ord-1.linodeobjects.com/
+
 # Object Storage configuration
 STORAGE_ENABLED = False
 STORAGE_PROVIDER = "linode"  # options: "s3", "linode", "local"
-STORAGE_REGION = "us-east-1"
+STORAGE_REGION = "us-ord-1"
 STORAGE_BUCKET_NAME = "feed-sync"
 STORAGE_ACCESS_KEY = ""  # Loaded from config.yaml
 STORAGE_SECRET_KEY = ""  # Loaded from config.yaml
-STORAGE_HOST = "s3.linode.com"
-STORAGE_SYNC_PREFIX = "feed-updates/"
+STORAGE_HOST = "s3.linode.com" #???
+STORAGE_SYNC_PATH = "feed-updates/"
 
 # Sync configuration
 SERVER_ID = hashlib.md5(os.uname().nodename.encode()).hexdigest()[:8] if hasattr(os, 'uname') else "default_server_id"

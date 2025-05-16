@@ -379,7 +379,7 @@ if __name__ == '__main__':
             self.mock_config.LIBCLOUD_AVAILABLE = True
             self.mock_config.STORAGE_ENABLED = True
             self.mock_config.SERVER_ID = 'test-server'
-            self.mock_config.STORAGE_SYNC_PREFIX = 'test-prefix/'
+            self.mock_config.STORAGE_SYNC_PATH = 'test-prefix/'
             self.mock_config._storage_container = self.mock_container
             self.mock_config._storage_driver = self.mock_driver
             self.mock_config.init_storage = MagicMock(return_value=True)

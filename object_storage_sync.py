@@ -30,10 +30,10 @@ import object_storage_config as oss_config
 from object_storage_config import (
     logger, LIBCLOUD_AVAILABLE, STORAGE_ENABLED,
     StorageError, ConfigurationError, StorageConnectionError, StorageOperationError,
-    StorageProvider, init_storage, SERVER_ID, STORAGE_SYNC_PREFIX,
+    StorageProvider, init_storage, SERVER_ID, STORAGE_SYNC_PATH,
     STORAGE_BUCKET_NAME, STORAGE_ACCESS_KEY,
     STORAGE_SECRET_KEY, STORAGE_PROVIDER, STORAGE_REGION, STORAGE_HOST,
-    STORAGE_SYNC_PREFIX,
+    STORAGE_SYNC_PATH,
     _storage_driver, _storage_container,
     _secrets_loaded,
     get_file_metadata
@@ -50,7 +50,7 @@ def generate_object_name(url):
     """Generate a unique object name for a feed URL"""
     url_hash = hashlib.md5(url.encode()).hexdigest()
     timestamp = int(time.time())
-    return f"{STORAGE_SYNC_PREFIX}{SERVER_ID}/{url_hash}_{timestamp}.json"
+    return f"{STORAGE_SYNC_PATH}{SERVER_ID}/{url_hash}_{timestamp}.json"
 
 def generate_file_object_name(file_path):
     """Generate a unique object name for a file
@@ -63,7 +63,7 @@ def generate_file_object_name(file_path):
     """
     file_hash = hashlib.md5(file_path.encode()).hexdigest()
     timestamp = int(time.time())
-    return f"{STORAGE_SYNC_PREFIX}files/{SERVER_ID}/{file_hash}_{timestamp}"
+    return f"{STORAGE_SYNC_PATH}files/{SERVER_ID}/{file_hash}_{timestamp}"
 
 def get_file_metadata(file_path):
     """Get metadata for a file including hash and timestamp
@@ -101,7 +101,7 @@ def _prepare_fetch(prefix: str, key: str, current_hash: Optional[str] = None):
         return None, False
     if not init_storage():
         return None, False
-    objects = list(_storage_container.list_objects(prefix=f'{STORAGE_SYNC_PREFIX}{prefix}/'))
+    objects = list(_storage_container.list_objects(prefix=f'{STORAGE_SYNC_PATH}{prefix}/'))
     if objects:
         return objects[-1], False  # Return the last object and force fetch
     return None, False
@@ -184,7 +184,7 @@ def publish_bytes(bytes_data: bytes, key: str, metadata: Optional[Dict] = None):
     
     try:
         file_hash = hashlib.sha256(bytes_data).hexdigest()
-        object_name = f"{STORAGE_SYNC_PREFIX}bytes/{SERVER_ID}/{key}_{int(time.time())}"
+        object_name = f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{key}_{int(time.time())}"
         extra_metadata = {
             'meta_data': {
                 'server_id': SERVER_ID,
@@ -232,12 +232,12 @@ def fetch_bytes(key: str, force=False):
 class TestObjectStorageSync(unittest.TestCase):
     def test_generate_object_name(self):
         result = generate_object_name('http://example.com/feed')
-        self.assertTrue(result.startswith(f"{oss_config.STORAGE_SYNC_PREFIX}{oss_config.SERVER_ID}/"))  # Updated to use actual config values
+        self.assertTrue(result.startswith(f"{oss_config.STORAGE_SYNC_PATH}{oss_config.SERVER_ID}/"))  # Updated to use actual config values
         self.assertRegex(result, r'.*_\d+\.json$')  # Checks for hash and timestamp pattern
 
     def test_generate_file_object_name(self):
         result = generate_file_object_name('/path/to/file.txt')
-        self.assertTrue(result.startswith(f"{oss_config.STORAGE_SYNC_PREFIX}files/{oss_config.SERVER_ID}/"))  # Updated to use actual config values
+        self.assertTrue(result.startswith(f"{oss_config.STORAGE_SYNC_PATH}files/{oss_config.SERVER_ID}/"))  # Updated to use actual config values
         self.assertRegex(result, r'.*_\d+$')  # Checks for hash and timestamp
 
     def test_publish_file(self):
