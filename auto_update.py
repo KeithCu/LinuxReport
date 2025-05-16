@@ -51,9 +51,9 @@ PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
 PROMPT_30B = f""" Prompt:
 Given a list of news headlines, follow these steps:
 Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
+Think carefully and consisely about relevance, interest, and topic distinction without repeating entire headlines in your reasoning.
 From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
-Think deeply, using as many tokens as needed to reason about relevance, interest, and topic distinction for the best selections.
-After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no reasoning or extra text:
+After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no extra text:
 1. [Title 1]
 2. [Title 2]
 3. [Title 3]
