@@ -144,6 +144,15 @@ def fahrenheit_to_celsius(f_temp):
         return None
     return round((f_temp - 32) * 5/9)
 
+def convert_weather_to_metric(data):
+    if 'daily' in data:
+        for day in data['daily']:
+            if 'temp_min' in day:
+                day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
+            if 'temp_max' in day:
+                day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
+    return data
+
 def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     """Fetches weather data for given coordinates or IP address, using cache or API.
     Returns a tuple of (data, status_code) where data includes 'fetch_time'
@@ -164,12 +173,7 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     if bucketed_weather:
         # Convert to metric if requested
         if units == 'metric':
-            for day in bucketed_weather['daily']:
-                day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
-                day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
-        # Add fetch_time to the cached data if not already present (it should be)
-        if 'fetch_time' not in bucketed_weather:
-            bucketed_weather['fetch_time'] = datetime.now(TZ).timestamp() # Fallback, though unlikely needed
+            bucketed_weather = convert_weather_to_metric(bucketed_weather)
         return bucketed_weather, 200
 
     # Acquire lock specific to this location bucket
@@ -181,12 +185,7 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         if bucketed_weather:
             # Convert to metric if requested
             if units == 'metric':
-                for day in bucketed_weather['daily']:
-                    day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
-                    day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
-            # Add fetch_time to the cached data if not already present
-            if 'fetch_time' not in bucketed_weather:
-                bucketed_weather['fetch_time'] = datetime.now(TZ).timestamp() # Fallback
+                bucketed_weather = convert_weather_to_metric(bucketed_weather)
             return bucketed_weather, 200
 
         # Cache miss and lock acquired, proceed with API call
@@ -275,11 +274,8 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
             # Save to cache regardless of which API was used
             save_weather_cache_entry(lat, lon, processed_data)
 
-            # Convert to metric if requested *before* logging
             if units == 'metric':
-                for day in processed_data['daily']:
-                    day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
-                    day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
+                processed_data = convert_weather_to_metric(processed_data)
 
             try:
                 today_entry = processed_data["daily"][0]
@@ -302,7 +298,6 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
             print(f"Weather API error: Failed to process weather data: {e}")
             error_data = {"error": "Failed to process weather data", "fetch_time": fetch_time}
             return error_data, 500
-        # Lock is automatically released by the 'with' statement
 
 
 
