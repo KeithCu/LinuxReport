@@ -126,7 +126,7 @@ async function fetchWeatherData() {
   const useMetric = determineUnits() === 'metric';
 
   try {
-    const response = await fetch(`/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_=${cacheBuster}`);
+    const response = await fetch(`/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
     setCachedWeatherData(data);

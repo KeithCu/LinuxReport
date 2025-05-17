@@ -275,6 +275,11 @@ class TestObjectStorageSync(unittest.TestCase):
         content = b''.join([chunk for chunk in stream])  # Assuming stream is iterable
         self.assertIn(b'Test content', content, 'Stream content should match published content')
 
+    def test_fetch_file_not_found(self):
+        content, metadata = fetch_file('non_existent_key', force=True)
+        self.assertIsNone(content, 'Should return None for non-existent file')
+        self.assertIsNone(metadata, 'Should return None for non-existent file metadata')
+
 if __name__ == '__main__':
     import sys
     if not init_storage():  # Attempt to initialize storage before running tests

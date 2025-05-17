@@ -12,6 +12,7 @@ from io import BytesIO
 
 # Import from our config module
 import object_storage_config as oss_config
+import object_storage_sync
 
 # Import in-memory cache from shared
 from shared import g_cm, TZ, EXPIRE_HOUR
