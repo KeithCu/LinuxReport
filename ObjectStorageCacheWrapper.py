@@ -5,7 +5,7 @@ Object Storage-based cache wrapper for feed updates. Used to manage cache operat
 """
 import json
 import hashlib
-from datetime import datetime
+import datetime
 from typing import Any, Optional
 
 # Import from our config module
@@ -57,8 +57,8 @@ class ObjectStorageCacheWrapper:
         First checks in-memory cache, then falls back to object storage if not found.
         """
         memory_key = self._get_memory_cache_key(key)
-        if self.g_cm.exists(memory_key):
-            return self.g_cm.get(memory_key)
+        if g_cm.has(memory_key):
+            return g_cm.get(memory_key)
         
         obj_name = self._get_object_name(key)
         try:
@@ -67,11 +67,11 @@ class ObjectStorageCacheWrapper:
                 data = json.loads(content.decode('utf-8'))
                 if datetime.datetime.now(TZ).timestamp() > data.get('expires', float('inf')):
                     return None
-                self.g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
+                g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
                 return data
             return None
         except Exception as e:
-            oss_config.logger.error(f"Error getting object {obj_name}: {e}")
+            print(f"Error getting object {obj_name}: {e}")
             return None
 
     def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
@@ -80,7 +80,7 @@ class ObjectStorageCacheWrapper:
         Stores in both in-memory cache and object storage.
         """
         memory_key = self._get_memory_cache_key(key)
-        self.g_cm.set(memory_key, value, ttl=self.local_cache_expiry)
+        g_cm.set(memory_key, value, ttl=self.local_cache_expiry)
         
         obj_name = self._get_object_name(key)
         expires_at = (datetime.datetime.now(TZ).timestamp() + timeout) if timeout is not None else float('inf')
@@ -107,19 +107,19 @@ class ObjectStorageCacheWrapper:
         except oss_config.ObjectDoesNotExistError:
             pass
         except Exception as e:
-            oss_config.logger.error(f"Error deleting cache value for {key}: {e}")
+            print(f"Error deleting cache value for {key}: {e}")
             
     def has(self, key: str) -> bool:
         """Check if a key exists in the cache."""
         memory_key = self._get_memory_cache_key(key)
-        if self.g_cm.has(memory_key):
+        if g_cm.has(memory_key):
             return True
         
         obj_name = self._get_object_name(key)
         try:
             content, metadata = object_storage_sync.fetch_bytes(obj_name, force=True)
             if content is not None:
-                self.g_cm.set(memory_key, None, ttl=self.local_cache_expiry)  # Cache existence
+                g_cm.set(memory_key, None, ttl=self.local_cache_expiry)  # Cache existence
                 return True
             return False
         except Exception:

@@ -140,7 +140,7 @@ def _prepare_fetch(prefix: str, key: str, current_hash: Optional[str] = None, us
         objects = list(_storage_container.list_objects(prefix=prefix_path))
         
         if not objects:
-            logger.debug(f"No objects found matching prefix: {prefix_path}")
+            print(f"No objects found matching prefix: {prefix_path}")
             return None, False
             
         # Sort by name (which contains timestamp) to get the latest version
@@ -207,7 +207,7 @@ def fetch_file(file_path: str, force: bool = False) -> tuple[Optional[bytes], Op
     """
     try:
         content, metadata = fetch_bytes(file_path, force)
-        logger.debug(f"Fetched file ({len(content) if content else 0} bytes) from key: {file_path}")
+        print(f"Fetched file ({len(content) if content else 0} bytes) from key: {file_path}")
         return content, metadata
     except Exception as e:
         print(f"Error fetching file: {file_path}, exception: {e}")
@@ -227,7 +227,7 @@ def fetch_file_stream(file_path: str, force: bool = False) -> tuple[Optional[Byt
     try:
         content, metadata = fetch_bytes(file_path, force)
         if content is not None:
-            logger.debug(f"Streamed file ({len(content)} bytes) from key: {file_path}")
+            print(f"Streamed file ({len(content)} bytes) from key: {file_path}")
             return BytesIO(content), metadata
         print(f"No content retrieved for key: {file_path}")
         return None, None
@@ -283,7 +283,7 @@ def publish_bytes(bytes_data: bytes, key: str, metadata: Optional[Dict] = None) 
             extra=extra_metadata
         )
         
-        logger.info(f"Published {len(bytes_data)} bytes to object: {object_name}")
+        print(f"Published {len(bytes_data)} bytes to object: {object_name}")
         return obj
     except Exception as e:
         print(f"Error publishing bytes with key: {key}, exception: {e}")
@@ -307,10 +307,10 @@ def fetch_bytes(key: str, force: bool = False) -> tuple[Optional[bytes], Optiona
             _storage_driver.download_object_as_stream(latest_obj, content_buffer)
             content = content_buffer.getvalue()
             metadata = latest_obj.meta_data if latest_obj else None
-            logger.debug(f"Retrieved {len(content)} bytes for key: {key}")
+            print(f"Retrieved {len(content)} bytes for key: {key}")
             return content, metadata
         
-        logger.debug(f"No content found for key: {key}")
+        print(f"No content found for key: {key}")
         return None, None
     except Exception as e:
         print(f"Error fetching bytes for key: {key}, exception: {e}")
@@ -484,7 +484,6 @@ class TestObjectStorageSync(unittest.TestCase):
         self.assertEqual(reconstructed, test_data)
 
 if __name__ == '__main__':
-    import sys
     
     if not init_storage():  # Attempt to initialize storage before running tests
         print("Storage initialization failed; tests may not run fully.")
