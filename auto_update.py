@@ -31,6 +31,8 @@ class PromptMode(Enum):
     O3 = 'o3'
     THIRTY_B = '30b'  # Represents '30b' prompt
 
+PROMPT_MODE = PromptMode.THIRTY_B
+
 # --- Configuration and Prompt Constants ---
 MAX_PREVIOUS_HEADLINES = 200 # Number of headlines to remember and filter out to the AI
 
@@ -100,8 +102,6 @@ ALL_URLS = {} # Initialized here, passed to utils
 RUN_MODE = "normal"  # options: "normal", "compare"
 
 PROVIDER = "openrouter"
-
-PROMPT_MODE = PromptMode.DEFAULT  # Default Enum instance
 
 # Configuration for the primary provider/model
 MODEL_1 = None
@@ -203,21 +203,21 @@ class LLMProvider(ABC):
     
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call the primary model with fallback to secondary if needed."""
-        # Try primary model
-        primary_model = self.primary_model
-        print(f"\n--- LLM Call: {self.name} / {primary_model} / {prompt_mode} {label} ---")
+        # Try to get the current working model first
+        current_model = get_current_model()
+        print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} ---")
         
         try:
-            response_text = self.call_model(primary_model, messages, MAX_TOKENS, f"{label}")
-            return response_text, primary_model
+            response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
+            return response_text, current_model
         except Exception as e:
-            print(f"Error with model {primary_model} ({self.name}): {e}")
+            print(f"Error with model {current_model} ({self.name}): {e}")
             traceback.print_exc()
             
             # Try fallback model
+            fallback_model = self.fallback_model
+            print(f"Trying fallback model: {fallback_model}")
             try:
-                fallback_model = self.fallback_model
-                print(f"Trying fallback model: {fallback_model}")
                 response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback {label}")
                 return response_text, fallback_model
             except Exception as fallback_e:
@@ -246,11 +246,11 @@ class OpenRouterProvider(LLMProvider):
     
     @property
     def primary_model(self) -> str:
-        return "meta-llama/llama-3.3-70b-instruct:free"
+        return "mistralai/mistral-small-3.1-24b-instruct:free"
     
     @property
     def fallback_model(self) -> str:
-        return "meta-llama/llama-3.3-70b-instruct:floor"
+        return "mistralai/mistral-small-3.1-24b-instruct"
     
     def get_comparison_models(self) -> Tuple[str, str]:
         """Get models specific for comparison mode."""
@@ -284,10 +284,13 @@ def get_current_model():
     # Check if we have a cached working model
     cached_model = g_c.get("working_llm_model")
     if cached_model:
+        print(f"Using cached working model: {cached_model}")
         return cached_model
     
     # Get the current provider's primary model
-    return get_provider(PROVIDER)
+    provider = get_provider(PROVIDER)
+    print(f"Using primary model: {provider.primary_model}")
+    return provider.primary_model
 
 def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
@@ -295,6 +298,7 @@ def update_model_cache(model):
     if current_model == model:
         return
     g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+    print(f"Updated cached working model to: {model}")
 
 def _try_call_model(client, model, messages, max_tokens):
     max_retries = 2
@@ -590,11 +594,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Configure primary provider from CLI
-    # Set MODEL_1 based on selected provider
     provider = get_provider(PROVIDER)
-    MODEL_1 = provider.primary_model
-    
-    # Set MODEL_2 for comparison mode
+    MODEL_1 = provider.primary_model  # Start with primary model, will be updated by call_with_fallback if needed
     MODEL_2 = provider.fallback_model
 
     # Set RUN_MODE to 'compare' if --compare is specified
