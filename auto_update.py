@@ -457,17 +457,16 @@ def ask_ai_top_articles(articles):
         "Primary"
     )
     
-    # Update model cache if we got a valid response
-    if response_text and used_model:
-        update_model_cache(used_model)
-    else:
-        return "LLM models failed due to error (all models for selected provider).", filtered_articles, previous_selections
-
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
         return "No response from LLM models.", filtered_articles, previous_selections
 
     # --- Process Response and Update Selections (remains the same) ---
     top_titles = extract_top_titles_from_ai(response_text)
+    
+    # Only update model cache if we successfully extracted headlines
+    if top_titles and used_model:
+        update_model_cache(used_model)
+    
     top_articles = []
     for title in top_titles:
         best_match = get_best_matching_article(title, filtered_articles)
