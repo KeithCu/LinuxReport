@@ -89,7 +89,7 @@ WELCOME_HTML = (
     '<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
     'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>'
-    '<br/>Now using <a href="https://openrouter.ai">OpenRouter</a> to access a variety of free LLMs for selecting the top headlines.'
+    '<br/>Now using <a href="https://openrouter.ai" target="_blank">OpenRouter</a> to access a variety of free LLMs for selecting the top headlines.'
 )
 STANDARD_ORDER_STR = str(SITE_URLS)
 
