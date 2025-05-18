@@ -284,6 +284,17 @@ def get_current_model():
     # Check if we have a cached working model
     cached_model = g_c.get("working_llm_model")
     if cached_model:
+        # Get current provider to check valid models
+        provider = get_provider(PROVIDER)
+        valid_models = [provider.primary_model, provider.fallback_model]
+        
+        # If cached model is no longer in our valid models, clear the cache
+        if cached_model not in valid_models:
+            print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
+            g_c.delete("working_llm_model")
+            print(f"Using primary model: {provider.primary_model}")
+            return provider.primary_model
+            
         print(f"Using cached working model: {cached_model}")
         return cached_model
     
