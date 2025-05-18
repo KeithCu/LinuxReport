@@ -463,6 +463,21 @@ def ask_ai_top_articles(articles):
     # --- Process Response and Update Selections (remains the same) ---
     top_titles = extract_top_titles_from_ai(response_text)
     
+    # If no headlines extracted, try fallback model
+    if not top_titles:
+        print("No headlines extracted from primary model, trying fallback model...")
+        fallback_model = provider1.fallback_model
+        try:
+            response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, "Fallback (headline retry)")
+            if response_text:
+                top_titles = extract_top_titles_from_ai(response_text)
+                if top_titles:
+                    used_model = fallback_model
+                    print(f"Successfully extracted headlines using fallback model: {fallback_model}")
+        except Exception as e:
+            print(f"Fallback model failed during headline retry: {e}")
+            traceback.print_exc()
+    
     # Only update model cache if we successfully extracted headlines
     if top_titles and used_model:
         update_model_cache(used_model)
