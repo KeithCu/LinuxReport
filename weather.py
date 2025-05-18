@@ -176,99 +176,32 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     if bucketed_weather:
         return bucketed_weather, 200
 
-    # Acquire lock specific to this location bucket
-    # The 'with' statement handles waiting and acquisition via __enter__
-    with get_lock(lock_key):
+    # Record a preliminary fetch_time, to be overwritten by API if possible or firmed up later
+    fetch_time = datetime.now(TZ).timestamp()
 
-        # Re-check cache *inside* the lock to prevent race condition
-        bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
-        if bucketed_weather:
-            return bucketed_weather, 200
-
-        # Cache miss and lock acquired, proceed with API call
-        # Record a preliminary fetch_time, to be overwritten by API if possible or firmed up later
-        fetch_time = datetime.now(TZ).timestamp() 
+    # For LinuxReport API, we don't need locking as it handles caching and rate limiting internally
+    if USE_LINUXREPORT_API:
         try:
-            # Decide whether to use LinuxReport API or OpenWeather
-            if USE_LINUXREPORT_API:
-                # Use LinuxReport.net API - already processes the data in the correct format
-                service_name = "LinuxReport.net"
-                url = f"{LINUXREPORT_WEATHER_API}?lat={lat}&lon={lon}&units=imperial"
-                start_time = datetime.now(TZ).timestamp()
-                response = requests.get(url, timeout=10, headers={'User-Agent': USER_AGENT})
-                api_time = datetime.now(TZ).timestamp() - start_time
-                response.raise_for_status()
-                processed_data = response.json()
-                
-                # This will be the definitive fetch_time for this path
-                fetch_time = processed_data.get('fetch_time', fetch_time)
-                
-                # Extract city name from the API response if available
-                city_name = processed_data.get("city_name", "Unknown Location")
-                
-            else:
-                # Original OpenWeather API implementation
-                service_name = "OpenWeather"
-                # fetch_time is already set before the try block for OpenWeather
-                # Check for valid API key before proceeding
-                if not WEATHER_API_KEY or len(WEATHER_API_KEY) < 10:
-                    print("Weather API error: WEATHER_API_KEY is missing or too short.")
-                    error_data = {"error": "Weather API key is not configured", "fetch_time": fetch_time}
-                    return error_data, 500
-                
-                rate_limit_check()
-                # Always fetch in imperial (Fahrenheit) for consistent caching
-                url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
-                start_time = datetime.now(TZ).timestamp()
-                response = requests.get(url, timeout=10)
-                api_time = datetime.now(TZ).timestamp() - start_time
-                response.raise_for_status()
-                weather_data = response.json()
-                # Determine city name for logging
-                city_name = weather_data.get("city", {}).get("name", "Unknown location")
-
-                daily_data = defaultdict(list)
-                for entry in weather_data.get("list", []):
-                    date_str = entry.get("dt_txt", "")[:10]
-                    daily_data[date_str].append(entry)
-
-                processed_data = {"daily": []}
-                today_date = datetime.now().date()
-                days_added = 0
-                for date, entries in sorted(daily_data.items()):
-                    entry_date = datetime.strptime(date, "%Y-%m-%d").date()
-                    if entry_date < today_date:
-                        continue
-                    if days_added >= 5:
-                        break
-                    temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
-                    temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
-                    pops = [e.get("pop", 0) for e in entries]
-                    rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
-
-                    # Use noon entry if possible, else first
-                    preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
-                    weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
-                    weather_icon = preferred_entry["weather"][0]["icon"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "01d"
-
-                    processed_data["daily"].append({
-                        "dt": int(datetime.strptime(date, "%Y-%m-%d").replace(hour=12).timestamp()),
-                        "temp_min": min(temp_mins) if temp_mins else None,
-                        "temp_max": max(temp_maxs) if temp_maxs else None,
-                        "precipitation": round(max(pops) * 100) if pops else 0,
-                        "rain": round(rain_total, 2),
-                        "weather": weather_main,
-                        "weather_icon": weather_icon
-                    })
-                    days_added += 1
-
-            # Add city information to processed data
+            # Use LinuxReport.net API - already processes the data in the correct format
+            service_name = "LinuxReport.net"
+            url = f"{LINUXREPORT_WEATHER_API}?lat={lat}&lon={lon}&units=imperial"
+            start_time = datetime.now(TZ).timestamp()
+            response = requests.get(url, timeout=10, headers={'User-Agent': USER_AGENT})
+            api_time = datetime.now(TZ).timestamp() - start_time
+            response.raise_for_status()
+            processed_data = response.json()
+            
+            # This will be the definitive fetch_time for this path
+            fetch_time = processed_data.get('fetch_time', fetch_time)
+            
+            # Extract city name from the API response if available
+            city_name = processed_data.get("city_name", "Unknown Location")
+            
+            # Add city information and fetch_time to processed data
             processed_data['city_name'] = city_name
-            # Add fetch_time to processed_data so it's included in the cache
-            # and available if this instance acts as the API provider.
             processed_data['fetch_time'] = fetch_time
             
-            # Save to cache regardless of which API was used
+            # Save to cache
             save_weather_cache_entry(lat, lon, processed_data)
 
             if units == 'metric':
@@ -281,18 +214,113 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
                 log_unit = 'C' if units == 'metric' else 'F'
                 print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}{log_unit}, API time: {api_time:.2f}s")
             except (IndexError, KeyError, TypeError):
-                 # Indicate error or missing data
+                # Indicate error or missing data
+                print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
+
+            return processed_data, 200
+            
+        except requests.exceptions.RequestException as e:
+            print(f"Weather API error: Failed to fetch weather data from LinuxReport API: {e}")
+            error_data = {"error": "Failed to fetch weather data from API", "fetch_time": fetch_time}
+            return error_data, 500
+        except (ValueError, KeyError, TypeError) as e:
+            # Always log error result
+            print(f"Weather API error: Failed to process weather data from LinuxReport API: {e}")
+            error_data = {"error": "Failed to process weather data", "fetch_time": fetch_time}
+            return error_data, 500
+    
+    # For OpenWeather API, we need locking to prevent race conditions and rate limit issues
+    # Acquire lock specific to this location bucket
+    with get_lock(lock_key):
+        # Re-check cache inside the lock to prevent race condition
+        bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
+        if bucketed_weather:
+            return bucketed_weather, 200
+
+        try:
+            # Original OpenWeather API implementation
+            service_name = "OpenWeather"
+            # Check for valid API key before proceeding
+            if not WEATHER_API_KEY or len(WEATHER_API_KEY) < 10:
+                print("Weather API error: WEATHER_API_KEY is missing or too short.")
+                error_data = {"error": "Weather API key is not configured", "fetch_time": fetch_time}
+                return error_data, 500
+            
+            rate_limit_check()
+            # Always fetch in imperial (Fahrenheit) for consistent caching
+            url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
+            start_time = datetime.now(TZ).timestamp()
+            response = requests.get(url, timeout=10)
+            api_time = datetime.now(TZ).timestamp() - start_time
+            response.raise_for_status()
+            weather_data = response.json()
+            # Determine city name for logging
+            city_name = weather_data.get("city", {}).get("name", "Unknown location")
+
+            daily_data = defaultdict(list)
+            for entry in weather_data.get("list", []):
+                date_str = entry.get("dt_txt", "")[:10]
+                daily_data[date_str].append(entry)
+
+            processed_data = {"daily": []}
+            today_date = datetime.now().date()
+            days_added = 0
+            for date, entries in sorted(daily_data.items()):
+                entry_date = datetime.strptime(date, "%Y-%m-%d").date()
+                if entry_date < today_date:
+                    continue
+                if days_added >= 5:
+                    break
+                temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
+                temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
+                pops = [e.get("pop", 0) for e in entries]
+                rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
+
+                # Use noon entry if possible, else first
+                preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
+                weather_main = preferred_entry["weather"][0]["main"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "N/A"
+                weather_icon = preferred_entry["weather"][0]["icon"] if preferred_entry.get("weather") and len(preferred_entry["weather"]) > 0 else "01d"
+
+                processed_data["daily"].append({
+                    "dt": int(datetime.strptime(date, "%Y-%m-%d").replace(hour=12).timestamp()),
+                    "temp_min": min(temp_mins) if temp_mins else None,
+                    "temp_max": max(temp_maxs) if temp_maxs else None,
+                    "precipitation": round(max(pops) * 100) if pops else 0,
+                    "rain": round(rain_total, 2),
+                    "weather": weather_main,
+                    "weather_icon": weather_icon
+                })
+                days_added += 1
+
+            # Add city information and fetch_time to processed data
+            processed_data['city_name'] = city_name
+            processed_data['fetch_time'] = fetch_time
+            
+            # Save to cache
+            save_weather_cache_entry(lat, lon, processed_data)
+
+            if units == 'metric':
+                processed_data = convert_weather_to_metric(processed_data)
+
+            try:
+                today_entry = processed_data["daily"][0]
+                # Get the temp (already potentially converted)
+                current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
+                log_unit = 'C' if units == 'metric' else 'F'
+                print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}{log_unit}, API time: {api_time:.2f}s")
+            except (IndexError, KeyError, TypeError):
+                # Indicate error or missing data
                 print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
 
             return processed_data, 200
 
         except requests.exceptions.RequestException as e:
-            print(f"Weather API error: Failed to fetch weather data from API: {e}")
+            print(f"Weather API error: Failed to fetch weather data from OpenWeather API: {e}")
             error_data = {"error": "Failed to fetch weather data from API", "fetch_time": fetch_time}
             return error_data, 500
         except (ValueError, KeyError, TypeError) as e:
             # Always log error result
-            print(f"Weather API error: Failed to process weather data: {e}")
+            print(f"Weather API error: Failed to process weather data from OpenWeather API: {e}")
             error_data = {"error": "Failed to process weather data", "fetch_time": fetch_time}
             return error_data, 500
 
