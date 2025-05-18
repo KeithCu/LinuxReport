@@ -4,6 +4,10 @@
 const weatherWidgetToggleEnabled = true;
 const WEATHER_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
+// Flag to use linuxreport.net for weather data (cross-origin)
+const USE_LINUXREPORT_WEATHER = false;
+const WEATHER_BASE_URL = USE_LINUXREPORT_WEATHER ? 'https://linuxreport.net' : '';
+
 // --- Weather Widget Toggle ---
 const weatherDefaultCollapsed = false; // <<< SET TO true FOR COLLAPSED BY DEFAULT, false FOR OPEN BY DEFAULT >>>
 
@@ -126,7 +130,8 @@ async function fetchWeatherData() {
   const useMetric = determineUnits() === 'metric';
 
   try {
-    const response = await fetch(`/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
+
+    const response = await fetch(`${WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
     setCachedWeatherData(data);

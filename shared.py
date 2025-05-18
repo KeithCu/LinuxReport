@@ -27,6 +27,29 @@ class Mode(str, Enum):
     SPACE_REPORT = "space"
     PV_REPORT = "pv"
 
+# Allowed domains for CORS and CSP
+ALLOWED_DOMAINS = [
+    'https://linuxreport.net',
+    'https://covidreport.org',
+    'https://aireport.keithcu.com',
+    'https://pvreport.org',
+    'https://trumpreport.info',
+    'https://news.thedetroitilove.com',
+    'http://127.0.0.1:5000',
+]
+
+# Domains allowed to make requests to this server
+ALLOWED_REQUESTER_DOMAINS = [
+    'https://covidreport.org',
+    'https://aireport.keithcu.com',
+    'https://pvreport.org',
+    'https://trumpreport.info',
+    'https://news.thedetroitilove.com',
+    # Add more domains as needed
+]
+
+ENABLE_CORS = False
+
 # Simple map from Mode enum to URL identifiers - identical to enum values
 MODE_MAP = {mode: mode.value for mode in Mode}
 
@@ -266,3 +289,4 @@ def clear_page_caches():
     for key in keys:
         if key.startswith('page-cache:'):
             g_cm.delete(key)
+
