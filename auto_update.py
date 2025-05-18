@@ -28,7 +28,6 @@ from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 from enum import Enum  # Ensure this is included if not already
 
 class PromptMode(Enum):
-    DEFAULT = 'default'
     O3 = 'o3'
     THIRTY_B = '30b'  # Represents '30b' prompt
 
@@ -76,14 +75,6 @@ FALLBACK_MODEL = "mistralai/mistral-small-3.1-24b-instruct"
 
 # Set to True to always try random models, False to use cached working model
 USE_RANDOM_MODELS = True
-
-PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}      
-    Please talk over the titles to decide which ones sound interesting.
-    Some headlines will be irrelevant, those are easy to exclude.
-    Do not select top 3 headlines that are similar; pick only distinct headlines/topics.
-    When you are done discussing the titles, put {TITLE_MARKER} and then on a new line list the top 3, using only the title text.
-    """
-
 
 PROMPT_30B = f""" Prompt:
 Given a list of news headlines, follow these steps:
@@ -373,10 +364,10 @@ def _try_call_model(client, model, messages, max_tokens):
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
 
 def extract_top_titles_from_ai(text):
-    """Extracts top titles from AI-generated text after the first '{TITLE_MARKER}' marker."""
-    marker_index = text.find(TITLE_MARKER)
+    """Extracts top titles from AI-generated text after the last '{TITLE_MARKER}' marker."""
+    marker_index = text.rfind(TITLE_MARKER)
     if (marker_index != -1):
-        # Use the content after the first '{TITLE_MARKER}'
+        # Use the content after the last '{TITLE_MARKER}'
         text = text[marker_index + len(TITLE_MARKER):]
     lines = text.splitlines()
     titles = []
@@ -414,15 +405,12 @@ def _prepare_messages(prompt_mode, filtered_articles):
             {"role": "system", "content": PROMPT_O3_SYSTEM},
             {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
         ]
-    elif prompt_mode == PromptMode.THIRTY_B:
+    else: # THIRTY_B mode
         mode_instructions = REPORT_PROMPT
         user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [
             {"role": "user", "content": PROMPT_30B.format(mode_instructions=mode_instructions) + "\n" + user_list}
         ]
-    else: # Default mode
-        prompt = PROMPT_AI.format(mode_instructions=mode_instructions) + "\n" + "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
-        messages = [{"role": "user", "content": prompt}]
     return messages
 
 def ask_ai_top_articles(articles):
@@ -645,7 +633,7 @@ if __name__ == "__main__":
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
     parser.add_argument('--compare', action='store_true', help='Run in comparison mode')
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
-    parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., default, o3)')
+    parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
     args = parser.parse_args()
 
@@ -710,8 +698,8 @@ if __name__ == "__main__":
                     prompt_mode_enum = PromptMode(args.prompt_mode.upper())
                     PROMPT_MODE = prompt_mode_enum
                 except ValueError:
-                    print(f"Invalid prompt mode specified: {args.prompt_mode}. Using default.")
-                    PROMPT_MODE = PromptMode.DEFAULT
+                    print(f"Invalid prompt mode specified: {args.prompt_mode}. Using 30B mode.")
+                    PROMPT_MODE = PromptMode.THIRTY_B
             main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run) # Pass string mode, loaded module and config
         else:
             print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
