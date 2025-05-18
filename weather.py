@@ -128,14 +128,17 @@ def save_weather_cache_entry(lat, lon, data):
     entry = {'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str}
     g_cs.put(CACHE_ENTRY_PREFIX + key, entry, timeout=remaining_timeout)
 
-def get_bucketed_weather_cache(lat, lon):
+def get_bucketed_weather_cache(lat, lon, units='imperial'):
     """Returns cached weather data for the bucketed (lat, lon) if present and same day."""
     key = _bucket_key(lat, lon)
     entry = g_cs.get(CACHE_ENTRY_PREFIX + key)
     today_str = date_obj.today().isoformat()
     now = datetime.now(TZ).timestamp()
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
-        return entry['data']
+        data = entry['data']
+        if units == 'metric':
+            data = convert_weather_to_metric(data)
+        return data
     return None
 
 def fahrenheit_to_celsius(f_temp):
@@ -169,23 +172,17 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     lock_key = f"weather_fetch:{bucket_key}"
 
     # Check cache first (outside the lock for a quick check)
-    bucketed_weather = get_bucketed_weather_cache(lat, lon)
+    bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
     if bucketed_weather:
-        # Convert to metric if requested
-        if units == 'metric':
-            bucketed_weather = convert_weather_to_metric(bucketed_weather)
         return bucketed_weather, 200
 
     # Acquire lock specific to this location bucket
     # The 'with' statement handles waiting and acquisition via __enter__
-    with get_lock(lock_key):  # We don't need to assign the lock to a variable
+    with get_lock(lock_key):
 
         # Re-check cache *inside* the lock to prevent race condition
-        bucketed_weather = get_bucketed_weather_cache(lat, lon)
+        bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
         if bucketed_weather:
-            # Convert to metric if requested
-            if units == 'metric':
-                bucketed_weather = convert_weather_to_metric(bucketed_weather)
             return bucketed_weather, 200
 
         # Cache miss and lock acquired, proceed with API call
