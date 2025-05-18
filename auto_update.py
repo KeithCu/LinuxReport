@@ -93,7 +93,7 @@ Think carefully and consisely about relevance, interest, and topic distinction w
 From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
 After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no extra text:
 
-******
+{TITLE_MARKER}
 1. [Title 1]
 2. [Title 2]
 3. [Title 3]
