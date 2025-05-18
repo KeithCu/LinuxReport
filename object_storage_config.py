@@ -1,16 +1,8 @@
-import time
-import json
 import os
-import hashlib
-from datetime import datetime
-from typing import Any, Optional, Dict, List
-from dataclasses import dataclass
-from enum import Enum
 import os.path
-from pathlib import Path
-from config_utils import load_config
-from io import BytesIO
+import hashlib
 
+from config_utils import load_config
 
 # Object Storage configuration
 STORAGE_ENABLED = False
@@ -22,17 +14,23 @@ STORAGE_SECRET_KEY = ""  # Loaded from config.yaml
 STORAGE_HOST = "us-ord-1.linodeobjects.com"
 STORAGE_SYNC_PATH = "feeds/"
 
+
+DEFAULT_RETRY_INTERVAL = 1.0  # Base interval for lock acquisition retries
+MIN_RETRY_INTERVAL = 1.0      # Minimum retry interval in seconds
+MAX_RETRY_INTERVAL = 10.0     # Maximum retry interval in seconds
+MAX_RETRY_ATTEMPTS = 3        # Maximum number of retry attempts for S3 operations
+RETRY_MULTIPLIER = 1.0        # Multiplier for exponential backoff
+TEMP_FILE_EXTENSION = '.json'  # Constant for consistent temporary file naming
+
+
 # Sync configuration
 SERVER_ID = hashlib.md5(os.uname().nodename.encode()).hexdigest()[:8] if hasattr(os, 'uname') else "default_server_id"
 
 
-
 # Libcloud imports for availability check and init_storage
 try:
-    from libcloud.storage.types import Provider, ContainerDoesNotExistError, ObjectDoesNotExistError
+    from libcloud.storage.types import ContainerDoesNotExistError
     from libcloud.storage.providers import get_driver
-    from libcloud.storage.base import Object
-    import libcloud.security
     from libcloud.common.types import LibcloudError
     LIBCLOUD_AVAILABLE = True
 except ImportError:

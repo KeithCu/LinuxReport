@@ -11,40 +11,24 @@ Optimizations for Linode Object Storage:
 - Metadata operations are optimized for efficiency, leveraging Linode's support for custom metadata to track file versions and timestamps, minimizing conflicts in distributed environments.
 - The implementation considers Linode's regional storage for better performance, using specified regions to reduce latency and costs.
 """
-import threading
 import time
-import json
 import os
-import hashlib
-from datetime import datetime
 import os.path
-from pathlib import Path
+import hashlib
 from io import BytesIO
-from config_utils import load_config
-from typing import Any, Optional, Dict, List
+from typing import Optional, Dict
+
 import unittest
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 # Import from object_storage_config
 import object_storage_config as oss_config
-from object_storage_config import (
-    logger, LIBCLOUD_AVAILABLE, STORAGE_ENABLED,
-    StorageError, ConfigurationError, StorageConnectionError, StorageOperationError,
-    StorageProvider, init_storage, SERVER_ID, STORAGE_SYNC_PATH,
-    STORAGE_BUCKET_NAME, STORAGE_ACCESS_KEY,
-    STORAGE_SECRET_KEY, STORAGE_PROVIDER, STORAGE_REGION, STORAGE_HOST,
-    STORAGE_SYNC_PATH,
-    _storage_driver, _storage_container,
-    _secrets_loaded,
-    get_file_metadata
-)
 
-# Ensure libcloud imports are available when needed
-if LIBCLOUD_AVAILABLE:
-    from libcloud.storage.types import Provider, ContainerDoesNotExistError, ObjectDoesNotExistError
-    from libcloud.storage.providers import get_driver
-    from libcloud.storage.base import Object
-    from libcloud.common.types import LibcloudError
+from object_storage_config import (
+    LIBCLOUD_AVAILABLE, STORAGE_ENABLED,
+    init_storage, SERVER_ID, STORAGE_SYNC_PATH,
+    _storage_driver, _storage_container,
+)
 
 def generate_object_name(url):
     """Generate a unique object name for a feed URL"""
@@ -87,13 +71,13 @@ def get_file_metadata(file_path):
                 'content': content  # Include content for in-memory operations
             }
     except FileNotFoundError as e:
-        logger.error(f"File not found for metadata: {file_path}: {e}")
+        print(f"File not found for metadata: {file_path}: {e}")
         return None
     except IOError as e: # Broader I/O errors (e.g. permission denied)
-        logger.error(f"I/O error getting file metadata for {file_path}: {e}")
+        print(f"I/O error getting file metadata for {file_path}: {e}")
         return None
     except Exception as e:
-        logger.error(f"Error getting file metadata for {file_path}: {e}")
+        print(f"Error getting file metadata for {file_path}: {e}")
         return None
 
 def _prepare_fetch(prefix: str, key: str, current_hash: Optional[str] = None):

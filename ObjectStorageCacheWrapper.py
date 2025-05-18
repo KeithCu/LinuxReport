@@ -7,8 +7,6 @@ import json
 import hashlib
 from datetime import datetime
 from typing import Any, Optional
-from pathlib import Path
-from io import BytesIO
 
 # Import from our config module
 import object_storage_config as oss_config
