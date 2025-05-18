@@ -11,6 +11,7 @@ import traceback
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
+import enum  # New import for Enum
 
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
@@ -22,6 +23,13 @@ from html_generation import (
 )
 
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
+
+from enum import Enum  # Ensure this is included if not already
+
+class PromptMode(Enum):
+    DEFAULT = 'default'
+    O3 = 'o3'
+    THIRTY_B = '30b'  # Represents '30b' prompt
 
 # --- Configuration and Prompt Constants ---
 MAX_PREVIOUS_HEADLINES = 200 # Number of headlines to remember and filter out to the AI
@@ -93,7 +101,7 @@ RUN_MODE = "normal"  # options: "normal", "compare"
 
 PROVIDER = "openrouter"
 
-PROMPT_MODE = "default"  # Global default for prompt mode if not overridden
+PROMPT_MODE = PromptMode.DEFAULT  # Default Enum instance
 
 # Configuration for the primary provider/model
 MODEL_1 = None
@@ -355,13 +363,13 @@ def _prepare_messages(prompt_mode, filtered_articles):
     # Get the mode instructions from the global REPORT_PROMPT
     mode_instructions = REPORT_PROMPT
 
-    if prompt_mode == "o3":
+    if prompt_mode == PromptMode.O3:
         user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [
             {"role": "system", "content": PROMPT_O3_SYSTEM},
             {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
         ]
-    elif prompt_mode == "30b":
+    elif prompt_mode == PromptMode.THIRTY_B:
         mode_instructions = REPORT_PROMPT
         user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [
@@ -638,7 +646,12 @@ if __name__ == "__main__":
         should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or RUN_MODE == "compare"
         if should_run:
             if args.prompt_mode:
-                PROMPT_MODE = args.prompt_mode
+                try:
+                    prompt_mode_enum = PromptMode(args.prompt_mode.upper())
+                    PROMPT_MODE = prompt_mode_enum
+                except ValueError:
+                    print(f"Invalid prompt mode specified: {args.prompt_mode}. Using default.")
+                    PROMPT_MODE = PromptMode.DEFAULT
             main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run) # Pass string mode, loaded module and config
         else:
             print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
