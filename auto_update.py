@@ -40,7 +40,7 @@ MAX_ARCHIVE_HEADLINES = 50 # Size of Headlines Archive page
 
 
 # Title marker used to separate reasoning from selected headlines
-TITLE_MARKER = "***\n"
+TITLE_MARKER = "******"
 
 # How many articles from each feed to consider for the LLM
 MAX_ARTICLES_PER_FEED_FOR_LLM = 5
@@ -54,7 +54,7 @@ PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
     Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
     Do not select top 3 headlines that are similar; pick only distinct headlines/topics.
-    When you are done discussing the titles, put {TITLE_MARKER} and then list the top 3, using only the titles.
+    When you are done discussing the titles, put {TITLE_MARKER} and then on a new line list the top 3, using only the title text.
     """
 
 
@@ -64,6 +64,8 @@ Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
 Think carefully and consisely about relevance, interest, and topic distinction without repeating entire headlines in your reasoning.
 From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
 After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no extra text:
+
+******
 1. [Title 1]
 2. [Title 2]
 3. [Title 3]
