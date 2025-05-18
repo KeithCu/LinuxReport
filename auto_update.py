@@ -47,29 +47,28 @@ TITLE_MARKER = "******"
 MAX_ARTICLES_PER_FEED_FOR_LLM = 5
 
 # === Global LLM/AI config ===
-MAX_TOKENS = 5000
-TIMEOUT = 60
+MAX_TOKENS = 20000
+TIMEOUT = 120
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
 # List of free models to try
 FREE_MODELS = [
-    "mistralai/mistral-small-3.1-24b-instruct:free",
-    "nousresearch/deephermes-3-mistral-24b-preview:free",
+    "cognitivecomputations/dolphin3.0-mistral-24b:free",
+    "deepseek/deepseek-r1-distill-qwen-32b:free"
+    "featherless/qwerky-72b:free",
+    "google/gemma-3-27b-it:free",
+    "meta-llama/llama-4-scout:free",
+    "meta-llama/llama-4-maverick:free",
     "microsoft/phi-4-reasoning-plus:free",
     "microsoft/phi-4-reasoning:free",
+    "microsoft/mai-ds-r1:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "nousresearch/deephermes-3-mistral-24b-preview:free",
+    "nvidia/llama-3.3-nemotron-super-49b-v1:free",
     "qwen/qwen3-30b-a3b:free",
     "qwen/qwen3-14b:free",
     "qwen/qwen3-32b:free",
     "qwen/qwen3-235b-a22b:free",
-    "microsoft/mai-ds-r1:free",
-    "nvidia/llama-3.3-nemotron-super-49b-v1:free",
-    "meta-llama/llama-4-scout:free",
-    "meta-llama/llama-4-maverick:free",
-    "featherless/qwerky-72b:free",
-    "google/gemma-3-27b-it:free",
-    "qwen/qwq-32b:free",
-    "cognitivecomputations/dolphin3.0-mistral-24b:free",
-    "deepseek/deepseek-r1-distill-qwen-32b:free"
 ]
 
 # Fallback model to use if all free models fail
