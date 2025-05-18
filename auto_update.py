@@ -40,7 +40,7 @@ MAX_ARCHIVE_HEADLINES = 50 # Size of Headlines Archive page
 
 
 # Title marker used to separate reasoning from selected headlines
-TITLE_MARKER = "***"
+TITLE_MARKER = "***\n"
 
 # How many articles from each feed to consider for the LLM
 MAX_ARTICLES_PER_FEED_FOR_LLM = 5
