@@ -12,6 +12,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 import enum  # New import for Enum
+import random
 
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
@@ -50,7 +51,34 @@ MAX_TOKENS = 5000
 TIMEOUT = 60
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
-PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
+# List of free models to try
+FREE_MODELS = [
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "nousresearch/deephermes-3-mistral-24b-preview:free",
+    "microsoft/phi-4-reasoning-plus:free",
+    "microsoft/phi-4-reasoning:free",
+    "qwen/qwen3-30b-a3b:free",
+    "qwen/qwen3-14b:free",
+    "qwen/qwen3-32b:free",
+    "qwen/qwen3-235b-a22b:free",
+    "microsoft/mai-ds-r1:free",
+    "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+    "meta-llama/llama-4-scout:free",
+    "meta-llama/llama-4-maverick:free",
+    "featherless/qwerky-72b:free",
+    "google/gemma-3-27b-it:free",
+    "qwen/qwq-32b:free",
+    "cognitivecomputations/dolphin3.0-mistral-24b:free",
+    "deepseek/deepseek-r1-distill-qwen-32b:free"
+]
+
+# Fallback model to use if all free models fail
+FALLBACK_MODEL = "mistralai/mistral-small-3.1-24b-instruct"
+
+# Set to True to always try random models, False to use cached working model
+USE_RANDOM_MODELS = True
+
+PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}      
     Please talk over the titles to decide which ones sound interesting.
     Some headlines will be irrelevant, those are easy to exclude.
     Do not select top 3 headlines that are similar; pick only distinct headlines/topics.
@@ -206,7 +234,7 @@ class LLMProvider(ABC):
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call the primary model with fallback to secondary if needed."""
         # Try to get the current working model first
-        current_model = get_current_model()
+        current_model = self.primary_model
         print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} ---")
         
         try:
@@ -237,6 +265,7 @@ class OpenRouterProvider(LLMProvider):
     
     def __init__(self):
         super().__init__("openrouter")
+        self._selected_model = None  # Cache the selected model
     
     @property
     def api_key_env_var(self) -> str:
@@ -248,11 +277,13 @@ class OpenRouterProvider(LLMProvider):
     
     @property
     def primary_model(self) -> str:
-        return "mistralai/mistral-small-3.1-24b-instruct:free"
+        if self._selected_model is None:
+            self._selected_model = get_current_model()
+        return self._selected_model
     
     @property
     def fallback_model(self) -> str:
-        return "mistralai/mistral-small-3.1-24b-instruct"
+        return FALLBACK_MODEL
     
     def get_comparison_models(self) -> Tuple[str, str]:
         """Get models specific for comparison mode."""
@@ -282,28 +313,26 @@ def get_provider(name: str) -> LLMProvider:
     return PROVIDERS[name]
 
 def get_current_model():
-    """Get the current working model, with fallback mechanism."""
-    # Check if we have a cached working model
-    cached_model = g_c.get("working_llm_model")
-    if cached_model:
-        # Get current provider to check valid models
-        provider = get_provider(PROVIDER)
-        valid_models = [provider.primary_model, provider.fallback_model]
-        
-        # If cached model is no longer in our valid models, clear the cache
-        if cached_model not in valid_models:
-            print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
-            g_c.delete("working_llm_model")
-            print(f"Using primary model: {provider.primary_model}")
-            return provider.primary_model
-            
-        print(f"Using cached working model: {cached_model}")
-        return cached_model
+    """Get the current working model.
+    If USE_RANDOM_MODELS is True, randomly selects a new model each time.
+    If False, uses cached working model or falls back to random selection if no cache exists.
+    """
+    if not USE_RANDOM_MODELS:
+        # Check if we have a cached working model
+        cached_model = g_c.get("working_llm_model")
+        if cached_model:
+            # If cached model is in our free models list or is the fallback, use it
+            if cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL:
+                print(f"Using cached working model: {cached_model}")
+                return cached_model
+            else:
+                print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
+                g_c.delete("working_llm_model")
     
-    # Get the current provider's primary model
-    provider = get_provider(PROVIDER)
-    print(f"Using primary model: {provider.primary_model}")
-    return provider.primary_model
+    # Randomly select a free model
+    selected_model = random.choice(FREE_MODELS)
+    print(f"Randomly selected free model: {selected_model}")
+    return selected_model
 
 def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
@@ -604,7 +633,11 @@ if __name__ == "__main__":
     parser.add_argument('--compare', action='store_true', help='Run in comparison mode')
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
     parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., default, o3)')
+    parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
     args = parser.parse_args()
+
+    # Set USE_RANDOM_MODELS based on command line argument
+    USE_RANDOM_MODELS = not args.use_cached_model
 
     # Configure primary provider from CLI
     provider = get_provider(PROVIDER)
