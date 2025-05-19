@@ -2,7 +2,6 @@
 weather.py
 
 Provides functions to fetch and cache weather data, including a fake API mode for testing. Includes HTML rendering for weather forecasts.
-Supports fetching from LinuxReport.net API as an alternative to OpenWeather API.
 """
 
 import os
@@ -20,14 +19,6 @@ import requests
 
 # Local imports
 from shared import g_cs, get_lock, USER_AGENT, TZ
-
-# Global flag to control whether to use LinuxReport.net API instead of OpenWeather
-# This allows to share data between servers and for better rate-limit support
-# Since all servers are in the same datacenter, it will be very fast.
-USE_LINUXREPORT_API = False  # Set to True to use LinuxReport.net API, False to use OpenWeather
-
-# LinuxReport.net API endpoint
-LINUXREPORT_WEATHER_API = "https://linuxreport.net/api/weather"
 from models import DEBUG
 
 # --- Arbitrary bucket resolution (miles-based) ---
@@ -214,28 +205,6 @@ def _log_weather_result(processed_data, city_name, service_name, api_time, units
         # Indicate error or missing data
         print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
 
-def _fetch_from_linuxreport_api(lat, lon, fetch_time):
-    """Fetch weather data from LinuxReport.net API."""
-    service_name = "LinuxReport.net"
-    url = f"{LINUXREPORT_WEATHER_API}?lat={lat}&lon={lon}&units=imperial"
-    start_time = datetime.now(TZ).timestamp()
-    response = requests.get(url, timeout=10, headers={'User-Agent': USER_AGENT})
-    api_time = datetime.now(TZ).timestamp() - start_time
-    response.raise_for_status()
-    processed_data = response.json()
-    
-    # This will be the definitive fetch_time for this path
-    fetch_time = processed_data.get('fetch_time', fetch_time)
-    
-    # Extract city name from the API response if available
-    city_name = processed_data.get("city_name", "Unknown Location")
-    
-    # Add city information and fetch_time to processed data
-    processed_data['city_name'] = city_name
-    processed_data['fetch_time'] = fetch_time
-    
-    return processed_data, city_name, api_time, service_name
-
 def _fetch_from_openweather_api(lat, lon, fetch_time):
     """Fetch weather data from OpenWeather API."""
     service_name = "OpenWeather"
@@ -285,27 +254,22 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     try:
         bucket_key = _bucket_key(lat, lon)
         
-        # Determine which API to use and fetch accordingly
-        if USE_LINUXREPORT_API:
-            # LinuxReport API doesn't need locking
-            processed_data, city_name, api_time, service_name = _fetch_from_linuxreport_api(lat, lon, fetch_time)
-        else:
-            # OpenWeather API needs locking
-            lock_key = f"weather_fetch:{bucket_key}"
-            with get_lock(lock_key):
-                # Re-check cache inside the lock to prevent race condition
-                bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
-                if bucketed_weather:
-                    return bucketed_weather, 200
-                
-                result = _fetch_from_openweather_api(lat, lon, fetch_time)
-                processed_data, city_name, api_time, service_name, error_data, error_code = result
-                
-                # If we got an error from the fetch function, return it
-                if error_data and error_code:
-                    return error_data, error_code
+        # Use OpenWeather API with locking
+        lock_key = f"weather_fetch:{bucket_key}"
+        with get_lock(lock_key):
+            # Re-check cache inside the lock to prevent race condition
+            bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
+            if bucketed_weather:
+                return bucketed_weather, 200
+            
+            result = _fetch_from_openweather_api(lat, lon, fetch_time)
+            processed_data, city_name, api_time, service_name, error_data, error_code = result
+            
+            # If we got an error from the fetch function, return it
+            if error_data and error_code:
+                return error_data, error_code
         
-        # Save to cache regardless of which API was used
+        # Save to cache
         save_weather_cache_entry(lat, lon, processed_data)
         
         # Convert to metric if requested
@@ -318,14 +282,12 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         return processed_data, 200
         
     except requests.exceptions.RequestException as e:
-        api_type = "LinuxReport" if USE_LINUXREPORT_API else "OpenWeather"
-        print(f"Weather API error: Failed to fetch weather data from {api_type} API: {e}")
-        error_data = {"error": f"Failed to fetch weather data from {api_type} API", "fetch_time": fetch_time}
+        print(f"Weather API error: Failed to fetch weather data from OpenWeather API: {e}")
+        error_data = {"error": "Failed to fetch weather data from OpenWeather API", "fetch_time": fetch_time}
         return error_data, 500
     except (ValueError, KeyError, TypeError) as e:
-        api_type = "LinuxReport" if USE_LINUXREPORT_API else "OpenWeather"
-        print(f"Weather API error: Failed to process weather data from {api_type} API: {e}")
-        error_data = {"error": f"Failed to process weather data from {api_type} API", "fetch_time": fetch_time}
+        print(f"Weather API error: Failed to process weather data from OpenWeather API: {e}")
+        error_data = {"error": "Failed to process weather data from OpenWeather API", "fetch_time": fetch_time}
         return error_data, 500
 
 
