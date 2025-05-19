@@ -52,22 +52,31 @@ MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
 # List of free models to try
 FREE_MODELS = [
-    "cognitivecomputations/dolphin3.0-mistral-24b:free",
-    "deepseek/deepseek-r1-distill-qwen-32b:free"
+    "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
+    "deepseek/deepseek-r1-distill-qwen-14b:free",
+    "deepseek/deepseek-r1-distill-qwen-32b:free",
     "featherless/qwerky-72b:free",
+    "google/gemma-3-12b-it:free",
     "google/gemma-3-27b-it:free",
+    "meta-llama/llama-3.3-8b-instruct:free",
     "meta-llama/llama-4-scout:free",
     "meta-llama/llama-4-maverick:free",
     "microsoft/phi-4-reasoning-plus:free",
     "microsoft/phi-4-reasoning:free",
     "microsoft/mai-ds-r1:free",
+    "mistralai/mistral-7b-instruct:free",
     "mistralai/mistral-small-3.1-24b-instruct:free",
+    "moonshotai/moonlight-16b-a3b-instruct:free",
+    "nousresearch/deephermes-3-llama-3-8b-preview:free",
     "nousresearch/deephermes-3-mistral-24b-preview:free",
     "nvidia/llama-3.3-nemotron-super-49b-v1:free",
-    "qwen/qwen3-30b-a3b:free",
+    "qwen/qwen-2.5-72b-instruct:free"
+    "qwen/qwen3-8b:free",
     "qwen/qwen3-14b:free",
     "qwen/qwen3-32b:free",
+    "qwen/qwen3-30b-a3b:free",
     "qwen/qwen3-235b-a22b:free",
+    "rekaai/reka-flash-3:free",
 ]
 
 # Fallback model to use if all free models fail
@@ -223,26 +232,36 @@ class LLMProvider(ABC):
     
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call the primary model with fallback to secondary if needed."""
-        # Try to get the current working model first
-        current_model = self.primary_model
-        print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} ---")
-        
-        try:
-            response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
-            return response_text, current_model
-        except Exception as e:
-            print(f"Error with model {current_model} ({self.name}): {e}")
-            traceback.print_exc()
+        # Try two random free models first
+        tried_models = set()
+        for attempt in range(2):
+            # Get a random free model that hasn't been tried yet
+            available_models = [m for m in FREE_MODELS if m not in tried_models]
+            if not available_models:
+                print("No more free models available to try")
+                break
+                
+            current_model = random.choice(available_models)
+            tried_models.add(current_model)
             
-            # Try fallback model
-            fallback_model = self.fallback_model
-            print(f"Trying fallback model: {fallback_model}")
+            print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Attempt {attempt + 1}/2) ---")
+            
             try:
-                response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback {label}")
-                return response_text, fallback_model
-            except Exception as fallback_e:
-                print(f"Fallback model {fallback_model} also failed: {fallback_e}")
+                response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
+                return response_text, current_model
+            except Exception as e:
+                print(f"Error with model {current_model} ({self.name}): {e}")
                 traceback.print_exc()
+        
+        # If both free models failed, try fallback model
+        fallback_model = self.fallback_model
+        print(f"\nBoth free models failed. Trying fallback model: {fallback_model}")
+        try:
+            response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback {label}")
+            return response_text, fallback_model
+        except Exception as fallback_e:
+            print(f"Fallback model {fallback_model} also failed: {fallback_e}")
+            traceback.print_exc()
         
         return None, None
     
