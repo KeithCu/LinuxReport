@@ -45,6 +45,7 @@ ALLOWED_REQUESTER_DOMAINS = [
     'https://pvreport.org',
     'https://trumpreport.info',
     'https://news.thedetroitilove.com',
+    'https://linuxreport.net',
     # Add more domains as needed
 ]
 

@@ -28,7 +28,8 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, 
                     get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, 
-                    ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS)
+                    ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
+                    ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL)
 from weather import get_default_weather_html, get_weather_data
 from workers import fetch_urls_parallel, fetch_urls_thread
 from config_utils import get_admin_password
@@ -118,9 +119,9 @@ def init_app(flask_app):
     if ENABLE_CORS:
         # Configure CORS to allow requests from specified domains
         CORS(flask_app, resources={
-            r"/api/*": {
+            r"/api/weather": {  # Only allow CORS for weather API
                 "origins": ALLOWED_REQUESTER_DOMAINS,
-                "methods": ["GET", "POST", "OPTIONS"],
+                "methods": ["GET", "OPTIONS"],
                 "allow_headers": ["Content-Type"],
                 "expose_headers": ["Content-Type"],
                 "supports_credentials": True,
@@ -131,21 +132,34 @@ def init_app(flask_app):
         # Add security headers to all responses
         @flask_app.after_request
         def add_security_headers(response):
-            # Add CORS headers
-            origin = request.headers.get('Origin')
-            if origin in ALLOWED_REQUESTER_DOMAINS:
-                response.headers['Access-Control-Allow-Origin'] = origin
-                response.headers['Access-Control-Allow-Credentials'] = 'true'
-                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
-                response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            # Add CORS headers only for weather API
+            if request.path == '/api/weather':
+                origin = request.headers.get('Origin')
+                if origin in ALLOWED_REQUESTER_DOMAINS:
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
             
             # Add other security headers
             response.headers['X-Content-Type-Options'] = 'nosniff'
             response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
             
-            # Add CSP header that allows connections to this domain
-            response.headers['Content-Security-Policy'] = "default-src 'self'; connect-src 'self'; frame-ancestors 'none';"
+            # Add CSP header that allows connections to this domain and CDN if enabled
+            img_src = "'self' data:"
+            if ENABLE_URL_IMAGE_CDN_DELIVERY:
+                img_src += f" {CDN_IMAGE_URL}"
+            
+            response.headers['Content-Security-Policy'] = (
+                f"default-src 'self'; "
+                f"connect-src 'self' https://linuxreport.net; "  # Allow weather API calls to linuxreport.net
+                f"img-src {img_src} *; "  # Allow images from any domain
+                f"script-src 'self' 'unsafe-inline'; "
+                f"style-src 'self' 'unsafe-inline'; "
+                f"font-src 'self'; "
+                f"frame-ancestors 'none';"
+            )
             
             return response
 
