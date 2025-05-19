@@ -151,9 +151,10 @@ def init_app(flask_app):
             if ENABLE_URL_IMAGE_CDN_DELIVERY:
                 img_src += f" {CDN_IMAGE_URL}"
             
+            csp_domains = " ".join(ALLOWED_DOMAINS)
             response.headers['Content-Security-Policy'] = (
                 f"default-src 'self'; "
-                f"connect-src 'self' https://linuxreport.net; "  # Allow weather API calls to linuxreport.net
+                f"connect-src 'self' {csp_domains}; "  # Allow connections to all allowed domains
                 f"img-src {img_src} *; "  # Allow images from any domain
                 f"script-src 'self' 'unsafe-inline'; "
                 f"style-src 'self' 'unsafe-inline'; "
@@ -192,10 +193,6 @@ def init_app(flask_app):
         full_page = g_cm.get(cache_key)
         if not DEBUG and full_page is not None:
             response = make_response(full_page)
-            # Add CSP header only to the main page if CORS is enabled
-            if ENABLE_CORS:
-                csp_domains = " ".join(ALLOWED_DOMAINS)
-                response.headers['Content-Security-Policy'] = f"default-src 'self'; connect-src 'self' {csp_domains}; frame-ancestors 'none';"
             return response
 
         # Prepare the page layout.
@@ -308,10 +305,6 @@ def init_app(flask_app):
                 fetch_urls_thread()
         
         response = make_response(page)
-        # Add CSP header only to the main page if CORS is enabled
-        if ENABLE_CORS:
-            csp_domains = " ".join(ALLOWED_DOMAINS)
-            response.headers['Content-Security-Policy'] = f"default-src 'self'; connect-src 'self' {csp_domains}; frame-ancestors 'none';"
         return response
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
