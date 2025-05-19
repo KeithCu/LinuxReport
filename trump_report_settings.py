@@ -1,6 +1,5 @@
 from models import RssInfo, SiteConfig, REDDIT_FETCH_CONFIG
 import shared
-import datetime
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
@@ -36,7 +35,7 @@ CONFIG: SiteConfig = SiteConfig(
 	LOGO_URL="TrumpReport.webp",
 	WEB_DESCRIPTION="Trump Report",
 	WEB_TITLE="TrumpReport",
-	REPORT_PROMPT=f"Celebrating Trump's biggest fans of his second term Presidency, which began on January 20, 2025, as of today: {f'{datetime.date.today().strftime('%Y-%m-%d')}'} ",
+	REPORT_PROMPT="Trump's biggest fans",
     PATH="/srv/http/trumpreport",
     SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 20],
     CUSTOM_FETCH_CONFIG={
