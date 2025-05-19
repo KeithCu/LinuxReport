@@ -3,19 +3,17 @@ ObjectStorageCacheWrapper.py
 
 Object Storage-based cache wrapper for feed updates. Used to manage cache operations with libcloud.
 """
-import time
 import json
 import hashlib
-from datetime import datetime
+import datetime
 from typing import Any, Optional
-from pathlib import Path
-from io import BytesIO
 
 # Import from our config module
 import object_storage_config as oss_config
+import object_storage_sync
 
 # Import in-memory cache from shared
-from shared import g_cm
+from shared import g_cm, TZ, EXPIRE_HOUR
 
 # Default local cache expiration time (15 minutes)
 DEFAULT_LOCAL_CACHE_EXPIRY = 15 * 60  # 15 minutes in seconds
@@ -43,18 +41,11 @@ class ObjectStorageCacheWrapper:
             
         if not oss_config.init_storage():
             raise oss_config.ConfigurationError("Failed to initialize object storage")
-        
-    def _ensure_cache_dir(self) -> None:
-        """Ensure the cache directory exists."""
-        try:
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-        except Exception as e:
-            raise oss_config.ConfigurationError(f"Error creating cache directory: {e}")
-            
+                    
     def _get_object_name(self, key: str) -> str:
         """Generate a unique object name for a cache key."""
         key_hash = hashlib.md5(key.encode()).hexdigest()
-        return f"{oss_config.STORAGE_SYNC_PREFIX}cache/{oss_config.SERVER_ID}/{key_hash}"
+        return f"{oss_config.STORAGE_SYNC_PATH}cache/{oss_config.SERVER_ID}/{key_hash}"
         
     def _get_memory_cache_key(self, key: str) -> str:
         """Generate a unique memory cache key."""
@@ -65,31 +56,22 @@ class ObjectStorageCacheWrapper:
         
         First checks in-memory cache, then falls back to object storage if not found.
         """
-        # First check in-memory cache
         memory_key = self._get_memory_cache_key(key)
-        if self.g_cm.exists(memory_key):
-            return self.g_cm.get(memory_key)
+        if g_cm.has(memory_key):
+            return g_cm.get(memory_key)
         
-        # Get object from object storage
         obj_name = self._get_object_name(key)
         try:
-            obj = self._storage_container.get_object(obj_name)
-            if obj:
-                # Download as stream
-                stream = self._storage_driver.download_object_as_stream(obj)
-                # Read stream into string (assuming UTF-8 for JSON)
-                data_str = b''.join(stream).decode('utf-8')
-                # Parse JSON
-                data = json.loads(data_str)
-                # Store in in-memory cache with TTL
-                self.g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
+            content, metadata = object_storage_sync.fetch_bytes(obj_name, force=True)
+            if content:
+                data = json.loads(content.decode('utf-8'))
+                if datetime.datetime.now(TZ).timestamp() > data.get('expires', float('inf')):
+                    return None
+                g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
                 return data
-            else:
-                return None
-        except ObjectDoesNotExistError:
             return None
         except Exception as e:
-            logger.error(f"Error getting object {obj_name}: {e}")
+            print(f"Error getting object {obj_name}: {e}")
             return None
 
     def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
@@ -97,42 +79,20 @@ class ObjectStorageCacheWrapper:
         
         Stores in both in-memory cache and object storage.
         """
-        # Store in memory cache first
-        memory_cache_key = self._get_memory_cache_key(key)
-        g_cm.set(memory_cache_key, value, ttl=self.local_cache_expiry)
+        memory_key = self._get_memory_cache_key(key)
+        g_cm.set(memory_key, value, ttl=self.local_cache_expiry)
         
-        object_name = self._get_object_name(key)
-        data_stream = None
-        try:
-            expires_at = (time.time() + timeout) if timeout is not None else float('inf')
-            data_to_store = {
-                'value': value,
-                'timestamp': time.time(),
-                'expires': expires_at 
-            }
-            
-            json_data = json.dumps(data_to_store).encode('utf-8')
-            data_stream = BytesIO(json_data)
-            
-            metadata = {
-                'cache_key': key,
-                'timestamp': str(data_to_store['timestamp']),
-                'expires': str(data_to_store['expires']),
-                'server_id': oss_config.SERVER_ID
-            }
-            
-            oss_config._storage_driver.upload_object_via_stream(
-                iterator=data_stream,
-                container=oss_config._storage_container,
-                object_name=object_name,
-                extra={'meta_data': metadata, 'content_type': 'application/json'}
-            )
-                
-        except Exception as e:
-            oss_config.logger.error(f"Error putting cache value for {key}: {e}")
-        finally:
-            if data_stream:
-                data_stream.close()
+        obj_name = self._get_object_name(key)
+        expires_at = (datetime.datetime.now(TZ).timestamp() + timeout) if timeout is not None else float('inf')
+        data_to_store = {
+            'value': value,
+            'timestamp': datetime.datetime.now(TZ).timestamp(),
+            'expires': expires_at,
+            'server_id': oss_config.SERVER_ID
+        }
+        json_data = json.dumps(data_to_store).encode('utf-8')
+        extra_metadata = {'content_type': 'application/json'}
+        object_storage_sync.publish_bytes(json_data, key=obj_name, metadata=extra_metadata)
             
     def delete(self, key: str) -> None:
         """Delete a value from the cache."""
@@ -147,22 +107,20 @@ class ObjectStorageCacheWrapper:
         except oss_config.ObjectDoesNotExistError:
             pass
         except Exception as e:
-            oss_config.logger.error(f"Error deleting cache value for {key}: {e}")
+            print(f"Error deleting cache value for {key}: {e}")
             
     def has(self, key: str) -> bool:
         """Check if a key exists in the cache."""
-        # First check in-memory cache
-        memory_cache_key = self._get_memory_cache_key(key)
-        if g_cm.has(memory_cache_key):
+        memory_key = self._get_memory_cache_key(key)
+        if g_cm.has(memory_key):
             return True
         
-        object_name = self._get_object_name(key)
+        obj_name = self._get_object_name(key)
         try:
-            oss_config._storage_container.get_object(object_name=object_name)
-            # Cache the existence
-            g_cm.set(memory_cache_key, None, ttl=self.local_cache_expiry)
-            return True
-        except oss_config.ObjectDoesNotExistError:
+            content, metadata = object_storage_sync.fetch_bytes(obj_name, force=True)
+            if content is not None:
+                g_cm.set(memory_key, None, ttl=self.local_cache_expiry)  # Cache existence
+                return True
             return False
         except Exception:
             return False
@@ -190,3 +148,24 @@ class ObjectStorageCacheWrapper:
         """Set the last fetch time for a URL in object storage."""
         last_fetch_key = url + ":last_fetch"
         self.put(last_fetch_key, timestamp, timeout)
+
+def migrate_from_disk_cache() -> None:
+    import shared  # Import to access DiskCacheWrapper
+    from shared import g_c  # Assuming g_c is the instance from shared.py
+    
+    old_cache = g_c  # Reference to the existing DiskCacheWrapper instance
+    new_cache = ObjectStorageCacheWrapper()  # Create an instance of the new cache
+    
+    for key in old_cache.cache.iterkeys():  # Iterate through keys in the old cache
+        if old_cache.has(key):
+            value = old_cache.get(key)  # Get value from old cache
+            metadata = old_cache.get(key, read=False)  # Fetch metadata to get expire_time
+            expire_time = metadata['expire_time']
+            current_time = datetime.datetime.now(TZ).timestamp()
+            timeout = expire_time - current_time if expire_time > current_time else EXPIRE_HOUR
+            new_cache.put(key, value, timeout=timeout)  # Use calculated timeout
+            print(f'Migrated key: {key}')  # Optional logging
+    print('Migration completed.')
+
+if __name__ == "__main__":
+    migrate_from_disk_cache()  # Trigger migration when run directly

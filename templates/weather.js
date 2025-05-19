@@ -130,7 +130,8 @@ async function fetchWeatherData() {
   const useMetric = determineUnits() === 'metric';
 
   try {
-    const response = await fetch(`${WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_=${cacheBuster}`);
+
+    const response = await fetch(`${WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     const data = await response.json();
     setCachedWeatherData(data);
@@ -155,6 +156,12 @@ function renderWeatherData(data, useMetric) {
   if (!weatherForecast || !weatherLoading || !weatherError) {
     console.error('Weather elements not found');
     return;
+  }
+
+  // Add this line to update the header with city name
+  const weatherHeader = document.querySelector('#weather-container h3');
+  if (weatherHeader && data.city_name) {
+    weatherHeader.textContent = `5-Day Weather (${data.city_name})`;
   }
 
   if (!data.daily || data.daily.length === 0) {

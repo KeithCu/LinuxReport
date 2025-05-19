@@ -11,6 +11,8 @@ import traceback
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
+import enum  # New import for Enum
+import random
 
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
@@ -23,37 +25,69 @@ from html_generation import (
 
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 
+from enum import Enum  # Ensure this is included if not already
+
+class PromptMode(Enum):
+    O3 = 'o3'
+    THIRTY_B = '30b'  # Represents '30b' prompt
+
+PROMPT_MODE = PromptMode.THIRTY_B
+
 # --- Configuration and Prompt Constants ---
-MAX_PREVIOUS_HEADLINES = 200
+MAX_PREVIOUS_HEADLINES = 200 # Number of headlines to remember and filter out to the AI
+
+MAX_ARCHIVE_HEADLINES = 50 # Size of Headlines Archive page
+
 
 # Title marker used to separate reasoning from selected headlines
-TITLE_MARKER = "***"
+TITLE_MARKER = "******"
 
 # How many articles from each feed to consider for the LLM
 MAX_ARTICLES_PER_FEED_FOR_LLM = 5
 
 # === Global LLM/AI config ===
-MAX_TOKENS = 5000
-TIMEOUT = 60
+MAX_TOKENS = 20000
+TIMEOUT = 120
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
-BASE = "/srv/http/"
-
-BANNED_WORDS = [
-    "tmux",
-    "redox",
-    "java",
-    "javascript",
-    "mysql (mariadb is ok)",
+# List of free models to try
+FREE_MODELS = [
+    "cognitivecomputations/dolphin3.0-mistral-24b:free",
+    "deepseek/deepseek-r1-distill-qwen-32b:free"
+    "featherless/qwerky-72b:free",
+    "google/gemma-3-27b-it:free",
+    "meta-llama/llama-4-scout:free",
+    "meta-llama/llama-4-maverick:free",
+    "microsoft/phi-4-reasoning-plus:free",
+    "microsoft/phi-4-reasoning:free",
+    "microsoft/mai-ds-r1:free",
+    "mistralai/mistral-small-3.1-24b-instruct:free",
+    "nousresearch/deephermes-3-mistral-24b-preview:free",
+    "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+    "qwen/qwen3-30b-a3b:free",
+    "qwen/qwen3-14b:free",
+    "qwen/qwen3-32b:free",
+    "qwen/qwen3-235b-a22b:free",
 ]
 
-PROMPT_AI = f""" Rank these article titles by relevance to {{mode_instructions}}
-    Please talk over the titles to decide which ones sound interesting.
-    Some headlines will be irrelevant, those are easy to exclude.
-    Do not select headlines that are very similar or nearly duplicates; pick only distinct headlines/topics.
-    When you are done discussing the titles, put {TITLE_MARKER} and then list the top 3, using only the titles.
-    """
+# Fallback model to use if all free models fail
+FALLBACK_MODEL = "mistralai/mistral-small-3.1-24b-instruct"
 
+# Set to True to always try random models, False to use cached working model
+USE_RANDOM_MODELS = True
+
+PROMPT_30B = f""" Prompt:
+Given a list of news headlines, follow these steps:
+Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
+Think carefully and consisely about relevance, interest, and topic distinction without repeating entire headlines in your reasoning.
+From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
+After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no extra text:
+
+{TITLE_MARKER}
+1. [Title 1]
+2. [Title 2]
+3. [Title 3]
+"""
 
 #O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = """
@@ -87,21 +121,27 @@ ALL_URLS = {} # Initialized here, passed to utils
 # --- Global Configuration (Replaces Environment Variables except API Keys) ---
 RUN_MODE = "normal"  # options: "normal", "compare"
 
+PROVIDER = "openrouter"
+
 # Configuration for the primary provider/model
-CHAT_PROVIDER_1 = "openrouter"  # options: "together", "openrouter"
-PROMPT_MODE_1 = "default"     # options: "default", "o3"
 MODEL_1 = None
 
 # Configuration for the secondary provider/model (for comparison mode)
-CHAT_PROVIDER_2 = "openrouter" # options: "together", "openrouter"
-PROMPT_MODE_2 = "default"      # options: "default", "o3"
 MODEL_2 = None  # Will be set based on provider
+
+MISTRAL_EXTRA_PARAMS = {
+    "provider": {
+        "order": ["Mistral"], # Try to send the request to Mistral first
+        "allow_fallbacks": True
+    }
+}
 
 # Add unified provider client cache (for normal mode)
 provider_client_cache = None
 
 # Optional: include more article data (summary, etc) in LLM prompt
 INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
+
 
 # Provider class hierarchy
 class LLMProvider(ABC):
@@ -179,25 +219,25 @@ class LLMProvider(ABC):
     def call_model(self, model: str, messages: List[Dict[str, str]], max_tokens: int, label: str = "") -> str:
         """Call the model with retry logic, timeout, and logging."""
         client = self.get_client(use_cache=False)
-        return _try_call_model(client, model, messages, max_tokens, f"{label} ({self.name})")
+        return _try_call_model(client, model, messages, max_tokens)
     
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call the primary model with fallback to secondary if needed."""
-        # Try primary model
-        primary_model = self.primary_model
-        print(f"\n--- LLM Call: {self.name} / {primary_model} / {prompt_mode} {label} ---")
+        # Try to get the current working model first
+        current_model = self.primary_model
+        print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} ---")
         
         try:
-            response_text = self.call_model(primary_model, messages, MAX_TOKENS, f"{label}")
-            return response_text, primary_model
+            response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
+            return response_text, current_model
         except Exception as e:
-            print(f"Error with model {primary_model} ({self.name}): {e}")
+            print(f"Error with model {current_model} ({self.name}): {e}")
             traceback.print_exc()
             
             # Try fallback model
+            fallback_model = self.fallback_model
+            print(f"Trying fallback model: {fallback_model}")
             try:
-                fallback_model = self.fallback_model
-                print(f"Trying fallback model: {fallback_model}")
                 response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback {label}")
                 return response_text, fallback_model
             except Exception as fallback_e:
@@ -210,34 +250,12 @@ class LLMProvider(ABC):
         return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
 
 
-class TogetherProvider(LLMProvider):
-    """Provider implementation for Together AI."""
-    
-    def __init__(self):
-        super().__init__("together")
-    
-    @property
-    def api_key_env_var(self) -> str:
-        return "TOGETHER_API_KEY_LINUXREPORT"
-    
-    @property
-    def base_url(self) -> str:
-        return "https://api.together.xyz/v1"
-    
-    @property
-    def primary_model(self) -> str:
-        return "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
-    
-    @property
-    def fallback_model(self) -> str:
-        return "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-
-
 class OpenRouterProvider(LLMProvider):
     """Provider implementation for OpenRouter."""
     
     def __init__(self):
         super().__init__("openrouter")
+        self._selected_model = None  # Cache the selected model
     
     @property
     def api_key_env_var(self) -> str:
@@ -249,15 +267,17 @@ class OpenRouterProvider(LLMProvider):
     
     @property
     def primary_model(self) -> str:
-        return "meta-llama/llama-3.3-70b-instruct:free"
+        if self._selected_model is None:
+            self._selected_model = get_current_model()
+        return self._selected_model
     
     @property
     def fallback_model(self) -> str:
-        return "meta-llama/llama-3.3-70b-instruct:floor"
+        return FALLBACK_MODEL
     
     def get_comparison_models(self) -> Tuple[str, str]:
         """Get models specific for comparison mode."""
-        return "x-ai/grok-3-mini-beta", "google/gemini-2.5-flash-preview"
+        return "google/gemma-3-27b-it", "mistralai/mistral-small-3.1-24b-instruct"
     
     def _configure_client(self, client):
         """Add OpenRouter-specific headers."""
@@ -272,7 +292,6 @@ class OpenRouterProvider(LLMProvider):
 
 # Provider registry
 PROVIDERS = {
-    "together": TogetherProvider(),
     "openrouter": OpenRouterProvider()
 }
 
@@ -284,15 +303,26 @@ def get_provider(name: str) -> LLMProvider:
     return PROVIDERS[name]
 
 def get_current_model():
-    """Get the current working model, with fallback mechanism."""
-    # Check if we have a cached working model
-    cached_model = g_c.get("working_llm_model")
-    if cached_model:
-        return cached_model
+    """Get the current working model.
+    If USE_RANDOM_MODELS is True, randomly selects a new model each time.
+    If False, uses cached working model or falls back to random selection if no cache exists.
+    """
+    if not USE_RANDOM_MODELS:
+        # Check if we have a cached working model
+        cached_model = g_c.get("working_llm_model")
+        if cached_model:
+            # If cached model is in our free models list or is the fallback, use it
+            if cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL:
+                print(f"Using cached working model: {cached_model}")
+                return cached_model
+            else:
+                print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
+                g_c.delete("working_llm_model")
     
-    # Get the current provider's primary model
-    provider = get_provider(CHAT_PROVIDER_1)
-    return provider.primary_model
+    # Randomly select a free model
+    selected_model = random.choice(FREE_MODELS)
+    print(f"Randomly selected free model: {selected_model}")
+    return selected_model
 
 def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
@@ -300,41 +330,44 @@ def update_model_cache(model):
     if current_model == model:
         return
     g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+    print(f"Updated cached working model to: {model}")
 
-def _try_call_model(client, model, messages, max_tokens, provider_label=""):
-    """Helper to call a model with retry logic, timeout, and logging."""
+def _try_call_model(client, model, messages, max_tokens):
     max_retries = 2
     for attempt in range(1, max_retries + 1):
         start = timer()
-        print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model} ({provider_label})")
+        print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model}")
         try:
+            if 'mistral' in model.lower():
+                extra_params = MISTRAL_EXTRA_PARAMS
+            else:
+                extra_params = {}
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 max_tokens=max_tokens,
-                timeout=TIMEOUT
+                timeout=TIMEOUT,
+                extra_body=extra_params
             )
             end = timer()
             choice = response.choices[0]
             response_text = choice.message.content
             finish_reason = choice.finish_reason
-            print(f"[_try_call_model] Response from {provider_label} ({model}) in {end - start:.3f}s, finish_reason: {finish_reason}")
-            if finish_reason != "stop":
-                print(f"Warning: Response finish_reason is {finish_reason}")
+            print(f"[_try_call_model] Response in {end - start:.3f}s, finish_reason: {finish_reason}")
             print(f"[_try_call_model] Model response (Attempt {attempt}):\n{response_text}\n{'-'*40}")
             return response_text
         except Exception as e:
-            print(f"Error on attempt {attempt} for model {model} ({provider_label}): {e}")
+            print(f"Error on attempt {attempt} for model {model}: {e}")
             traceback.print_exc()
             if attempt < max_retries:
                 time.sleep(1)
-    raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model} ({provider_label})")
+    raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
 
 def extract_top_titles_from_ai(text):
-    """Extracts top titles from AI-generated text after the first '{TITLE_MARKER}' marker."""
-    marker_index = text.find(TITLE_MARKER)
+    """Extracts top titles from AI-generated text after the last '{TITLE_MARKER}' marker."""
+    marker_index = text.rfind(TITLE_MARKER)
     if (marker_index != -1):
-        # Use the content after the first '{TITLE_MARKER}'
+        # Use the content after the last '{TITLE_MARKER}'
         text = text[marker_index + len(TITLE_MARKER):]
     lines = text.splitlines()
     titles = []
@@ -366,15 +399,18 @@ def _prepare_messages(prompt_mode, filtered_articles):
     # Get the mode instructions from the global REPORT_PROMPT
     mode_instructions = REPORT_PROMPT
 
-    if prompt_mode == "o3":
+    if prompt_mode == PromptMode.O3:
         user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
         messages = [
             {"role": "system", "content": PROMPT_O3_SYSTEM},
             {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
         ]
-    else: # Default mode
-        prompt = PROMPT_AI.format(mode_instructions=mode_instructions) + "\n" + "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
-        messages = [{"role": "user", "content": prompt}]
+    else: # THIRTY_B mode
+        mode_instructions = REPORT_PROMPT
+        user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
+        messages = [
+            {"role": "user", "content": PROMPT_30B.format(mode_instructions=mode_instructions) + "\n" + user_list}
+        ]
     return messages
 
 def ask_ai_top_articles(articles):
@@ -396,29 +432,43 @@ def ask_ai_top_articles(articles):
         return "No new articles to rank.", [], previous_selections
 
     # --- Prepare Messages ---
-    messages = _prepare_messages(PROMPT_MODE_1, filtered_articles)
-    print(f"Constructed Prompt (Mode: {PROMPT_MODE_1}):")
+    messages = _prepare_messages(PROMPT_MODE, filtered_articles)
+    print(f"Constructed Prompt (Mode: {PROMPT_MODE}):")
     print(messages)
 
     # --- Call Primary LLM using the provider class ---
-    provider = get_provider(CHAT_PROVIDER_1)
-    response_text, used_model = provider.call_with_fallback(
+    provider1 = get_provider(PROVIDER)
+    response_text, used_model = provider1.call_with_fallback(
         messages, 
-        PROMPT_MODE_1,
+        PROMPT_MODE,
         "Primary"
     )
     
-    # Update model cache if we got a valid response
-    if response_text and used_model:
-        update_model_cache(used_model)
-    else:
-        return "LLM models failed due to error (all models for selected provider).", filtered_articles, previous_selections
-
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
         return "No response from LLM models.", filtered_articles, previous_selections
 
     # --- Process Response and Update Selections (remains the same) ---
     top_titles = extract_top_titles_from_ai(response_text)
+    
+    # If no headlines extracted, try fallback model
+    if not top_titles:
+        print("No headlines extracted from primary model, trying fallback model...")
+        fallback_model = provider1.fallback_model
+        try:
+            response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, "Fallback (headline retry)")
+            if response_text:
+                top_titles = extract_top_titles_from_ai(response_text)
+                if top_titles:
+                    used_model = fallback_model
+                    print(f"Successfully extracted headlines using fallback model: {fallback_model}")
+        except Exception as e:
+            print(f"Fallback model failed during headline retry: {e}")
+            traceback.print_exc()
+    
+    # Only update model cache if we successfully extracted headlines
+    if top_titles and used_model:
+        update_model_cache(used_model)
+    
     top_articles = []
     for title in top_titles:
         best_match = get_best_matching_article(title, filtered_articles)
@@ -450,33 +500,23 @@ def run_comparison(articles):
         return
 
     # --- Config 1 ---
-    messages1 = _prepare_messages(PROMPT_MODE_1, filtered_articles)
-    provider1 = get_provider(CHAT_PROVIDER_1)
-    response_text1, _ = provider1.call_with_fallback(
-        messages1,
-        PROMPT_MODE_1,
-        "Comparison 1"
-    )
+    provider = get_provider(PROVIDER)
+    model1, model2 = provider.get_comparison_models()
+    messages1 = _prepare_messages(PROMPT_MODE, filtered_articles)
+    response_text1 = provider.call_model(model1, messages1, MAX_TOKENS, 'Comparison 1')
     
     if not response_text1:
-        print(f"Comparison 1 failed for {CHAT_PROVIDER_1}")
+        print(f"Comparison 1 failed for {PROVIDER}")
 
     # --- Config 2 ---
-    messages2 = _prepare_messages(PROMPT_MODE_2, filtered_articles)
-    provider2 = get_provider(CHAT_PROVIDER_2)
-    response_text2, _ = provider2.call_with_fallback(
-        messages2,
-        PROMPT_MODE_2,
-        "Comparison 2"
-    )
+    messages2 = _prepare_messages(PROMPT_MODE, filtered_articles)
+    response_text2 = provider.call_model(model2, messages2, MAX_TOKENS, 'Comparison 2')
     
     if not response_text2:
-        print(f"Comparison 2 failed for {CHAT_PROVIDER_2}")
+        print(f"Comparison 2 failed for {PROVIDER}")
 
     print("\n--- Comparison Mode Finished ---")
 
-
-MAX_ARCHIVE_HEADLINES = 50
 
 def append_to_archive(mode, top_articles):
     """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
@@ -591,32 +631,25 @@ if __name__ == "__main__":
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
-    parser.add_argument('--provider', choices=['together','openrouter'], default='openrouter', help='Primary chat provider: together or openrouter')
-    parser.add_argument('--compare', action='store_true', help='Run in comparison mode (compare two providers/models)')
+    parser.add_argument('--compare', action='store_true', help='Run in comparison mode')
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
+    parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
+    parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
     args = parser.parse_args()
 
+    # Set USE_RANDOM_MODELS based on command line argument
+    USE_RANDOM_MODELS = not args.use_cached_model
+
     # Configure primary provider from CLI
-    CHAT_PROVIDER_1 = args.provider
-    # Set MODEL_1 based on selected provider
-    provider1 = get_provider(CHAT_PROVIDER_1)
-    MODEL_1 = provider1.primary_model
-    
-    # Set MODEL_2 for comparison mode
-    provider2 = get_provider(CHAT_PROVIDER_1)
-    MODEL_2 = provider2.fallback_model
+    provider = get_provider(PROVIDER)
+    MODEL_1 = provider.primary_model  # Start with primary model, will be updated by call_with_fallback if needed
+    MODEL_2 = provider.fallback_model
 
     # Set RUN_MODE to 'compare' if --compare is specified
     if args.compare:
         RUN_MODE = "compare"
         # In compare mode, use openrouter for both, but with dedicated comparison models
-        CHAT_PROVIDER_1 = "openrouter"
-        CHAT_PROVIDER_2 = "openrouter"
         
-        provider = get_provider("openrouter")
-        comparison_models = provider.get_comparison_models()
-        MODEL_1 = comparison_models[0]
-        MODEL_2 = comparison_models[1]
 
     # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
     if args.include_summary:
@@ -660,7 +693,15 @@ if __name__ == "__main__":
         # Ensure dry-run/compare always run if specified, otherwise check schedule or force flag
         should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or RUN_MODE == "compare"
         if should_run:
+            if args.prompt_mode:
+                try:
+                    prompt_mode_enum = PromptMode(args.prompt_mode.upper())
+                    PROMPT_MODE = prompt_mode_enum
+                except ValueError:
+                    print(f"Invalid prompt mode specified: {args.prompt_mode}. Using 30B mode.")
+                    PROMPT_MODE = PromptMode.THIRTY_B
             main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run) # Pass string mode, loaded module and config
         else:
             print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
+
 
