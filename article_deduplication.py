@@ -46,7 +46,8 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
     return unique_articles
 
 def get_best_matching_article(target_title, articles):
-    """Finds the article with the highest similarity score to the target title."""
+    """Finds the article with the highest similarity score to the target title.
+    Returns None if no article has a similarity score above the threshold."""
     target_emb = get_embedding(target_title)
     best_match = None
     best_score = 0.0
@@ -57,7 +58,7 @@ def get_best_matching_article(target_title, articles):
             if score == 1.0:
                 return best_match
             best_score = score
-    return best_match
+    return best_match if best_score >= THRESHOLD else None
 
 def extract_articles_from_html(html_file):
     """Extract article URLs and titles from the HTML file."""
