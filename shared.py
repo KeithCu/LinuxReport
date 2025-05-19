@@ -51,7 +51,7 @@ ALLOWED_REQUESTER_DOMAINS = [
     # Add more domains as needed
 ]
 
-ENABLE_CORS = False
+ENABLE_CORS = True
 
 # Simple map from Mode enum to URL identifiers - identical to enum values
 MODE_MAP = {mode: mode.value for mode in Mode}
