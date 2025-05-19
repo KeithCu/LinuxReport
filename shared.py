@@ -112,7 +112,8 @@ WELCOME_HTML = (
     '<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
     'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
     'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>'
-    '<br/>Now using <a href="https://openrouter.ai" target="_blank">OpenRouter</a> to access a variety of free LLMs for selecting the top headlines.'
+    '<br/>The Reddit Woke mafia had blocked my user-agent and IP address for political reasons, (I was making max a few requests per hour!!) '
+    '<br/>So, I picked a random USER_AGENT and am using <a href = "https://www.torproject.org/">TOR</a> to fetch Reddit feeds. Checkmate, bitches!'
 )
 STANDARD_ORDER_STR = str(SITE_URLS)
 

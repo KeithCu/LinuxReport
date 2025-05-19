@@ -37,7 +37,7 @@ CONFIG: SiteConfig = SiteConfig(
     Avoid simple tutorials, error explanations, troubleshooting guides, or cheat sheets.
     Nothing about Ubuntu or any other distro. Anything non-distro-specific is fine, but nothing about 
     the following products:
-    tmux, redox, java, Rust, javascript, mysql (but mariadb is fine) .""",
+    tmux, redox, java, javascript, mysql (mariadb is ok).""",
     PATH="/srv/http/LinuxReport2",
     SCHEDULE=[0, 8, 12, 16, 20],  # Update schedule for Linux Report
     CUSTOM_FETCH_CONFIG={
