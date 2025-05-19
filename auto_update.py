@@ -640,28 +640,13 @@ if __name__ == "__main__":
     # Set USE_RANDOM_MODELS based on command line argument
     USE_RANDOM_MODELS = not args.use_cached_model
 
-    # Configure primary provider from CLI
-    provider = get_provider(PROVIDER)
-    MODEL_1 = provider.primary_model  # Start with primary model, will be updated by call_with_fallback if needed
-    MODEL_2 = provider.fallback_model
-
-    # Set RUN_MODE to 'compare' if --compare is specified
-    if args.compare:
-        RUN_MODE = "compare"
-        # In compare mode, use openrouter for both, but with dedicated comparison models
-        
-
-    # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
-    if args.include_summary:
-        INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
-
     # Revert to CWD-based mode detection
     cwd = os.getcwd()
     selected_mode_enum = None
     selected_mode_str = None
 
     # Try to find a matching settings file in the current directory
-    for mode_enum_val in Mode: # Renamed to avoid conflict with outer 'mode' variable
+    for mode_enum_val in Mode:
         settings_file = f"{mode_enum_val.value}_report_settings.py"
         if os.path.isfile(settings_file):
             # Load the settings file to get its path
@@ -685,23 +670,40 @@ if __name__ == "__main__":
 
     print(f"Detected mode '{selected_mode_str}' based on current directory.")
 
+    # Handle forceimage case early
     if args.forceimage:
-        refresh_images_only(selected_mode_str) # Pass string mode
-    else:
-        # Check schedule using the config's SCHEDULE field
-        current_hour = datetime.datetime.now(TZ).hour
-        # Ensure dry-run/compare always run if specified, otherwise check schedule or force flag
-        should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or RUN_MODE == "compare"
-        if should_run:
-            if args.prompt_mode:
-                try:
-                    prompt_mode_enum = PromptMode(args.prompt_mode.upper())
-                    PROMPT_MODE = prompt_mode_enum
-                except ValueError:
-                    print(f"Invalid prompt mode specified: {args.prompt_mode}. Using 30B mode.")
-                    PROMPT_MODE = PromptMode.THIRTY_B
-            main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run) # Pass string mode, loaded module and config
-        else:
-            print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
+        refresh_images_only(selected_mode_str)
+        sys.exit(0)
+
+    # Check schedule using the config's SCHEDULE field
+    current_hour = datetime.datetime.now(TZ).hour
+    should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or args.compare
+
+    if not should_run:
+        print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
+        sys.exit(0)
+
+    # Set RUN_MODE to 'compare' if --compare is specified
+    if args.compare:
+        RUN_MODE = "compare"
+
+    # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
+    if args.include_summary:
+        INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
+
+    # Configure primary provider from CLI - only if we're actually going to run
+    provider = get_provider(PROVIDER)
+    MODEL_1 = provider.primary_model
+    MODEL_2 = provider.fallback_model
+
+    if args.prompt_mode:
+        try:
+            prompt_mode_enum = PromptMode(args.prompt_mode.upper())
+            PROMPT_MODE = prompt_mode_enum
+        except ValueError:
+            print(f"Invalid prompt mode specified: {args.prompt_mode}. Using 30B mode.")
+            PROMPT_MODE = PromptMode.THIRTY_B
+
+    main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run)
 
 
