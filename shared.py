@@ -36,6 +36,8 @@ ALLOWED_DOMAINS = [
     'https://trumpreport.info',
     'https://news.thedetroitilove.com',
     'http://127.0.0.1:5000',
+    'https://fonts.googleapis.com',
+    'https://fonts.gstatic.com',
 ]
 
 # Domains allowed to make requests to this server
