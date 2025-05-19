@@ -157,8 +157,8 @@ def init_app(flask_app):
                 f"connect-src 'self' {csp_domains}; "  # Allow connections to all allowed domains
                 f"img-src {img_src} *; "  # Allow images from any domain
                 f"script-src 'self' 'unsafe-inline'; "
-                f"style-src 'self' 'unsafe-inline'; "
-                f"font-src 'self'; "
+                f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "  # Allow Google Fonts stylesheets
+                f"font-src 'self' https://fonts.gstatic.com; "  # Allow Google Fonts files
                 f"frame-ancestors 'none';"
             )
             
