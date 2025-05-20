@@ -11,7 +11,7 @@ import traceback
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
-import enum  # New import for Enum
+import enum
 import random
 
 from image_parser import custom_fetch_largest_image
@@ -352,7 +352,7 @@ def update_model_cache(model):
     print(f"Updated cached working model to: {model}")
 
 def _try_call_model(client, model, messages, max_tokens):
-    max_retries = 2
+    max_retries = 1
     for attempt in range(1, max_retries + 1):
         start = timer()
         print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model}")
