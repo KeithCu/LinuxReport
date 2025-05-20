@@ -488,6 +488,9 @@ def init_app(flask_app):
                 for line in f:
                     try:
                         entry = json.loads(line)
+                        # Convert timestamp to datetime object for grouping
+                        if 'timestamp' in entry:
+                            entry['date'] = datetime.datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00')).date()
                         headlines.append(entry)
                     except json.JSONDecodeError:
                         continue
@@ -495,15 +498,34 @@ def init_app(flask_app):
             pass
         except IOError as e:
             print(f"Error reading archive file {archive_file}: {e}")
+
+        # Sort headlines by timestamp
         headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        
+        # Skip the first 3 headlines (most recent)
         if len(headlines) > 3:
             headlines = headlines[3:]
         else:
             headlines = []
+
+        # Group headlines by date
+        grouped_headlines = {}
+        for headline in headlines:
+            date = headline.get('date')
+            if date:
+                date_str = date.strftime('%B %d, %Y')  # Format: January 1, 2024
+                if date_str not in grouped_headlines:
+                    grouped_headlines[date_str] = []
+                grouped_headlines[date_str].append(headline)
+
+        # Convert to list of tuples (date, headlines) and sort by date
+        grouped_headlines_list = [(date, headlines) for date, headlines in grouped_headlines.items()]
+        grouped_headlines_list.sort(key=lambda x: datetime.datetime.strptime(x[0], '%B %d, %Y'), reverse=True)
+
         is_admin = request.cookies.get('isAdmin') == '1'
         return render_template(
             'old_headlines.html',
-            headlines=headlines,
+            grouped_headlines=grouped_headlines_list,
             mode=mode_str,
             title=f"Old Headlines - {mode_str.title()}Report",
             favicon=FAVICON,

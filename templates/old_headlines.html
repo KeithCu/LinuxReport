@@ -62,6 +62,17 @@
             padding: 0;
             line-height: 1;
         }
+        .date-header {
+            font-size: 1.4em;
+            font-weight: bold;
+            margin: 1.5em 0 1em;
+            padding-bottom: 0.5em;
+            border-bottom: 2px solid var(--border, #ddd);
+            color: var(--text, #222);
+        }
+        .date-header:first-child {
+            margin-top: 0;
+        }
     </style>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
@@ -75,22 +86,25 @@
     <div class="headline-archive-container">
         <a href="/" class="back-link">&larr; Back to Main Page</a>
         <h2>Old Headlines ({{ mode.title() }}Report)</h2>
-        {% if headlines %}
-            {% for h in headlines %}
-                <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
-                    <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
-                        <span><a href="{{ h.url }}" target="_blank">{{ h.title }}</a></span>
-                        {% if is_admin %}
-                        <button class="delete-headline-btn" title="Delete">&#10005;</button>
+        {% if grouped_headlines %}
+            {% for date, headlines in grouped_headlines %}
+                <div class="date-header">{{ date }}</div>
+                {% for h in headlines %}
+                    <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
+                        <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
+                            <span><a href="{{ h.url }}" target="_blank">{{ h.title }}</a></span>
+                            {% if is_admin %}
+                            <button class="delete-headline-btn" title="Delete">&#10005;</button>
+                            {% endif %}
+                        </div>
+                        {% if h.image_url %}
+                            <img src="{{ h.image_url }}" class="headline-image" alt="headline image">
                         {% endif %}
+                        <div class="headline-timestamp">
+                            {{ h.timestamp[:19].replace('T', ' ') if h.timestamp }}
+                        </div>
                     </div>
-                    {% if h.image_url %}
-                        <img src="{{ h.image_url }}" class="headline-image" alt="headline image">
-                    {% endif %}
-                    <div class="headline-timestamp">
-                        {{ h.timestamp[:19].replace('T', ' ') if h.timestamp }}
-                    </div>
-                </div>
+                {% endfor %}
             {% endfor %}
         {% else %}
             <p>No old headlines found for this report.</p>
