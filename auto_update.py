@@ -52,7 +52,10 @@ MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
 # List of free models to try
 FREE_MODELS = [
+    "agentica-org/deepcoder-14b-preview:free",
+    "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
+    "deepseek/deepseek-chat-v3-0324:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
     "featherless/qwerky-72b:free",
@@ -70,13 +73,18 @@ FREE_MODELS = [
     "nousresearch/deephermes-3-llama-3-8b-preview:free",
     "nousresearch/deephermes-3-mistral-24b-preview:free",
     "nvidia/llama-3.3-nemotron-super-49b-v1:free",
-    "qwen/qwen-2.5-72b-instruct:free"
+    "open-r1/olympiccoder-32b:free",
+    "qwen/qwen-2.5-72b-instruct:free",
     "qwen/qwen3-8b:free",
     "qwen/qwen3-14b:free",
     "qwen/qwen3-32b:free",
     "qwen/qwen3-30b-a3b:free",
     "qwen/qwen3-235b-a22b:free",
     "rekaai/reka-flash-3:free",
+    "shisa-ai/shisa-v2-llama3.3-70b:free",
+    "thudm/glm-z1-9b:free",
+    "thudm/glm-z1-32b:free",
+    "thudm/glm-4-32b:free",
 ]
 
 # Fallback model to use if all free models fail
