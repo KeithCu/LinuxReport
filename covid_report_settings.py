@@ -26,7 +26,7 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_TITLE="COVID-19 Report",
     REPORT_PROMPT="COVID-19 researchers",
     PATH="/srv/http/CovidReport2",
-    SCHEDULE=[7, 11, 15, 19, 23],
+    SCHEDULE=[8, 12, 18, 23],
     CUSTOM_FETCH_CONFIG={
         "reddit.com": REDDIT_FETCH_CONFIG
     }
