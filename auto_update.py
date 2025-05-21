@@ -59,6 +59,9 @@ MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 GLOBAL_LOGGING_ENABLED = True
 API_RESPONSE_LOG = "api_responses.jsonl"
 
+# AI Attribution configuration
+SHOW_AI_ATTRIBUTION = True  # Set to False to hide AI model attribution in headlines
+
 # List of free models to try
 FREE_MODELS = [
     "agentica-org/deepcoder-14b-preview:free",
@@ -682,7 +685,7 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
             # Render HTML and archive with images
             print(f"Generating HTML file: {html_file}")
             # Pass headline_template to generate_headlines_html
-            generate_headlines_html(top_3_articles_match, html_file, model_name=used_model)
+            generate_headlines_html(top_3_articles_match, html_file, model_name=used_model if SHOW_AI_ATTRIBUTION else None)
                         
             print(f"Appending to archive for mode: {mode}")
             append_to_archive(mode, top_3_articles_match)
@@ -751,7 +754,7 @@ if __name__ == "__main__":
 
     # Handle forceimage case early
     if args.forceimage:
-        refresh_images_only(selected_mode_str, used_model)
+        refresh_images_only(selected_mode_str, used_model if SHOW_AI_ATTRIBUTION else None)
         sys.exit(0)
 
     # Check schedule using the config's SCHEDULE field
