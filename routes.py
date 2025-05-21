@@ -219,7 +219,7 @@ def init_app(flask_app):
             last_fetch = g_c.get_last_fetch(url)
             last_fetch_cache[url] = last_fetch
             
-            expired_rss = g_c.has_feed_expired(url, last_fetch)
+            expired_rss = ENABLE_BACKGROUND_REFRESH and g_c.has_feed_expired(url, last_fetch)
 
             if not g_c.has(url):
                 needed_urls.append(url)
@@ -259,7 +259,7 @@ def init_app(flask_app):
                                            error_message=("Feed could not be loaded." if feed is None else None))
 
                 # Cache entry deleted by worker thread after fetch
-                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_DAY)
+                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_MINUTES)
 
             result[cur_col].append(template)
 
