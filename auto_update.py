@@ -286,7 +286,7 @@ class OpenRouterProvider(LLMProvider):
     
     def __init__(self):
         super().__init__("openrouter")
-        self._selected_model = None  # Cache the selected model
+        self._selected_model = get_current_model()  # Get model once during initialization
     
     @property
     def api_key_env_var(self) -> str:
@@ -298,9 +298,7 @@ class OpenRouterProvider(LLMProvider):
     
     @property
     def primary_model(self) -> str:
-        if self._selected_model is None:
-            self._selected_model = get_current_model()
-        return self._selected_model
+        return self._selected_model  # Just return the cached model
     
     @property
     def fallback_model(self) -> str:
