@@ -32,7 +32,11 @@ class PromptMode(Enum):
     THIRTY_B = '30b'  # Represents '30b' prompt
 
 # Randomly select between O3 and 30B prompts by default
-PROMPT_MODE = random.choice([PromptMode.O3, PromptMode.THIRTY_B])
+#PROMPT_MODE = random.choice([PromptMode.O3, PromptMode.THIRTY_B])
+
+# Use O3 prompt mode by default for a while to try it out
+PROMPT_MODE = PromptMode.O3
+
 
 # --- Configuration and Prompt Constants ---
 MAX_PREVIOUS_HEADLINES = 200 # Number of headlines to remember and filter out to the AI
