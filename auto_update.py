@@ -50,6 +50,10 @@ MAX_TOKENS = 15000
 TIMEOUT = 120
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
 
+# Global logging configuration
+GLOBAL_LOGGING_ENABLED = True
+API_RESPONSE_LOG = "api_responses.jsonl"
+
 # List of free models to try
 FREE_MODELS = [
     "agentica-org/deepcoder-14b-preview:free",
@@ -382,6 +386,20 @@ def _try_call_model(client, model, messages, max_tokens):
             finish_reason = choice.finish_reason
             print(f"[_try_call_model] Response in {end - start:.3f}s, finish_reason: {finish_reason}")
             print(f"[_try_call_model] Model response (Attempt {attempt}):\n{response_text}\n{'-'*40}")
+            
+            # Log the API response only if global logging is enabled
+            if GLOBAL_LOGGING_ENABLED:
+                log_entry = {
+                    "timestamp": datetime.datetime.now(TZ).isoformat(),
+                    "model": model,
+                    "response": response_text,
+                    "finish_reason": finish_reason,
+                    "response_time": end - start,
+                    "messages": messages
+                }
+                with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+            
             return response_text
         except Exception as e:
             print(f"Error on attempt {attempt} for model {model}: {e}")
