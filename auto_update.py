@@ -428,12 +428,29 @@ def extract_top_titles_from_ai(text):
     titles = []
 
     for line in lines:
-        match = re.match(r"^\s*\d+\.\s+(.+)$", line)
+        # Clean up the line first
+        line = line.strip()
+        if not line:  # Skip empty lines
+            continue
+            
+        # Clean up formatting
+        line = re.sub(r'^\*+|\*+$', '', line).strip()  # Remove asterisks
+        line = re.sub(r'^["\']|["\']$', '', line).strip()  # Remove quotes
+        
+        # Skip if too short or looks like reasoning
+        if len(line) < 10 or line.lower().startswith(('because', 'since', 'therefore', 'thus', 'however', 'and', 'but', 'or', 'so')):
+            continue
+            
+        # Try to match numbered headlines (e.g., "1. Title" or "1) Title")
+        match = re.match(r"^\s*\d+[\.\)]\s+(.+)$", line)
         if match:
-            title = match.group(1).strip("*").strip()
-            titles.append(title)
-            if len(titles) == 3:
-                break
+            title = match.group(1).strip()
+        else:
+            title = line
+
+        titles.append(title)
+        if len(titles) == 3:
+            break
 
     return titles
 
