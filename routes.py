@@ -258,8 +258,8 @@ def init_app(flask_app):
                                            alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url,
                                            error_message=("Feed could not be loaded." if feed is None else None))
 
-                # Cache entry deleted by worker thread after fetch
-                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_MINUTES)
+                # Cache entry deleted by worker thread after fetch, however, that only effects the same process.
+                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_MINUTES*6)
 
             result[cur_col].append(template)
 
