@@ -281,6 +281,43 @@ class LLMProvider(ABC):
         return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
 
 
+# Helper function to get provider
+def get_provider(name: str) -> LLMProvider:
+    """Get a provider by name."""
+    if name not in PROVIDERS:
+        raise ValueError(f"Unknown provider: {name}")
+    return PROVIDERS[name]
+
+def get_current_model():
+    """Get the current working model.
+    If USE_RANDOM_MODELS is True, randomly selects a new model each time.
+    If False, uses cached working model or falls back to random selection if no cache exists.
+    """
+    if not USE_RANDOM_MODELS:
+        # Check if we have a cached working model
+        cached_model = g_c.get("working_llm_model")
+        if cached_model:
+            # If cached model is in our free models list or is the fallback, use it
+            if cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL:
+                print(f"Using cached working model: {cached_model}")
+                return cached_model
+            else:
+                print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
+                g_c.delete("working_llm_model")
+    
+    # Randomly select a free model
+    selected_model = random.choice(FREE_MODELS)
+    print(f"Randomly selected free model: {selected_model}")
+    return selected_model
+
+def update_model_cache(model):
+    """Update the cache with the currently working model if it's different."""
+    current_model = g_c.get("working_llm_model")
+    if current_model == model:
+        return
+    g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+    print(f"Updated cached working model to: {model}")
+
 class OpenRouterProvider(LLMProvider):
     """Provider implementation for OpenRouter."""
     
@@ -318,48 +355,10 @@ class OpenRouterProvider(LLMProvider):
             client._client.headers[header] = value
         print(f"[OpenRouter] Using headers: {headers}")
 
-
 # Provider registry
 PROVIDERS = {
     "openrouter": OpenRouterProvider()
 }
-
-# Helper function to get provider
-def get_provider(name: str) -> LLMProvider:
-    """Get a provider by name."""
-    if name not in PROVIDERS:
-        raise ValueError(f"Unknown provider: {name}")
-    return PROVIDERS[name]
-
-def get_current_model():
-    """Get the current working model.
-    If USE_RANDOM_MODELS is True, randomly selects a new model each time.
-    If False, uses cached working model or falls back to random selection if no cache exists.
-    """
-    if not USE_RANDOM_MODELS:
-        # Check if we have a cached working model
-        cached_model = g_c.get("working_llm_model")
-        if cached_model:
-            # If cached model is in our free models list or is the fallback, use it
-            if cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL:
-                print(f"Using cached working model: {cached_model}")
-                return cached_model
-            else:
-                print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
-                g_c.delete("working_llm_model")
-    
-    # Randomly select a free model
-    selected_model = random.choice(FREE_MODELS)
-    print(f"Randomly selected free model: {selected_model}")
-    return selected_model
-
-def update_model_cache(model):
-    """Update the cache with the currently working model if it's different."""
-    current_model = g_c.get("working_llm_model")
-    if current_model == model:
-        return
-    g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
-    print(f"Updated cached working model to: {model}")
 
 def _try_call_model(client, model, messages, max_tokens):
     max_retries = 1
