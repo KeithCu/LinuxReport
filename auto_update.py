@@ -244,35 +244,38 @@ class LLMProvider(ABC):
     
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call the primary model with fallback to secondary if needed."""
-        # Try two random free models first
-        tried_models = set()
-        for attempt in range(2):
-            # Get a random free model that hasn't been tried yet
-            available_models = [m for m in FREE_MODELS if m not in tried_models]
-            if not available_models:
-                print("No more free models available to try")
-                break
-                
-            current_model = random.choice(available_models)
-            tried_models.add(current_model)
-            
-            print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Attempt {attempt + 1}/2) ---")
+        # Try the selected model first
+        current_model = self.primary_model
+        print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Primary Model) ---")
+        
+        try:
+            response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
+            return response_text, current_model
+        except Exception as e:
+            print(f"Error with primary model {current_model} ({self.name}): {e}")
+            traceback.print_exc()
+        
+        # If primary model fails, try one random free model
+        available_models = [m for m in FREE_MODELS if m != current_model]
+        if available_models:
+            fallback_model = random.choice(available_models)
+            print(f"\n--- LLM Call: {self.name} / {fallback_model} / {prompt_mode} {label} (First Fallback) ---")
             
             try:
-                response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
-                return response_text, current_model
+                response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"{label}")
+                return response_text, fallback_model
             except Exception as e:
-                print(f"Error with model {current_model} ({self.name}): {e}")
+                print(f"Error with fallback model {fallback_model} ({self.name}): {e}")
                 traceback.print_exc()
         
-        # If both free models failed, try fallback model
-        fallback_model = self.fallback_model
-        print(f"\nBoth free models failed. Trying fallback model: {fallback_model}")
+        # If both attempts failed, try the final fallback model
+        final_fallback = self.fallback_model
+        print(f"\nBoth attempts failed. Trying final fallback model: {final_fallback}")
         try:
-            response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback {label}")
-            return response_text, fallback_model
+            response_text = self.call_model(final_fallback, messages, MAX_TOKENS, f"Final Fallback {label}")
+            return response_text, final_fallback
         except Exception as fallback_e:
-            print(f"Fallback model {fallback_model} also failed: {fallback_e}")
+            print(f"Final fallback model {final_fallback} also failed: {fallback_e}")
             traceback.print_exc()
         
         return None, None
