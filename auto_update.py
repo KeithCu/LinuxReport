@@ -401,14 +401,7 @@ def _try_call_model(client, model, messages, max_tokens):
             print(f"[_try_call_model] Model response (Attempt {attempt}):\n{response_text}\n{'-'*40}")
             
             # Log the API response only if global logging is enabled
-            if GLOBAL_LOGGING_ENABLED:
-                print("\nDEBUG - Raw response text:")
-                print("="*40)
-                print(response_text)
-                print("="*40)
-                print("DEBUG - Response text contains newlines:", "\n" in response_text)
-                print("DEBUG - Response text repr:", repr(response_text))
-                
+            if GLOBAL_LOGGING_ENABLED:                
                 log_entry = {
                     "timestamp": datetime.datetime.now(TZ).isoformat(),
                     "model": model,
