@@ -74,13 +74,17 @@ try:
 except ImportError:
     import json
 
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from abc import ABC, abstractmethod
 
 # Import from config module (assumed to exist)
 import object_storage_config as oss_config
 import object_storage_sync
-from object_storage_sync import generate_object_name, publish_file, fetch_file
+from object_storage_sync import (
+    generate_object_name, 
+    publish_file, 
+    fetch_file,
+    retry_decorator
+)
 
 # Global constants for backoff and retry configuration
 DEFAULT_RETRY_INTERVAL = 1.0  # Base interval for lock acquisition retries
@@ -201,11 +205,7 @@ class ObjectStorageLock(LockBase):
             time.sleep(delay)
             attempt += 1
             
-    @retry(
-        stop=stop_after_attempt(object_storage_sync.oss_config.MAX_RETRY_ATTEMPTS),
-        wait=wait_exponential(multiplier=object_storage_sync.oss_config.RETRY_MULTIPLIER, min=object_storage_sync.oss_config.MIN_RETRY_INTERVAL, max=object_storage_sync.oss_config.MAX_RETRY_INTERVAL),
-        retry=retry_if_exception_type(Exception)
-    )
+    @retry_decorator()
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
         """Attempt to acquire the lock once with fencing token."""
         try:
@@ -246,11 +246,7 @@ class ObjectStorageLock(LockBase):
             print(f"Error acquiring lock {self.lock_key}: {e}")
             return False
             
-    @retry(
-        stop=stop_after_attempt(object_storage_sync.oss_config.MAX_RETRY_ATTEMPTS),
-        wait=wait_exponential(multiplier=object_storage_sync.oss_config.RETRY_MULTIPLIER, min=object_storage_sync.oss_config.MIN_RETRY_INTERVAL, max=object_storage_sync.oss_config.MAX_RETRY_INTERVAL),
-        retry=retry_if_exception_type(Exception)
-    )
+    @retry_decorator()
     def _get_lock_info(self):
         """Get current lock information from object storage."""
         try:
@@ -263,11 +259,7 @@ class ObjectStorageLock(LockBase):
             print(f"Error getting lock info for {self.lock_key}: {e}")
             raise
             
-    @retry(
-        stop=stop_after_attempt(object_storage_sync.oss_config.MAX_RETRY_ATTEMPTS),
-        wait=wait_exponential(multiplier=object_storage_sync.oss_config.RETRY_MULTIPLIER, min=object_storage_sync.oss_config.MIN_RETRY_INTERVAL, max=object_storage_sync.oss_config.MAX_RETRY_INTERVAL),
-        retry=retry_if_exception_type(Exception)
-    )
+    @retry_decorator()
     def _put_lock_info(self, lock_data):
         """Store lock information in object storage."""
         try:
