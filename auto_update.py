@@ -284,12 +284,16 @@ class LLMProvider(ABC):
         return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
 
 
-# Helper function to get provider
+# Provider registry
+PROVIDERS = {
+    "openrouter": OpenRouterProvider  # Store the class, not an instance
+}
+
 def get_provider(name: str) -> LLMProvider:
     """Get a provider by name."""
     if name not in PROVIDERS:
         raise ValueError(f"Unknown provider: {name}")
-    return PROVIDERS[name]
+    return PROVIDERS[name]()  # Create a new instance when requested
 
 def get_current_model():
     """Get the current working model.
@@ -372,11 +376,6 @@ class OpenRouterProvider(LLMProvider):
         for header, value in headers.items():
             client._client.headers[header] = value
         print(f"[OpenRouter] Using headers: {headers}")
-
-# Provider registry
-PROVIDERS = {
-    "openrouter": OpenRouterProvider()
-}
 
 def _try_call_model(client, model, messages, max_tokens):
     max_retries = 1
