@@ -326,7 +326,22 @@ class OpenRouterProvider(LLMProvider):
     
     def __init__(self):
         super().__init__("openrouter")
-        self._selected_model = get_current_model()  # Get model once during initialization
+        # Handle model selection internally
+        if not USE_RANDOM_MODELS:
+            # Check if we have a cached working model
+            cached_model = g_c.get("working_llm_model")
+            if cached_model and (cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL):
+                print(f"Using cached working model: {cached_model}")
+                self._selected_model = cached_model
+            else:
+                if cached_model:
+                    print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
+                    g_c.delete("working_llm_model")
+                self._selected_model = random.choice(FREE_MODELS)
+                print(f"Randomly selected free model: {self._selected_model}")
+        else:
+            self._selected_model = random.choice(FREE_MODELS)
+            print(f"Randomly selected free model: {self._selected_model}")
     
     @property
     def api_key_env_var(self) -> str:
@@ -338,7 +353,7 @@ class OpenRouterProvider(LLMProvider):
     
     @property
     def primary_model(self) -> str:
-        return self._selected_model  # Just return the cached model
+        return self._selected_model
     
     @property
     def fallback_model(self) -> str:
