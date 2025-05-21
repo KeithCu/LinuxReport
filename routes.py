@@ -29,8 +29,8 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, 
                     get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, 
                     ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
-                    ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL)
-from weather import get_default_weather_html, get_weather_data
+                    ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS)
+from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 from workers import fetch_urls_parallel, fetch_urls_thread
 from config_utils import get_admin_password
 
@@ -45,46 +45,6 @@ WEB_UPLOAD_PATH = '/static/uploads' # Define the web-accessible path prefix
 UPLOAD_FOLDER = PATH + WEB_UPLOAD_PATH # Define absolute upload folder for server deployment
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'} # Allowed image types
 MAX_IMAGE_SIZE = 5 * 1024 * 1024 # 5 MB
-
-# Common webbot user agents that should not trigger background refreshes
-WEB_BOT_USER_AGENTS = [
-    # Google Crawlers
-    "Googlebot",
-    "Google-InspectionTool",
-    "Google-Site-Verification",
-    "Google-Extended",
-
-    # Bing Crawlers
-    "Bingbot",
-    "AdIdxBot",
-    "MicrosoftPreview",
-
-    # Yandex Crawlers
-    "YandexBot",
-    "YandexMobileBot",
-    "YandexImages",
-
-    # AI-Related Crawlers
-    "GPTBot",
-    "ClaudeBot",
-    "CCBot",
-    "Bytespider",
-    "Applebot",
-
-    # Other Common Crawlers
-    "Baiduspider",
-    "DuckDuckBot",
-    "AhrefsBot",
-    "SemrushBot",
-    "MJ12bot",
-    "KeybaseBot",
-    "Lemmy",
-    "CookieHubScan",
-    "Hydrozen.io",
-    "SummalyBot",
-    "DotBot",
-    "Coccocbot"
-]
 
 # Ensure upload folder exists
 if not os.path.exists(UPLOAD_FOLDER):
@@ -465,8 +425,16 @@ def init_app(flask_app):
         lat = request.args.get('lat')
         lon = request.args.get('lon')
         
-        # Convert lat/lon to float if provided
-        if lat is not None and lon is not None:
+        # Check if request is from a web bot
+        user_agent = request.headers.get('User-Agent', '')
+        is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+        
+        # If it's a web bot, use default coordinates
+        if is_web_bot:
+            lat = DEFAULT_WEATHER_LAT
+            lon = DEFAULT_WEATHER_LON
+        # Otherwise, convert lat/lon to float if provided
+        elif lat is not None and lon is not None:
             try:
                 lat = float(lat)
                 lon = float(lon)

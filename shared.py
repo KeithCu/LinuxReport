@@ -127,6 +127,48 @@ _JS_MODULES = [
     'config.js'
 ]
 
+# Common webbot user agents that should not trigger background refreshes or OpenWeather queries
+WEB_BOT_USER_AGENTS = [
+    # Google Crawlers
+    "Googlebot",
+    "Google-InspectionTool",
+    "Google-Site-Verification",
+    "Google-Extended",
+
+    # Bing Crawlers
+    "Bingbot",
+    "AdIdxBot",
+    "MicrosoftPreview",
+
+    # Yandex Crawlers
+    "YandexBot",
+    "YandexMobileBot",
+    "YandexImages",
+
+    # AI-Related Crawlers
+    "GPTBot",
+    "ClaudeBot",
+    "CCBot",
+    "Bytespider",
+    "Applebot",
+
+    # Other Common Crawlers
+    "Baiduspider",
+    "DuckDuckBot",
+    "AhrefsBot",
+    "SemrushBot",
+    "MJ12bot",
+    "KeybaseBot",
+    "Lemmy",
+    "CookieHubScan",
+    "Hydrozen.io",
+    "SummalyBot",
+    "DotBot",
+    "Coccocbot"
+]
+
+
+
 # Classes
 class RssFeed:
     """Represents an RSS feed with entries and optional top articles."""
