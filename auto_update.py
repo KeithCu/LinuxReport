@@ -76,6 +76,7 @@ FREE_MODELS = [
     "microsoft/phi-4-reasoning-plus:free",
     "microsoft/phi-4-reasoning:free",
     "microsoft/mai-ds-r1:free",
+    "mistralai/devstral-small:free",
     "mistralai/mistral-7b-instruct:free",
     "mistralai/mistral-small-3.1-24b-instruct:free",
     "moonshotai/moonlight-16b-a3b-instruct:free",
