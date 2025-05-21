@@ -422,25 +422,26 @@ def init_app(flask_app):
     def get_weather():
         ip = request.remote_addr
         units = request.args.get('units', 'imperial')
-        lat = request.args.get('lat')
-        lon = request.args.get('lon')
         
         # Check if request is from a web bot
         user_agent = request.headers.get('User-Agent', '')
         is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
         
-        # If it's a web bot, use default coordinates
+        # For web bots, use default coordinates
         if is_web_bot:
             lat = DEFAULT_WEATHER_LAT
             lon = DEFAULT_WEATHER_LON
-        # Otherwise, convert lat/lon to float if provided
-        elif lat is not None and lon is not None:
-            try:
-                lat = float(lat)
-                lon = float(lon)
-            except ValueError:
-                # If conversion fails, fall back to IP-based location
-                lat = lon = None
+        else:
+            lat = request.args.get('lat')
+            lon = request.args.get('lon')
+            # Convert lat/lon to float if provided
+            if lat is not None and lon is not None:
+                try:
+                    lat = float(lat)
+                    lon = float(lon)
+                except ValueError:
+                    # If conversion fails, fall back to IP-based location
+                    lat = lon = None
         
         weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
             
