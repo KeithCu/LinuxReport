@@ -62,7 +62,7 @@ FREE_MODELS = [
     "deepseek/deepseek-chat-v3-0324:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
-    "featherless/qwerky-72b:free",
+   # "featherless/qwerky-72b:free", returns garbage, don't use
     "google/gemma-3-12b-it:free",
     "google/gemma-3-27b-it:free",
     "meta-llama/llama-3.3-8b-instruct:free",
