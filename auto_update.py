@@ -682,7 +682,7 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
             # Render HTML and archive with images
             print(f"Generating HTML file: {html_file}")
             # Pass headline_template to generate_headlines_html
-            generate_headlines_html(top_3_articles_match, html_file)
+            generate_headlines_html(top_3_articles_match, html_file, model_name=used_model)
                         
             print(f"Appending to archive for mode: {mode}")
             append_to_archive(mode, top_3_articles_match)
@@ -751,7 +751,7 @@ if __name__ == "__main__":
 
     # Handle forceimage case early
     if args.forceimage:
-        refresh_images_only(selected_mode_str)
+        refresh_images_only(selected_mode_str, used_model)
         sys.exit(0)
 
     # Check schedule using the config's SCHEDULE field
