@@ -284,39 +284,6 @@ class LLMProvider(ABC):
         return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
 
 
-# Provider registry
-PROVIDERS = {
-    "openrouter": OpenRouterProvider  # Store the class, not an instance
-}
-
-def get_provider(name: str) -> LLMProvider:
-    """Get a provider by name."""
-    if name not in PROVIDERS:
-        raise ValueError(f"Unknown provider: {name}")
-    return PROVIDERS[name]()  # Create a new instance when requested
-
-def get_current_model():
-    """Get the current working model.
-    If USE_RANDOM_MODELS is True, randomly selects a new model each time.
-    If False, uses cached working model or falls back to random selection if no cache exists.
-    """
-    if not USE_RANDOM_MODELS:
-        # Check if we have a cached working model
-        cached_model = g_c.get("working_llm_model")
-        if cached_model:
-            # If cached model is in our free models list or is the fallback, use it
-            if cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL:
-                print(f"Using cached working model: {cached_model}")
-                return cached_model
-            else:
-                print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
-                g_c.delete("working_llm_model")
-    
-    # Randomly select a free model
-    selected_model = random.choice(FREE_MODELS)
-    print(f"Randomly selected free model: {selected_model}")
-    return selected_model
-
 def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
     current_model = g_c.get("working_llm_model")
@@ -376,6 +343,23 @@ class OpenRouterProvider(LLMProvider):
         for header, value in headers.items():
             client._client.headers[header] = value
         print(f"[OpenRouter] Using headers: {headers}")
+
+# Provider registry
+PROVIDERS = {
+    "openrouter": OpenRouterProvider  # Store the class, not an instance
+}
+
+# Global provider instance
+_provider_instance = None
+
+def get_provider(name: str) -> LLMProvider:
+    """Get a provider by name."""
+    global _provider_instance
+    if _provider_instance is None:
+        if name not in PROVIDERS:
+            raise ValueError(f"Unknown provider: {name}")
+        _provider_instance = PROVIDERS[name]()  # Create a new instance only once
+    return _provider_instance
 
 def _try_call_model(client, model, messages, max_tokens):
     max_retries = 1
