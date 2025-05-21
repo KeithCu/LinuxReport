@@ -511,7 +511,7 @@ def ask_ai_top_articles(articles):
 
     if not filtered_articles:
         print("No new articles available after deduplication.")
-        return "No new articles to rank.", [], previous_selections
+        return "No new articles to rank.", [], previous_selections, None
 
     # --- Prepare Messages ---
     messages = _prepare_messages(PROMPT_MODE, filtered_articles)
@@ -527,7 +527,7 @@ def ask_ai_top_articles(articles):
     )
     
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
-        return "No response from LLM models.", filtered_articles, previous_selections
+        return "No response from LLM models.", filtered_articles, previous_selections, None
 
     # --- Process Response and Update Selections (remains the same) ---
     top_titles = extract_top_titles_from_ai(response_text)
@@ -563,7 +563,7 @@ def ask_ai_top_articles(articles):
     if len(updated_selections) > MAX_PREVIOUS_HEADLINES:
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
 
-    return response_text, top_articles, updated_selections
+    return response_text, top_articles, updated_selections, used_model
 
 
 def run_comparison(articles):
@@ -649,7 +649,7 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
             print("Exiting after comparison run.")
             sys.exit(0)
         elif RUN_MODE == "normal":
-            full_response, top_3_articles_match, updated_selections = ask_ai_top_articles(articles)
+            full_response, top_3_articles_match, updated_selections, used_model = ask_ai_top_articles(articles)
 
             # Check if AI call failed or returned no usable response
             if not top_3_articles_match and not full_response.startswith("No new articles"):
