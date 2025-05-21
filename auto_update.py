@@ -110,21 +110,27 @@ From relevant headlines, pick the top 3 most interesting, each covering a comple
 After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no extra text other than the title on the 3 lines:
 
 {TITLE_MARKER}
-1. [Title 1]
-2. [Title 2]
-3. [Title 3]
+1. [Full Title 1 Only]
+2. [Full Title 2 Only]
+3. [Full Title 3 Only]
 """
 
 #O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = """
 FORMAT:
-Exactly ONE paragraph (<= 40 words) explaining your choice.
-{TITLE_MARKER} on its own line.
-1. Best headline.
-2. Second headline.
-3. Third headline.
-No other text.
-""".format(TITLE_MARKER=TITLE_MARKER)
+1. Write exactly ONE paragraph (40 words or less) explaining your choices
+2. Write ****** on its own line
+3. List exactly 3 titles, one per line, numbered 1-3
+4. Do NOT include any extra text on the title lines
+
+Example format:
+Your reasoning paragraph here.
+
+******
+1. First actual title here
+2. Second actual title here
+3. Third actual title here
+"""
 
 PROMPT_O3_USER_TEMPLATE = """
 <scratchpad>
