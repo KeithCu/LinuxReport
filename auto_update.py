@@ -118,11 +118,11 @@ After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in t
 #O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = """
 FORMAT:
-1. Exactly ONE paragraph (<= 40 words) explaining your choice.
-2. {TITLE_MARKER} on its own line.
-3. Best headline.
-4. Second headline.
-5. Third headline.
+Exactly ONE paragraph (<= 40 words) explaining your choice.
+{TITLE_MARKER} on its own line.
+1. Best headline.
+2. Second headline.
+3. Third headline.
 No other text.
 """.format(TITLE_MARKER=TITLE_MARKER)
 
