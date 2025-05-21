@@ -389,6 +389,13 @@ def _try_call_model(client, model, messages, max_tokens):
             
             # Log the API response only if global logging is enabled
             if GLOBAL_LOGGING_ENABLED:
+                print("\nDEBUG - Raw response text:")
+                print("="*40)
+                print(response_text)
+                print("="*40)
+                print("DEBUG - Response text contains newlines:", "\n" in response_text)
+                print("DEBUG - Response text repr:", repr(response_text))
+                
                 log_entry = {
                     "timestamp": datetime.datetime.now(TZ).isoformat(),
                     "model": model,
@@ -398,7 +405,7 @@ def _try_call_model(client, model, messages, max_tokens):
                     "messages": messages
                 }
                 with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+                    f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n\n")
             
             return response_text
         except Exception as e:
