@@ -597,3 +597,57 @@ This approach ensures:
 - No need to manage load balancer configuration
 - Current high reliability through server stability
 - Future improvements planned for even better reliability
+
+#### Why Litestream is Perfect for LinuxReport
+
+Litestream's key advantages make it the ideal solution for LinuxReport:
+
+1. **Zero Application Changes**
+   - Your DiskCache code works exactly the same
+   - No need to modify any database calls
+   - No special connection handling
+   - No client library changes
+   - No API modifications
+   - Works with any SQLite-based application
+   - No need to rewrite database access code
+   - Preserves all existing functionality
+   - Maintains compatibility with DiskCache
+   - No special configuration needed
+
+2. **Superior Performance**
+   - Direct file system access (microseconds)
+   - No network latency overhead
+   - No TCP/IP stack processing
+   - No HTTP request/response cycle
+   - No serialization/deserialization needed
+   - Zero network bandwidth usage for reads
+   - No need for additional caching layer
+   - Lower CPU usage (no HTTP processing)
+   - Reduced memory requirements
+   - No connection pooling needed
+   - OS-level page cache works automatically
+   - No cache invalidation complexity
+   - No cache consistency issues
+   - No cache warming needed
+
+3. **Simple Integration**
+   - Just install and configure Litestream
+   - Point it at your SQLite database
+   - That's it!
+   - Your application keeps working as before
+   - No code changes required
+   - Faster response times for users
+   - Lower server resource usage
+   - Simpler architecture
+   - Better scalability
+   - More cost-effective
+
+This is particularly important for LinuxReport because:
+- You're using DiskCache which expects standard SQLite
+- The application code is already working well
+- No need to modify proven database access patterns
+- Can scale without touching the application code
+- Maintains compatibility with all existing features
+- Provides better performance than object storage
+- Simpler to maintain and monitor
+- More cost-effective than complex solutions
