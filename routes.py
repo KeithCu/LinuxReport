@@ -23,7 +23,7 @@ from flask_cors import CORS
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo, DEBUG
 # Local imports
-from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_WEEK, EXPIRE_YEARS,
+from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_WEEK, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, 
@@ -198,15 +198,15 @@ def init_app(flask_app):
             rss_info = ALL_URLS[url]
 
             template = g_cm.get(rss_info.site_url)
+            # Check if the feed has been updated since we rendered this template
+            render_time = g_cm.get(f"{rss_info.site_url}_render_time")
+            if render_time != last_fetch_cache.get(url):
+                # Feed was updated, treat as if template doesn't exist
+                template = None
+
             if DEBUG or template is None:
                 feed = g_c.get(url)
                 last_fetch = last_fetch_cache.get(url)  # Use cached value instead of calling get_last_fetch again
-                if last_fetch is None and feed is not None:  # We should have last_fetch in cache if we have a feed
-                    # Instead of raising an exception, set last_fetch to current time
-                    print(f"Warning: Last fetch missing from cache for URL {url} when feed exists. Setting to current time.")
-                    last_fetch = datetime.datetime.now(TZ)
-                    # Store the missing timestamp to prevent future issues
-                    g_c.set_last_fetch(url, last_fetch, timeout=EXPIRE_WEEK)
                 last_fetch_str = format_last_updated(last_fetch)
                 if feed is not None:
                     entries = feed.entries
@@ -219,7 +219,9 @@ def init_app(flask_app):
                                            error_message=("Feed could not be loaded." if feed is None else None))
 
                 # Cache entry deleted by worker thread after fetch, however, that only effects the same process.
-                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_MINUTES*6)
+                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_HOUR)
+                # Store the last fetch time when we rendered this template
+                g_cm.set(f"{rss_info.site_url}_render_time", last_fetch, ttl=EXPIRE_DAY)
 
             result[cur_col].append(template)
 
