@@ -109,7 +109,7 @@ USE_RANDOM_MODELS = True
 PROMPT_30B = f""" Prompt:
 Given a list of news headlines, follow these steps:
 Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
-Think carefully and consisely about relevance, interest, and topic distinction without repeating entire headlines in your reasoning.
+Think carefully and consisely about relevance, interest, and topic distinction.
 From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
 After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no extra text other than the title on the 3 lines:
 
@@ -178,6 +178,10 @@ provider_client_cache = None
 # Optional: include more article data (summary, etc) in LLM prompt
 INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
 
+# Models that don't support system instructions properly and need user-only instructions
+USER_ONLY_INSTRUCTION_MODELS = [
+    "google/gemma-3-27b-it:free",
+]
 
 # Provider class hierarchy
 class LLMProvider(ABC):
@@ -381,6 +385,23 @@ def _try_call_model(client, model, messages, max_tokens):
     for attempt in range(1, max_retries + 1):
         start = timer()
         print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model}")
+        
+        prepared_messages = list(messages) # Make a copy to potentially modify
+
+        # If the model requires user-only instructions and the current message structure
+        # is [system_prompt, user_prompt] (typical for O3 mode), combine them.
+        if model in USER_ONLY_INSTRUCTION_MODELS and \
+           len(prepared_messages) == 2 and \
+           prepared_messages[0].get("role") == "system" and \
+           prepared_messages[1].get("role") == "user":
+            
+            print(f"Model {model} is in USER_ONLY_INSTRUCTION_MODELS. Combining system and user prompts into a single user prompt.")
+            system_content = prepared_messages[0]["content"]
+            user_content = prepared_messages[1]["content"]
+            
+            combined_user_content = f"{system_content}\n\n{user_content}"
+            prepared_messages = [{"role": "user", "content": combined_user_content}]
+
         try:
             if 'mistral' in model.lower():
                 extra_params = MISTRAL_EXTRA_PARAMS
@@ -388,7 +409,7 @@ def _try_call_model(client, model, messages, max_tokens):
                 extra_params = {}
             response = client.chat.completions.create(
                 model=model,
-                messages=messages,
+                messages=prepared_messages, # Use potentially modified messages
                 max_tokens=max_tokens,
                 timeout=TIMEOUT,
                 extra_body=extra_params
@@ -408,7 +429,7 @@ def _try_call_model(client, model, messages, max_tokens):
                     "response": response_text,
                     "finish_reason": finish_reason,
                     "response_time": end - start,
-                    "messages": messages
+                    "messages": prepared_messages # Log potentially modified messages
                 }
                 with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
                     f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n\n")
