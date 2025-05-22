@@ -200,13 +200,13 @@ def init_app(flask_app):
             template = g_cm.get(rss_info.site_url)
             # Check if the feed has been updated since we rendered this template
             render_time = g_cm.get(f"{rss_info.site_url}_render_time")
-            if render_time != last_fetch_cache.get(url):
+            last_fetch = last_fetch_cache.get(url)  # Use cached value instead of calling get_last_fetch again
+            if render_time != last_fetch:
                 # Feed was updated, treat as if template doesn't exist
                 template = None
 
             if DEBUG or template is None:
                 feed = g_c.get(url)
-                last_fetch = last_fetch_cache.get(url)  # Use cached value instead of calling get_last_fetch again
                 last_fetch_str = format_last_updated(last_fetch)
                 if feed is not None:
                     entries = feed.entries
