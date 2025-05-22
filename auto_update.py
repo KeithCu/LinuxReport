@@ -314,10 +314,13 @@ def update_model_cache(model):
 class OpenRouterProvider(LLMProvider):
     """Provider implementation for OpenRouter."""
     
-    def __init__(self):
+    def __init__(self, forced_model=None):
         super().__init__("openrouter")
         # Handle model selection internally
-        if not USE_RANDOM_MODELS:
+        if forced_model:
+            print(f"Using forced model: {forced_model}")
+            self._selected_model = forced_model
+        elif not USE_RANDOM_MODELS:
             # Check if we have a cached working model
             cached_model = g_c.get("working_llm_model")
             if cached_model and (cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL):
@@ -371,13 +374,13 @@ PROVIDERS = {
 # Global provider instance
 _provider_instance = None
 
-def get_provider(name: str) -> LLMProvider:
+def get_provider(name: str, forced_model=None) -> LLMProvider:
     """Get a provider by name."""
     global _provider_instance
     if _provider_instance is None:
         if name not in PROVIDERS:
             raise ValueError(f"Unknown provider: {name}")
-        _provider_instance = PROVIDERS[name]()  # Create a new instance only once
+        _provider_instance = PROVIDERS[name](forced_model=forced_model)  # Pass forced_model to provider
     return _provider_instance
 
 def _try_call_model(client, model, messages, max_tokens):
@@ -533,7 +536,7 @@ def ask_ai_top_articles(articles):
     print(messages)
 
     # --- Call Primary LLM using the provider class ---
-    provider1 = get_provider(PROVIDER)
+    provider1 = get_provider(PROVIDER, forced_model=None)
     response_text, used_model = provider1.call_with_fallback(
         messages, 
         PROMPT_MODE,
@@ -596,7 +599,7 @@ def run_comparison(articles):
         return
 
     # --- Config 1 ---
-    provider = get_provider(PROVIDER)
+    provider = get_provider(PROVIDER, forced_model=None)
     model1, model2 = provider.get_comparison_models()
     messages1 = _prepare_messages(PROMPT_MODE, filtered_articles)
     response_text1 = provider.call_model(model1, messages1, MAX_TOKENS, 'Comparison 1')
@@ -731,6 +734,7 @@ if __name__ == "__main__":
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
     parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
+    parser.add_argument('--force-model', type=str, help='Force the use of a specific model (overrides random/cached selection)')
     args = parser.parse_args()
 
     # Set USE_RANDOM_MODELS based on command line argument
@@ -788,7 +792,7 @@ if __name__ == "__main__":
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
 
     # Configure primary provider from CLI - only if we're actually going to run
-    provider = get_provider(PROVIDER)
+    provider = get_provider(PROVIDER, forced_model=args.force_model)
     MODEL_1 = provider.primary_model
     MODEL_2 = provider.fallback_model
 
