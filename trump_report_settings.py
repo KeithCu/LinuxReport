@@ -38,7 +38,7 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_TITLE="TrumpReport",
 	REPORT_PROMPT=f"Trump's biggest supporters of his second term Presidency, which began on January 20, 2025, as of today: {f'{datetime.date.today().strftime('%Y-%m-%d')}'} ",
     PATH="/srv/http/trumpreport",
-    SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 20],
+    SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 18, 20, 22],
     CUSTOM_FETCH_CONFIG={
         "patriots.win": {
             "needs_selenium": True,
