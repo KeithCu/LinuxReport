@@ -267,9 +267,9 @@ def init_app(flask_app):
                 fetch_urls_thread()
         
         response = make_response(page)
-        # Add cache control headers for 1 hour (3600 seconds)
-        response.headers['Cache-Control'] = 'public, max-age=3600'
-        response.headers['Expires'] = (datetime.datetime.utcnow() + datetime.timedelta(hours=1)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+        # Add cache control headers for 30 minutes (1800 seconds)
+        response.headers['Cache-Control'] = 'public, max-age=1800'
+        response.headers['Expires'] = (datetime.datetime.utcnow() + datetime.timedelta(hours=0.5)).strftime('%a, %d %b %Y %H:%M:%S GMT')
         return response
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
