@@ -25,7 +25,8 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
 
 ```
 .
-├── app.py                 # Main application entry point
+├── app.py                 # Main application entry point and core Flask setup
+├── shared.py             # Shared utilities and core functionality
 ├── routes.py             # Route definitions
 ├── models.py             # Database models
 ├── templates/            # Jinja2 templates and JavaScript files
@@ -41,6 +42,29 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
 └── tests/               # Test directory
 ```
 
+## Core Application Files
+
+1. **app.py**:
+   - Main application entry point
+   - Flask application initialization and configuration
+   - Core middleware setup
+   - Global error handlers
+   - Application-wide settings
+   - Database connection management
+   - Template configuration
+   - Static file serving setup
+
+2. **shared.py**:
+   - Core utility functions used across the application
+   - Shared data structures and constants
+   - Common helper functions
+   - Cross-module functionality
+   - Reusable business logic
+   - Common error handling
+   - Shared configuration management
+
+These files form the foundation of the application and should be carefully considered when making changes. They contain critical functionality that other parts of the application depend on.
+
 ## Coding Conventions
 
 1. **File Organization**:
@@ -51,7 +75,7 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
 2. **Code Style**:
    - Follow PEP 8 guidelines
    - Use 4 spaces for indentation
-   - Maximum line length of 88 characters
+   - Maximum line length of 160 characters
    - Use type hints where appropriate
 
 3. **Naming Conventions**:
@@ -93,7 +117,7 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
    - Use transactions for data consistency
 
 3. **Feed Processing**:
-   - Follow patterns in `auto_update.py`
+   - Follow patterns in `workers.py`
    - Use thread pools for concurrent processing
    - Implement proper error handling
 
@@ -193,4 +217,29 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
 - [Flask Documentation](https://flask.palletsprojects.com/)
 - [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
 - [Jinja2 Documentation](https://jinja.palletsprojects.com/)
-- [Python Style Guide](https://www.python.org/dev/peps/pep-0008/) 
+- [Python Style Guide](https://www.python.org/dev/peps/pep-0008/)
+
+## Additional Documentation
+
+The codebase includes several specialized documentation files that provide detailed information about specific aspects of the system:
+
+1. **Main Documentation**:
+   - `README.md`: Main project documentation with setup instructions and overview
+   - `agents.md`: This file - guide for AI agents working with the codebase
+
+2. **System Architecture**:
+   - `Scaling.md`: Detailed information about system scaling and performance optimization
+   - `Caching.md`: Documentation about the caching system and strategies
+   - `Litestream.md`: Information about database replication and backup
+
+3. **Storage and Sync**:
+   - `README_object_storage_sync.md`: Documentation for object storage synchronization
+   - `ObjectStorageCacheWrapper.py`: Implementation details for cache wrapper
+   - `ObjectStorageLock.py`: Documentation for distributed locking system
+
+4. **Configuration**:
+   - `config.yaml`: Main configuration file (with sensitive defaults)
+   - `httpd-vhosts-sample.conf`: Sample Apache configuration
+   - `update-headlines.service`: Systemd service configuration
+
+When working with the codebase, refer to these documentation files for specific implementation details and best practices. Each file focuses on a particular aspect of the system and provides in-depth information about that component. 
