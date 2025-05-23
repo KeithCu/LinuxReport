@@ -11,6 +11,70 @@ Litestream is a powerful tool that provides continuous replication for SQLite da
 - Minimal performance impact
 - Simple configuration and maintenance
 
+## Alternative Approaches to Database Replication
+
+For applications that primarily deal with feed data and updates, there are simpler alternatives to Litestream that may be more appropriate:
+
+### Object Store with Separate Process
+
+This approach is particularly well-suited for feed-based applications where:
+- Data changes are infrequent and predictable
+- You want to minimize complexity
+
+#### Implementation Options:
+
+1. **Separate Process Approach (Recommended)**
+   - Run a separate process that:
+     - Downloads new feed data directly from sources
+     - Updates local SQLite/diskcache
+     - Runs on its own schedule
+   - Main application:
+     - Reads from local diskcache
+     - Always has fresh data
+     - No need to deal with file swapping or S3
+   - Benefits:
+     - Only transfers new data, not entire database files
+     - Local diskcache stays consistent
+     - No need to pause or swap files
+     - Better use of bandwidth
+     - Simpler architecture overall
+
+2. **Controlled File Swap**
+   - Main application pauses briefly every 5 minutes
+   - Swaps in new replicated database file
+   - Resumes operations
+   - Considerations:
+     - Need to handle concurrent requests during pause
+     - May need to recreate diskcache instance
+     - Brief service interruption
+     - Simpler than complex replication logic
+
+3. **Direct S3 Access**
+   - Read directly from S3
+   - Benefits:
+     - No file swapping needed
+     - No need to pause application
+     - Simpler implementation
+   - Drawbacks:
+     - Higher latency than local disk
+     - S3 costs for storage and requests
+     - Need to handle S3 credentials
+
+#### When to Choose This Over Litestream:
+- Your application primarily deals with feed data
+- Updates are infrequent and predictable
+- You're already using object storage for feeds
+- You want to minimize infrastructure complexity
+- You don't need point-in-time recovery
+- Your data changes are small and incremental
+
+#### When to Stick with Litestream:
+- You need continuous replication
+- Point-in-time recovery is important
+- Your database changes are frequent and unpredictable
+- You need atomic transactions across replicas
+- Your application makes many small changes to the database
+
 ## Prerequisites
 
 - Two Arch Linux servers (primary and replica)
@@ -134,6 +198,37 @@ journalctl -u litestream -f
 litestream replicate -config /etc/litestream/litestream.yml
 ```
 
+## Understanding Retention
+
+### Retention in Continuous Replication
+
+The retention policy in Litestream works differently from traditional backup systems:
+
+1. **Point-in-Time Recovery**
+   - Litestream maintains a continuous stream of WAL (Write-Ahead Logging) files
+   - Each WAL file represents a point-in-time snapshot of your database
+   - The retention period (e.g., `retention: 24h`) determines how long these WAL files are kept
+   - This allows you to restore your database to any point within the retention window
+
+2. **How Retention Works**
+   ```yaml
+   replicas:
+     - url: sftp://user@replica-server/path/to/replica/cache.db
+       retention: 24h  # Keep WAL files for 24 hours
+   ```
+   - Litestream continuously streams WAL files to the replica
+   - Old WAL files are automatically deleted after the retention period
+   - The main database file is always kept
+   - You can restore to any point within the last 24 hours
+
+3. **Storage Considerations**
+   - WAL files are typically small (few MB each)
+   - Storage usage depends on:
+     - How frequently your database changes
+     - The retention period
+     - The number of replicas
+   - Example: If your database changes 100MB per day and you keep 24 hours of WAL files, you might use ~100MB of additional storage
+
 ## Best Practices
 
 1. **Regular Backups**
@@ -155,24 +250,46 @@ litestream replicate -config /etc/litestream/litestream.yml
    - Monitor system resources
    - Consider using tmpfs for WAL files
 
-## Troubleshooting
+5. **Handling Replicated Database Access**
+   - **Option 1: Separate Process Approach**
+     - Run a separate process that monitors S3 for changes
+     - Downloads new feed data directly from sources
+     - Updates local SQLite/diskcache
+     - Main application reads from local diskcache
+     - Benefits:
+       - Only transfers new data, not entire database files
+       - Local diskcache stays consistent
+       - No need to pause or swap files
+       - Better use of bandwidth
+       - Simpler architecture overall
 
-### Common Issues
+   - **Option 2: Controlled File Swap**
+     - Main application pauses briefly every 5 minutes
+     - Swaps in new replicated database file
+     - Resumes operations
+     - Considerations:
+       - Need to handle concurrent requests during pause
+       - May need to recreate diskcache instance
+       - Brief service interruption
+       - Simpler than complex replication logic
 
-1. **Replication Not Starting**
-   - Check SSH connectivity
-   - Verify file permissions
-   - Check systemd logs
+   - **Option 3: Direct S3 Access**
+     - Read directly from S3
+     - Benefits:
+       - No file swapping needed
+       - No need to pause application
+       - Simpler implementation
+     - Drawbacks:
+       - Higher latency than local disk
+       - S3 costs for storage and requests
+       - Need to handle S3 credentials
 
-2. **High Replication Lag**
-   - Check network connectivity
-   - Monitor system resources
-   - Adjust sync-interval
-
-3. **Disk Space Issues**
-   - Monitor disk usage
-   - Adjust retention period
-   - Clean up old replicas
+   - **Recommendation:**
+     - Start with Option 1 (Separate Process)
+     - Provides best balance of performance and simplicity
+     - No need to pause application
+     - Efficient use of bandwidth
+     - Clean separation of concerns
 
 ### Useful Commands
 
@@ -220,37 +337,6 @@ replicas:
   - url: sftp://user@replica-server/path/to/replica/cache.db
     validation-interval: 1h  # Validate every hour
 ```
-
-## Understanding Retention
-
-### Retention in Continuous Replication
-
-The retention policy in Litestream works differently from traditional backup systems:
-
-1. **Point-in-Time Recovery**
-   - Litestream maintains a continuous stream of WAL (Write-Ahead Logging) files
-   - Each WAL file represents a point-in-time snapshot of your database
-   - The retention period (e.g., `retention: 24h`) determines how long these WAL files are kept
-   - This allows you to restore your database to any point within the retention window
-
-2. **How Retention Works**
-   ```yaml
-   replicas:
-     - url: sftp://user@replica-server/path/to/replica/cache.db
-       retention: 24h  # Keep WAL files for 24 hours
-   ```
-   - Litestream continuously streams WAL files to the replica
-   - Old WAL files are automatically deleted after the retention period
-   - The main database file is always kept
-   - You can restore to any point within the last 24 hours
-
-3. **Storage Considerations**
-   - WAL files are typically small (few MB each)
-   - Storage usage depends on:
-     - How frequently your database changes
-     - The retention period
-     - The number of replicas
-   - Example: If your database changes 100MB per day and you keep 24 hours of WAL files, you might use ~100MB of additional storage
 
 ## Maintenance
 
