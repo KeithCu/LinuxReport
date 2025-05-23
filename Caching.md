@@ -22,7 +22,7 @@ This document outlines the different caching strategies employed within the code
 
 ## 3. Disk-Based Caching (`diskcache` - via `g_c`)
 
-The application utilizes the `diskcache` library (accessed via the `g_c` object, likely initialized in `shared.py`), storing cached data persistently on disk using an SQLite backend (indicated by `cache.db*` files).
+The application utilizes the `diskcache` library (accessed via the `g_c` object, storing cached data persistently on disk using an SQLite backend (indicated by `cache.db*` files).
 
 *   **Weather Data Caching:**
     *   **Location:** `weather.py`
