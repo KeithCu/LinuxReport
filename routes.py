@@ -267,6 +267,9 @@ def init_app(flask_app):
                 fetch_urls_thread()
         
         response = make_response(page)
+        # Add cache control headers for 1 hour (3600 seconds)
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+        response.headers['Expires'] = (datetime.datetime.utcnow() + datetime.timedelta(hours=1)).strftime('%a, %d %b %Y %H:%M:%S GMT')
         return response
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
@@ -446,8 +449,12 @@ def init_app(flask_app):
                     lat = lon = None
         
         weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
-            
-        return jsonify(weather_data), status_code
+        
+        response = jsonify(weather_data)
+        # Add cache control headers for 4 hours (14400 seconds)
+        response.headers['Cache-Control'] = 'public, max-age=14400'
+        response.headers['Expires'] = (datetime.datetime.utcnow() + datetime.timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+        return response, status_code
 
     @flask_app.route('/old_headlines')
     def old_headlines():
