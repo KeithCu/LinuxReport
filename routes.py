@@ -699,6 +699,35 @@ def init_app(flask_app):
         else:
             return jsonify({"error": "Invalid file type"}), 400
 
+    @flask_app.route('/sitemap.xml')
+    def sitemap():
+        # Try to get cached sitemap
+        cache_key = 'sitemap.xml'
+        cached_sitemap = g_cm.get(cache_key)
+        if cached_sitemap:
+            response = make_response(cached_sitemap)
+            response.headers['Content-Type'] = 'application/xml'
+            return response
+
+        # Generate sitemap XML
+        urls = []
+        for domain in ALLOWED_REQUESTER_DOMAINS:
+            # Add main page
+            urls.append(f'<url><loc>{domain}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>')
+            # Add old_headlines page
+            urls.append(f'<url><loc>{domain}/old_headlines</loc><changefreq>daily</changefreq><priority>0.8</priority></url>')
+
+        sitemap_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{chr(10).join(urls)}
+</urlset>'''
+
+        g_cm.set(cache_key, sitemap_xml, ttl=EXPIRE_YEARS)
+
+        response = make_response(sitemap_xml)
+        response.headers['Content-Type'] = 'application/xml'
+        return response
+
     # If UPLOAD_FOLDER is 'static/uploads', Flask handles this automatically.
     # If it were outside 'static', you'd need something like this:
     # @flask_app.route('/uploads/<filename>')
