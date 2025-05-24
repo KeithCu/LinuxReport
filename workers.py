@@ -65,16 +65,23 @@ def load_url_worker(url):
             content, metadata = smart_fetch(url, cache_expiry=OBJECT_STORE_FEED_TIMEOUT)
             if content:
                 try:
-                    # Parse the pickled content from object store
-                    feed_data = pickle.loads(content)
-                    res = feedparser.FeedParserDict(feed_data)
-                    print(f"Successfully fetched feed from object store: {url}")
+                    # Parse the pickled RssFeed object from object store
+                    rssfeed = pickle.loads(content)
+                    if isinstance(rssfeed, RssFeed):
+                        # Store directly in cache since it's already processed
+                        g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
+                        g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
+                        print(f"Successfully fetched processed feed from object store: {url}")
+                        return
+                    else:
+                        print(f"Invalid feed data type from object store for {url}")
+                        return
                 except Exception as e:
                     print(f"Error parsing object store feed for {url}: {e}")
-                    res = None
+                    return
             else:
                 print(f"No content found in object store for {url}")
-                res = None
+                return
 
         if "lwn.net" in url:
             new_entries = handle_lwn_feed(url)
