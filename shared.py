@@ -87,6 +87,9 @@ ENABLE_OBJECT_STORE_FEEDS = False
 OBJECT_STORE_FEED_URL = "https://linuxreportupdates.us-ord-1.linodeobjects.com/feeds/"
 OBJECT_STORE_FEED_TIMEOUT = 15 * 60  # 15 minutes in seconds
 
+# Enable publishing feeds to object store when fetched
+ENABLE_OBJECT_STORE_FEED_PUBLISH = False
+
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds

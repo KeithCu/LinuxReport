@@ -27,11 +27,12 @@ from seleniumfetch import fetch_site_posts
 from shared import (
     ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
     USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,
-    ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_URL, OBJECT_STORE_FEED_TIMEOUT
+    ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_URL, OBJECT_STORE_FEED_TIMEOUT,
+    ENABLE_OBJECT_STORE_FEED_PUBLISH
 )
 from Tor import fetch_via_tor
 from models import DEBUG, USE_TOR
-from object_storage_sync import smart_fetch
+from object_storage_sync import smart_fetch, publish_bytes
 
  #Reddit is a pain, so hide user_agent
 if not g_cs.has("REDDIT_USER_AGENT"):
@@ -152,6 +153,17 @@ def load_url_worker(url):
                 top_articles = old_feed.top_articles
 
         rssfeed = RssFeed(entries, top_articles=top_articles)
+
+        # Publish feed to object store if enabled - publish exactly what we store locally
+        if ENABLE_OBJECT_STORE_FEED_PUBLISH and not url.startswith("http://") and "fakefeed" not in url:
+            try:
+                # Pickle the RssFeed object for storage
+                feed_data = pickle.dumps(rssfeed)
+                publish_bytes(feed_data, url)
+                print(f"Successfully published feed to object store: {url}")
+            except Exception as e:
+                print(f"Error publishing feed to object store for {url}: {e}")
+
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
 
