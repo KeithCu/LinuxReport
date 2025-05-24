@@ -219,7 +219,7 @@ def publish_bytes(bytes_data: bytes, key: str) -> Any:
             raise ValueError(f"Invalid bytes data. Type: {type(bytes_data)}, Data: {bytes_data}")
         
         # Generate a safe object key from the key identifier
-        safe_key = generate_object_key(key, "data")
+        safe_key = generate_object_name(key, "data")
         object_name = f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{safe_key}"
         
         content_stream = BytesIO(bytes_data)
@@ -246,7 +246,7 @@ def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
         Tuple containing data and metadata or None values if not found
     """
     try:
-        obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_key(key, 'data')}")
+        obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_name(key, 'data')}")
         if obj:
             content_buffer = BytesIO()
             _storage_driver.download_object_as_stream(obj, content_buffer)
@@ -280,7 +280,7 @@ def smart_fetch(key: str, cache_expiry: int = None) -> tuple[Optional[bytes], Op
             return cached_value, None
 
         # Get object and metadata
-        obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_key(key, 'data')}")
+        obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_name(key, 'data')}")
         if not obj:
             return None, None
 
@@ -291,9 +291,7 @@ def smart_fetch(key: str, cache_expiry: int = None) -> tuple[Optional[bytes], Op
         cached_last_modified = g_cm.get(last_modified_key)
         
         if cached_last_modified == metadata['last_modified']:
-            cached_content = g_cm.get(f"{memory_key}:content")
-            if cached_content:
-                return cached_content, metadata
+            return cached_value, metadata
 
         # Fetch content
         content_buffer = BytesIO()
@@ -307,7 +305,6 @@ def smart_fetch(key: str, cache_expiry: int = None) -> tuple[Optional[bytes], Op
         if cache_expiry is not None:
             g_cm.set(memory_key, content, ttl=cache_expiry)
             g_cm.set(last_modified_key, metadata['last_modified'], ttl=cache_expiry)
-            g_cm.set(f"{memory_key}:content", content, ttl=cache_expiry)
         
         return content, metadata
             
@@ -380,7 +377,7 @@ class TestObjectStorageSync(unittest.TestCase):
         ]
         
         for key in test_cases:
-            safe_key = generate_object_key(key)
+            safe_key = generate_object_name(key)
             self.assertNotIn('/', safe_key, "Object key should not contain slashes")
 
     def test_file_metadata(self):

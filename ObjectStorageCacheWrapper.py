@@ -142,7 +142,6 @@ class ObjectStorageCacheWrapper:
         memory_cache_key = self._get_memory_cache_key(key)
         g_cm.delete(memory_cache_key)
         g_cm.delete(f"{memory_cache_key}:last_modified")
-        g_cm.delete(f"{memory_cache_key}:content")
         
         object_name = self._get_object_name(key)
         try:
