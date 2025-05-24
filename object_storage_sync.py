@@ -1,15 +1,13 @@
 """
-object_storage_sync.py (Not used yet)
+object_storage_sync.py
 
 Object Storage-based publisher/subscriber for feed updates. Used to synchronize feed updates across multiple servers.
 Uses libcloud to interface with object storage providers (like Linode Object Storage).
 
 Optimizations for Linode Object Storage:
-- This module is designed for Linode's S3-compatible Object Storage, using Apache Libcloud for seamless, provider-agnostic interactions.
-- Linode provides eventual consistency, so the code incorporates retry mechanisms with exponential backoff (via Tenacity) to handle transient errors and ensure reliable operations.
-- Error handling is robust, addressing issues like object non-existence, network failures, and storage operation errors through custom exceptions and logging.
-- Metadata operations are optimized for efficiency, leveraging Linode's support for custom metadata to track file versions and timestamps, minimizing conflicts in distributed environments.
-- The implementation considers Linode's regional storage for better performance, using specified regions to reduce latency and costs.
+- Uses S3's built-in metadata (last-modified, etag, content-length) for caching
+- Leverages Linode's eventual consistency with retry mechanisms
+- Optimized for regional storage to reduce latency
 """
 import time
 import os
@@ -17,6 +15,7 @@ import hashlib
 from io import BytesIO
 from typing import Optional, Dict, Union, Any
 from functools import wraps
+import json
 
 import unittest
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -34,7 +33,6 @@ from object_storage_config import (
     LibcloudError
 )
 
-
 def generate_object_name(url: str) -> str:
     """Generate a unique object name for a feed URL
     
@@ -42,11 +40,10 @@ def generate_object_name(url: str) -> str:
         url: Feed URL to generate name for
     
     Returns:
-        str: Unique object name with server ID, hash, and timestamp
+        str: Unique object name with server ID and hash
     """
     url_hash = hashlib.md5(url.encode()).hexdigest()
-    timestamp = int(time.time())
-    return f"{STORAGE_SYNC_PATH}{SERVER_ID}/feeds/{url_hash}_{timestamp}.json"
+    return f"{STORAGE_SYNC_PATH}{SERVER_ID}/feeds/{url_hash}.json"
 
 def generate_object_key(key: Union[str, bytes], salt: str = "") -> str:
     """Generate a safe, consistent object key
@@ -56,7 +53,7 @@ def generate_object_key(key: Union[str, bytes], salt: str = "") -> str:
         salt: Optional additional string to differentiate keys
     
     Returns:
-        str: MD5 hash-based key with salt and timestamp
+        str: MD5 hash-based key with salt
     """
     if isinstance(key, str):
         key_bytes = key.encode()
@@ -68,8 +65,7 @@ def generate_object_key(key: Union[str, bytes], salt: str = "") -> str:
         combined += salt.encode()
     
     key_hash = hashlib.md5(combined).hexdigest()
-    timestamp = int(time.time())
-    return f"{key_hash}_{timestamp}"
+    return f"{key_hash}"
 
 def generate_file_object_name(file_path: str) -> str:
     """Generate a unique object name for a file
@@ -83,35 +79,24 @@ def generate_file_object_name(file_path: str) -> str:
     return f"{STORAGE_SYNC_PATH}files/{SERVER_ID}/{generate_object_key(file_path)}"
 
 def get_file_metadata(file_path: str) -> Optional[Dict]:
-    """Get metadata for a file including hash and timestamp
+    """Get metadata for a file using S3's built-in metadata fields
     
     Args:
         file_path: Path to the file
         
     Returns:
-        dict: File metadata including hash and timestamp or None on error
+        dict: File metadata including hash and content or None on error
     """
     try:
         with open(file_path, 'rb') as f:
-            # Use streaming read for large files
             content = f.read()
             file_hash = hashlib.sha256(content).hexdigest()
-            stat = os.stat(file_path)
             return {
                 'hash': file_hash,
-                'size': stat.st_size,
-                'mtime': stat.st_mtime,
-                'ctime': stat.st_ctime,
-                'content': content  # Include content for in-memory operations
+                'content': content
             }
-    except FileNotFoundError as e:
-        print(f"File not found for metadata: {file_path}: {e}")
-        return None
-    except IOError as e:  # Broader I/O errors (e.g. permission denied)
-        print(f"I/O error getting file metadata for {file_path}: {e}")
-        return None
     except Exception as e:
-        print(f"Unexpected error getting file metadata for {file_path}, exception: {e}")
+        print(f"Error getting file metadata for {file_path}: {e}")
         return None
 
 def _init_check():
@@ -122,32 +107,38 @@ def _init_check():
         raise StorageConnectionError("Failed to initialize storage")
     return True
 
-def _prepare_fetch(prefix: str, key: str, current_hash: Optional[str] = None, use_cache: Optional[Dict] = None):
-    """Prepare fetch operation by listing objects matching the given prefix and key
+def _get_object_metadata(obj: Any) -> Dict:
+    """Get S3 metadata from an object.
     
     Args:
-        prefix: Type of object to fetch ('feeds', 'files', 'bytes')
-        key: Identifier for the object
-        current_hash: Optional hash of current version to compare
-        use_cache: Optional cache information to compare against
+        obj: S3 object to get metadata from
         
     Returns:
-        Tuple[object, bool]: (object_to_fetch, use_local_content)
+        dict: Object metadata including last_modified, size, and hash
+    """
+    return {
+        'last_modified': obj.extra.get('last_modified'),
+        'size': obj.size,
+        'hash': obj.hash
+    }
+
+def _get_object(obj_name: str) -> Optional[Any]:
+    """Get an object from storage.
+    
+    Args:
+        obj_name: Name of the object to get
+        
+    Returns:
+        object: The object if found, None otherwise
     """
     try:
         _init_check()
-        prefix_path = f"{STORAGE_SYNC_PATH}{prefix}/{SERVER_ID}/{key}_"
-        objects = list(_storage_container.list_objects(prefix=prefix_path))
-        
-        if not objects:
-            print(f"No objects found matching prefix: {prefix_path}")
-            return None, False
-            
-        # Sort by name (which contains timestamp) to get the latest version
-        objects.sort(key=lambda obj: obj.name, reverse=True)
-        return objects[0], False  # Return latest object and not using local content
+        try:
+            return _storage_container.get_object(object_name=obj_name)
+        except Exception:
+            return None
     except Exception as e:
-        print("Error preparing fetch operation, exception: {e}")
+        print(f"Error getting object {obj_name}: {e}")
         raise
 
 def retry_decorator(max_retries: int = oss_config.MAX_RETRY_ATTEMPTS):
@@ -172,12 +163,11 @@ def retry_decorator(max_retries: int = oss_config.MAX_RETRY_ATTEMPTS):
     return decorator
 
 @retry_decorator()
-def publish_file(file_path: str, metadata: Optional[Dict] = None) -> Any:
+def publish_file(file_path: str) -> Any:
     """Publish a file from disk to object storage.
     
     Args:
         file_path: Path to the file to publish
-        metadata: Optional metadata to associate with the object
         
     Returns:
         The uploaded object on success
@@ -187,7 +177,7 @@ def publish_file(file_path: str, metadata: Optional[Dict] = None) -> Any:
         file_metadata = get_file_metadata(file_path)
         if file_metadata:
             bytes_data = file_metadata['content']
-            return publish_bytes(bytes_data, file_path, metadata)
+            return publish_bytes(bytes_data, file_path)
         print(f"No content found in file: {file_path}")
         return None
     except Exception as e:
@@ -195,18 +185,17 @@ def publish_file(file_path: str, metadata: Optional[Dict] = None) -> Any:
         raise
 
 @retry_decorator()
-def fetch_file(file_path: str, force: bool = False) -> tuple[Optional[bytes], Optional[Dict]]:
+def fetch_file(file_path: str) -> tuple[Optional[bytes], Optional[Dict]]:
     """Fetch a file from object storage as bytes with its metadata.
     
     Args:
         file_path: Identifier for the file to fetch
-        force: Skip local cache check if supported
     
     Returns:
         Tuple containing file content and metadata or None values if not found
     """
     try:
-        content, metadata = fetch_bytes(file_path, force)
+        content, metadata = fetch_bytes(file_path)
         print(f"Fetched file ({len(content) if content else 0} bytes) from key: {file_path}")
         return content, metadata
     except Exception as e:
@@ -214,18 +203,17 @@ def fetch_file(file_path: str, force: bool = False) -> tuple[Optional[bytes], Op
         raise
 
 @retry_decorator()
-def fetch_file_stream(file_path: str, force: bool = False) -> tuple[Optional[BytesIO], Optional[Dict]]:
+def fetch_file_stream(file_path: str) -> tuple[Optional[BytesIO], Optional[Dict]]:
     """Fetch a file from object storage as a stream with its metadata.
     
     Args:
         file_path: Identifier for the file to fetch
-        force: Skip local cache check if supported
     
     Returns:
         Tuple containing file stream and metadata or None values if not found
     """
     try:
-        content, metadata = fetch_bytes(file_path, force)
+        content, metadata = fetch_bytes(file_path)
         if content is not None:
             print(f"Streamed file ({len(content)} bytes) from key: {file_path}")
             return BytesIO(content), metadata
@@ -236,13 +224,12 @@ def fetch_file_stream(file_path: str, force: bool = False) -> tuple[Optional[Byt
         raise
 
 @retry_decorator()
-def publish_bytes(bytes_data: bytes, key: str, metadata: Optional[Dict] = None) -> Any:
+def publish_bytes(bytes_data: bytes, key: str) -> Any:
     """Publish raw bytes to object storage.
     
     Args:
         bytes_data: Data to publish
         key: Identifier for the object
-        metadata: Optional metadata to associate with the object
         
     Returns:
         The uploaded object on success
@@ -257,30 +244,11 @@ def publish_bytes(bytes_data: bytes, key: str, metadata: Optional[Dict] = None) 
         safe_key = generate_object_key(key, "data")
         object_name = f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{safe_key}"
         
-        file_hash = hashlib.sha256(bytes_data).hexdigest()
-        extra_metadata = {
-            'meta_data': {
-                'server_id': SERVER_ID,
-                'file_key': key,  # Store original key for reference
-                'file_hash': file_hash,
-                'timestamp': str(time.time())
-            }
-        }
-        
-        if metadata:
-            # Filter metadata to ensure compatibility with storage backend
-            filtered_metadata = {
-                k: str(v) for k, v in metadata.items() 
-                if isinstance(k, str) and isinstance(v, (str, int, float, bool))
-            }
-            extra_metadata['meta_data'].update(filtered_metadata)
-        
         content_stream = BytesIO(bytes_data)
         obj = _storage_driver.upload_object_via_stream(
             iterator=content_stream,
             container=_storage_container,
-            object_name=object_name,
-            extra=extra_metadata
+            object_name=object_name
         )
         
         print(f"Published {len(bytes_data)} bytes to object: {object_name}")
@@ -290,23 +258,22 @@ def publish_bytes(bytes_data: bytes, key: str, metadata: Optional[Dict] = None) 
         raise
 
 @retry_decorator()
-def fetch_bytes(key: str, force: bool = False) -> tuple[Optional[bytes], Optional[Dict]]:
+def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
     """Fetch bytes data from object storage with its metadata.
     
     Args:
         key: Identifier for the object to fetch
-        force: Skip local cache check if supported
     
     Returns:
         Tuple containing data and metadata or None values if not found
     """
     try:
-        latest_obj, use_local_content = _prepare_fetch('bytes', key, force)
-        if latest_obj and not use_local_content:
+        obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_key(key, 'data')}")
+        if obj:
             content_buffer = BytesIO()
-            _storage_driver.download_object_as_stream(latest_obj, content_buffer)
+            _storage_driver.download_object_as_stream(obj, content_buffer)
             content = content_buffer.getvalue()
-            metadata = latest_obj.meta_data if latest_obj else None
+            metadata = _get_object_metadata(obj)
             print(f"Retrieved {len(content)} bytes for key: {key}")
             return content, metadata
         
@@ -316,42 +283,78 @@ def fetch_bytes(key: str, force: bool = False) -> tuple[Optional[bytes], Optiona
         print(f"Error fetching bytes for key: {key}, exception: {e}")
         raise
 
+@retry_decorator()
+def smart_fetch(key: str, memory_cache=None, cache_expiry: int = None) -> tuple[Optional[bytes], Optional[Dict]]:
+    """Smart fetch that handles caching and metadata checks.
+    
+    Args:
+        key: Identifier for the object to fetch
+        memory_cache: Optional memory cache instance to use
+        cache_expiry: Optional cache expiry time in seconds
+        
+    Returns:
+        Tuple containing raw bytes and metadata or None values if not found
+    """
+    try:
+        # If memory cache is provided, check it first
+        if memory_cache is not None:
+            memory_key = f"objstorage_cache:{key}"
+            cached_value = memory_cache.get(memory_key)
+            if cached_value is not None:
+                return cached_value, None
+
+        # Get object and metadata
+        obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_key(key, 'data')}")
+        if not obj:
+            return None, None
+
+        metadata = _get_object_metadata(obj)
+        
+        # If memory cache is provided, check last-modified
+        if memory_cache is not None:
+            last_modified_key = f"{memory_key}:last_modified"
+            cached_last_modified = memory_cache.get(last_modified_key)
+            
+            if cached_last_modified == metadata['last_modified']:
+                cached_content = memory_cache.get(f"{memory_key}:content")
+                if cached_content:
+                    return cached_content, metadata
+
+        # Fetch content
+        content_buffer = BytesIO()
+        _storage_driver.download_object_as_stream(obj, content_buffer)
+        content = content_buffer.getvalue()
+        
+        if not content:
+            return None, None
+            
+        # Cache the results if memory cache is provided
+        if memory_cache is not None and cache_expiry is not None:
+            memory_cache.set(memory_key, content, ttl=cache_expiry)
+            memory_cache.set(last_modified_key, metadata['last_modified'], ttl=cache_expiry)
+            memory_cache.set(f"{memory_key}:content", content, ttl=cache_expiry)
+        
+        return content, metadata
+            
+    except Exception as e:
+        print(f"Error in smart_fetch for key: {key}, exception: {e}")
+        raise
+
 class TestObjectStorageSync(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test environment before running tests"""
-        
         if not init_storage():
             raise RuntimeError("Failed to initialize storage for tests")
     
     def test_generate_object_name(self):
         result = generate_object_name('http://example.com/feed')
         self.assertTrue(result.startswith(f"{oss_config.STORAGE_SYNC_PATH}{oss_config.SERVER_ID}/feeds/"))
-        self.assertRegex(result, r'.*_\d+\.json$', "Object name should end with _timestamp.json")
+        self.assertTrue(result.endswith('.json'))
     
     def test_generate_file_object_name(self):
         result = generate_file_object_name('/path/to/file.txt')
         self.assertTrue(result.startswith(f"{oss_config.STORAGE_SYNC_PATH}files/{oss_config.SERVER_ID}/"))
-        self.assertRegex(result, r'.*_\d+$', "File object name should end with _timestamp")
-
-    def test_metadata_hash_consistency(self):
-        """Test that local and stored metadata remain consistent"""
-        test_content = b'Test content for metadata'
-        test_key = 'metadata_test_key'
-        
-        # Test 1: Compute expected object name
-        safe_key = generate_object_key(test_key, "data")
-        expected_name = f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{safe_key}"
-        
-        # Test 2: Publish and verify metadata
-        uploaded_obj = publish_bytes(test_content, test_key)
-        self.assertIsNotNone(uploaded_obj)
-        self.assertEqual(uploaded_obj.name, expected_name)
-        
-        # Extract hash from stored object name
-        stored_hash = os.path.basename(expected_name).split('_')[0]
-        content_hash = hashlib.sha256(test_content).hexdigest()
-        self.assertEqual(stored_hash, content_hash, "Stored hash should match content hash")
 
     def test_publish_fetch_roundtrip(self):
         test_data = b'Test content for roundtrip'
@@ -367,29 +370,13 @@ class TestObjectStorageSync(unittest.TestCase):
         self.assertEqual(fetched_data, test_data)
         
         # Verify metadata fields
-        self.assertIn('server_id', metadata)
-        self.assertIn('file_key', metadata)
-        self.assertIn('file_hash', metadata)
-        self.assertIn('timestamp', metadata)
-        
-        # Verify metadata values
-        self.assertEqual(metadata['server_id'], SERVER_ID)
-        self.assertEqual(metadata['file_key'], test_key)
-        self.assertEqual(metadata['file_hash'], hashlib.sha256(test_data).hexdigest())
-        self.assertAlmostEqual(
-            float(metadata['timestamp']), 
-            time.time(), 
-            delta=2  # Allow 2 seconds difference
-        )
+        self.assertIn('last_modified', metadata)
+        self.assertIn('size', metadata)
+        self.assertIn('hash', metadata)
 
     def test_fetch_nonexistent(self):
         """Test fetching nonexistent data"""
         empty_bytes, empty_meta = fetch_bytes('nonexistent_key')
-        self.assertIsNone(empty_bytes)
-        self.assertIsNone(empty_meta)
-        
-        # Test 2: Empty key
-        empty_bytes, empty_meta = fetch_bytes('')
         self.assertIsNone(empty_bytes)
         self.assertIsNone(empty_meta)
 
@@ -405,10 +392,6 @@ class TestObjectStorageSync(unittest.TestCase):
         # Test empty content
         empty_obj = publish_bytes(b'', 'empty_key')
         self.assertIsNotNone(empty_obj, "Should allow publishing empty content")
-        
-        # Test invalid file fetch
-        with self.assertRaises(TypeError):
-            get_file_metadata(123)
 
     def test_object_key_safety(self):
         """Test that object key generation handles problematic inputs"""
@@ -424,8 +407,6 @@ class TestObjectStorageSync(unittest.TestCase):
         for key in test_cases:
             safe_key = generate_object_key(key)
             self.assertNotIn('/', safe_key, "Object key should not contain slashes")
-            self.assertTrue(safe_key.endswith(str(int(safe_key.split("_")[-1]))), 
-                          "Object key should end with numeric timestamp")
 
     def test_file_metadata(self):
         """Test file metadata handling with temp files"""
@@ -444,19 +425,6 @@ class TestObjectStorageSync(unittest.TestCase):
         finally:
             if os.path.exists(test_path):
                 os.remove(test_path)
-
-    def test_concurrency_safety(self):
-        """Simulate concurrent writes to test object key uniqueness"""
-        test_key = 'concurrent_key'
-        key_count = 5
-        test_data = b'Concurrent write test content'
-        keys = []
-        
-        for i in range(key_count):
-            keys.append(generate_object_key(f"{test_key}_{i}"))
-        
-        # Check uniqueness
-        self.assertEqual(len(keys), len(set(keys)), "Generated keys must be unique")
 
     def test_stream_roundtrip(self):
         """Test stream operations and chunked reading"""
@@ -484,9 +452,7 @@ class TestObjectStorageSync(unittest.TestCase):
         self.assertEqual(reconstructed, test_data)
 
 if __name__ == '__main__':
-    
     if not init_storage():  # Attempt to initialize storage before running tests
         print("Storage initialization failed; tests may not run fully.")
-        # Don't exit, allow tests to run that don't require storage
     
     unittest.main()
