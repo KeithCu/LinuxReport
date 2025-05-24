@@ -111,12 +111,12 @@ Given a list of news headlines, follow these steps:
 Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
 Think carefully and consisely about relevance, interest, and topic distinction.
 From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
-After reasoning, output {TITLE_MARKER} followed by only the top 3 headlines in this format, with no extra text other than the title on the 3 lines:
+After reasoning, output {TITLE_MARKER} followed by the top 3 headlines in this format, with no extra text but title:
 
 {TITLE_MARKER}
-1. [Full Title 1 Only]
-2. [Full Title 2 Only]
-3. [Full Title 3 Only]
+Best Title
+Second Best Title
+Third Best Title
 """
 
 #O3-suggested alternate prompt for reasoning models
@@ -124,16 +124,16 @@ PROMPT_O3_SYSTEM = """
 FORMAT:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
 2. Write ****** on its own line
-3. List exactly 3 titles, one per line, numbered 1-3
+3. List exactly 3 titles, one per line
 4. Do NOT include any extra text on the title lines
 
 Example format:
 Your reasoning paragraph here.
 
 ******
-1. First actual title here
-2. Second actual title here
-3. Third actual title here
+Best title here
+Second best title here
+Third best title here
 """
 
 PROMPT_O3_USER_TEMPLATE = """
