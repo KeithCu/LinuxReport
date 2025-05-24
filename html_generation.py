@@ -22,7 +22,7 @@ headline_template = Template("""
 {% if image_url %}
 <br/>
 <a href="{{ url }}" target="_blank">
-<img src="{{ image_url }}" width="500" alt="{{ title }}">
+<img src="{{ image_url }}" width="500" alt="headline: {{ title[:50] }}">
 </a>
 {% endif %}
 </center>

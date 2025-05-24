@@ -636,7 +636,8 @@ def append_to_archive(mode, top_articles):
             "title": article["title"],
             "url": article["url"],
             "timestamp": timestamp,
-            "image_url": article.get("image_url")
+            "image_url": article.get("image_url"),
+            "alt_text": f"headline: {article['title'][:50]}" if article.get("image_url") else None
         })
     # Read old entries, append new, and trim to limit
     try:
