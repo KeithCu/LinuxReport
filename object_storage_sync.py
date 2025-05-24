@@ -16,6 +16,8 @@ from io import BytesIO
 from typing import Optional, Dict, Union, Any
 from functools import wraps
 import json
+import datetime
+import mimetypes
 
 import unittest
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -85,16 +87,42 @@ def get_file_metadata(file_path: str) -> Optional[Dict]:
         file_path: Path to the file
         
     Returns:
-        dict: File metadata including hash and content or None on error
+        dict: File metadata including:
+            - hash: SHA-256 hash of file contents
+            - size: File size in bytes
+            - last_modified: Last modified timestamp
+            - content_type: MIME type of the file
+            - content: File contents
+            or None on error
     """
     try:
+        # Check if file exists and is accessible
+        if not os.path.exists(file_path):
+            print(f"File does not exist: {file_path}")
+            return None
+            
+        # Get basic file stats
+        stats = os.stat(file_path)
+        file_size = stats.st_size
+        last_modified = datetime.datetime.fromtimestamp(stats.st_mtime)
+        
+        # Determine content type
+        content_type, _ = mimetypes.guess_type(file_path)
+        if not content_type:
+            content_type = 'application/octet-stream'
+            
+        # Read file and generate hash in one operation
         with open(file_path, 'rb') as f:
             content = f.read()
             file_hash = hashlib.sha256(content).hexdigest()
-            return {
-                'hash': file_hash,
-                'content': content
-            }
+            
+        return {
+            'hash': file_hash,
+            'size': file_size,
+            'last_modified': last_modified,
+            'content_type': content_type,
+            'content': content
+        }
     except Exception as e:
         print(f"Error getting file metadata for {file_path}: {e}")
         return None
