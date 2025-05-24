@@ -12,6 +12,8 @@ import threading
 from timeit import default_timer as timer
 from urllib.parse import urlparse
 from collections import defaultdict
+import json
+import pickle
 
 # Third-party imports
 import feedparser
@@ -24,10 +26,12 @@ from feedfilter import filter_similar_titles, merge_entries, prefilter_news
 from seleniumfetch import fetch_site_posts
 from shared import (
     ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
-    USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY
+    USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,
+    ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_URL, OBJECT_STORE_FEED_TIMEOUT
 )
 from Tor import fetch_via_tor
 from models import DEBUG, USE_TOR
+from object_storage_sync import smart_fetch
 
  #Reddit is a pain, so hide user_agent
 if not g_cs.has("REDDIT_USER_AGENT"):
@@ -53,24 +57,47 @@ def load_url_worker(url):
         rssfeed = None
         res = None  # Ensure res is always defined
 
+        # Check if we should use object store for this feed
+        use_object_store = ENABLE_OBJECT_STORE_FEEDS and not url.startswith("http://") and "fakefeed" not in url
+        if use_object_store:
+            # Use smart_fetch to get feed content with metadata
+            content, metadata = smart_fetch(url, cache_expiry=OBJECT_STORE_FEED_TIMEOUT)
+            if content:
+                try:
+                    # Parse the pickled content from object store
+                    feed_data = pickle.loads(content)
+                    res = feedparser.FeedParserDict(feed_data)
+                    print(f"Successfully fetched feed from object store: {url}")
+                except Exception as e:
+                    print(f"Error parsing object store feed for {url}: {e}")
+                    res = None
+            else:
+                print(f"No content found in object store for {url}")
+                res = None
+
         if "lwn.net" in url:
             new_entries = handle_lwn_feed(url)
         else:
             # Standard feed parsing logic
-            if USE_TOR and "reddit" in url:
-                print(f"Using TOR proxy for Reddit URL: {url}")
-                res = fetch_via_tor(url, rss_info.site_url)
-            elif "fakefeed" in url:
-                res = fetch_site_posts(rss_info.site_url, USER_AGENT)
+            if not use_object_store:  # Only use standard parsing if not using object store
+                if USE_TOR and "reddit" in url:
+                    print(f"Using TOR proxy for Reddit URL: {url}")
+                    res = fetch_via_tor(url, rss_info.site_url)
+                elif "fakefeed" in url:
+                    res = fetch_site_posts(rss_info.site_url, USER_AGENT)
+                else:
+                    user_a = USER_AGENT
+                    if "reddit" in url:
+                        user_a = USER_AGENT_RANDOM
+                    res = feedparser.parse(url, agent=user_a)
+
+            if res:
+                new_entries = prefilter_news(url, res)
+                new_entries = filter_similar_titles(url, new_entries)
+                #Trim the entries to the limit before compare so it doesn't find 500 new entries.
+                new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
             else:
-                user_a = USER_AGENT
-                if "reddit" in url:
-                    user_a = USER_AGENT_RANDOM
-                res = feedparser.parse(url, agent=user_a)
-            new_entries = prefilter_news(url, res)
-            new_entries = filter_similar_titles(url, new_entries)
-            #Trim the entries to the limit before compare so it doesn't find 500 new entries.
-            new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
+                new_entries = []
 
         # Added detailed logging when no entries are found
         if len(new_entries) == 0:
