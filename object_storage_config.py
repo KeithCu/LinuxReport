@@ -2,7 +2,7 @@ import os
 import os.path
 import hashlib
 
-from config_utils import load_config
+from app import load_config
 
 # Object Storage configuration
 STORAGE_ENABLED = False

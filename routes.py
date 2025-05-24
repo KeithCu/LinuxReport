@@ -32,7 +32,7 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS)
 from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 from workers import fetch_urls_parallel, fetch_urls_thread
-from config_utils import get_admin_password
+from app import get_admin_password
 
 # Global setting for background refreshes
 ENABLE_BACKGROUND_REFRESH = True
