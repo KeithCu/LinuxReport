@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import os
-import shutil
-import time
-import diskcache
 import logging
+import diskcache
 
 # Configure logging
 logging.basicConfig(
@@ -124,19 +122,10 @@ if __name__ == "__main__":
     # Use current directory by default
     CACHE_DIR = os.getcwd()
     
-    # Create a backup of the cache directory first
-    backup_dir = f"{CACHE_DIR}_backup_{int(time.time())}"
-    logging.info(f"Creating backup at {backup_dir}")
-    shutil.copytree(CACHE_DIR, backup_dir)
-    
     logging.info("Starting migration to SQLite-only storage...")
     if migrate_to_sqlite(CACHE_DIR):
         logging.info("Migration completed successfully!")
-        logging.info(f"Backup is available at {backup_dir}")
         logging.info(f"New SQLite-only cache is in: {os.path.join(CACHE_DIR, 'migrated')}")
         logging.info("You can now update your DiskCache configuration to use sqlite_only=True")
     else:
-        logging.error("Migration failed! Restoring from backup...")
-        shutil.rmtree(CACHE_DIR)
-        shutil.copytree(backup_dir, CACHE_DIR)
-        logging.info("Restored from backup. Please check the errors above and try again.") 
+        logging.error("Migration failed! Please check the errors above and try again.") 
