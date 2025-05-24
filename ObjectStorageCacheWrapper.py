@@ -21,7 +21,7 @@ Key features:
 The cache wrapper provides a compatible interface with DiskCacheWrapper but uses
 object storage as the backend instead of local disk cache.
 """
-import json
+import pickle
 import hashlib
 import datetime
 from typing import Any, Optional
@@ -92,7 +92,7 @@ class ObjectStorageCacheWrapper:
             if obj:
                 content = obj.as_stream().read()
                 if content:
-                    data = json.loads(content.decode('utf-8'))
+                    data = pickle.loads(content)
                     g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
         except Exception as e:
             print(f"Error refreshing object {obj_name}: {e}")
@@ -101,24 +101,12 @@ class ObjectStorageCacheWrapper:
             self._refresh_locks.pop(key, None)
         
     def _get_object_metadata(self, obj_name: str) -> Optional[dict]:
-        """Get object metadata without fetching content.
-        
-        Linode Object Storage, being S3-compatible, supports system-defined metadata similar to AWS S3, accessible via libcloud's `Object` instance. This includes:
-        - last-modified: The date and time the object was last modified, available in `obj.extra['last_modified']`, essential for tracking updates.
-        - content-length: The object size in bytes, accessible as `obj.size` or `obj.extra['content_length']`.
-        - etag: An entity tag (often an MD5 hash for unencrypted objects), accessible as `obj.hash` or `obj.extra['etag']`, used as a version identifier.
-        - content-type: The MIME type of the object, available as `obj.content_type`, indicating the data format.
-        - Optional headers: Fields like `cache-control`, `content-disposition`, or `x-amz-storage-class` may be included in `obj.extra` if configured during object creation.        
-        Returns:
-            dict: Object metadata including last_modified, size, and hash (etag), or None if object doesn't exist
-        """
+        """Get object metadata without fetching content."""
         try:
             obj = object_storage_sync._get_object(obj_name)
-            return {
-                'last_modified': obj.extra.get('last_modified'),
-                'size': obj.size,
-                'hash': obj.hash
-            }
+            if obj:
+                return object_storage_sync._get_object_metadata(obj)
+            return None
         except Exception as e:
             print(f"Error getting metadata for {obj_name}: {e}")
             return None
@@ -142,23 +130,12 @@ class ObjectStorageCacheWrapper:
             return None
         
         try:
-            return json.loads(content.decode('utf-8'))
-        except json.JSONDecodeError as e:
-            print(f"Error decoding JSON for key: {key}, exception: {e}")
+            return pickle.loads(content)
+        except pickle.UnpicklingError as e:
+            print(f"Error unpickling data for key: {key}, exception: {e}")
             return None
 
-    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
-        """Store a value in the cache.
-        
-        Stores in both in-memory cache and object storage.
-        """
-        memory_key = self._get_memory_cache_key(key)
-        g_cm.set(memory_key, value, ttl=self.local_cache_expiry)
-        
-        obj_name = self._get_object_name(key)
-        json_data = json.dumps(value).encode('utf-8')
-        object_storage_sync.publish_bytes(json_data, key=obj_name)
-            
+    @object_storage_sync.retry_decorator()
     def delete(self, key: str) -> None:
         """Delete a value from both in-memory and object storage caches."""
         # Delete from memory cache first
@@ -175,6 +152,18 @@ class ObjectStorageCacheWrapper:
         except Exception as e:
             print(f"Error deleting cache value for {key}: {e}")
             
+    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
+        """Store a value in the cache.
+        
+        Stores in both in-memory cache and object storage.
+        """
+        memory_key = self._get_memory_cache_key(key)
+        g_cm.set(memory_key, value, ttl=self.local_cache_expiry)
+        
+        obj_name = self._get_object_name(key)
+        pickled_data = pickle.dumps(value)
+        object_storage_sync.publish_bytes(pickled_data, key=obj_name)
+
     def has(self, key: str) -> bool:
         """Check if a key exists in either in-memory or object storage cache."""
         memory_key = self._get_memory_cache_key(key)

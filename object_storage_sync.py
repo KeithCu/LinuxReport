@@ -231,27 +231,6 @@ def fetch_file(file_path: str) -> tuple[Optional[bytes], Optional[Dict]]:
         raise
 
 @retry_decorator()
-def fetch_file_stream(file_path: str) -> tuple[Optional[BytesIO], Optional[Dict]]:
-    """Fetch a file from object storage as a stream with its metadata.
-    
-    Args:
-        file_path: Identifier for the file to fetch
-    
-    Returns:
-        Tuple containing file stream and metadata or None values if not found
-    """
-    try:
-        content, metadata = fetch_bytes(file_path)
-        if content is not None:
-            print(f"Streamed file ({len(content)} bytes) from key: {file_path}")
-            return BytesIO(content), metadata
-        print(f"No content retrieved for key: {file_path}")
-        return None, None
-    except Exception as e:
-        print(f"Error fetching file stream: {file_path}, exception: {e}")
-        raise
-
-@retry_decorator()
 def publish_bytes(bytes_data: bytes, key: str) -> Any:
     """Publish raw bytes to object storage.
     
@@ -454,30 +433,6 @@ class TestObjectStorageSync(unittest.TestCase):
             if os.path.exists(test_path):
                 os.remove(test_path)
 
-    def test_stream_roundtrip(self):
-        """Test stream operations and chunked reading"""
-        test_data = b'Test content for stream roundtrip'
-        test_key = 'stream_roundtrip'
-        
-        # Test upload via stream
-        uploaded_obj = publish_bytes(test_data, test_key)
-        self.assertIsNotNone(uploaded_obj)
-        
-        # Test stream download
-        stream, metadata = fetch_file_stream(test_key)
-        self.assertIsNotNone(stream)
-        
-        # Read in chunks
-        chunk_size = 2
-        chunks = []
-        while True:
-            chunk = stream.read(chunk_size)
-            if not chunk:
-                break
-            chunks.append(chunk)
-            
-        reconstructed = b''.join(chunks)
-        self.assertEqual(reconstructed, test_data)
 
 if __name__ == '__main__':
     if not init_storage():  # Attempt to initialize storage before running tests
