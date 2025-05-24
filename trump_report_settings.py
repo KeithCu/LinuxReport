@@ -36,7 +36,12 @@ CONFIG: SiteConfig = SiteConfig(
 	LOGO_URL="TrumpReport.webp",
 	WEB_DESCRIPTION="Trump Report",
 	WEB_TITLE="TrumpReport",
-	REPORT_PROMPT=f"Trump's biggest supporters of his second term Presidency, which began on January 20, 2025, as of today: {datetime.date.today().strftime('%B %d, %Y')} ",
+	REPORT_PROMPT=f'''Trump's biggest supporters of his second term Presidency, which began on January 20, 2025, as of today: {datetime.date.today().strftime('%B %d, %Y')}
+VP: J.D. Vance
+Cabinet: Marco Rubio (State), Pete Hegseth (Defense), Scott Bessent (Treasury), Pam Bondi (AG), Doug Burgum (Interior), Lori Chavez-DeRemer (Labor), Sean Duffy (Transpo),
+Robert F. Kennedy Jr. (HHS), Howard Lutnick (Commerce), Linda McMahon (Ed), Kristi Noem (DHS), Brooke Rollins (Ag), Eric Turner (HUD), Lee Zeldin (EPA), Chris Wright (Energy)
+Allies: Elon Musk (DOGE - Department of Government Efficiency), Russell Vought (OMB), Stephen Miller (Deputy CoS)
+''',
     PATH="/srv/http/trumpreport",
     SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 18, 20, 22],
     CUSTOM_FETCH_CONFIG={
