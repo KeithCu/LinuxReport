@@ -10,6 +10,21 @@ from dataclasses import dataclass
 from typing import Dict, List
 import socket
 import time
+import os
+import yaml
+import logging
+from shared import PATH
+
+# --- Shared Reddit Fetch Config ---
+REDDIT_FETCH_CONFIG = {
+    "needs_selenium": True,
+    "needs_tor": True,
+    "post_container": "article",
+    "title_selector": "a[id^='post-title-']",
+    "link_selector": "a[id^='post-title-']",
+    "link_attr": "href",
+    "filter_pattern": ""
+}
 
 
 @dataclass
@@ -83,13 +98,34 @@ if USE_TOR and not is_tor_running():
     print("Tor is enabled but not running. Falling back to direct connection.")
     USE_TOR = False
 
-# --- Shared Reddit Fetch Config ---
-REDDIT_FETCH_CONFIG = {
-    "needs_selenium": True,
-    "needs_tor": True,
-    "post_container": "article",
-    "title_selector": "a[id^='post-title-']",
-    "link_selector": "a[id^='post-title-']",
-    "link_attr": "href",
-    "filter_pattern": ""
-}
+
+def load_config():
+    """
+    Load configuration from config.yaml file.
+    Returns a dictionary with configuration values.
+    Raises an exception if the config file is missing or if necessary keys are missing.
+    """
+    config_path = os.path.join(PATH, 'config.yaml')
+    
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                yaml_config = yaml.safe_load(f)
+                
+                # Update config with values from YAML file
+                if yaml_config and isinstance(yaml_config, dict):
+                    # Handle admin section
+                    if 'admin' in yaml_config and isinstance(yaml_config['admin'], dict):
+                        return yaml_config
+                    else:
+                        raise ValueError("Missing 'admin' section in config file.")
+        else:
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+    except Exception as e:
+        logging.error(f"Error loading config.yaml: {e}")
+        raise
+
+def get_admin_password():
+    """Get the admin password from configuration."""
+    config = load_config()
+    return config['admin']['password']

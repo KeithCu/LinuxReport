@@ -9,8 +9,6 @@ import hashlib
 from functools import lru_cache
 import datetime
 import glob
-import yaml
-import logging
 
 # Third-party imports
 from flask import Flask
@@ -20,38 +18,7 @@ sys.path.insert(0, "/srv/http/LinuxReport2")
 
 # Local imports
 from shared import EXPIRE_WEEK, PATH, ABOVE_HTML_FILE, MODE
-from models import DEBUG
-
-def load_config():
-    """
-    Load configuration from config.yaml file.
-    Returns a dictionary with configuration values.
-    Raises an exception if the config file is missing or if necessary keys are missing.
-    """
-    config_path = os.path.join(PATH, 'config.yaml')
-    
-    try:
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                yaml_config = yaml.safe_load(f)
-                
-                # Update config with values from YAML file
-                if yaml_config and isinstance(yaml_config, dict):
-                    # Handle admin section
-                    if 'admin' in yaml_config and isinstance(yaml_config['admin'], dict):
-                        return yaml_config
-                    else:
-                        raise ValueError("Missing 'admin' section in config file.")
-        else:
-            raise FileNotFoundError(f"Config file not found: {config_path}")
-    except Exception as e:
-        logging.error(f"Error loading config.yaml: {e}")
-        raise
-
-def get_admin_password():
-    """Get the admin password from configuration."""
-    config = load_config()
-    return config['admin']['password']
+from models import DEBUG, load_config, get_admin_password
 
 # Initialize Flask app
 g_app = Flask(__name__)

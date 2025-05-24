@@ -21,7 +21,7 @@ from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
 from forms import ConfigForm, CustomRSSForm, UrlForm
-from models import RssInfo, DEBUG
+from models import RssInfo, DEBUG, get_admin_password
 # Local imports
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_WEEK, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
@@ -32,7 +32,6 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS)
 from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 from workers import fetch_urls_parallel, fetch_urls_thread
-from app import get_admin_password
 
 # Global setting for background refreshes
 ENABLE_BACKGROUND_REFRESH = True

@@ -83,7 +83,7 @@ ENABLE_URL_IMAGE_CDN_DELIVERY = True
 CDN_IMAGE_URL = "https://linuxreportstatic.us-ord-1.linodeobjects.com/"
 
 # Enable fetching non-custom feeds from object store instead of original URLs
-ENABLE_OBJECT_STORE_FEEDS = True
+ENABLE_OBJECT_STORE_FEEDS = False
 OBJECT_STORE_FEED_URL = "https://linuxreportupdates.us-ord-1.linodeobjects.com/feeds/"
 OBJECT_STORE_FEED_TIMEOUT = 15 * 60  # 15 minutes in seconds
 
