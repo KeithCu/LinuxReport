@@ -448,9 +448,12 @@ def _try_call_model(client, model, messages, max_tokens):
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text after the last '{TITLE_MARKER}' marker."""
     marker_index = text.rfind(TITLE_MARKER)
-    if (marker_index != -1):
-        # Use the content after the last '{TITLE_MARKER}'
-        text = text[marker_index + len(TITLE_MARKER):]
+    if marker_index == -1:
+        print(f"Warning: Response does not contain required marker '{TITLE_MARKER}'")
+        return []
+        
+    # Use the content after the last '{TITLE_MARKER}'
+    text = text[marker_index + len(TITLE_MARKER):]
     lines = text.splitlines()
     titles = []
 
@@ -479,6 +482,11 @@ def extract_top_titles_from_ai(text):
         if len(titles) == 3:
             break
 
+    if not titles:
+        print("Warning: No valid titles found in response")
+        return []
+        
+    print(f"Found {len(titles)} valid titles in response")
     return titles
 
 
