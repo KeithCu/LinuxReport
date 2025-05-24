@@ -68,11 +68,7 @@ import uuid
 from typing import Optional, Dict
 from io import BytesIO
 import hashlib
-
-try:
-    import ujson as json
-except ImportError:
-    import json
+import pickle
 
 from abc import ABC, abstractmethod
 
@@ -83,6 +79,7 @@ from object_storage_sync import (
     generate_object_name, 
     publish_file, 
     fetch_file,
+    publish_bytes,
     retry_decorator
 )
 
@@ -160,8 +157,8 @@ class ObjectStorageLock(LockBase):
         self.metadata = metadata or {}
         
         # Validate metadata size (S3 limit: 2KB)
-        metadata_str = json.dumps(self.metadata)
-        if len(metadata_str.encode('utf-8')) > 2048:
+        metadata_bytes = pickle.dumps(self.metadata)
+        if len(metadata_bytes) > 2048:
             raise ValueError("Metadata exceeds 2KB limit")
         
         self._fencing_token = 0  # Monotonic counter for safety
@@ -246,35 +243,27 @@ class ObjectStorageLock(LockBase):
             print(f"Error acquiring lock {self.lock_key}: {e}")
             return False
             
-    @retry_decorator()
     def _get_lock_info(self):
-        """Get current lock information from object storage."""
+        """Get current lock information from storage."""
         try:
-            # Use fetch_file from object_storage_sync to get lock data
-            content, metadata = fetch_file(self.lock_object_name, force=True)  # Assuming fetch_file can handle object names
+            content, _ = fetch_file(self.lock_object_name)
             if content:
-                return json.loads(content.decode('utf-8'))
+                return pickle.loads(content)
             return None
         except Exception as e:
             print(f"Error getting lock info for {self.lock_key}: {e}")
-            raise
-            
+            return None
+
     @retry_decorator()
     def _put_lock_info(self, lock_data):
-        """Store lock information in object storage."""
+        """Put lock information to storage."""
         try:
-            json_data = json.dumps(lock_data).encode('utf-8')
-            extra_metadata = {
-                'lock_name': self.lock_name,
-                'owner_id': self.owner_id,
-                'expiry': str(lock_data['expiry']),
-                'server_id': oss_config.SERVER_ID,
-                **self.metadata
-            }
-            object_storage_sync.publish_bytes(json_data, key=self.lock_object_name, metadata=extra_metadata)  # Use publish_bytes directly
+            content = pickle.dumps(lock_data)
+            publish_bytes(content, self.lock_object_name)
+            return True
         except Exception as e:
             print(f"Error putting lock info for {self.lock_key}: {e}")
-            raise
+            return False
     
     def release(self) -> bool:
         """
@@ -419,7 +408,7 @@ if __name__ == '__main__':
                 'fencing_token': 1
             }
             mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = [json.dumps(expired_lock_data).encode('utf-8')]
+            mock_stream.__iter__.return_value = [pickle.dumps(expired_lock_data)]
             self.mock_driver.download_object_as_stream.return_value = mock_stream
             result = self.lock.acquire()
             self.assertTrue(result)
@@ -435,7 +424,7 @@ if __name__ == '__main__':
                 'fencing_token': 1
             }
             mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = [json.dumps(valid_lock_data).encode('utf-8')]
+            mock_stream.__iter__.return_value = [pickle.dumps(valid_lock_data)]
             self.mock_driver.download_object_as_stream.return_value = mock_stream
             result = self.lock.acquire()
             self.assertFalse(result)
@@ -462,7 +451,7 @@ if __name__ == '__main__':
                 'fencing_token': self.lock._fencing_token
             }
             mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = [json.dumps(current_lock).encode('utf-8')]
+            mock_stream.__iter__.return_value = [pickle.dumps(current_lock)]
             self.mock_driver.download_object_as_stream.return_value = mock_stream
             result = self.lock.renew(20)
             self.assertTrue(result)
@@ -476,7 +465,7 @@ if __name__ == '__main__':
             
         def test_invalid_lock_data(self):
             mock_stream = MagicMock()
-            mock_stream.__iter__.return_value = [b"invalid json"]
+            mock_stream.__iter__.return_value = [b"invalid pickle"]
             self.mock_driver.download_object_as_stream.return_value = mock_stream
             result = self.lock.acquire()
             self.assertFalse(result)

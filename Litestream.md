@@ -15,29 +15,32 @@ Litestream is a powerful tool that provides continuous replication for SQLite da
 
 For applications that primarily deal with feed data and updates, there are simpler alternatives to Litestream that may be more appropriate:
 
-### Object Store with Separate Process
+### Object Store with Metadata-Based Updates
 
 This approach is particularly well-suited for feed-based applications where:
 - Data changes are infrequent and predictable
 - You want to minimize complexity
+- You want to avoid running separate processes
 
-#### Implementation Options:
+#### Implementation Strategy:
 
-1. **Separate Process Approach (Recommended)**
-   - Run a separate process that:
-     - Downloads new feed data directly from sources
-     - Updates local SQLite/diskcache
-     - Runs on its own schedule
-   - Main application:
-     - Reads from local diskcache
-     - Always has fresh data
-     - No need to deal with file swapping or S3
+1. **Direct Object Store Access with Metadata**
+   - Servers are configured to fetch directly from object store instead of original URLs
+   - Cache is configured with a 15-minute TTL
+   - Each feed entry includes metadata about its last update time
+   - When cache expires:
+     - Check metadata to determine if new data is available
+     - Only fetch if metadata indicates changes
    - Benefits:
-     - Only transfers new data, not entire database files
-     - Local diskcache stays consistent
-     - No need to pause or swap files
-     - Better use of bandwidth
-     - Simpler architecture overall
+     - No separate process needed
+     - Efficient bandwidth usage (only fetch when needed)
+     - Simple architecture
+     - Natural load distribution
+     - Built-in redundancy through object store
+   - Implementation considerations:
+     - Ensure object store has proper caching headers
+     - Implement metadata comparison logic
+     - Handle object store authentication securely
 
 2. **Controlled File Swap**
    - Main application pauses briefly every 5 minutes
@@ -251,17 +254,24 @@ The retention policy in Litestream works differently from traditional backup sys
    - Consider using tmpfs for WAL files
 
 5. **Handling Replicated Database Access**
-   - **Option 1: Separate Process Approach**
-     - Run a separate process that monitors S3 for changes
-     - Downloads new feed data directly from sources
-     - Updates local SQLite/diskcache
-     - Main application reads from local diskcache
+   - **Option 1: Direct Object Store Access with Metadata**
+     - Servers are configured to fetch directly from object store instead of original URLs
+     - Cache is configured with a 15-minute TTL
+     - Each feed entry includes metadata about its last update time
+     - When cache expires:
+       - Check metadata to determine if new data is available
+       - Only fetch if metadata indicates changes
      - Benefits:
-       - Only transfers new data, not entire database files
-       - Local diskcache stays consistent
-       - No need to pause or swap files
-       - Better use of bandwidth
-       - Simpler architecture overall
+       - No separate process needed
+       - Efficient bandwidth usage (only fetch when needed)
+       - Simple architecture
+       - Natural load distribution
+       - Built-in redundancy through object store
+     - Implementation considerations:
+       - Ensure object store has proper caching headers
+       - Implement metadata comparison logic
+       - Handle object store authentication securely
+       - Consider using CDN for better performance
 
    - **Option 2: Controlled File Swap**
      - Main application pauses briefly every 5 minutes
@@ -285,7 +295,7 @@ The retention policy in Litestream works differently from traditional backup sys
        - Need to handle S3 credentials
 
    - **Recommendation:**
-     - Start with Option 1 (Separate Process)
+     - Start with Option 1 (Direct Object Store Access with Metadata)
      - Provides best balance of performance and simplicity
      - No need to pause application
      - Efficient use of bandwidth

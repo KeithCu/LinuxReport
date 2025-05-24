@@ -24,6 +24,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 # Import from object_storage_config
 import object_storage_config as oss_config
+from shared import g_cm
 
 from object_storage_config import (
     LIBCLOUD_AVAILABLE, STORAGE_ENABLED,
@@ -291,24 +292,22 @@ def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
         raise
 
 @retry_decorator()
-def smart_fetch(key: str, memory_cache=None, cache_expiry: int = None) -> tuple[Optional[bytes], Optional[Dict]]:
-    """Smart fetch that handles caching and metadata checks.
+def smart_fetch(key: str, cache_expiry: int = None) -> tuple[Optional[bytes], Optional[Dict]]:
+    """Smart fetch that handles caching and metadata checks using the global cache manager.
     
     Args:
         key: Identifier for the object to fetch
-        memory_cache: Optional memory cache instance to use
         cache_expiry: Optional cache expiry time in seconds
         
     Returns:
         Tuple containing raw bytes and metadata or None values if not found
     """
     try:
-        # If memory cache is provided, check it first
-        if memory_cache is not None:
-            memory_key = f"objstorage_cache:{key}"
-            cached_value = memory_cache.get(memory_key)
-            if cached_value is not None:
-                return cached_value, None
+        # Check global cache first
+        memory_key = f"objstorage_cache:{key}"
+        cached_value = g_cm.get(memory_key)
+        if cached_value is not None:
+            return cached_value, None
 
         # Get object and metadata
         obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_key(key, 'data')}")
@@ -317,15 +316,14 @@ def smart_fetch(key: str, memory_cache=None, cache_expiry: int = None) -> tuple[
 
         metadata = _get_object_metadata(obj)
         
-        # If memory cache is provided, check last-modified
-        if memory_cache is not None:
-            last_modified_key = f"{memory_key}:last_modified"
-            cached_last_modified = memory_cache.get(last_modified_key)
-            
-            if cached_last_modified == metadata['last_modified']:
-                cached_content = memory_cache.get(f"{memory_key}:content")
-                if cached_content:
-                    return cached_content, metadata
+        # Check last-modified in global cache
+        last_modified_key = f"{memory_key}:last_modified"
+        cached_last_modified = g_cm.get(last_modified_key)
+        
+        if cached_last_modified == metadata['last_modified']:
+            cached_content = g_cm.get(f"{memory_key}:content")
+            if cached_content:
+                return cached_content, metadata
 
         # Fetch content
         content_buffer = BytesIO()
@@ -335,11 +333,11 @@ def smart_fetch(key: str, memory_cache=None, cache_expiry: int = None) -> tuple[
         if not content:
             return None, None
             
-        # Cache the results if memory cache is provided
-        if memory_cache is not None and cache_expiry is not None:
-            memory_cache.set(memory_key, content, ttl=cache_expiry)
-            memory_cache.set(last_modified_key, metadata['last_modified'], ttl=cache_expiry)
-            memory_cache.set(f"{memory_key}:content", content, ttl=cache_expiry)
+        # Cache the results if expiry is provided
+        if cache_expiry is not None:
+            g_cm.set(memory_key, content, ttl=cache_expiry)
+            g_cm.set(last_modified_key, metadata['last_modified'], ttl=cache_expiry)
+            g_cm.set(f"{memory_key}:content", content, ttl=cache_expiry)
         
         return content, metadata
             

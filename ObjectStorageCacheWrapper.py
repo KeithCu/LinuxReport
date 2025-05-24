@@ -124,7 +124,7 @@ class ObjectStorageCacheWrapper:
         immediately while fresh data is fetched asynchronously.
         """
         obj_name = self._get_object_name(key)
-        content, _ = object_storage_sync.smart_fetch(obj_name, memory_cache=g_cm, cache_expiry=self.local_cache_expiry)
+        content, _ = object_storage_sync.smart_fetch(obj_name, cache_expiry=self.local_cache_expiry)
         
         if content is None:
             return None
