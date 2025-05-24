@@ -15,12 +15,12 @@ STORAGE_HOST = "us-ord-1.linodeobjects.com"
 STORAGE_SYNC_PATH = "feeds/"
 
 
+# Common constants for all object storage modules
 DEFAULT_RETRY_INTERVAL = 1.0  # Base interval for lock acquisition retries
 MIN_RETRY_INTERVAL = 1.0      # Minimum retry interval in seconds
 MAX_RETRY_INTERVAL = 10.0     # Maximum retry interval in seconds
 MAX_RETRY_ATTEMPTS = 3        # Maximum number of retry attempts for S3 operations
 RETRY_MULTIPLIER = 1.0        # Multiplier for exponential backoff
-TEMP_FILE_EXTENSION = '.json'  # Constant for consistent temporary file naming
 
 
 # Sync configuration
@@ -153,5 +153,29 @@ def init_storage() -> bool:
             raise StorageConnectionError(f"Error initializing storage driver: {e}")
     
     return True
+
+def generate_object_name(key: str, prefix: str = "") -> str:
+    """Generate a unique object name for storage.
+    
+    Args:
+        key: Base identifier for the object
+        prefix: Optional prefix to add to the path (e.g., 'cache/', 'lock/')
+        
+    Returns:
+        str: Unique object name with server ID and hash
+    """
+    if not key:
+        raise ValueError("Key cannot be empty")
+        
+    # Generate hash of the key
+    key_hash = hashlib.md5(key.encode()).hexdigest()
+    
+    # Build the full path
+    path_parts = [STORAGE_SYNC_PATH]
+    if prefix:
+        path_parts.append(prefix)
+    path_parts.extend([SERVER_ID, key_hash])
+    
+    return "/".join(path_parts)
 
 

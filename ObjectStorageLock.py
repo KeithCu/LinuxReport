@@ -70,12 +70,10 @@ from io import BytesIO
 import hashlib
 import pickle
 
-
-# Import from config module (assumed to exist)
+# Import from config module
 import object_storage_config as oss_config
 import object_storage_sync
 from object_storage_sync import (
-    generate_object_name, 
     publish_file, 
     fetch_file,
     publish_bytes,
@@ -84,15 +82,9 @@ from object_storage_sync import (
 )
 from models import LockBase
 
-# Global constants for backoff and retry configuration
-DEFAULT_RETRY_INTERVAL = 1.0  # Base interval for lock acquisition retries
-MIN_RETRY_INTERVAL = 1.0      # Minimum retry interval in seconds
-MAX_RETRY_INTERVAL = 10.0     # Maximum retry interval in seconds
-MAX_RETRY_ATTEMPTS = 3        # Maximum number of retry attempts for S3 operations
-RETRY_MULTIPLIER = 1.0        # Multiplier for exponential backoff
-TEMP_FILE_EXTENSION = '.json'  # Constant for consistent temporary file naming
-
-
+DEFAULT_RETRY_INTERVAL = oss_config.DEFAULT_RETRY_INTERVAL
+MIN_RETRY_INTERVAL = oss_config.MIN_RETRY_INTERVAL
+MAX_RETRY_INTERVAL = oss_config.MAX_RETRY_INTERVAL
 
 class ObjectStorageLock(LockBase):
     """
@@ -131,7 +123,7 @@ class ObjectStorageLock(LockBase):
         
         self._thread_local = threading.local()
         self._thread_local.lock_count = 0
-        self.retry_interval = max(MIN_RETRY_INTERVAL, retry_interval)  # Ensure minimum interval
+        self.retry_interval = max(MIN_RETRY_INTERVAL, retry_interval)
         self.metadata = metadata or {}
         
         # Validate metadata size (S3 limit: 2KB)
@@ -139,10 +131,10 @@ class ObjectStorageLock(LockBase):
         if len(metadata_bytes) > 2048:
             raise ValueError("Metadata exceeds 2KB limit")
         
-        self._fencing_token = 0  # Monotonic counter for safety
+        self._fencing_token = 0
 
     def _get_object_name(self, key: str) -> str:
-        return generate_object_name(key)  # Use the imported function
+        return oss_config.generate_object_name(key, prefix="lock")
         
     def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
         """

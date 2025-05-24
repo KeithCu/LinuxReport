@@ -33,42 +33,12 @@ from object_storage_config import (
     StorageOperationError,
     ConfigurationError,
     StorageConnectionError,
-    LibcloudError
+    LibcloudError,
+    generate_object_name,
+    MAX_RETRY_ATTEMPTS,
+    RETRY_MULTIPLIER,
+    MAX_RETRY_INTERVAL
 )
-
-def generate_object_name(url: str) -> str:
-    """Generate a unique object name for a feed URL
-    
-    Args:
-        url: Feed URL to generate name for
-    
-    Returns:
-        str: Unique object name with server ID and hash
-    """
-    url_hash = hashlib.md5(url.encode()).hexdigest()
-    return f"{STORAGE_SYNC_PATH}{SERVER_ID}/feeds/{url_hash}.json"
-
-def generate_object_key(key: Union[str, bytes], salt: str = "") -> str:
-    """Generate a safe, consistent object key
-    
-    Args:
-        key: Base identifier for the object
-        salt: Optional additional string to differentiate keys
-    
-    Returns:
-        str: MD5 hash-based key with salt
-    """
-    if isinstance(key, str):
-        key_bytes = key.encode()
-    else:
-        key_bytes = key
-    
-    combined = key_bytes
-    if salt:
-        combined += salt.encode()
-    
-    key_hash = hashlib.md5(combined).hexdigest()
-    return f"{key_hash}"
 
 def generate_file_object_name(file_path: str) -> str:
     """Generate a unique object name for a file
@@ -79,7 +49,7 @@ def generate_file_object_name(file_path: str) -> str:
     Returns:
         str: Unique object name for storage
     """
-    return f"{STORAGE_SYNC_PATH}files/{SERVER_ID}/{generate_object_key(file_path)}"
+    return generate_object_name(file_path, prefix="files")
 
 def get_file_metadata(file_path: str) -> Optional[Dict]:
     """Get metadata for a file using S3's built-in metadata fields
@@ -170,7 +140,7 @@ def _get_object(obj_name: str) -> Optional[Any]:
         print(f"Error getting object {obj_name}: {e}")
         raise
 
-def retry_decorator(max_retries: int = oss_config.MAX_RETRY_ATTEMPTS):
+def retry_decorator(max_retries: int = MAX_RETRY_ATTEMPTS):
     """Create retry decorator for object storage operations"""
     def decorator(func):
         @wraps(func)
@@ -179,8 +149,8 @@ def retry_decorator(max_retries: int = oss_config.MAX_RETRY_ATTEMPTS):
                 return retry(
                     stop=stop_after_attempt(max_retries),
                     wait=wait_exponential(
-                        multiplier=oss_config.RETRY_MULTIPLIER,
-                        max=oss_config.MAX_RETRY_INTERVAL
+                        multiplier=RETRY_MULTIPLIER,
+                        max=MAX_RETRY_INTERVAL
                     ),
                     retry=retry_if_exception_type((StorageOperationError, LibcloudError)),
                     reraise=True

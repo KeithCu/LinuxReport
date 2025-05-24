@@ -74,7 +74,7 @@ class ObjectStorageCacheWrapper:
                     
     def _get_object_name(self, key: str) -> str:
         """Generate a unique object name for a cache key."""
-        return f"{oss_config.STORAGE_SYNC_PATH}cache/{oss_config.SERVER_ID}/{object_storage_sync.generate_object_key(key)}"
+        return oss_config.generate_object_name(key, prefix="cache")
         
     def _get_memory_cache_key(self, key: str) -> str:
         """Generate a unique memory cache key."""
