@@ -5,7 +5,7 @@ const weatherWidgetToggleEnabled = true;
 const WEATHER_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 // Flag to use linuxreport.net for weather data (cross-origin)
-const USE_LINUXREPORT_WEATHER = false;
+const USE_LINUXREPORT_WEATHER = true;
 const WEATHER_BASE_URL = USE_LINUXREPORT_WEATHER ? 'https://linuxreport.net' : '';
 
 // --- Weather Widget Toggle ---
