@@ -2,6 +2,13 @@
 
 As LinuxReport grows in popularity, this scaling plan provides a roadmap for efficiently handling increased traffic while maintaining cost-effectiveness.
 
+### Note on Database Replication Solutions
+While database replication solutions like Litestream and rqlite exist, they are not suitable for this scaling scenario:
+- **Litestream**: Designed primarily for disaster recovery, not for replicating two live databases. It's excellent for backup and recovery but doesn't solve the scaling problem of having multiple live servers.
+- **rqlite**: Requires using its own API instead of direct SQLite calls. Since LinuxReport uses the standard diskcache / SQLite API directly, this would require significant code changes and isn't a practical solution.
+
+Instead, this plan focuses on a more appropriate architecture using object storage as the central data store, allowing for true horizontal scaling without the complexity of database replication.
+
 ### Current Setup
 - Single server (Linode Nanode 1GB/$5/month)
 - All components (web server, feed fetching, content generation) on one machine
@@ -412,12 +419,6 @@ if ! pgrep -f "your_update_script.py" > /dev/null; then
     exit 1
 fi
 
-# Check if Litestream is running
-if ! systemctl is-active --quiet litestream; then
-    echo "Litestream not running"
-    exit 1
-fi
-
 # Check if files were updated in the last hour
 if [ ! -f "/path/to/last_update.txt" ] || [ $(($(date +%s) - $(stat -c %Y "/path/to/last_update.txt"))) -gt 3600 ]; then
     echo "Files not updated in the last hour"
@@ -436,56 +437,57 @@ This approach ensures:
 - Current high reliability through server stability
 - Future improvements planned for even better reliability
 
-#### Why Litestream is Perfect for LinuxReport
+#### New Scale-Out Architecture
 
-Litestream's key advantages make it the ideal solution for LinuxReport:
+The new scaling approach focuses on separating feed processing from UI serving, using object storage as the central data store:
 
-1. **Zero Application Changes**
-   - Your DiskCache code works exactly the same
-   - No need to modify any database calls
-   - No special connection handling
-   - No client library changes
-   - No API modifications
-   - Works with any SQLite-based application
-   - No need to rewrite database access code
-   - Preserves all existing functionality
-   - Maintains compatibility with DiskCache
-   - No special configuration needed
+1. **Backend Servers (Feed Processing)**
+   - Multiple backend servers process feeds independently
+   - Each server publishes processed data directly to object storage
+   - No need for complex replication or synchronization
+   - Simple, stateless operation
+   - Can scale horizontally by adding more backend servers
+   - Each server can process a subset of feeds
+   - No need for ObjectStorageCacheWrapper or ObjectStorageLock
+   - Direct publishing of processed data to object storage
 
-2. **Superior Performance**
-   - Direct file system access (microseconds)
-   - No network latency overhead
-   - No TCP/IP stack processing
-   - No HTTP request/response cycle
-   - No serialization/deserialization needed
-   - Zero network bandwidth usage for reads
-   - No need for additional caching layer
-   - Lower CPU usage (no HTTP processing)
-   - Reduced memory requirements
-   - No connection pooling needed
-   - OS-level page cache works automatically
-   - No cache invalidation complexity
-   - No cache consistency issues
-   - No cache warming needed
+2. **Frontend Servers (UI Serving)**
+   - Multiple frontend servers serve the UI
+   - Read data from object storage instead of direct remote servers
+   - Implement local caching for performance (1 hr, then start checking every 10 minutes)
+   - Use simple routines from object_storage_sync to fetch data
+   - Cache data in memory for fast access
+   - No need for complex replication
+   - Can scale horizontally by adding more frontend servers
+   - Each server maintains its own cache
 
-3. **Simple Integration**
-   - Just install and configure Litestream
-   - Point it at your SQLite database
-   - That's it!
-   - Your application keeps working as before
-   - No code changes required
-   - Faster response times for users
-   - Lower server resource usage
-   - Simpler architecture
-   - Better scalability
-   - More cost-effective
+3. **Weather Data Handling**
+   - Weather data is a simpler case that can be handled separately
+   - Can use a dedicated weather processing server
+   - Publish weather data to object storage
+   - Frontend servers cache weather data locally
+   - Simple TTL-based cache invalidation
+   - No need for complex synchronization
 
-This is particularly important for LinuxReport because:
-- You're using DiskCache which expects standard SQLite
-- The application code is already working well
-- No need to modify proven database access patterns
-- Can scale without touching the application code
-- Maintains compatibility with all existing features
-- Provides better performance than object storage
-- Simpler to maintain and monitor
-- More cost-effective than complex solutions
+4. **Implementation Details**
+   - Use existing object_storage_sync routines for data fetching
+   - Implement simple in-memory caching on frontend servers
+   - No need for complex distributed caching
+   - Each server can operate independently
+   - Simple health checks and monitoring
+   - Easy to scale by adding more servers
+   - Clear separation of concerns
+
+This new architecture provides several advantages:
+- Simpler implementation
+- Easier to scale
+- No complex replication needed
+- Clear separation of concerns
+- Better resource utilization
+- More cost-effective
+- Easier to maintain and monitor
+- Better reliability through simplicity
+- No single point of failure
+- Can scale each component independently
+
+The key is that we're not trying to replicate live databases, but rather using object storage as a central data store that both backend and frontend servers can access. This is a much simpler and more scalable approach than trying to replicate live databases between servers.
