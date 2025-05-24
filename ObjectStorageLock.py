@@ -70,7 +70,6 @@ from io import BytesIO
 import hashlib
 import pickle
 
-from abc import ABC, abstractmethod
 
 # Import from config module (assumed to exist)
 import object_storage_config as oss_config
@@ -80,8 +79,10 @@ from object_storage_sync import (
     publish_file, 
     fetch_file,
     publish_bytes,
-    retry_decorator
+    retry_decorator,
+    smart_fetch
 )
+from models import LockBase
 
 # Global constants for backoff and retry configuration
 DEFAULT_RETRY_INTERVAL = 1.0  # Base interval for lock acquisition retries
@@ -91,30 +92,7 @@ MAX_RETRY_ATTEMPTS = 3        # Maximum number of retry attempts for S3 operatio
 RETRY_MULTIPLIER = 1.0        # Multiplier for exponential backoff
 TEMP_FILE_EXTENSION = '.json'  # Constant for consistent temporary file naming
 
-class LockBase(ABC):
-    @abstractmethod
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
-        pass
 
-    @abstractmethod
-    def release(self) -> bool:
-        pass
-
-    @abstractmethod
-    def __enter__(self):
-        pass
-
-    @abstractmethod
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-    @abstractmethod
-    def locked(self) -> bool:
-        pass
-
-    @abstractmethod
-    def renew(self, timeout_seconds: int) -> bool:
-        pass
 
 class ObjectStorageLock(LockBase):
     """
@@ -246,7 +224,7 @@ class ObjectStorageLock(LockBase):
     def _get_lock_info(self):
         """Get current lock information from storage."""
         try:
-            content, _ = fetch_file(self.lock_object_name)
+            content, metadata = smart_fetch(self.lock_object_name, cache_expiry=1)  # 1 second cache expiry for locks
             if content:
                 return pickle.loads(content)
             return None

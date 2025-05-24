@@ -5,6 +5,7 @@ Defines data models and configuration structures for the LinuxReport project.
 """
 
 # Standard library imports
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Dict, List
 import socket
@@ -33,6 +34,32 @@ class RssInfo:
         self.logo_url = logo_url
         self.logo_alt = logo_alt
         self.site_url = site_url
+
+
+class LockBase(ABC):
+    @abstractmethod
+    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+        pass
+
+    @abstractmethod
+    def release(self) -> bool:
+        pass
+
+    @abstractmethod
+    def __enter__(self):
+        pass
+
+    @abstractmethod
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        pass
+
+    @abstractmethod
+    def locked(self) -> bool:
+        pass
+
+    @abstractmethod
+    def renew(self, timeout_seconds: int) -> bool:
+        pass
 
 DEBUG = False
 
