@@ -34,8 +34,8 @@ CONFIG: SiteConfig = SiteConfig(
 	URL_IMAGES="https://trumpreport.info/static/images/",
 	FAVICON="TrumpReport.webp",
 	LOGO_URL="TrumpReport.webp",
-	WEB_DESCRIPTION="Trump Report",
-	WEB_TITLE="TrumpReport",
+	WEB_DESCRIPTION="Fast Trump 2025 news for MAGA: tariffs, immigration, deregulation. Hourly conservative headlines.",
+	WEB_TITLE="Trump Report | Conservative News",
 	REPORT_PROMPT=f'''Trump's biggest supporters of his second term Presidency, which began on January 20, 2025, as of today: {datetime.date.today().strftime('%B %d, %Y')}
 VP: J.D. Vance
 Cabinet: Marco Rubio (State), Pete Hegseth (Defense), Scott Bessent (Treasury), Pam Bondi (AG), Doug Burgum (Interior), Lori Chavez-DeRemer (Labor), Sean Duffy (Transpo),
