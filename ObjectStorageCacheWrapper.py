@@ -8,6 +8,7 @@ This module implements a caching system that:
 - Maintains a local in-memory cache for fast access
 - Implements background refresh of expired cache entries
 - Shares thread pool and refresh locks across all instances
+- Uses last-modified caching to avoid unnecessary content fetches
 
 Key features:
 - Two-level caching: in-memory + object storage
@@ -15,6 +16,7 @@ Key features:
 - Thread pool for managing concurrent background operations
 - Deduplication of refresh operations across instances
 - Automatic cleanup of expired entries
+- Last-modified caching to optimize content fetches
 
 The cache wrapper provides a compatible interface with DiskCacheWrapper but uses
 object storage as the backend instead of local disk cache.
@@ -25,6 +27,7 @@ import datetime
 from typing import Any, Optional
 from concurrent.futures import ThreadPoolExecutor
 import threading
+from libcloud.storage.drivers.s3 import S3StorageDriver
 
 # Import from our config module
 import object_storage_config as oss_config
@@ -48,7 +51,7 @@ class ObjectStorageCacheWrapper:
     - _refresh_locks: Shared locks to prevent duplicate refresh operations
     """
     # Class-level thread pool shared across all instances
-    _thread_pool = ThreadPoolExecutor(max_workers=4)
+    _thread_pool = ThreadPoolExecutor(max_workers=1)
     # Class-level refresh locks shared across all instances
     _refresh_locks = {}
     
@@ -87,24 +90,48 @@ class ObjectStorageCacheWrapper:
         """
         obj_name = self._get_object_name(key)
         try:
-            content, metadata = object_storage_sync.fetch_bytes(obj_name, force=True)
+            obj = oss_config._storage_container.get_object(object_name=obj_name)
+            content = obj.as_stream().read()
             if content:
                 data = json.loads(content.decode('utf-8'))
-                if datetime.datetime.now(TZ).timestamp() <= data.get('expires', float('inf')):
-                    g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
+                g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
         except Exception as e:
             print(f"Error refreshing object {obj_name}: {e}")
         finally:
             # Clean up the lock
             self._refresh_locks.pop(key, None)
         
+    def _get_object_metadata(self, obj_name: str) -> Optional[dict]:
+        """Get object metadata without fetching content.
+        
+Linode Object Storage, being S3-compatible, supports system-defined metadata similar to AWS S3, accessible via libcloud's `Object` instance. This includes:
+- last-modified: The date and time the object was last modified, available in `obj.extra['last_modified']`, essential for tracking updates.
+- content-length: The object size in bytes, accessible as `obj.size` or `obj.extra['content_length']`.
+- etag: An entity tag (often an MD5 hash for unencrypted objects), accessible as `obj.hash` or `obj.extra['etag']`, used as a version identifier.
+- content-type: The MIME type of the object, available as `obj.content_type`, indicating the data format.
+- Optional headers: Fields like `cache-control`, `content-disposition`, or `x-amz-storage-class` may be included in `obj.extra` if configured during object creation.        
+        Returns:
+            dict: Object metadata including last_modified, size, and hash (etag), or None if object doesn't exist
+        """
+        try:
+            obj = oss_config._storage_container.get_object(object_name=obj_name)
+            return {
+                'last_modified': obj.extra.get('last_modified'),
+                'size': obj.size,
+                'hash': obj.hash
+            }
+        except Exception as e:
+            print(f"Error getting metadata for {obj_name}: {e}")
+            return None
+
     def get(self, key: str) -> Any:
         """Get a value from the cache.
         
-        This method implements a two-level cache with background refresh:
+        This method implements a two-level cache with background refresh and last-modified caching:
         1. First checks in-memory cache
         2. If value is expired, returns it and triggers background refresh
-        3. If no cached value exists, fetches from object storage
+        3. If no cached value exists, checks last-modified before fetching content
+        4. Only fetches content if last-modified has changed
         
         The background refresh ensures that expired values are still returned
         immediately while fresh data is fetched asynchronously.
@@ -113,26 +140,39 @@ class ObjectStorageCacheWrapper:
         cached_value = g_cm.get(memory_key)
         
         if cached_value is not None:
-            # Check if the value is expired
-            if isinstance(cached_value, dict) and 'expires' in cached_value:
-                if datetime.datetime.now(TZ).timestamp() > cached_value['expires']:
-                    # Value is expired, trigger background refresh if not already refreshing
-                    if key not in self._refresh_locks:
-                        self._refresh_locks[key] = threading.Lock()
-                        self._thread_pool.submit(self._background_refresh, key, memory_key)
-                    return cached_value.get('value')
             return cached_value
         
-        # No cached value, fetch from object storage
+        # No cached value, check object storage
         obj_name = self._get_object_name(key)
+        
+        # First get metadata to check last-modified
+        metadata = self._get_object_metadata(obj_name)
+        if not metadata:
+            return None
+            
+        # Check if we have a cached version with same last-modified
+        last_modified_key = f"{memory_key}:last_modified"
+        cached_last_modified = g_cm.get(last_modified_key)
+        
+        if cached_last_modified == metadata['last_modified']:
+            # Content hasn't changed, return cached value if it exists
+            cached_content = g_cm.get(f"{memory_key}:content")
+            if cached_content:
+                return cached_content
+        
+        # Content has changed or no cached content, fetch from storage
         try:
-            content, metadata = object_storage_sync.fetch_bytes(obj_name, force=True)
+            obj = oss_config._storage_container.get_object(object_name=obj_name)
+            content = obj.as_stream().read()
+            
             if content:
                 data = json.loads(content.decode('utf-8'))
-                if datetime.datetime.now(TZ).timestamp() > data.get('expires', float('inf')):
-                    return None
+                # Cache both the content and last-modified
                 g_cm.set(memory_key, data, ttl=self.local_cache_expiry)
-                return data.get('value')
+                g_cm.set(last_modified_key, metadata['last_modified'], ttl=self.local_cache_expiry)
+                g_cm.set(f"{memory_key}:content", data, ttl=self.local_cache_expiry)
+                
+                return data
             return None
         except Exception as e:
             print(f"Error getting object {obj_name}: {e}")
@@ -141,36 +181,27 @@ class ObjectStorageCacheWrapper:
     def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
         """Store a value in the cache.
         
-        Stores in both in-memory cache and object storage. The value is stored with
-        metadata including expiration time and server ID.
+        Stores in both in-memory cache and object storage.
         """
         memory_key = self._get_memory_cache_key(key)
         g_cm.set(memory_key, value, ttl=self.local_cache_expiry)
         
         obj_name = self._get_object_name(key)
-        expires_at = (datetime.datetime.now(TZ).timestamp() + timeout) if timeout is not None else float('inf')
-        data_to_store = {
-            'value': value,
-            'timestamp': datetime.datetime.now(TZ).timestamp(),
-            'expires': expires_at,
-            'server_id': oss_config.SERVER_ID
-        }
-        json_data = json.dumps(data_to_store).encode('utf-8')
-        extra_metadata = {'content_type': 'application/json'}
-        object_storage_sync.publish_bytes(json_data, key=obj_name, metadata=extra_metadata)
+        json_data = json.dumps(value).encode('utf-8')
+        object_storage_sync.publish_bytes(json_data, key=obj_name)
             
     def delete(self, key: str) -> None:
         """Delete a value from both in-memory and object storage caches."""
         # Delete from memory cache first
         memory_cache_key = self._get_memory_cache_key(key)
         g_cm.delete(memory_cache_key)
+        g_cm.delete(f"{memory_cache_key}:last_modified")
+        g_cm.delete(f"{memory_cache_key}:content")
         
         object_name = self._get_object_name(key)
         try:
             obj_to_delete = oss_config._storage_container.get_object(object_name=object_name)
             oss_config._storage_container.delete_object(obj_to_delete)
-        except oss_config.ObjectDoesNotExistError:
-            pass
         except Exception as e:
             print(f"Error deleting cache value for {key}: {e}")
             
@@ -182,37 +213,40 @@ class ObjectStorageCacheWrapper:
         
         obj_name = self._get_object_name(key)
         try:
-            content, metadata = object_storage_sync.fetch_bytes(obj_name, force=True)
-            if content is not None:
-                g_cm.set(memory_key, None, ttl=self.local_cache_expiry)  # Cache existence
-                return True
-            return False
+            obj = oss_config._storage_container.get_object(object_name=obj_name)
+            return obj is not None
         except Exception:
             return False
 
     def has_feed_expired(self, url: str, last_fetch: Optional[datetime] = None) -> bool:
-        """Check if a feed has expired based on the last fetch time."""
-        # Get the last fetch time if not provided
-        if last_fetch is None:
-            last_fetch = self.get_last_fetch(url)
+        """Check if a feed has expired based on the last_modified metadata.
+        
+        Args:
+            url: The URL of the feed to check
+            last_fetch: Optional last fetch time (ignored, kept for compatibility)
             
-        # If no last fetch time found, the feed has expired
-        if last_fetch is None:
+        Returns:
+            bool: True if the feed has expired, False otherwise
+        """
+        obj_name = self._get_object_name(url)
+        try:
+            metadata = self._get_object_metadata(obj_name)
+            if not metadata or not metadata.get('last_modified'):
+                return True
+                
+            # Use the shared history module to check if the last_modified time is too old
+            from shared import history
+            return history.has_expired(url, metadata['last_modified'])
+        except Exception as e:
+            print(f"Error checking feed expiration for {url}: {e}")
             return True
-            
-        # Use the shared history module
-        from shared import history
-        return history.has_expired(url, last_fetch)
-        
-    def get_last_fetch(self, url: str) -> Optional[datetime]:
-        """Get the last fetch time for a URL from object storage."""
-        last_fetch_key = url + ":last_fetch"
-        return self.get(last_fetch_key)
-        
+
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
-        """Set the last fetch time for a URL in object storage."""
-        last_fetch_key = url + ":last_fetch"
-        self.put(last_fetch_key, timestamp, timeout)
+        """No-op method kept for backward compatibility.
+        
+        The last fetch time is now tracked via S3's last_modified metadata.
+        """
+        pass
 
 def migrate_from_disk_cache() -> None:
     """Migrate data from disk cache to object storage cache.
