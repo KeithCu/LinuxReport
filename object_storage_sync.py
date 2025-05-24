@@ -40,6 +40,10 @@ from object_storage_config import (
     MAX_RETRY_INTERVAL
 )
 
+# Constants for last-written tracking
+BUCKET_LAST_WRITTEN_KEY = f"{STORAGE_SYNC_PATH}last-written"
+DEFAULT_CACHE_EXPIRY = 300  # 5 minutes in seconds
+
 def generate_file_object_name(file_path: str) -> str:
     """Generate a unique object name for a file
     
@@ -201,6 +205,20 @@ def fetch_file(file_path: str) -> tuple[Optional[bytes], Optional[Dict]]:
         print(f"Error fetching file: {file_path}, exception: {e}")
         raise
 
+def _update_bucket_last_written():
+    """Update the bucket's last-written timestamp in object storage"""
+    try:
+        timestamp = str(time.time())
+        timestamp_bytes = timestamp.encode('utf-8')
+        _storage_driver.upload_object_via_stream(
+            iterator=BytesIO(timestamp_bytes),
+            container=_storage_container,
+            object_name=BUCKET_LAST_WRITTEN_KEY
+        )
+    except Exception as e:
+        print(f"Error updating bucket last-written timestamp: {e}")
+        # Don't raise - this is a best-effort operation
+
 @retry_decorator()
 def publish_bytes(bytes_data: bytes, key: str) -> Any:
     """Publish raw bytes to object storage.
@@ -228,6 +246,9 @@ def publish_bytes(bytes_data: bytes, key: str) -> Any:
             container=_storage_container,
             object_name=object_name
         )
+        
+        # Update bucket last-written timestamp
+        _update_bucket_last_written()
         
         print(f"Published {len(bytes_data)} bytes to object: {object_name}")
         return obj
@@ -262,12 +283,12 @@ def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
         raise
 
 @retry_decorator()
-def smart_fetch(key: str, cache_expiry: int = None) -> tuple[Optional[bytes], Optional[Dict]]:
+def smart_fetch(key: str, cache_expiry: int = DEFAULT_CACHE_EXPIRY) -> tuple[Optional[bytes], Optional[Dict]]:
     """Smart fetch that handles caching and metadata checks using the global cache manager.
     
     Args:
         key: Identifier for the object to fetch
-        cache_expiry: Optional cache expiry time in seconds
+        cache_expiry: Optional cache expiry time in seconds (defaults to 5 minutes)
         
     Returns:
         Tuple containing raw bytes and metadata or None values if not found
@@ -279,21 +300,31 @@ def smart_fetch(key: str, cache_expiry: int = None) -> tuple[Optional[bytes], Op
         if cached_value is not None:
             return cached_value, None
 
-        # Get object and metadata
+        # Get object metadata first (lightweight operation)
         obj = _get_object(f"{STORAGE_SYNC_PATH}bytes/{SERVER_ID}/{generate_object_name(key, 'data')}")
         if not obj:
             return None, None
 
         metadata = _get_object_metadata(obj)
         
-        # Check last-modified in global cache
-        last_modified_key = f"{memory_key}:last_modified"
-        cached_last_modified = g_cm.get(last_modified_key)
-        
-        if cached_last_modified == metadata['last_modified']:
-            return cached_value, metadata
+        # Check both bucket last-written and object last-modified timestamps
+        bucket_last_written_obj = _get_object(BUCKET_LAST_WRITTEN_KEY)
+        if bucket_last_written_obj:
+            bucket_last_written_key = f"{memory_key}:bucket_last_written"
+            cached_bucket_last_written = g_cm.get(bucket_last_written_key)
+            cached_object_last_modified = g_cm.get(f"{memory_key}:object_last_modified")
+            
+            if cached_bucket_last_written is not None and cached_object_last_modified is not None:
+                content_buffer = BytesIO()
+                _storage_driver.download_object_as_stream(bucket_last_written_obj, content_buffer)
+                current_bucket_last_written = float(content_buffer.getvalue().decode('utf-8'))
+                
+                # If both timestamps match, we can safely return cached value
+                if (cached_bucket_last_written == current_bucket_last_written and 
+                    cached_object_last_modified == metadata['last_modified']):
+                    return cached_value, None
 
-        # Fetch content
+        # Fetch content if we need to
         content_buffer = BytesIO()
         _storage_driver.download_object_as_stream(obj, content_buffer)
         content = content_buffer.getvalue()
@@ -301,10 +332,16 @@ def smart_fetch(key: str, cache_expiry: int = None) -> tuple[Optional[bytes], Op
         if not content:
             return None, None
             
-        # Cache the results if expiry is provided
-        if cache_expiry is not None:
-            g_cm.set(memory_key, content, ttl=cache_expiry)
-            g_cm.set(last_modified_key, metadata['last_modified'], ttl=cache_expiry)
+        # Cache the results
+        g_cm.set(memory_key, content, ttl=cache_expiry)
+        
+        # Cache both timestamps
+        if bucket_last_written_obj:
+            content_buffer = BytesIO()
+            _storage_driver.download_object_as_stream(bucket_last_written_obj, content_buffer)
+            current_bucket_last_written = float(content_buffer.getvalue().decode('utf-8'))
+            g_cm.set(f"{memory_key}:bucket_last_written", current_bucket_last_written, ttl=cache_expiry)
+            g_cm.set(f"{memory_key}:object_last_modified", metadata['last_modified'], ttl=cache_expiry)
         
         return content, metadata
             
