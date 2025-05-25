@@ -508,23 +508,20 @@ def extract_top_titles_from_ai(text):
             
         # Use different regex patterns based on whether we're going forward or backward
         if should_reverse:
-            # For bottom-up search, require numbered format
-            # Match various numbered headline formats:
-            # 1. "1. Title" - Basic numbered list
-            # 2. "1) Title" - Parenthesized number
-            # 3. "1 - Title" - Dash separator
-            # 4. "1: Title" - Colon separator
-            # 5. "1, Title" - Comma separator
-            # 6. "Article 1. Title" - With "Article" prefix
-            # 7. "First: Title" - Written numbers
-            # 8. "1st. Title" - Ordinal numbers
-            match = re.match(r"^(?:(?:Article|First|Second|Third|1st|2nd|3rd)\s+)?\d+[\.\)\-\s:,]+(.+)$", line)
+            # For bottom-up search, just find numbered lines
+            # The embeddings code will handle finding the actual match
+            # Pattern explanation:
+            # ^ - Start of line
+            # \d+ - One or more digits
+            # [\.\)\-\s:,]+ - One or more separators (period, parenthesis, dash, space, colon, comma)
+            # (.+) - Capture the rest of the line
+            match = re.match(r"^\d+[\.\)\-\s:,]+(.+)", line)
             if match:
                 title = match.group(1)
             else:
                 continue  # Skip unnumbered lines in bottom-up search
         else:
-            # When going forward after marker, accept any line as a potential title
+            # When going forward after marker, accept any non-empty line as a potential title
             title = line
 
         # Validate title
