@@ -123,14 +123,14 @@ Third Best Title
 PROMPT_O3_SYSTEM = """
 FORMAT:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
-2. Write ****** on its own line
+2. Write {TITLE_MARKER} on its own line
 3. List exactly 3 titles, one per line
 4. Do NOT include any extra text on the title lines
 
 Example format:
 Your reasoning paragraph here.
 
-******
+{TITLE_MARKER}
 Best title here
 Second best title here
 Third best title here
