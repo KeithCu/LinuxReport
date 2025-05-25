@@ -241,6 +241,15 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     if not lat or not lon:
         lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
+    # Convert coordinates to float if they're strings
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (ValueError, TypeError):
+        # If conversion fails, use default coordinates
+        lat = float(DEFAULT_WEATHER_LAT)
+        lon = float(DEFAULT_WEATHER_LON)
+
     # Check cache first
     bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
     if bucketed_weather:
