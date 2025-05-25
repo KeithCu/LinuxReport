@@ -31,6 +31,7 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
     unique_articles = []
     do_not_select_similar = excluded_embeddings.copy()  # Start with embeddings of previous selections
 
+    print("\nFiltering articles by embedding similarity:")
     for article in articles:
         title = article["title"]
         current_emb = get_embedding(title)  # Compute embedding for the article's title
@@ -41,7 +42,7 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
             unique_articles.append(article)
             do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
         else:
-            print(f"Filtered duplicate (embeddings): {title}")
+            print(f"Filtered by embedding similarity: {title}")
 
     return unique_articles
 

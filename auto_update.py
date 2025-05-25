@@ -580,15 +580,31 @@ def ask_ai_top_articles(articles):
     """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
     # --- Deduplication (remains the same) ---
     previous_selections = g_c.get("previously_selected_selections_2")
+    print(f"Retrieved previous_selections from cache: {len(previous_selections) if previous_selections else 0} entries")
     if previous_selections is None:
         previous_selections = []
+        print("No previous selections found in cache")
 
     previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
     previous_urls = [sel["url"] for sel in previous_selections]
+    print(f"Previous URLs in cache: {len(previous_urls)} total")
+    if previous_urls:
+        print("Most recent URLs in cache:")
+        for url in previous_urls[-3:]:  # Show last 3 as examples
+            print(f"  - {url}")
+
+    # Log articles being filtered by URL
+    print("\nFiltering articles by URL:")
+    for article in articles:
+        if article["url"] in previous_urls:
+            print(f"Filtered by URL match: {article['title']} ({article['url']})")
 
     articles = [article for article in articles if article["url"] not in previous_urls]
+    print(f"\nRemaining articles after URL filtering: {len(articles)}")
+    
     # Pass threshold to deduplicate function
     filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
+    print(f"Remaining articles after embedding filtering: {len(filtered_articles)}")
 
     if not filtered_articles:
         print("No new articles available after deduplication.")
@@ -637,13 +653,16 @@ def ask_ai_top_articles(articles):
         best_match = get_best_matching_article(title, filtered_articles)
         if (best_match):
             top_articles.append(best_match)
+            print(f"Selected article: {best_match['title']} ({best_match['url']})")
 
     new_selections = [{"url": art["url"], "title": art["title"]}
                       for art in top_articles if art]
     updated_selections = previous_selections + new_selections
     if len(updated_selections) > MAX_PREVIOUS_HEADLINES:
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
+        print(f"Trimmed selections to {len(updated_selections)} entries")
 
+    print(f"Updating cache with {len(updated_selections)} selections")
     return response_text, top_articles, updated_selections, used_model
 
 
@@ -772,6 +791,7 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
             print(f"Appending to archive for mode: {mode}")
             append_to_archive(mode, top_3_articles_match)
             # Update selections cache only on successful normal run completion
+            print(f"About to update cache with {len(updated_selections)} selections")
             g_c.put("previously_selected_selections_2", updated_selections, timeout=EXPIRE_WEEK)
             print("Successfully updated headlines and archive.")
 
