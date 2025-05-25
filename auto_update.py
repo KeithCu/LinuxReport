@@ -448,16 +448,21 @@ def _try_call_model(client, model, messages, max_tokens):
 
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text with multiple fallback strategies."""
-    # Try to find the marker or its variations
+    # Try to find the marker by looking for the marker word with any surrounding characters
     marker_index = text.rfind(TITLE_MARKER)
     if marker_index != -1:
         marker_length = len(TITLE_MARKER)
     else:
-        # Try variations with regex:
-        # Matches: =HEADLINES=, = HEADLINES =, ==HEADLINES==, etc.
-        # Also matches with * or - instead of =
-        pattern = r"([=*\-]{1,4})\s*" + re.escape(TITLE_MARKER) + r"\s*\1"
-        match = re.search(pattern, text)
+        # Extract only A-Za-z letters from the marker
+        letters = ''.join(c for c in TITLE_MARKER if c.isalpha())
+        if letters:
+            # If we have letters, look for those words
+            pattern = re.escape(letters)
+        else:
+            # If no letters, use the marker as-is with special chars escaped
+            pattern = re.escape(TITLE_MARKER)
+            
+        match = re.search(pattern, text, re.IGNORECASE)
         if match:
             marker_index = match.start()
             marker_length = match.end() - match.start()
