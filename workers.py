@@ -162,7 +162,7 @@ def load_url_worker(url):
         rssfeed = RssFeed(entries, top_articles=top_articles)
 
         # Publish feed to object store if enabled - publish exactly what we store locally
-        if ENABLE_OBJECT_STORE_FEED_PUBLISH and not url.startswith("http://") and "fakefeed" not in url:
+        if ENABLE_OBJECT_STORE_FEED_PUBLISH:
             try:
                 # Pickle the RssFeed object for storage
                 feed_data = pickle.dumps(rssfeed)
