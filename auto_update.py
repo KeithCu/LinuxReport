@@ -45,7 +45,7 @@ MAX_ARCHIVE_HEADLINES = 50 # Size of Headlines Archive page
 
 
 # Title marker used to separate reasoning from selected headlines
-TITLE_MARKER = "******"
+TITLE_MARKER = "= HEADLINES ="
 
 # How many articles from each feed to consider for the LLM
 MAX_ARTICLES_PER_FEED_FOR_LLM = 5
@@ -445,119 +445,97 @@ def _try_call_model(client, model, messages, max_tokens):
                 time.sleep(1)
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
 
+
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text with multiple fallback strategies."""
-    # First try the standard marker-based approach
+    # Try to find the marker or its variations
     marker_index = text.rfind(TITLE_MARKER)
+    if marker_index != -1:
+        marker_length = len(TITLE_MARKER)
+    else:
+        # Try variations with regex:
+        # Matches: =HEADLINES=, = HEADLINES =, ==HEADLINES==, etc.
+        # Also matches with * or - instead of =
+        pattern = r"([=*\-]{1,4})\s*" + re.escape(TITLE_MARKER) + r"\s*\1"
+        match = re.search(pattern, text)
+        if match:
+            marker_index = match.start()
+            marker_length = match.end() - match.start()
+        else:
+            marker_index = -1
+            marker_length = 0
     
-    # If marker not found, try variations of the marker
-    if marker_index == -1:
-        # Try variations of the marker (with different numbers of =)
-        for i in range(1, 5):  # Try 1 to 4 = signs
-            alt_marker = "=" * i + " HEADLINES " + "=" * i
-            marker_index = text.rfind(alt_marker)
-            if marker_index != -1:
-                text = text[marker_index + len(alt_marker):]
-                break
-    
-    # If still no marker found, try bottom-up search
-    if marker_index == -1:
+    # Get lines to process - either after marker or reversed for bottom-up search
+    if marker_index != -1:
+        text = text[marker_index + marker_length:]
         lines = text.splitlines()
-        potential_titles = []
-        
-        # Start from bottom and work up
-        for line in reversed(lines):
-            line = line.strip()
-            if not line:
-                continue
-                
-            # Skip lines that look like reasoning or disclaimers
-            if any(line.lower().startswith(x) for x in [
-                'another''because', 'since', 'therefore', 'thus', 'however', 
-                'and', 'but', 'or', 'so', 'disclaimer', 'maybe', 'note', 'now',
-                'warning', 'caution', 'important:', 'please note'
-            ]):
-                continue
-                
-            # Skip lines that are too short or too long
-            if len(line) < 10 or len(line) > 200:  # Added max length check
-                continue
-                
-            # Skip lines that are all caps (likely headers)
-            if line.isupper():
-                continue
-                
-            # Clean up formatting
-            line = re.sub(r'^\*+|\*+$', '', line).strip()
-            line = re.sub(r'^["\']|["\']$', '', line).strip()
-            line = re.sub(r'^[-–—]+|[-–—]+$', '', line).strip()  # Remove dashes
-            
-            # Try to match numbered headlines with more variations
-            # Matches: 1. Title, 1) Title, 1 - Title, Article 1: Title, - Article 1, Title, etc.
-            match = re.match(r"^\s*(?:[-–—]?\s*(?:Article\s+)?\d+[\.\)\-\s:,]+|\(?\d+\)?\s*[-–—]?\s*)(.+)$", line)
-            if match:
-                title = match.group(1).strip()
-            else:
-                title = line
-                
-            # Additional validation for potential titles
-            if (len(title) >= 10 and  # Minimum length
-                not title.startswith(('http', 'www.')) and  # Not a URL
-                not title.endswith(('.com', '.org', '.net')) and  # Not a URL
-                not all(c in '=-*_' for c in title)):  # Not just separators
-                
-                potential_titles.append(title)
-                if len(potential_titles) == 3:
-                    break
-                    
-        return list(reversed(potential_titles))  # Return in original order
-
-    # Process lines after marker (existing logic)
-    lines = text.splitlines()
+        should_reverse = False
+    else:
+        lines = text.splitlines()
+        should_reverse = True
+        lines = list(reversed(lines))
+    
+    # Process the lines
     titles = []
     for line in lines:
         line = line.strip()
         if not line:
             continue
             
-        # Clean up formatting
-        line = re.sub(r'^\*+|\*+$', '', line).strip()
-        line = re.sub(r'^["\']|["\']$', '', line).strip()
-        line = re.sub(r'^[-–—]+|[-–—]+$', '', line).strip()  # Remove dashes
-        
-        # Skip lines that are too short or too long
-        if len(line) < 10 or len(line) > 200:
+        # Skip reasoning or disclaimer lines
+        if any(line.lower().startswith(x) for x in [
+            'because', 'since', 'therefore', 'thus', 'however', 
+            'and', 'but', 'or', 'so', 'disclaimer', 'maybe', 'note', 'now',
+            'warning', 'caution', 'important', 'please note'
+        ]):
             continue
             
-        # Skip lines that look like reasoning
-        if line.lower().startswith(('because', 'since', 'therefore', 'thus', 'however', 'and', 'but', 'or', 'so')):
-            continue
-            
-        # Skip lines that are all caps
-        if line.isupper():
-            continue
-            
-        # Try to match numbered headlines with more variations
-        # Matches: 1. Title, 1) Title, 1 - Title, Article 1: Title, etc.
-        match = re.match(r"^\s*(?:[-–—]?\s*(?:Article\s+)?\d+[\.\)\-\s:,]+|\(?\d+\)?\s*[-–—]?\s*)(.+)$", line)
+        # Match various numbered headline formats:
+        # 1. "1. Title" - Basic numbered list
+        # 2. "1) Title" - Parenthesized number
+        # 3. "1 - Title" - Dash separator
+        # 4. "1: Title" - Colon separator
+        # 5. "1, Title" - Comma separator
+        # 6. "- 1. Title" - Leading dash
+        # 7. "Article 1. Title" - With "Article" prefix
+        # 8. "First: Title" - Written numbers
+        # 9. "1st. Title" - Ordinal numbers
+        # 10. "1. **Article 3** Title" - With markdown
+        # 11. "(1) Title" - Parenthesized number at start
+        match = re.match(r"^\s*(?:[-–—]?\s*(?:(?:Article|First|Second|Third|1st|2nd|3rd)\s+)?\d+[\.\)\-\s:,]+|\(?\d+\)?\s*[-–—]?\s*)(?:\*\*)?(?:Article\s+)?(.+?)(?:\*\*)?$", line)
         if match:
-            title = match.group(1).strip()
+            title = match.group(1)
         else:
             title = line
 
-        # Additional validation for potential titles
+        # Clean up formatting
+        title = re.sub(r'^\*+|\*+$', '', title)  # Remove asterisks
+        title = re.sub(r'^["\']|["\']$', '', title)  # Remove quotes
+        title = re.sub(r'^[-–—]+|[-–—]+$', '', title)  # Remove dashes
+        title = re.sub(r'\*\*', '', title)  # Remove markdown
+        title = re.sub(r'^[-–—\s]+', '', title)  # Remove leading dashes and spaces
+        title = re.sub(r'^[#\s]+', '', title)  # Remove leading # and spaces
+        title = re.sub(r'^[•\s]+', '', title)  # Remove leading bullet points
+        title = title.strip()
+
+        # Validate title
         if (len(title) >= 10 and  # Minimum length
+            len(title) <= 200 and  # Maximum length
             not title.startswith(('http', 'www.')) and  # Not a URL
             not title.endswith(('.com', '.org', '.net')) and  # Not a URL
-            not all(c in '=-*_' for c in title)):  # Not just separators
-            
+            not all(c in '=-*_' for c in title) and  # Not just separators
+            not title.isupper()):  # Not all caps
             titles.append(title)
             if len(titles) == 3:
                 break
-
+    
     if not titles:
         print("Warning: No valid titles found in response")
         return []
+        
+    # Reverse the titles if we were processing in reverse
+    if should_reverse:
+        titles = list(reversed(titles))
         
     print(f"Found {len(titles)} valid titles in response")
     return titles
