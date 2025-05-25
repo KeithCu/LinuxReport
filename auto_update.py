@@ -276,9 +276,12 @@ class LLMProvider(ABC):
         
         # If primary model fails, try one random free model
         available_models = [m for m in FREE_MODELS if m != current_model]
+        print(f"\nAvailable fallback models: {len(available_models)}")
+        print(f"Current model was: {current_model}")
         if available_models:
             fallback_model = random.choice(available_models)
             print(f"\n--- LLM Call: {self.name} / {fallback_model} / {prompt_mode} {label} (First Fallback) ---")
+            print(f"Selected random fallback model from {len(available_models)} available models")
             
             try:
                 response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"{label}")
@@ -286,6 +289,8 @@ class LLMProvider(ABC):
             except Exception as e:
                 print(f"Error with fallback model {fallback_model} ({self.name}): {e}")
                 traceback.print_exc()
+        else:
+            print("No available fallback models found, skipping to final fallback")
         
         # If both attempts failed, try the final fallback model
         final_fallback = self.fallback_model
