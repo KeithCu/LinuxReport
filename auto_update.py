@@ -120,7 +120,7 @@ Third Best Title
 """
 
 #O3-suggested alternate prompt for reasoning models
-PROMPT_O3_SYSTEM = """
+PROMPT_O3_SYSTEM = f"""
 FORMAT:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
 2. Write {TITLE_MARKER} on its own line
