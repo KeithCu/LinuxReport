@@ -43,8 +43,8 @@ else:
     WEATHER_CACHE_TIMEOUT = 3600 * 4  # 4 hours
 
 # Add default coordinates for weather (Detroit, MI)
-DEFAULT_WEATHER_LAT = "42.3314"
-DEFAULT_WEATHER_LON = "-83.0458"
+DEFAULT_WEATHER_LAT = 42.3314
+DEFAULT_WEATHER_LON = -83.0458
 
 # --- GeoIP ---
 def _get_geoip_db_path():
@@ -240,7 +240,6 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     """Fetches weather data for given coordinates or IP address, using cache or API.
     Returns a tuple of (data, status_code) where data includes 'fetch_time'
     when the data was fetched from the API."""
-    # print(f"[DEBUG] Input coordinates: lat={lat} ({type(lat)}), lon={lon} ({type(lon)})")
     
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
@@ -254,12 +253,9 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     try:
         lat = float(lat)
         lon = float(lon)
-        # print(f"[DEBUG] Using coordinates: lat={lat}, lon={lon}")
-    except (ValueError, TypeError) as e:
-        # print(f"[DEBUG] Coordinate conversion failed: {e}")
-        # If conversion fails, use default coordinates
-        lat = float(DEFAULT_WEATHER_LAT)
-        lon = float(DEFAULT_WEATHER_LON)
+    except (ValueError, TypeError):
+        lat = DEFAULT_WEATHER_LAT
+        lon = DEFAULT_WEATHER_LON
 
     # Check cache first
     bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
