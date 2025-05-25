@@ -446,41 +446,114 @@ def _try_call_model(client, model, messages, max_tokens):
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
 
 def extract_top_titles_from_ai(text):
-    """Extracts top titles from AI-generated text after the last '{TITLE_MARKER}' marker."""
+    """Extracts top titles from AI-generated text with multiple fallback strategies."""
+    # First try the standard marker-based approach
     marker_index = text.rfind(TITLE_MARKER)
+    
+    # If marker not found, try variations of the marker
     if marker_index == -1:
-        print(f"Warning: Response does not contain required marker '{TITLE_MARKER}'")
-        return []
+        # Try variations of the marker (with different numbers of =)
+        for i in range(1, 5):  # Try 1 to 4 = signs
+            alt_marker = "=" * i + " HEADLINES " + "=" * i
+            marker_index = text.rfind(alt_marker)
+            if marker_index != -1:
+                text = text[marker_index + len(alt_marker):]
+                break
+    
+    # If still no marker found, try bottom-up search
+    if marker_index == -1:
+        lines = text.splitlines()
+        potential_titles = []
         
-    # Use the content after the last '{TITLE_MARKER}'
-    text = text[marker_index + len(TITLE_MARKER):]
+        # Start from bottom and work up
+        for line in reversed(lines):
+            line = line.strip()
+            if not line:
+                continue
+                
+            # Skip lines that look like reasoning or disclaimers
+            if any(line.lower().startswith(x) for x in [
+                'another''because', 'since', 'therefore', 'thus', 'however', 
+                'and', 'but', 'or', 'so', 'disclaimer', 'maybe', 'note', 'now',
+                'warning', 'caution', 'important:', 'please note'
+            ]):
+                continue
+                
+            # Skip lines that are too short or too long
+            if len(line) < 10 or len(line) > 200:  # Added max length check
+                continue
+                
+            # Skip lines that are all caps (likely headers)
+            if line.isupper():
+                continue
+                
+            # Clean up formatting
+            line = re.sub(r'^\*+|\*+$', '', line).strip()
+            line = re.sub(r'^["\']|["\']$', '', line).strip()
+            line = re.sub(r'^[-–—]+|[-–—]+$', '', line).strip()  # Remove dashes
+            
+            # Try to match numbered headlines with more variations
+            # Matches: 1. Title, 1) Title, 1 - Title, Article 1: Title, - Article 1, Title, etc.
+            match = re.match(r"^\s*(?:[-–—]?\s*(?:Article\s+)?\d+[\.\)\-\s:,]+|\(?\d+\)?\s*[-–—]?\s*)(.+)$", line)
+            if match:
+                title = match.group(1).strip()
+            else:
+                title = line
+                
+            # Additional validation for potential titles
+            if (len(title) >= 10 and  # Minimum length
+                not title.startswith(('http', 'www.')) and  # Not a URL
+                not title.endswith(('.com', '.org', '.net')) and  # Not a URL
+                not all(c in '=-*_' for c in title)):  # Not just separators
+                
+                potential_titles.append(title)
+                if len(potential_titles) == 3:
+                    break
+                    
+        return list(reversed(potential_titles))  # Return in original order
+
+    # Process lines after marker (existing logic)
     lines = text.splitlines()
     titles = []
-
     for line in lines:
-        # Clean up the line first
         line = line.strip()
-        if not line:  # Skip empty lines
+        if not line:
             continue
             
         # Clean up formatting
-        line = re.sub(r'^\*+|\*+$', '', line).strip()  # Remove asterisks
-        line = re.sub(r'^["\']|["\']$', '', line).strip()  # Remove quotes
+        line = re.sub(r'^\*+|\*+$', '', line).strip()
+        line = re.sub(r'^["\']|["\']$', '', line).strip()
+        line = re.sub(r'^[-–—]+|[-–—]+$', '', line).strip()  # Remove dashes
         
-        # Skip if too short or looks like reasoning
-        if len(line) < 10 or line.lower().startswith(('because', 'since', 'therefore', 'thus', 'however', 'and', 'but', 'or', 'so')):
+        # Skip lines that are too short or too long
+        if len(line) < 10 or len(line) > 200:
             continue
             
-        # Try to match numbered headlines (e.g., "1. Title" or "1) Title")
-        match = re.match(r"^\s*\d+[\.\)]\s+(.+)$", line)
+        # Skip lines that look like reasoning
+        if line.lower().startswith(('because', 'since', 'therefore', 'thus', 'however', 'and', 'but', 'or', 'so')):
+            continue
+            
+        # Skip lines that are all caps
+        if line.isupper():
+            continue
+            
+        # Try to match numbered headlines with more variations
+        # Matches: 1. Title, 1) Title, 1 - Title, Article 1: Title, etc.
+        match = re.match(r"^\s*(?:[-–—]?\s*(?:Article\s+)?\d+[\.\)\-\s:,]+|\(?\d+\)?\s*[-–—]?\s*)(.+)$", line)
         if match:
             title = match.group(1).strip()
         else:
             title = line
 
-        titles.append(title)
-        if len(titles) == 3:
-            break
+        # Additional validation for potential titles
+        if (len(title) >= 10 and  # Minimum length
+            not title.startswith(('http', 'www.')) and  # Not a URL
+            not title.endswith(('.com', '.org', '.net')) and  # Not a URL
+            not all(c in '=-*_' for c in title)):  # Not just separators
+            
+            titles.append(title)
+            if len(titles) == 3:
+                break
 
     if not titles:
         print("Warning: No valid titles found in response")
