@@ -485,14 +485,6 @@ def extract_top_titles_from_ai(text):
         line = line.strip()
         if not line:
             continue
-            
-        # Only skip reasoning lines during bottom-up search
-        if should_reverse and any(line.lower().startswith(x) for x in [
-            'because', 'since', 'therefore', 'thus', 'however', 
-            'and', 'but', 'or', 'so', 'disclaimer', 'maybe', 'note',
-            'warning', 'caution', 'important', 'please note'
-        ]):
-            continue
 
         # Clean up formatting first
         line = re.sub(r'^\*+|\*+$', '', line)  # Remove asterisks
