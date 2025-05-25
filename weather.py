@@ -12,6 +12,7 @@ from collections import defaultdict
 from datetime import date as date_obj
 from datetime import datetime
 from bisect import bisect_left
+import json
 
 import geoip2.database
 # Third-party imports
@@ -42,8 +43,8 @@ else:
     WEATHER_CACHE_TIMEOUT = 3600 * 4  # 4 hours
 
 # Add default coordinates for weather (Detroit, MI)
-DEFAULT_WEATHER_LAT = "42.3297"
-DEFAULT_WEATHER_LON = "83.0425"
+DEFAULT_WEATHER_LAT = "42.3314"
+DEFAULT_WEATHER_LON = "-83.0458"
 
 # --- GeoIP ---
 def _get_geoip_db_path():
@@ -126,10 +127,12 @@ def get_bucketed_weather_cache(lat, lon, units='imperial'):
     today_str = date_obj.today().isoformat()
     now = datetime.now(TZ).timestamp()
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
+        # print(f"[DEBUG] Cache hit for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
         data = entry['data']
         if units == 'metric':
             data = convert_weather_to_metric(data)
         return data
+    # print(f"[DEBUG] Cache miss for key {key}")
     return None
 
 def fahrenheit_to_celsius(f_temp):
@@ -151,6 +154,7 @@ def _process_openweather_response(weather_data, fetch_time):
     """Process the OpenWeather API response into the standard format."""
     # Determine city name for logging
     city_name = weather_data.get("city", {}).get("name", "Unknown location")
+    # print(f"[DEBUG] Raw API response city data: {weather_data.get('city', {})}")
 
     daily_data = defaultdict(list)
     for entry in weather_data.get("list", []):
@@ -218,14 +222,17 @@ def _fetch_from_openweather_api(lat, lon, fetch_time):
     rate_limit_check()
     # Always fetch in imperial (Fahrenheit) for consistent caching
     url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
+    # print(f"[DEBUG] OpenWeather API request URL: {url}")
     start_time = datetime.now(TZ).timestamp()
     response = requests.get(url, timeout=10)
     api_time = datetime.now(TZ).timestamp() - start_time
     response.raise_for_status()
     weather_data = response.json()
+    # print(f"[DEBUG] Full API response: {json.dumps(weather_data, indent=2)}")
     
     # Process the OpenWeather response
     processed_data, city_name = _process_openweather_response(weather_data, fetch_time)
+    # print(f"[DEBUG] OpenWeather API response - city: {city_name}, status: {response.status_code}")
     
     return processed_data, city_name, api_time, service_name, None, None
 
@@ -233,6 +240,8 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     """Fetches weather data for given coordinates or IP address, using cache or API.
     Returns a tuple of (data, status_code) where data includes 'fetch_time'
     when the data was fetched from the API."""
+    # print(f"[DEBUG] Input coordinates: lat={lat} ({type(lat)}), lon={lon} ({type(lon)})")
+    
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
         lat, lon = get_location_from_ip(ip)
@@ -245,7 +254,9 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     try:
         lat = float(lat)
         lon = float(lon)
-    except (ValueError, TypeError):
+        # print(f"[DEBUG] Using coordinates: lat={lat}, lon={lon}")
+    except (ValueError, TypeError) as e:
+        # print(f"[DEBUG] Coordinate conversion failed: {e}")
         # If conversion fails, use default coordinates
         lat = float(DEFAULT_WEATHER_LAT)
         lon = float(DEFAULT_WEATHER_LON)
