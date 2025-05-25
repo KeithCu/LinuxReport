@@ -467,11 +467,15 @@ def extract_top_titles_from_ai(text):
     
     # Get lines to process - either after marker or reversed for bottom-up search
     if marker_index != -1:
+        # When marker is found, trust the model's formatting and only look at lines immediately after
         text = text[marker_index + marker_length:]
         lines = text.splitlines()
         should_reverse = False
+        # Only look at first 10 lines after marker to avoid false positives
+        lines = lines[:10]
     else:
-        lines = text.splitlines()
+        # For bottom-up search, only look at last 15 lines
+        lines = text.splitlines()[-15:]
         should_reverse = True
         lines = list(reversed(lines))
     
@@ -482,49 +486,51 @@ def extract_top_titles_from_ai(text):
         if not line:
             continue
             
-        # Skip reasoning or disclaimer lines
-        if any(line.lower().startswith(x) for x in [
+        # Only skip reasoning lines during bottom-up search
+        if should_reverse and any(line.lower().startswith(x) for x in [
             'because', 'since', 'therefore', 'thus', 'however', 
-            'and', 'but', 'or', 'so', 'disclaimer', 'maybe', 'note', 'now',
+            'and', 'but', 'or', 'so', 'disclaimer', 'maybe', 'note',
             'warning', 'caution', 'important', 'please note'
         ]):
             continue
-            
-        # Match various numbered headline formats:
-        # 1. "1. Title" - Basic numbered list
-        # 2. "1) Title" - Parenthesized number
-        # 3. "1 - Title" - Dash separator
-        # 4. "1: Title" - Colon separator
-        # 5. "1, Title" - Comma separator
-        # 6. "- 1. Title" - Leading dash
-        # 7. "Article 1. Title" - With "Article" prefix
-        # 8. "First: Title" - Written numbers
-        # 9. "1st. Title" - Ordinal numbers
-        # 10. "1. **Article 3** Title" - With markdown
-        # 11. "(1) Title" - Parenthesized number at start
-        match = re.match(r"^\s*(?:[-–—]?\s*(?:(?:Article|First|Second|Third|1st|2nd|3rd)\s+)?\d+[\.\)\-\s:,]+|\(?\d+\)?\s*[-–—]?\s*)(?:\*\*)?(?:Article\s+)?(.+?)(?:\*\*)?$", line)
-        if match:
-            title = match.group(1)
-        else:
-            title = line
 
-        # Clean up formatting
-        title = re.sub(r'^\*+|\*+$', '', title)  # Remove asterisks
-        title = re.sub(r'^["\']|["\']$', '', title)  # Remove quotes
-        title = re.sub(r'^[-–—]+|[-–—]+$', '', title)  # Remove dashes
-        title = re.sub(r'\*\*', '', title)  # Remove markdown
-        title = re.sub(r'^[-–—\s]+', '', title)  # Remove leading dashes and spaces
-        title = re.sub(r'^[#\s]+', '', title)  # Remove leading # and spaces
-        title = re.sub(r'^[•\s]+', '', title)  # Remove leading bullet points
-        title = title.strip()
+        # Clean up formatting first
+        line = re.sub(r'^\*+|\*+$', '', line)  # Remove asterisks
+        line = re.sub(r'^["\']|["\']$', '', line)  # Remove quotes
+        line = re.sub(r'^[-–—]+|[-–—]+$', '', line)  # Remove dashes
+        line = re.sub(r'\*\*', '', line)  # Remove markdown
+        line = re.sub(r'^[-–—\s]+', '', line)  # Remove leading dashes and spaces
+        line = re.sub(r'^[#\s]+', '', line)  # Remove leading # and spaces
+        line = re.sub(r'^[•\s]+', '', line)  # Remove leading bullet points
+        line = line.strip()
+            
+        # Use different regex patterns based on whether we're going forward or backward
+        if should_reverse:
+            # For bottom-up search, require numbered format
+            # Match various numbered headline formats:
+            # 1. "1. Title" - Basic numbered list
+            # 2. "1) Title" - Parenthesized number
+            # 3. "1 - Title" - Dash separator
+            # 4. "1: Title" - Colon separator
+            # 5. "1, Title" - Comma separator
+            # 6. "Article 1. Title" - With "Article" prefix
+            # 7. "First: Title" - Written numbers
+            # 8. "1st. Title" - Ordinal numbers
+            match = re.match(r"^(?:(?:Article|First|Second|Third|1st|2nd|3rd)\s+)?\d+[\.\)\-\s:,]+(.+)$", line)
+            if match:
+                title = match.group(1)
+            else:
+                continue  # Skip unnumbered lines in bottom-up search
+        else:
+            # When going forward after marker, accept any line as a potential title
+            title = line
 
         # Validate title
         if (len(title) >= 10 and  # Minimum length
             len(title) <= 200 and  # Maximum length
             not title.startswith(('http', 'www.')) and  # Not a URL
             not title.endswith(('.com', '.org', '.net')) and  # Not a URL
-            not all(c in '=-*_' for c in title) and  # Not just separators
-            not title.isupper()):  # Not all caps
+            not all(c in '=-*_' for c in title)):  # Not just separators
             titles.append(title)
             if len(titles) == 3:
                 break
