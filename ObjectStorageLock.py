@@ -77,14 +77,16 @@ from object_storage_sync import (
     publish_file, 
     fetch_file,
     publish_bytes,
-    retry_decorator,
     smart_fetch
 )
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from models import LockBase
 
 DEFAULT_RETRY_INTERVAL = oss_config.DEFAULT_RETRY_INTERVAL
 MIN_RETRY_INTERVAL = oss_config.MIN_RETRY_INTERVAL
 MAX_RETRY_INTERVAL = oss_config.MAX_RETRY_INTERVAL
+MAX_RETRY_ATTEMPTS = oss_config.MAX_RETRY_ATTEMPTS
+RETRY_MULTIPLIER = oss_config.RETRY_MULTIPLIER
 
 class ObjectStorageLock(LockBase):
     """
@@ -172,7 +174,12 @@ class ObjectStorageLock(LockBase):
             time.sleep(delay)
             attempt += 1
             
-    @retry_decorator()
+    @retry(
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=MAX_RETRY_INTERVAL),
+        retry=retry_if_exception_type((oss_config.StorageOperationError, oss_config.LibcloudError)),
+        reraise=True
+    )
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
         """Attempt to acquire the lock once with fencing token."""
         try:
@@ -224,7 +231,12 @@ class ObjectStorageLock(LockBase):
             print(f"Error getting lock info for {self.lock_key}: {e}")
             return None
 
-    @retry_decorator()
+    @retry(
+        stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+        wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=MAX_RETRY_INTERVAL),
+        retry=retry_if_exception_type((oss_config.StorageOperationError, oss_config.LibcloudError)),
+        reraise=True
+    )
     def _put_lock_info(self, lock_data):
         """Put lock information to storage."""
         try:

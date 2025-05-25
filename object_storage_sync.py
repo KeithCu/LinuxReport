@@ -144,28 +144,12 @@ def _get_object(obj_name: str) -> Optional[Any]:
         print(f"Error getting object {obj_name}: {e}")
         raise
 
-def retry_decorator(max_retries: int = MAX_RETRY_ATTEMPTS):
-    """Create retry decorator for object storage operations"""
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
-                return retry(
-                    stop=stop_after_attempt(max_retries),
-                    wait=wait_exponential(
-                        multiplier=RETRY_MULTIPLIER,
-                        max=MAX_RETRY_INTERVAL
-                    ),
-                    retry=retry_if_exception_type((StorageOperationError, LibcloudError)),
-                    reraise=True
-                )(func)(*args, **kwargs)
-            except Exception as e:
-                print(f"Operation {func.__name__} failed after retries: {str(e)}")
-                raise
-        return wrapper
-    return decorator
-
-@retry_decorator()
+@retry(
+    stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=MAX_RETRY_INTERVAL),
+    retry=retry_if_exception_type((StorageOperationError, LibcloudError)),
+    reraise=True
+)
 def publish_file(file_path: str) -> Any:
     """Publish a file from disk to object storage.
     
@@ -187,7 +171,12 @@ def publish_file(file_path: str) -> Any:
         print(f"Error publishing file: {file_path}, exception: {e}")
         raise
 
-@retry_decorator()
+@retry(
+    stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=MAX_RETRY_INTERVAL),
+    retry=retry_if_exception_type((StorageOperationError, LibcloudError)),
+    reraise=True
+)
 def fetch_file(file_path: str) -> tuple[Optional[bytes], Optional[Dict]]:
     """Fetch a file from object storage as bytes with its metadata.
     
@@ -219,7 +208,12 @@ def _update_bucket_last_written():
         print(f"Error updating bucket last-written timestamp: {e}")
         # Don't raise - this is a best-effort operation
 
-@retry_decorator()
+@retry(
+    stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=MAX_RETRY_INTERVAL),
+    retry=retry_if_exception_type((StorageOperationError, LibcloudError)),
+    reraise=True
+)
 def publish_bytes(bytes_data: bytes, key: str) -> Any:
     """Publish raw bytes to object storage.
     
@@ -256,7 +250,12 @@ def publish_bytes(bytes_data: bytes, key: str) -> Any:
         print(f"Error publishing bytes with key: {key}, exception: {e}")
         raise
 
-@retry_decorator()
+@retry(
+    stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=MAX_RETRY_INTERVAL),
+    retry=retry_if_exception_type((StorageOperationError, LibcloudError)),
+    reraise=True
+)
 def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
     """Fetch bytes data from object storage with its metadata.
     
@@ -282,7 +281,12 @@ def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
         print(f"Error fetching bytes for key: {key}, exception: {e}")
         raise
 
-@retry_decorator()
+@retry(
+    stop=stop_after_attempt(MAX_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=RETRY_MULTIPLIER, max=MAX_RETRY_INTERVAL),
+    retry=retry_if_exception_type((StorageOperationError, LibcloudError)),
+    reraise=True
+)
 def smart_fetch(key: str, cache_expiry: int = DEFAULT_CACHE_EXPIRY) -> tuple[Optional[bytes], Optional[Dict]]:
     """Smart fetch that handles caching and metadata checks using the global cache manager.
     
