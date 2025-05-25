@@ -431,8 +431,9 @@ def init_app(flask_app):
         user_agent = request.headers.get('User-Agent', '')
         is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
         
-        # For web bots, use default coordinates
-        if is_web_bot:
+        # For web bots or requests from news.thedetroitilove.com, use default coordinates
+        referrer = request.headers.get('Referer', '')
+        if is_web_bot or 'news.thedetroitilove.com' in referrer:
             lat = DEFAULT_WEATHER_LAT
             lon = DEFAULT_WEATHER_LON
         else:
