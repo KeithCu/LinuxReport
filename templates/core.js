@@ -279,7 +279,7 @@ function toggleViewMode() {
     console.log('Toggling view mode from', currentViewMode);
     currentViewMode = currentViewMode === 'column' ? 'infinite' : 'column';
     const button = document.getElementById('view-mode-toggle');
-    button.textContent = currentViewMode === 'column' ? 'Switch to Infinite View' : 'Switch to Column View';
+    button.textContent = currentViewMode === 'column' ? 'Infinite View' : 'Column View';
     
     if (currentViewMode === 'infinite') {
         console.log('Switching to infinite view');
