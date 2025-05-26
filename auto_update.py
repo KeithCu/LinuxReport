@@ -624,7 +624,7 @@ def ask_ai_top_articles(articles):
     )
     
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
-        return "No response from LLM models.", filtered_articles, previous_selections, None
+        return "No response from LLM models.", [], previous_selections, None
 
     # --- Process Response and Update Selections (remains the same) ---
     top_titles = extract_top_titles_from_ai(response_text)
@@ -640,9 +640,13 @@ def ask_ai_top_articles(articles):
                 if top_titles:
                     used_model = fallback_model
                     print(f"Successfully extracted headlines using fallback model: {fallback_model}")
+                else:
+                    print("Fallback model also failed to extract headlines")
+                    return "No headlines could be extracted from AI response.", [], previous_selections, None
         except Exception as e:
             print(f"Fallback model failed during headline retry: {e}")
             traceback.print_exc()
+            return "Fallback model failed to process headlines.", [], previous_selections, None
     
     # Only update model cache if we successfully extracted headlines
     if top_titles and used_model:
