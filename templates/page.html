@@ -7,10 +7,11 @@
     <meta name="description" content = "{{description}}">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{{title}}</title>
-    <!-- Load Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=Open+Sans:wght@400;600&family=Source+Sans+Pro:wght@400;600&family=Ubuntu:wght@400;500&family=Noto+Sans:wght@400;500&family=Lato:wght@400;700&family=Raleway:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Preload critical fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" as="style">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" as="style">
+    <!-- Load fonts with font-display: swap -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=Open+Sans:wght@400;600&family=Source+Sans+Pro:wght@400;600&family=Ubuntu:wght@400;500&family=Noto+Sans:wght@400;500&family=Lato:wght@400;700&family=Raleway:wght@400;500&display=swap&font-display=swap">
     <!-- Link external CSS -->
     <link rel="stylesheet" href="/static/linuxreport.css?v={{ static_file_hash('linuxreport.css') }}">
   </head>
