@@ -86,9 +86,19 @@
         </select>
         <button id="chat-toggle-btn">Chat</button>
         <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
+        {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
+        <button id="view-mode-toggle" style="margin-left: 20px;">Infinite View</button>
+        {% endif %}
       </div>
     </center>
   
+    <!-- Infinite Scroll View -->
+    <div id="infinite-scroll-container" style="display: none; max-width: 800px; margin: 0 auto; padding: 0 15px;">
+      <div id="infinite-content" class="mobile-view"></div>
+      <div id="loading-indicator" style="display: none; text-align: center; padding: 20px;">
+        Loading more stories...
+      </div>
+    </div>
 
     <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}">
       <div class="column">{{ columns[0] }}</div>

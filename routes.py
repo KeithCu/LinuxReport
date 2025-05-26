@@ -29,7 +29,8 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, 
                     get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, 
                     ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
-                    ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS)
+                    ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS,
+                    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG)
 from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 from workers import fetch_urls_parallel, fetch_urls_thread
 
@@ -247,7 +248,9 @@ def init_app(flask_app):
                                description=WEB_DESCRIPTION, favicon=FAVICON,
                                welcome_html=Markup(WELCOME_HTML),
                                above_html=Markup(above_html),
-                               weather_html=Markup(weather_html))
+                               weather_html=Markup(weather_html),
+                               INFINITE_SCROLL_MOBILE=INFINITE_SCROLL_MOBILE,
+                               INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG)
 
         # Store full page cache
         if page_order_s == STANDARD_ORDER_STR:
@@ -431,7 +434,7 @@ def init_app(flask_app):
         user_agent = request.headers.get('User-Agent', '')
         is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
         
-        # For web bots or requests from news.thedetroitilove.com, use default coordinates
+        # For web bots or requests from news.thedetroitilove.com, use default (Detroit) coordinates
         referrer = request.headers.get('Referer', '')
         if is_web_bot or 'news.thedetroitilove.com' in referrer:
             lat = DEFAULT_WEATHER_LAT

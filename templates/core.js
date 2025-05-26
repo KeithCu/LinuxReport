@@ -236,7 +236,11 @@ document.addEventListener('DOMContentLoaded', function() {
         const endIdx = startIdx + itemsPerPage;
         
         items.forEach((item, i) => {
-          item.style.display = (i >= startIdx && i < endIdx) ? 'block' : 'none';
+          if (currentViewMode === 'column') {
+            item.style.display = (i >= startIdx && i < endIdx) ? 'block' : 'none';
+          } else {
+            item.style.display = 'block';
+          }
         });
         
         if (prevBtn) prevBtn.disabled = currentPage === 0;
@@ -264,4 +268,280 @@ document.addEventListener('DOMContentLoaded', function() {
     
     update();
   });
+});
+
+// Infinite Scroll View Mode
+let currentViewMode = 'column';
+let currentPage = 0;
+const itemsPerPage = 20;
+
+function toggleViewMode() {
+    console.log('Toggling view mode from', currentViewMode);
+    currentViewMode = currentViewMode === 'column' ? 'infinite' : 'column';
+    const button = document.getElementById('view-mode-toggle');
+    button.textContent = currentViewMode === 'column' ? 'Switch to Infinite View' : 'Switch to Column View';
+    
+    if (currentViewMode === 'infinite') {
+        console.log('Switching to infinite view');
+        // First collect all items while they're still visible
+        const container = document.getElementById('infinite-content');
+        container.innerHTML = '';
+        currentPage = 0;
+        
+        // Make all items visible before collecting them
+        document.querySelectorAll('.linkclass').forEach(item => {
+            item.style.display = 'block';
+        });
+        
+        loadInfiniteContent();
+        
+        // Then hide the row and show infinite container
+        document.querySelector('.row').style.display = 'none';
+        document.getElementById('infinite-scroll-container').style.display = 'block';
+    } else {
+        console.log('Switching to column view');
+        // Show row and hide infinite container
+        document.querySelector('.row').style.display = 'flex';
+        document.getElementById('infinite-scroll-container').style.display = 'none';
+        
+        // Restore pagination
+        document.querySelectorAll('.pagination-controls').forEach(feedControls => {
+            const feedId = feedControls.dataset.feedId;
+            const feedContainer = document.getElementById(feedId);
+            if (!feedContainer) return;
+            
+            const items = Array.from(feedContainer.querySelectorAll('.linkclass'));
+            const itemsPerPage = 8;
+            
+            // Show only first page of items
+            items.forEach((item, i) => {
+                item.style.display = (i < itemsPerPage) ? 'block' : 'none';
+            });
+        });
+    }
+    console.log('View mode toggled to', currentViewMode);
+}
+
+function loadInfiniteContent() {
+    const container = document.getElementById('infinite-content');
+    const loadingIndicator = document.getElementById('loading-indicator');
+    
+    console.log('Loading infinite content...');
+    
+    // Show loading indicator
+    loadingIndicator.style.display = 'block';
+    
+    // Get all items from all columns
+    const allItems = [];
+    const columns = document.querySelectorAll('.column');
+    console.log('Found columns:', columns.length);
+    
+    // Track sources we've found
+    const foundSources = new Set();
+    
+    columns.forEach((column, colIndex) => {
+        // Look for feed containers by their class
+        const feedContainers = column.querySelectorAll('.box');
+        console.log(`Column ${colIndex} has ${feedContainers.length} feed containers`);
+        
+        feedContainers.forEach((container, feedIndex) => {
+            const feedId = container.id;
+            const feedTitle = container.querySelector('a[target="_blank"]');
+            const feedIcon = container.querySelector('img');
+            
+            if (!feedTitle || !feedIcon) {
+                console.log(`Skipping feed ${feedId} - missing title or icon`);
+                return;
+            }
+            
+            // Extract feed name from the ID (which is the feed URL)
+            const feedUrl = feedId.replace('feed-', '');
+            let feedName = '';
+            
+            // Parse the URL to get a better feed name
+            try {
+                const url = new URL(feedUrl);
+                // Get the last part of the path or the hostname
+                feedName = url.pathname.split('/').filter(Boolean).pop() || url.hostname;
+                // Clean up the name
+                feedName = feedName
+                    .replace(/\.(com|org|net|io)$/, '')
+                    .replace(/-/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
+            } catch (e) {
+                // If URL parsing fails, use the ID
+                feedName = feedId.replace('feed-', '');
+            }
+            
+            const feedIconSrc = feedIcon.src;
+            const items = container.querySelectorAll('.linkclass');
+            
+            // Log only the first time we see a source
+            if (!foundSources.has(feedName)) {
+                console.log(`Found new source: ${feedName} with ${items.length} items`);
+                foundSources.add(feedName);
+            }
+            
+            items.forEach((item, itemIndex) => {
+                // Only collect items that are currently visible
+                if (window.getComputedStyle(item).display !== 'none') {
+                    // Get the timestamp from the data-index attribute
+                    const timestamp = parseInt(item.getAttribute('data-index') || '0');
+                    
+                    allItems.push({
+                        title: item.textContent,
+                        link: item.href,
+                        source_name: feedName,
+                        source_icon: feedIconSrc,
+                        timestamp: timestamp
+                    });
+                }
+            });
+        });
+    });
+    
+    console.log('Total items collected:', allItems.length);
+    console.log('Sources found:', Array.from(foundSources));
+    
+    // Sort all items by timestamp (newest first)
+    allItems.sort((a, b) => b.timestamp - a.timestamp);
+    
+    // Create a map of source information
+    const sourceInfo = new Map();
+    allItems.forEach(item => {
+        if (!sourceInfo.has(item.source_name)) {
+            sourceInfo.set(item.source_name, {
+                name: item.source_name,
+                icon: item.source_icon
+            });
+        }
+    });
+    
+    // Group all items by source while maintaining timestamp order
+    const groupedItems = [];
+    let currentGroup = null;
+    
+    allItems.forEach(item => {
+        if (!currentGroup || currentGroup.name !== item.source_name) {
+            // Start a new group
+            currentGroup = {
+                name: item.source_name,
+                icon: sourceInfo.get(item.source_name).icon,
+                items: []
+            };
+            groupedItems.push(currentGroup);
+        }
+        currentGroup.items.push({
+            title: item.title,
+            link: item.link
+        });
+    });
+    
+    // Add all source groups to the infinite scroll container
+    groupedItems.forEach(group => {
+        const groupElement = createSourceGroupElement(group);
+        container.appendChild(groupElement);
+    });
+    
+    loadingIndicator.style.display = 'none';
+    console.log('Finished loading infinite content');
+}
+
+function createSourceGroupElement(group) {
+    const div = document.createElement('div');
+    div.className = 'source-group';
+    div.style.cssText = `
+        margin: 20px 0;
+        padding: 15px;
+        border: 1px solid var(--btn-border);
+        border-radius: 8px;
+        background: var(--bg);
+        max-width: 100%;
+        box-sizing: border-box;
+    `;
+    
+    const header = document.createElement('div');
+    header.style.cssText = `
+        display: flex;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--btn-border);
+    `;
+    
+    const icon = document.createElement('img');
+    icon.src = group.icon;
+    icon.alt = group.name;
+    icon.style.cssText = `
+        width: 64px;
+        height: 64px;
+        margin-right: 16px;
+        border-radius: 8px;
+        object-fit: contain;
+    `;
+    
+    const sourceName = document.createElement('h2');
+    sourceName.textContent = group.name;
+    sourceName.style.cssText = `
+        margin: 0;
+        font-size: 1.4em;
+        color: var(--text);
+    `;
+    
+    header.appendChild(icon);
+    header.appendChild(sourceName);
+    div.appendChild(header);
+    
+    // Add all items from this source
+    group.items.forEach(item => {
+        const itemElement = document.createElement('div');
+        itemElement.style.cssText = `
+            margin: 10px 0;
+            padding: 12px;
+            border-radius: 6px;
+            background: var(--bg-secondary);
+            transition: background-color 0.2s;
+        `;
+        
+        itemElement.addEventListener('mouseover', () => {
+            itemElement.style.background = 'var(--bg-hover)';
+        });
+        
+        itemElement.addEventListener('mouseout', () => {
+            itemElement.style.background = 'var(--bg-secondary)';
+        });
+        
+        const title = document.createElement('a');
+        title.href = item.link;
+        title.target = '_blank';
+        title.textContent = item.title;
+        title.style.cssText = `
+            color: var(--link);
+            text-decoration: none;
+            font-size: 1.1em;
+            display: block;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.4;
+        `;
+        
+        itemElement.appendChild(title);
+        div.appendChild(itemElement);
+    });
+    
+    return div;
+}
+
+// Remove the intersection observer since we're showing all items at once
+document.addEventListener('DOMContentLoaded', function() {
+    const viewModeToggle = document.getElementById('view-mode-toggle');
+    if (viewModeToggle) {
+        viewModeToggle.addEventListener('click', toggleViewMode);
+        
+        // In debug mode, show a visual indicator that we're in debug mode
+        if (document.body.classList.contains('desktop-view')) {
+            viewModeToggle.style.border = '2px solid #ff0000';
+            viewModeToggle.title = 'Debug Mode: Infinite Scroll';
+        }
+    }
 });

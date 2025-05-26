@@ -90,6 +90,12 @@ OBJECT_STORE_FEED_TIMEOUT = 15 * 60  # 15 minutes in seconds
 # Enable publishing feeds to object store when fetched
 ENABLE_OBJECT_STORE_FEED_PUBLISH = False
 
+# Enable infinite scroll view mode for mobile
+INFINITE_SCROLL_MOBILE = True
+
+# Debug mode for infinite scroll (enables on desktop)
+INFINITE_SCROLL_DEBUG = True
+
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
