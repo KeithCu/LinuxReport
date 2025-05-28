@@ -107,7 +107,7 @@ FALLBACK_MODEL = "mistralai/mistral-small-3.1-24b-instruct"
 USE_RANDOM_MODELS = True
 
 PROMPT_30B = f""" Prompt:
-Given a list of news headlines, follow these steps:
+Given this list of news headlines, follow these steps:
 Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
 Think carefully and consisely about relevance, interest, and topic distinction.
 From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
@@ -124,8 +124,9 @@ PROMPT_O3_SYSTEM = f"""
 FORMAT:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
 2. Write {TITLE_MARKER} on its own line
-3. List exactly 3 titles, one per line
+3. List exactly 3 titles from the list of titles below, one per line
 4. Do NOT include any extra text on the title lines
+5. IMPORTANT: You must select ONLY from the provided list of titles - do not make up new titles
 
 Example format:
 Your reasoning paragraph here.
@@ -525,14 +526,27 @@ def extract_top_titles_from_ai(text):
             title = line
 
         # Validate title
-        if (len(title) >= 10 and  # Minimum length
-            len(title) <= 200 and  # Maximum length
-            not title.startswith(('http', 'www.')) and  # Not a URL
-            not title.endswith(('.com', '.org', '.net')) and  # Not a URL
-            not all(c in '=-*_' for c in title)):  # Not just separators
+        print(f"\nValidating title: {title}")
+        print(f"Title length: {len(title)}")
+        print(f"Title characters: {[c for c in title]}")
+        length_check = len(title) >= 10 and len(title) <= 200
+        url_start_check = not title.startswith(('http', 'www.'))
+        url_end_check = not title.endswith(('.com', '.org', '.net'))
+        separator_check = not all(c in '=-*_' for c in title)
+        
+        print(f"Length check ({len(title)} chars): {length_check}")
+        print(f"URL start check: {url_start_check}")
+        print(f"URL end check: {url_end_check}")
+        print(f"Separator check: {separator_check}")
+        
+        if (length_check and url_start_check and url_end_check and separator_check):
             titles.append(title)
+            print(f"Title accepted: {title}")
             if len(titles) == 3:
                 break
+        else:
+            print(f"Title rejected: {title}")
+            print(f"Failed checks: length={length_check}, url_start={url_start_check}, url_end={url_end_check}, separator={separator_check}")
     
     if not titles:
         print("Warning: No valid titles found in response")
