@@ -68,6 +68,7 @@ FREE_MODELS = [
     "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "deepseek/deepseek-chat-v3-0324:free",
+    "https://openrouter.ai/deepseek/deepseek-r1-0528:free"
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
    # "featherless/qwerky-72b:free", returns garbage, don't use
@@ -527,12 +528,8 @@ def extract_top_titles_from_ai(text):
                 
         if (length_check and url_start_check and url_end_check and separator_check):
             titles.append(title)
-            print(f"Title accepted: {title}")
             if len(titles) == 3:
                 break
-        else:
-            print(f"Title rejected: {title}")
-            print(f"Failed checks: length={length_check}, url_start={url_start_check}, url_end={url_end_check}, separator={separator_check}")
     
     if not titles:
         print("Warning: No valid titles found in response")
