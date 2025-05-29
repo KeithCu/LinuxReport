@@ -40,7 +40,7 @@ CONFIG: SiteConfig = SiteConfig(
 VP: J.D. Vance
 Cabinet: Marco Rubio (State), Pete Hegseth (Defense), Scott Bessent (Treasury), Pam Bondi (AG), Doug Burgum (Interior), Lori Chavez-DeRemer (Labor), Sean Duffy (Transpo),
 Robert F. Kennedy Jr. (HHS), Howard Lutnick (Commerce), Linda McMahon (Ed), Kristi Noem (DHS), Brooke Rollins (Ag), Eric Turner (HUD), Lee Zeldin (EPA), Chris Wright (Energy)
-Allies: Elon Musk (DOGE - Department of Government Efficiency), Russell Vought (OMB), Stephen Miller (Deputy CoS)
+Allies: Elon Musk (DOGE - Department of Government Efficiency), Russell Vought (OMB).
 ''',
     PATH="/srv/http/trumpreport",
     SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 18, 20, 22],

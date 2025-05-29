@@ -68,7 +68,7 @@ FREE_MODELS = [
     "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "deepseek/deepseek-chat-v3-0324:free",
-    "https://openrouter.ai/deepseek/deepseek-r1-0528:free"
+    "https://openrouter.ai/deepseek/deepseek-r1-0528:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
    # "featherless/qwerky-72b:free", returns garbage, don't use
@@ -461,7 +461,7 @@ def _try_call_model(client, model, messages, max_tokens):
                     "messages": prepared_messages # Log potentially modified messages
                 }
                 with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n\n")
+                    f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n")
             
             return response_text
         except Exception as e:
@@ -885,7 +885,7 @@ if __name__ == "__main__":
 
     # Handle forceimage case early
     if args.forceimage:
-        refresh_images_only(selected_mode_str, used_model if SHOW_AI_ATTRIBUTION else None)
+        refresh_images_only(selected_mode_str, None)
         sys.exit(0)
 
     # Check schedule using the config's SCHEDULE field
