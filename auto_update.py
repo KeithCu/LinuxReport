@@ -156,6 +156,9 @@ cache = g_c
 
 ALL_URLS = {} # Initialized here, passed to utils
 
+# Track failed models globally
+FAILED_MODELS = set()
+
 # --- Global Configuration (Replaces Environment Variables except API Keys) ---
 RUN_MODE = "normal"  # options: "normal", "compare"
 
@@ -337,11 +340,21 @@ class OpenRouterProvider(LLMProvider):
                 if cached_model:
                     print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
                     g_c.delete("working_llm_model")
-                self._selected_model = random.choice(FREE_MODELS)
-                print(f"Randomly selected free model: {self._selected_model}")
+                available_models = [m for m in FREE_MODELS if m not in FAILED_MODELS]
+                if available_models:
+                    self._selected_model = random.choice(available_models)
+                    print(f"Randomly selected free model: {self._selected_model}")
+                else:
+                    print("No available models found, using fallback")
+                    self._selected_model = FALLBACK_MODEL
         else:
-            self._selected_model = random.choice(FREE_MODELS)
-            print(f"Randomly selected free model: {self._selected_model}")
+            available_models = [m for m in FREE_MODELS if m not in FAILED_MODELS]
+            if available_models:
+                self._selected_model = random.choice(available_models)
+                print(f"Randomly selected free model: {self._selected_model}")
+            else:
+                print("No available models found, using fallback")
+                self._selected_model = FALLBACK_MODEL
     
     @property
     def api_key_env_var(self) -> str:
@@ -448,6 +461,8 @@ def _try_call_model(client, model, messages, max_tokens):
         except Exception as e:
             print(f"Error on attempt {attempt} for model {model}: {e}")
             traceback.print_exc()
+            # Add failed model to global set
+            FAILED_MODELS.add(model)
             if attempt < max_retries:
                 time.sleep(1)
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
