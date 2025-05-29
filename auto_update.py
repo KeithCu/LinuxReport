@@ -463,15 +463,9 @@ def extract_top_titles_from_ai(text):
         letters = ''.join(c for c in TITLE_MARKER if c.isalpha())
         if letters:
             # If we have letters, look for those words
-            pattern = re.escape(letters)
-        else:
-            # If no letters, use the marker as-is with special chars escaped
-            pattern = re.escape(TITLE_MARKER)
-            
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            marker_index = match.start()
-            marker_length = match.end() - match.start()
+            marker_index = text.rfind(letters)
+            if marker_index != -1:
+                marker_length = len(letters)
         else:
             marker_index = -1
             marker_length = 0
@@ -526,19 +520,11 @@ def extract_top_titles_from_ai(text):
             title = line
 
         # Validate title
-        print(f"\nValidating title: {title}")
-        print(f"Title length: {len(title)}")
-        print(f"Title characters: {[c for c in title]}")
         length_check = len(title) >= 10 and len(title) <= 200
         url_start_check = not title.startswith(('http', 'www.'))
         url_end_check = not title.endswith(('.com', '.org', '.net'))
         separator_check = not all(c in '=-*_' for c in title)
-        
-        print(f"Length check ({len(title)} chars): {length_check}")
-        print(f"URL start check: {url_start_check}")
-        print(f"URL end check: {url_end_check}")
-        print(f"Separator check: {separator_check}")
-        
+                
         if (length_check and url_start_check and url_end_check and separator_check):
             titles.append(title)
             print(f"Title accepted: {title}")
