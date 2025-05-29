@@ -278,9 +278,10 @@ class LLMProvider(ABC):
         except Exception as e:
             print(f"Error with primary model {current_model} ({self.name}): {e}")
             traceback.print_exc()
+            FAILED_MODELS.add(current_model)
         
         # If primary model fails, try one random free model
-        available_models = [m for m in FREE_MODELS if m != current_model]
+        available_models = [m for m in FREE_MODELS if m != current_model and m not in FAILED_MODELS]
         print(f"\nAvailable fallback models: {len(available_models)}")
         print(f"Current model was: {current_model}")
         if available_models:
@@ -294,18 +295,23 @@ class LLMProvider(ABC):
             except Exception as e:
                 print(f"Error with fallback model {fallback_model} ({self.name}): {e}")
                 traceback.print_exc()
+                FAILED_MODELS.add(fallback_model)
         else:
             print("No available fallback models found, skipping to final fallback")
         
         # If both attempts failed, try the final fallback model
         final_fallback = self.fallback_model
-        print(f"\nBoth attempts failed. Trying final fallback model: {final_fallback}")
-        try:
-            response_text = self.call_model(final_fallback, messages, MAX_TOKENS, f"Final Fallback {label}")
-            return response_text, final_fallback
-        except Exception as fallback_e:
-            print(f"Final fallback model {final_fallback} also failed: {fallback_e}")
-            traceback.print_exc()
+        if final_fallback not in FAILED_MODELS:
+            print(f"\nBoth attempts failed. Trying final fallback model: {final_fallback}")
+            try:
+                response_text = self.call_model(final_fallback, messages, MAX_TOKENS, f"Final Fallback {label}")
+                return response_text, final_fallback
+            except Exception as fallback_e:
+                print(f"Final fallback model {final_fallback} also failed: {fallback_e}")
+                traceback.print_exc()
+                FAILED_MODELS.add(final_fallback)
+        else:
+            print(f"Final fallback model {final_fallback} was already tried and failed")
         
         return None, None
     
@@ -645,20 +651,26 @@ def ask_ai_top_articles(articles):
     if not top_titles:
         print("No headlines extracted from primary model, trying fallback model...")
         fallback_model = provider1.fallback_model
-        try:
-            response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, "Fallback (headline retry)")
-            if response_text:
-                top_titles = extract_top_titles_from_ai(response_text)
-                if top_titles:
-                    used_model = fallback_model
-                    print(f"Successfully extracted headlines using fallback model: {fallback_model}")
-                else:
-                    print("Fallback model also failed to extract headlines")
-                    return "No headlines could be extracted from AI response.", [], previous_selections, None
-        except Exception as e:
-            print(f"Fallback model failed during headline retry: {e}")
-            traceback.print_exc()
-            return "Fallback model failed to process headlines.", [], previous_selections, None
+        if fallback_model not in FAILED_MODELS:
+            try:
+                response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, "Fallback (headline retry)")
+                if response_text:
+                    top_titles = extract_top_titles_from_ai(response_text)
+                    if top_titles:
+                        used_model = fallback_model
+                        print(f"Successfully extracted headlines using fallback model: {fallback_model}")
+                    else:
+                        print("Fallback model also failed to extract headlines")
+                        FAILED_MODELS.add(fallback_model)
+                        return "No headlines could be extracted from AI response.", [], previous_selections, None
+            except Exception as e:
+                print(f"Fallback model failed during headline retry: {e}")
+                traceback.print_exc()
+                FAILED_MODELS.add(fallback_model)
+                return "Fallback model failed to process headlines.", [], previous_selections, None
+        else:
+            print(f"Fallback model {fallback_model} was already tried and failed")
+            return "No headlines could be extracted from AI response.", [], previous_selections, None
     
     # Only update model cache if we successfully extracted headlines
     if top_titles and used_model:
