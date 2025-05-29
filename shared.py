@@ -27,27 +27,48 @@ class Mode(str, Enum):
     SPACE_REPORT = "space"
     PV_REPORT = "pv"
 
-# Allowed domains for CORS and CSP
+# Domains allowed for Content Security Policy (CSP) - controls which domains can load resources
+# like images, fonts, and scripts on our pages
 ALLOWED_DOMAINS = [
     'https://linuxreport.net',
+    'https://www.linuxreport.net',
+
     'https://covidreport.org',
+    'https://www.covidreport.org',
+
     'https://aireport.keithcu.com',
+
     'https://pvreport.org',
+    'https://www.pvreport.org',
+
     'https://trumpreport.info',
+    'https://www.trumpreport.info',
+
     'https://news.thedetroitilove.com',
+
     'http://127.0.0.1:5000',
     'https://fonts.googleapis.com',
     'https://fonts.gstatic.com',
 ]
 
-# Domains allowed to make requests to this server
+# Domains allowed to make API requests to this server (CORS only)
+# These domains can send requests to our endpoints
 ALLOWED_REQUESTER_DOMAINS = [
     'https://covidreport.org',
+    'https://www.covidreport.org',
+
     'https://aireport.keithcu.com',
+
     'https://pvreport.org',
+    'https://www.pvreport.org',
+
     'https://trumpreport.info',
+    'https://www.trumpreport.info',
+
     'https://news.thedetroitilove.com',
+
     'https://linuxreport.net',
+    'https://www.linuxreport.net',
     # Add more domains as needed
 ]
 
@@ -267,13 +288,18 @@ def get_chat_cache() -> DiskCacheWrapper:
 LOCK_CLASS: Type[LockBase] = DiskcacheSqliteLock
 
 def get_lock(lock_name: str, owner_prefix: Optional[str] = None) -> LockBase:
-    """Factory to get a lock instance using the selected lock class."""
-    if issubclass(LOCK_CLASS, FileLockWrapper):
-        return LOCK_CLASS(lock_name)
-    elif issubclass(LOCK_CLASS, DiskcacheSqliteLock):
-        return LOCK_CLASS(lock_name, g_cs.cache, owner_prefix)
-    else:
-        raise TypeError(f"Unsupported lock class: {LOCK_CLASS}")
+    """Get a DiskcacheSqliteLock instance."""
+    return DiskcacheSqliteLock(lock_name, g_cs.cache, owner_prefix)
+
+# Original factory implementation (commented out for reference):
+# def get_lock(lock_name: str, owner_prefix: Optional[str] = None) -> LockBase:
+#     """Factory to get a lock instance using the selected lock class."""
+#     if issubclass(LOCK_CLASS, FileLockWrapper):
+#         return LOCK_CLASS(lock_name)
+#     elif issubclass(LOCK_CLASS, DiskcacheSqliteLock):
+#         return LOCK_CLASS(lock_name, g_cs.cache, owner_prefix)
+#     else:
+#         raise TypeError(f"Unsupported lock class: {LOCK_CLASS}")
 
 # Functions
 def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
