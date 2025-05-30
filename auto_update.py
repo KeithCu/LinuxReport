@@ -96,7 +96,6 @@ FREE_MODELS = [
     "qwen/qwen3-235b-a22b:free",
     "rekaai/reka-flash-3:free",
     "shisa-ai/shisa-v2-llama3.3-70b:free",
-    "thudm/glm-z1-9b:free",
     "thudm/glm-z1-32b:free",
     "thudm/glm-4-32b:free",
 ]
