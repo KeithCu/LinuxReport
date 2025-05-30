@@ -61,19 +61,19 @@ API_RESPONSE_LOG = "api_responses.jsonl"
 
 # AI Attribution configuration
 SHOW_AI_ATTRIBUTION = True  # Set to False to hide AI model attribution in headlines
-
 # List of free models to try
 FREE_MODELS = [
     "agentica-org/deepcoder-14b-preview:free",
     "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "deepseek/deepseek-chat-v3-0324:free",
-    "https://openrouter.ai/deepseek/deepseek-r1-0528:free",
+    "deepseek/deepseek-r1-0528-qwen3-8b:free",
+    "deepseek-r1-0528:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
    # "featherless/qwerky-72b:free", returns garbage, don't use
     "google/gemma-3-12b-it:free",
-    "google/gemma-3-27b-it:free",
+   # "google/gemma-3-27b-it:free", rate limit errors
     "meta-llama/llama-3.3-8b-instruct:free",
     "meta-llama/llama-4-scout:free",
     "meta-llama/llama-4-maverick:free",
@@ -115,9 +115,9 @@ From relevant headlines, pick the top 3 most interesting, each covering a comple
 After reasoning, output {TITLE_MARKER} followed by the top 3 headlines in this format, with no extra text but title:
 
 {TITLE_MARKER}
-Best Title
-Second Best Title
-Third Best Title
+Best headline
+Second Best headline
+Third Best headline
 """
 
 #O3-suggested alternate prompt for reasoning models
@@ -133,9 +133,9 @@ Example format:
 Your reasoning paragraph here.
 
 {TITLE_MARKER}
-Best title here
-Second best title here
-Third best title here
+Best headline
+Second best headline
+Third best headline
 """
 
 PROMPT_O3_USER_TEMPLATE = """
