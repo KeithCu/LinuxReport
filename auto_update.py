@@ -786,16 +786,6 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
                 # Decide if we should exit or continue without update
                 sys.exit(1) # Exit if AI failed critically
 
-            print("\n--- Extracted Top Titles (from AI response) ---")
-            # Extract again here just for printing in dry-run or normal mode
-            top_titles_print = extract_top_titles_from_ai(full_response)
-            for title in top_titles_print:
-                print(title)
-            print("--- Matched Articles (used for update) ---")
-            for art in top_3_articles_match:
-                print(f"- {art['title']} ({art['url']})")
-
-
             if dry_run:
                 print("\n--- Dry Run Mode: Skipping file generation and archive update. ---")
                 sys.exit(0) # Exit after dry run
