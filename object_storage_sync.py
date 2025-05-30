@@ -439,6 +439,152 @@ class TestObjectStorageSync(unittest.TestCase):
             if os.path.exists(test_path):
                 os.remove(test_path)
 
+    def test_concurrent_access(self):
+        """Test concurrent access to the same object from multiple threads"""
+        import threading
+        
+        test_data = b'Test content for concurrent access'
+        test_key = 'concurrent_test'
+        results = []
+        
+        def worker():
+            try:
+                # Each thread tries to publish and fetch
+                publish_bytes(test_data, test_key)
+                fetched_data, _ = fetch_bytes(test_key)
+                results.append(fetched_data == test_data)
+            except Exception as e:
+                results.append(False)
+        
+        # Create multiple threads
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        
+        # Verify all threads succeeded
+        self.assertTrue(all(results), "All concurrent operations should succeed")
+
+    def test_smart_fetch_caching(self):
+        """Test that smart_fetch properly caches and respects cache expiry"""
+        test_data = b'Test content for caching'
+        test_key = 'cache_test'
+        
+        # First publish the data
+        publish_bytes(test_data, test_key)
+        
+        # First fetch should hit storage
+        first_fetch, first_meta = smart_fetch(test_key, cache_expiry=2)
+        self.assertEqual(first_fetch, test_data)
+        
+        # Second fetch should hit cache
+        second_fetch, second_meta = smart_fetch(test_key, cache_expiry=2)
+        self.assertEqual(second_fetch, test_data)
+        
+        # Wait for cache to expire
+        time.sleep(3)
+        
+        # This fetch should hit storage again
+        third_fetch, third_meta = smart_fetch(test_key, cache_expiry=2)
+        self.assertEqual(third_fetch, test_data)
+
+    def test_large_file_handling(self):
+        """Test handling of large files (>1MB)"""
+        # Create a large test file (2MB)
+        large_data = b'0' * (2 * 1024 * 1024)
+        test_key = 'large_file_test'
+        
+        # Test publishing
+        uploaded_obj = publish_bytes(large_data, test_key)
+        self.assertIsNotNone(uploaded_obj)
+        
+        # Test fetching
+        fetched_data, metadata = fetch_bytes(test_key)
+        self.assertIsNotNone(fetched_data)
+        self.assertEqual(len(fetched_data), len(large_data))
+        self.assertEqual(fetched_data, large_data)
+
+    def test_retry_mechanism(self):
+        """Test that retry mechanism works for temporary failures"""
+        test_data = b'Test content for retry'
+        test_key = 'retry_test'
+        
+        # Mock temporary failures
+        original_get_object = _get_object
+        failure_count = 0
+        
+        def mock_get_object(obj_name):
+            nonlocal failure_count
+            if failure_count < 2:  # Fail first two attempts
+                failure_count += 1
+                raise StorageOperationError("Temporary failure")
+            return original_get_object(obj_name)
+        
+        # Apply mock
+        _get_object = mock_get_object
+        
+        try:
+            # This should succeed after retries
+            fetched_data, metadata = fetch_bytes(test_key)
+            self.assertIsNotNone(fetched_data)
+        finally:
+            # Restore original function
+            _get_object = original_get_object
+
+    def test_metadata_handling(self):
+        """Test that metadata is properly preserved and retrieved"""
+        test_data = b'Test content for metadata'
+        test_key = 'metadata_test'
+        
+        # Publish with specific content type
+        content_stream = BytesIO(test_data)
+        obj = _storage_driver.upload_object_via_stream(
+            iterator=content_stream,
+            container=_storage_container,
+            object_name=test_key,
+            extra={'content_type': 'application/json'}
+        )
+        
+        # Fetch and verify metadata
+        fetched_data, metadata = fetch_bytes(test_key)
+        self.assertIsNotNone(metadata)
+        self.assertIn('last_modified', metadata)
+        self.assertIn('size', metadata)
+        self.assertIn('hash', metadata)
+        self.assertEqual(metadata['size'], len(test_data))
+
+    def test_invalid_configuration(self):
+        """Test behavior with invalid storage configuration"""
+        # Temporarily disable storage
+        original_enabled = STORAGE_ENABLED
+        STORAGE_ENABLED = False
+        
+        try:
+            with self.assertRaises(ConfigurationError):
+                _init_check()
+        finally:
+            STORAGE_ENABLED = original_enabled
+
+    def test_bucket_last_written_tracking(self):
+        """Test that bucket last-written timestamp is properly updated"""
+        test_data = b'Test content for last-written'
+        test_key = 'last_written_test'
+        
+        # Get initial last-written timestamp
+        initial_obj = _get_object(BUCKET_LAST_WRITTEN_KEY)
+        initial_timestamp = float(initial_obj.get_content_as_string()) if initial_obj else 0
+        
+        # Publish new data
+        publish_bytes(test_data, test_key)
+        
+        # Get new last-written timestamp
+        new_obj = _get_object(BUCKET_LAST_WRITTEN_KEY)
+        new_timestamp = float(new_obj.get_content_as_string())
+        
+        # Verify timestamp was updated
+        self.assertGreater(new_timestamp, initial_timestamp)
+
 
 if __name__ == '__main__':
     if not init_storage():  # Attempt to initialize storage before running tests

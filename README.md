@@ -18,7 +18,7 @@ https://pvreport.org
 
 https://news.thedetroitilove.com
 
-Takes advantage of thread pools and process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page after less than 10 lines of my Python code.
+Takes advantage of thread pools and Apache process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page after less than 10 lines of my Python code.
 
 It now auto-updates the top headlines using LLMs and https://api.together.ai/. They have inexpensive and high-performance inference. I can make 300 of these requests to Meta's Llama 3.3-70B for $1. I tried other models but they didn't work as well, but there are cheaper ones to consider. See https://github.com/KeithCu/LinuxReport/blob/master/auto_update.py.
 
@@ -109,7 +109,7 @@ User-oriented features:
 
 These features can help make your site more interactive, personalized, and useful for regular visitors.
 
-## Feature Suggestions (March 19, 2024 - Claude AI)
+## Feature Suggestions (May 23, 2025 - Claude AI)
 
 Here are some suggested features to enhance user engagement and functionality:
 

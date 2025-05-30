@@ -16,9 +16,8 @@ This document outlines the different caching strategies employed within the code
 *   **Location:** Initialized in `shared.py` as `g_cm = Cache()`.
 *   **Mechanism:** Uses an in-memory cache, the `cacheout` library.
 *   **Uses:**
-    *   **Full Page Caching:** (`routes.py`) Stores the entire rendered HTML output of the main page. Keys are based on request parameters (page order, mobile flag). Allows serving previously rendered pages directly from memory.
-    *   **RSS Template Caching:** (`routes.py`, `workers.py`) Caches templates fetched based on site URLs (`rss_info.site_url`). Cache entries are deleted by the worker when a feed is updated.
-*   **Persistence:** The cache exists only in memory for the duration of the application process. It is cleared upon application restart or when items expire/are evicted.
+    *   **Full Page Caching:** (`routes.py`) Stores the entire rendered HTML output of the main page.
+    *   **RSS Template Caching:** (`routes.py`, `workers.py`) Caches templates fetched based on site URLs (`rss_info.site_url`). Cache entries are deleted by the worker when a feed is updated. That doesn't work across threads, so at page rendering time, we check to see if the last_fetch time is different from last_render and if so, then regenerate the template.
 
 ## 3. Disk-Based Caching (`diskcache` - via `g_c`)
 
@@ -26,7 +25,7 @@ The application utilizes the `diskcache` library (accessed via the `g_c` object,
 
 *   **Weather Data Caching:**
     *   **Location:** `weather.py`
-    *   **Mechanism:** Uses the generic disk cache (`g_c`). Weather data fetched from an API is stored.
+    *   **Mechanism:** Uses the generic disk cache (`g_cs`). This is a shared cache among all instances on the server. Weather data fetched from an API is stored.
     *   **Keying:** Keys are generated based on latitude and longitude, which are "bucketed" (grouped into nearby regions) to increase cache hits for close locations. Keys use the prefix `weather:cache_entry:`.
     *   **Expiration:** Cached entries have a timeout (`WEATHER_CACHE_TIMEOUT`, currently 4 hours) and are also validated against the current date to ensure freshness.
     *   **Concurrency:** Uses `DiskcacheSqliteLock` to prevent multiple processes/threads from fetching data for the same location simultaneously.
@@ -39,7 +38,7 @@ The application utilizes the `diskcache` library (accessed via the `g_c` object,
 
 *   **Feed Fetching Synchronization:**
     *   **Location:** `workers.py`
-    *   **Mechanism:** Uses `DiskcacheSqliteLock` (via `get_lock` function, likely wrapping `g_c`'s lock).
+    *   **Mechanism:** Uses `DiskcacheSqliteLock` wrapping `g_c`'s lock.
     *   **Purpose:** While not explicitly showing data caching with `g_c` here, it uses locks provided by `diskcache` to ensure that only one worker process attempts to fetch a specific feed URL at any given time. This prevents redundant network requests.
 
 ## 4. File-Based Caching (via `_file_cache`)
