@@ -68,7 +68,7 @@ FREE_MODELS = [
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "deepseek/deepseek-chat-v3-0324:free",
     "deepseek/deepseek-r1-0528-qwen3-8b:free",
-    "deepseek-r1-0528:free",
+    "deepseek/deepseek-r1-0528:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
    # "featherless/qwerky-72b:free", returns garbage, don't use
@@ -275,25 +275,21 @@ class LLMProvider(ABC):
             response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
             return response_text, current_model
         except Exception as e:
-            print(f"Error with primary model {current_model} ({self.name}): {e}")
-            traceback.print_exc()
+            print(f"Primary model {current_model} failed: {str(e)}")
             FAILED_MODELS.add(current_model)
         
         # If primary model fails, try one random free model
         available_models = [m for m in FREE_MODELS if m != current_model and m not in FAILED_MODELS]
         print(f"\nAvailable fallback models: {len(available_models)}")
-        print(f"Current model was: {current_model}")
         if available_models:
             fallback_model = random.choice(available_models)
             print(f"\n--- LLM Call: {self.name} / {fallback_model} / {prompt_mode} {label} (First Fallback) ---")
-            print(f"Selected random fallback model from {len(available_models)} available models")
             
             try:
                 response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"{label}")
                 return response_text, fallback_model
             except Exception as e:
-                print(f"Error with fallback model {fallback_model} ({self.name}): {e}")
-                traceback.print_exc()
+                print(f"Fallback model {fallback_model} failed: {str(e)}")
                 FAILED_MODELS.add(fallback_model)
         else:
             print("No available fallback models found, skipping to final fallback")
@@ -301,13 +297,12 @@ class LLMProvider(ABC):
         # If both attempts failed, try the final fallback model
         final_fallback = self.fallback_model
         if final_fallback not in FAILED_MODELS:
-            print(f"\nBoth attempts failed. Trying final fallback model: {final_fallback}")
+            print(f"\nTrying final fallback model: {final_fallback}")
             try:
                 response_text = self.call_model(final_fallback, messages, MAX_TOKENS, f"Final Fallback {label}")
                 return response_text, final_fallback
             except Exception as fallback_e:
-                print(f"Final fallback model {final_fallback} also failed: {fallback_e}")
-                traceback.print_exc()
+                print(f"Final fallback model {final_fallback} failed: {str(fallback_e)}")
                 FAILED_MODELS.add(final_fallback)
         else:
             print(f"Final fallback model {final_fallback} was already tried and failed")
@@ -450,22 +445,29 @@ def _try_call_model(client, model, messages, max_tokens):
             print(f"[_try_call_model] Model response (Attempt {attempt}):\n{response_text}\n{'-'*40}")
             
             # Log the API response only if global logging is enabled
-            if GLOBAL_LOGGING_ENABLED:                
-                log_entry = {
-                    "timestamp": datetime.datetime.now(TZ).isoformat(),
-                    "model": model,
-                    "response": response_text,
-                    "finish_reason": finish_reason,
-                    "response_time": end - start,
-                    "messages": prepared_messages # Log potentially modified messages
-                }
-                with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n")
+            if GLOBAL_LOGGING_ENABLED:
+                try:
+                    log_entry = {
+                        "timestamp": datetime.datetime.now(TZ).isoformat(),
+                        "model": model,
+                        "response": response_text,
+                        "finish_reason": finish_reason,
+                        "response_time": end - start,
+                        "messages": prepared_messages # Log potentially modified messages
+                    }
+                    with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
+                        f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n")
+                except Exception as log_error:
+                    print(f"Warning: Failed to log API response: {str(log_error)}")
+                    # Continue execution even if logging fails
             
             return response_text
         except Exception as e:
-            print(f"Error on attempt {attempt} for model {model}: {e}")
-            traceback.print_exc()
+            error_msg = str(e)
+            if "JSONDecodeError" in error_msg:
+                print(f"Model {model} returned malformed response: {error_msg}")
+            else:
+                print(f"Error on attempt {attempt} for model {model}: {error_msg}")
             # Add failed model to global set
             FAILED_MODELS.add(model)
             if attempt < max_retries:
