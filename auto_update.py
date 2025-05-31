@@ -128,6 +128,7 @@ INSTRUCTIONS:
 4. Do NOT include any extra text on the title lines, put your comments and disclaimers above or below the list of titles.
 5. IMPORTANT: You must select ONLY from the provided list of titles - do not make up new titles
 6. Order the titles by importance - most important/interesting first
+7. CRITICAL: Each selected title must cover a completely distinct topic - ensure there is no similarity in topics between your selections
 
 The example below shows the structure, but you must write your own reasoning and select actual titles:
 
