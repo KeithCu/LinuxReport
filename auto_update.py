@@ -125,16 +125,20 @@ INSTRUCTIONS:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
 2. Write {TITLE_MARKER} on its own line
 3. List exactly 3 titles from the list of titles below, one per line
-4. Do NOT include any extra text on the title lines
+4. Do NOT include any extra text on the title lines, put your comments and disclaimers above or below the list of titles.
 5. IMPORTANT: You must select ONLY from the provided list of titles - do not make up new titles
+6. Order the titles by importance - most important/interesting first
 
-DO NOT COPY THIS EXAMPLE - IT IS JUST A FORMAT GUIDE:
-[Your reasoning paragraph here]
+The example below shows the structure, but you must write your own reasoning and select actual titles:
+
+TEMPLATE START
+[Reasoning paragraph above titles]
 
 {TITLE_MARKER}
-[Title 1]
-[Title 2]
-[Title 3]
+[Select and paste the MOST important/interesting title from the list]
+[Select and paste the SECOND most important/interesting title from the list]
+[Select and paste the THIRD most important/interesting title from the list]
+TEMPLATE END
 """
 
 PROMPT_O3_USER_TEMPLATE = """
@@ -185,6 +189,7 @@ INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
 # Models that don't support system instructions properly and need user-only instructions
 USER_ONLY_INSTRUCTION_MODELS = [
     "google/gemma-3-27b-it:free",
+    "qwen/qwen3-8b:free",  # Added due to issues with system prompts
 ]
 
 # Provider class hierarchy
