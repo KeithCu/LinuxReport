@@ -121,20 +121,20 @@ Third Best headline
 
 #O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = f"""
-FORMAT:
+INSTRUCTIONS:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
 2. Write {TITLE_MARKER} on its own line
 3. List exactly 3 titles from the list of titles below, one per line
 4. Do NOT include any extra text on the title lines
 5. IMPORTANT: You must select ONLY from the provided list of titles - do not make up new titles
 
-Example format:
-Your reasoning paragraph here.
+DO NOT COPY THIS EXAMPLE - IT IS JUST A FORMAT GUIDE:
+[Your reasoning paragraph here]
 
 {TITLE_MARKER}
-Best headline
-Second best headline
-Third best headline
+[Title 1]
+[Title 2]
+[Title 3]
 """
 
 PROMPT_O3_USER_TEMPLATE = """
