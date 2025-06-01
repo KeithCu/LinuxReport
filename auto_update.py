@@ -789,7 +789,7 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
 
             # Check if AI call failed or returned no usable response
             if not top_3_articles_match and not full_response.startswith("No new articles"):
-                print(f"AI processing failed or returned no headlines: {full_response}")
+                print(f"AI processing failed or returned no headlines.")
                 # Decide if we should exit or continue without update
                 sys.exit(1) # Exit if AI failed critically
 

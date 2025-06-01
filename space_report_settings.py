@@ -34,9 +34,9 @@ CONFIG: SiteConfig = SiteConfig(
 	LOGO_URL="SpaceReport.webp",
 	WEB_DESCRIPTION="Space exploration news: Cosmic updates in milliseconds",
 	WEB_TITLE="Space Report",
-	REPORT_PROMPT="Latest space exploration news",
+	REPORT_PROMPT="Latest positive and exciting space exploration news",
     PATH="/srv/http/spacereport",
-    SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 20],
+    SCHEDULE=[0, 8, 12, 16, 20],
     CUSTOM_FETCH_CONFIG={
         "reddit.com": REDDIT_FETCH_CONFIG,
     }
