@@ -33,6 +33,32 @@ $ sudo pip install -r requirements.txt
 $ python -m flask run
 ```
 
+## FastAPI vs Flask for This Project
+
+While FastAPI is a modern, high-performance framework with excellent async support, this project intentionally uses Flask for several reasons:
+
+1. **Simplicity**: Flask's synchronous model is straightforward and matches the project's needs. The current implementation uses thread pools and Apache process pools for scaling, which works well for this use case.
+
+2. **Maturity**: Flask has been battle-tested for years and has a vast ecosystem of extensions and community support.
+
+3. **Performance**: For this news aggregation site, the bottleneck is typically network I/O (fetching RSS feeds) rather than request handling. The current implementation achieves good performance through thread pools and caching.
+
+4. **Development Speed**: Flask's simplicity allows for rapid development and easier maintenance, which is crucial for a project that needs to be easily modifiable.
+
+While FastAPI offers benefits like automatic API documentation, better type checking, and modern async support, these advantages are less relevant for this project because:
+- The site primarily serves HTML pages rather than JSON APIs
+- The current synchronous code is already performant enough
+- The project doesn't heavily utilize type hints
+- The existing thread pool implementation works well for the use case
+
+If you're considering switching to FastAPI, you would need to:
+1. Rewrite the core application logic
+2. Modify the Apache configuration
+3. Potentially restructure the caching system
+4. Update all dependencies and extensions
+
+The effort required for this switch might not justify the benefits for this specific use case.
+
 ## Admin Mode Security
 
 The application has an admin mode that allows editing headlines and other admin-only functions. Admin mode is protected by a password stored in `config.yaml`.
