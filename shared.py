@@ -46,6 +46,8 @@ ALLOWED_DOMAINS = [
 
     'https://news.thedetroitilove.com',
 
+    'https://news.spaceelevatorwiki.com',
+
     'http://127.0.0.1:5000',
     'https://fonts.googleapis.com',
     'https://fonts.gstatic.com',
@@ -69,6 +71,9 @@ ALLOWED_REQUESTER_DOMAINS = [
 
     'https://linuxreport.net',
     'https://www.linuxreport.net',
+
+    'https://news.spaceelevatorwiki.com',
+
     # Add more domains as needed
 ]
 
