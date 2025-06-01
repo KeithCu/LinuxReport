@@ -14,6 +14,7 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://www.sciencedaily.com/rss/space_time.xml": RssInfo("sciencedaily.png", "Science Daily", "https://www.sciencedaily.com"),
 		"https://phys.org/rss-feed/space-news/": RssInfo("phys.png", "Phys.org", "https://phys.org"),
 		"https://space.com/feeds/all": RssInfo("space.webp", "Space.com", "https://space.com"),
+        "https://www.spaceelevatorblog.com/?feed=rss2": RssInfo("spaceelevatorblog.jpg","Space Elevator Blog", "https://www.spaceelevatorblog.com"),
 	},
 	USER_AGENT="Space Report -- https://spacereport.info",
 	SITE_URLS=[
@@ -28,13 +29,14 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://www.planetary.org/rss/articles",
 		"https://www.astronomy.com/feed/",
 		"https://skyandtelescope.org/astronomy-news/rss/",
+        "https://www.spaceelevatorblog.com/?feed=rss2",
 	],
 	URL_IMAGES="https://spacereport.info/static/images/",
 	FAVICON="SpaceReport.ico",
 	LOGO_URL="SpaceReport.webp",
 	WEB_DESCRIPTION="Space exploration news: Cosmic updates in milliseconds",
 	WEB_TITLE="Space Report",
-	REPORT_PROMPT="Latest positive and exciting space exploration news",
+	REPORT_PROMPT="Latest news in the space industry and space exploration",
     PATH="/srv/http/spacereport",
     SCHEDULE=[0, 8, 12, 16, 20],
     CUSTOM_FETCH_CONFIG={
