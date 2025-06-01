@@ -41,7 +41,7 @@ While FastAPI is a modern, high-performance framework with excellent async suppo
 
 2. **Maturity**: Flask has been battle-tested for years and has a vast ecosystem of extensions and community support.
 
-3. **Performance**: For this news aggregation site, the bottleneck is typically network I/O (fetching RSS feeds) rather than request handling. The current implementation achieves good performance through thread pools and caching.
+3. **Performance**: The current implementation achieves good performance through thread pools and caching.
 
 4. **Development Speed**: Flask's simplicity allows for rapid development and easier maintenance, which is crucial for a project that needs to be easily modifiable.
 
