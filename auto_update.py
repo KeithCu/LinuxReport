@@ -71,9 +71,7 @@ FREE_MODELS = [
     "deepseek/deepseek-r1-0528:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
-   # "featherless/qwerky-72b:free", returns garbage, don't use
     "google/gemma-3-12b-it:free",
-   # "google/gemma-3-27b-it:free", rate limit errors
     "meta-llama/llama-3.3-8b-instruct:free",
     "meta-llama/llama-4-scout:free",
     "meta-llama/llama-4-maverick:free",
@@ -689,6 +687,8 @@ def ask_ai_top_articles(articles):
         if (best_match):
             top_articles.append(best_match)
             print(f"Selected article: {best_match['title']} ({best_match['url']})")
+        else:
+            print(f"Failed to find match for title: {title}")
 
     new_selections = [{"url": art["url"], "title": art["title"]}
                       for art in top_articles if art]
