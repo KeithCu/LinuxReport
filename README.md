@@ -20,7 +20,7 @@ https://news.thedetroitilove.com
 
 Takes advantage of thread pools and Apache process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page after less than 10 lines of my Python code.
 
-It now auto-updates the top headlines using LLMs and https://api.together.ai/. They have inexpensive and high-performance inference. I can make 300 of these requests to Meta's Llama 3.3-70B for $1. I tried other models but they didn't work as well, but there are cheaper ones to consider. See https://github.com/KeithCu/LinuxReport/blob/master/auto_update.py.
+It now auto-updates the top headlines using LLMs through [OpenRouter.ai](https://openrouter.ai), which provides access to a wide variety of AI models. The system intelligently selects from over 30 free models, including powerful options like [Llama 4](https://openrouter.ai/models/meta-llama/llama-4-maverick), [Qwen](https://openrouter.ai/models/qwen/qwen3-32b), and [Mistral](https://openrouter.ai/models/mistralai/mistral-small-3.1-24b-instruct) variants. The implementation includes smart caching of working models and automatic fallback mechanisms to ensure reliable headline generation. See the [model selection logic](https://github.com/KeithCu/LinuxReport/blob/master/auto_update.py) in `auto_update.py`.
 
 Feel free to request more default RSS feeds, or send pull requests.
 
