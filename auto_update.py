@@ -545,14 +545,8 @@ def extract_top_titles_from_ai(text):
         else:
             # When going forward after marker, accept any non-empty line as a potential title
             title = line
-
-        # Validate title
-        length_check = len(title) >= 10 and len(title) <= 200
-        url_start_check = not title.startswith(('http', 'www.'))
-        url_end_check = not title.endswith(('.com', '.org', '.net'))
-        separator_check = not all(c in '=-*_' for c in title)
                 
-        if (length_check and url_start_check and url_end_check and separator_check):
+        if len(title) >= 10 and len(title) <= 200:
             titles.append(title)
             if len(titles) == 3:
                 break
