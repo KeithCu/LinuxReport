@@ -1,20 +1,13 @@
 #!/usr/bin/env python3
 import os
-import logging
 import diskcache
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
 
 def migrate_to_sqlite(cache_dir):
     """
     Migrate DiskCache from file-based storage to SQLite-only storage.
     Uses DiskCache's own API to handle all data properly and preserves expiration times and tags.
     """
-    logging.info(f"Starting migration of cache at {cache_dir}")
+    print(f"Starting migration of cache at {cache_dir}")
     
     # Create migrated directory if it doesn't exist
     migrated_dir = os.path.join(os.path.dirname(cache_dir), 'migrated')
@@ -46,7 +39,7 @@ def migrate_to_sqlite(cache_dir):
                 )
                 
                 if retrieved_data == diskcache.core.ENOVAL:
-                    logging.warning(f"Key '{key}' not found in source cache. Skipping.")
+                    print(f"Warning: Key '{key}' not found in source cache. Skipping.")
                     continue
                 
                 value_object, expiry_timestamp, tag_value = retrieved_data
@@ -60,15 +53,15 @@ def migrate_to_sqlite(cache_dir):
                 )
                 
                 migrated_count += 1
-                logging.info(f"Migrated key {migrated_count}/{keys_to_migrate}: {key}")
+                print(f"Migrated key {migrated_count}/{keys_to_migrate}: {key}")
                 
             except Exception as e:
                 error_count += 1
-                logging.error(f"Error migrating key '{key}': {e}", exc_info=True)
+                print(f"Error migrating key '{key}': {e}")
                 return False
         
         # Verify the migration
-        logging.info("\nVerifying migration...")
+        print("\nVerifying migration...")
         for key in old_cache:
             try:
                 # Get data from both caches with all metadata
@@ -76,7 +69,7 @@ def migrate_to_sqlite(cache_dir):
                 new_data = new_cache.get(key, read=False, expire_time=True, tag=True)
                 
                 if old_data == diskcache.core.ENOVAL or new_data == diskcache.core.ENOVAL:
-                    logging.error(f"Key '{key}' missing in one of the caches")
+                    print(f"Error: Key '{key}' missing in one of the caches")
                     return False
                 
                 old_value, old_expire, old_tag = old_data
@@ -84,25 +77,25 @@ def migrate_to_sqlite(cache_dir):
                 
                 # Verify value, expiration, and tag
                 if old_value != new_value:
-                    logging.error(f"Value mismatch for key {key}")
+                    print(f"Error: Value mismatch for key {key}")
                     return False
                 if old_expire != new_expire:
-                    logging.error(f"Expiration time mismatch for key {key}")
+                    print(f"Error: Expiration time mismatch for key {key}")
                     return False
                 if old_tag != new_tag:
-                    logging.error(f"Tag mismatch for key {key}")
+                    print(f"Error: Tag mismatch for key {key}")
                     return False
                     
-                logging.info(f"Verified key: {key}")
+                print(f"Verified key: {key}")
                 
             except Exception as e:
-                logging.error(f"Verification error for key {key}: {e}", exc_info=True)
+                print(f"Verification error for key {key}: {e}")
                 return False
         
-        logging.info("\nVerification successful!")
+        print("\nVerification successful!")
         
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}", exc_info=True)
+        print(f"An unexpected error occurred: {e}")
         return False
         
     finally:
@@ -110,11 +103,11 @@ def migrate_to_sqlite(cache_dir):
         old_cache.close()
         new_cache.close()
         
-        # Log summary
-        logging.info("--- Migration Summary ---")
-        logging.info(f"Total keys encountered: {keys_to_migrate}")
-        logging.info(f"Successfully migrated items: {migrated_count}")
-        logging.info(f"Items failed to migrate: {error_count}")
+        # Print summary
+        print("--- Migration Summary ---")
+        print(f"Total keys encountered: {keys_to_migrate}")
+        print(f"Successfully migrated items: {migrated_count}")
+        print(f"Items failed to migrate: {error_count}")
     
     return True
 
@@ -122,10 +115,10 @@ if __name__ == "__main__":
     # Use current directory by default
     CACHE_DIR = os.getcwd()
     
-    logging.info("Starting migration to SQLite-only storage...")
+    print("Starting migration to SQLite-only storage...")
     if migrate_to_sqlite(CACHE_DIR):
-        logging.info("Migration completed successfully!")
-        logging.info(f"New SQLite-only cache is in: {os.path.join(CACHE_DIR, 'migrated')}")
-        logging.info("You can now update your DiskCache configuration to use sqlite_only=True")
+        print("Migration completed successfully!")
+        print(f"New SQLite-only cache is in: {os.path.join(CACHE_DIR, 'migrated')}")
+        print("You can now update your DiskCache configuration to use sqlite_only=True")
     else:
-        logging.error("Migration failed! Please check the errors above and try again.") 
+        print("Migration failed! Please check the errors above and try again.") 

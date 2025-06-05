@@ -16,15 +16,22 @@ THRESHOLD = 0.75  # Similarity threshold for deduplication
 # === Embedding Model Globals ===
 embedder = None
 st_util = None
+embedding_cache = {}  # Cache for storing computed embeddings
 
 def get_embedding(text):
     """Get the embedding vector for a piece of text using SentenceTransformer."""
     global embedder, st_util
+    if text in embedding_cache:
+        return embedding_cache[text]
+        
     if embedder is None:
         # Lazy initialization of SentenceTransformer since it takes 5 seconds.
         embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
         st_util = util
-    return embedder.encode(text, convert_to_tensor=True)
+    
+    embedding = embedder.encode(text, convert_to_tensor=True)
+    embedding_cache[text] = embedding
+    return embedding
 
 def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
     """Deduplicate articles based on their embeddings, excluding similar ones."""
