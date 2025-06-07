@@ -162,8 +162,9 @@ cache = g_c
 
 ALL_URLS = {} # Initialized here, passed to utils
 
-# Track failed models globally
-FAILED_MODELS = set()
+# Global tracking with persistence
+FAILED_MODELS_CACHE_KEY = "failed_llm_models"
+FAILED_MODELS_RETRY_HOURS = 24  # Retry failed models after 24 hours
 
 # --- Global Configuration (Replaces Environment Variables except API Keys) ---
 RUN_MODE = "normal"  # options: "normal", "compare"
@@ -284,7 +285,7 @@ class LLMProvider(ABC):
             return response_text, current_model
         except Exception as e:
             print(f"Primary model {current_model} failed: {str(e)}")
-            FAILED_MODELS.add(current_model)
+            self.model_selector.mark_failed(current_model)
         
         # Let ModelSelector handle all model selection logic
         current_model = self.model_selector.get_next_model(current_model)
@@ -295,7 +296,7 @@ class LLMProvider(ABC):
                 return response_text, current_model
             except Exception as e:
                 print(f"Fallback model {current_model} failed: {str(e)}")
-                FAILED_MODELS.add(current_model)
+                self.model_selector.mark_failed(current_model)
         
         return None, None
     
@@ -317,11 +318,55 @@ class ModelSelector:
     def __init__(self, use_random=True, forced_model=None):
         self.use_random = use_random
         self.forced_model = forced_model
-        self.failed_models = set()
         self.cache = g_c
+        self._load_failed_models()
         
+    def _load_failed_models(self):
+        """Load failed models from cache with timestamp."""
+        failed_models_data = self.cache.get(FAILED_MODELS_CACHE_KEY) or {}
+        current_time = time.time()
+        
+        # Filter out models that have been failed for too long
+        self.failed_models = {
+            model for model, fail_time in failed_models_data.items()
+            if current_time - fail_time < FAILED_MODELS_RETRY_HOURS * 3600
+        }
+        
+    def mark_failed(self, model):
+        """Mark a model as failed with timestamp."""
+        if model not in FREE_MODELS:
+            print(f"Warning: Attempted to mark unknown model as failed: {model}")
+            return
+            
+        failed_models_data = self.cache.get(FAILED_MODELS_CACHE_KEY) or {}
+        failed_models_data[model] = time.time()
+        self.cache.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
+        self.failed_models.add(model)
+        print(f"Marked model as failed: {model}")
+        
+    def mark_success(self, model):
+        """Mark a model as successful and update cache."""
+        if model not in FREE_MODELS:
+            print(f"Warning: Attempted to mark unknown model as successful: {model}")
+            return
+            
+        if model != self.forced_model:  # Don't cache forced models
+            self.cache.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+            
+        # Remove from failed models if it was there
+        if model in self.failed_models:
+            self.failed_models.remove(model)
+            failed_models_data = self.cache.get(FAILED_MODELS_CACHE_KEY) or {}
+            if model in failed_models_data:
+                del failed_models_data[model]
+                self.cache.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
+            print(f"Removed model from failed list: {model}")
+            
     def get_next_model(self, current_model=None):
         """Get the next model to try."""
+        # Reload failed models to check for retry eligibility
+        self._load_failed_models()
+        
         # 1. Forced model takes precedence
         if self.forced_model:
             return self.forced_model
@@ -340,14 +385,16 @@ class ModelSelector:
         # 4. Final fallback
         return FALLBACK_MODEL if FALLBACK_MODEL not in self.failed_models else None
         
-    def mark_failed(self, model):
-        """Mark a model as failed."""
-        self.failed_models.add(model)
-        
-    def mark_success(self, model):
-        """Mark a model as successful and update cache."""
-        if model != self.forced_model:  # Don't cache forced models
-            self.cache.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+    def get_model_status(self):
+        """Get current status of all models."""
+        self._load_failed_models()  # Refresh status
+        return {
+            "forced_model": self.forced_model,
+            "use_random": self.use_random,
+            "failed_models": list(self.failed_models),
+            "cached_model": self.cache.get("working_llm_model"),
+            "available_models": [m for m in FREE_MODELS if m not in self.failed_models]
+        }
 
 class OpenRouterProvider(LLMProvider):
     """Provider implementation for OpenRouter."""
@@ -496,7 +543,6 @@ def _try_call_model(client, model, messages, max_tokens):
             else:
                 print(f"Error on attempt {attempt} for model {model}: {error_msg}")
             # Add failed model to global set
-            FAILED_MODELS.add(model)
             if attempt < max_retries:
                 time.sleep(1)
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
@@ -671,7 +717,7 @@ def ask_ai_top_articles(articles):
     if not top_titles:
         print("No headlines extracted from primary model, trying fallback model...")
         fallback_model = provider1.fallback_model
-        if fallback_model not in FAILED_MODELS:
+        if fallback_model not in provider1.model_selector.failed_models:
             try:
                 response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, "Fallback (headline retry)")
                 if response_text:
@@ -681,12 +727,12 @@ def ask_ai_top_articles(articles):
                         print(f"Successfully extracted headlines using fallback model: {fallback_model}")
                     else:
                         print("Fallback model also failed to extract headlines")
-                        FAILED_MODELS.add(fallback_model)
+                        provider1.model_selector.mark_failed(fallback_model)
                         return "No headlines could be extracted from AI response.", [], previous_selections, None
             except Exception as e:
                 print(f"Fallback model failed during headline retry: {e}")
                 traceback.print_exc()
-                FAILED_MODELS.add(fallback_model)
+                provider1.model_selector.mark_failed(fallback_model)
                 return "Fallback model failed to process headlines.", [], previous_selections, None
         else:
             print(f"Fallback model {fallback_model} was already tried and failed")
