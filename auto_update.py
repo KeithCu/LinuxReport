@@ -88,7 +88,7 @@ FREE_MODELS = [
     "nousresearch/deephermes-3-mistral-24b-preview:free",
     "nvidia/llama-3.3-nemotron-super-49b-v1:free",
     "opengvlab/internvl3-14b:free",
-    "open-r1/olympiccoder-32b:free",
+   # "open-r1/olympiccoder-32b:free", Generates too many tokens
     "qwen/qwen-2.5-72b-instruct:free",
     "qwen/qwen3-8b:free",
     "qwen/qwen3-14b:free",
