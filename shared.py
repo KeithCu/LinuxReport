@@ -17,8 +17,18 @@ import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock, FileLockWrapper
 from models import load_config
 
+# Load configuration
+config = load_config()
+settings = config.get('settings', {})
+
+# Export user-configurable settings
+ALLOWED_DOMAINS = settings.get('allowed_domains', [])
+ALLOWED_REQUESTER_DOMAINS = settings.get('allowed_requester_domains', [])
+ENABLE_CORS = True
+
 class Mode(str, Enum):
     """Enumeration for different report modes using string values."""
+    # Base modes that are always available
     LINUX_REPORT = "linux"
     COVID_REPORT = "covid"
     TECHNO_REPORT = "techno"
@@ -28,14 +38,23 @@ class Mode(str, Enum):
     SPACE_REPORT = "space"
     PV_REPORT = "pv"
 
-# Load configuration
-config = load_config()
-settings = config.get('settings', {})
+    @classmethod
+    def from_config(cls, config_modes):
+        """Create a new Mode enum with additional modes from config."""
+        # Start with base modes
+        mode_dict = {mode.name: mode.value for mode in cls}
+        
+        # Add modes from config
+        for mode in config_modes:
+            name = mode['name'].upper()
+            if name not in mode_dict:
+                mode_dict[name] = mode['name']
+        
+        # Create new enum class with all modes
+        return Enum('Mode', mode_dict, type=str)
 
-# Export user-configurable settings
-ALLOWED_DOMAINS = settings.get('allowed_domains', [])
-ALLOWED_REQUESTER_DOMAINS = settings.get('allowed_requester_domains', [])
-ENABLE_CORS = True
+# Create Mode enum with config modes
+Mode = Mode.from_config(config['reports']['modes'])
 
 # Simple map from Mode enum to URL identifiers - identical to enum values
 MODE_MAP = {mode: mode.value for mode in Mode}
@@ -47,7 +66,7 @@ CONFIG_MODULES = {mode: f"{mode.value}_report_settings" for mode in Mode}
 PATH: str = os.path.dirname(os.path.abspath(__file__))
 
 # Shared path for weather, etc.
-SPATH: str = "/run/linuxreport"
+SPATH: str = config['storage']['shared_path']
 TZ = FeedHistory.FeedConfig.TZ
 EXPIRE_MINUTES: int = 60 * 5
 EXPIRE_HOUR: int = 3600
@@ -85,7 +104,7 @@ RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
 
 # Welcome message from config
-WELCOME_HTML = settings.get('welcome_html', '')
+WELCOME_HTML = settings['welcome_html']
 
 config_module_name = CONFIG_MODULES.get(MODE)
 if not config_module_name:

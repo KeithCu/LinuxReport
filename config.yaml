@@ -5,10 +5,18 @@
 admin:
   password: "LinuxReportAdmin2024"
 
-# Storage settings - only secrets here
+# Storage settings
 storage:
   access_key: ""  # Add your access key here
   secret_key: ""  # Add your secret key here
+  shared_path: "/run/linuxreport"  # Path for shared data like weather, etc.
+
+# Report modes configuration
+# Add any additional report modes here beyond the base modes
+reports:
+  modes: []  # Add new modes here if needed, e.g.:
+  # - name: "newreport"
+  #   description: "New Report Type"
 
 # User-configurable settings
 # REQUIRED: All settings below must be configured for your installation
