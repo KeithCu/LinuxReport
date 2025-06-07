@@ -329,40 +329,52 @@ def update_model_cache(model):
     g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
     print(f"Updated cached working model to: {model}")
 
+class ModelSelector:
+    """Simple model selection and fallback logic."""
+    
+    def __init__(self, use_random=True, forced_model=None):
+        self.use_random = use_random
+        self.forced_model = forced_model
+        self.failed_models = set()
+        self.cache = g_c
+        
+    def get_next_model(self, current_model=None):
+        """Get the next model to try."""
+        # 1. Forced model takes precedence
+        if self.forced_model:
+            return self.forced_model
+            
+        # 2. Try cached model if not using random selection
+        if not self.use_random:
+            cached_model = self.cache.get("working_llm_model")
+            if cached_model and cached_model not in self.failed_models:
+                return cached_model
+                
+        # 3. Try random available model
+        available_models = [m for m in FREE_MODELS if m not in self.failed_models and m != current_model]
+        if available_models:
+            return random.choice(available_models)
+            
+        # 4. Final fallback
+        return FALLBACK_MODEL if FALLBACK_MODEL not in self.failed_models else None
+        
+    def mark_failed(self, model):
+        """Mark a model as failed."""
+        self.failed_models.add(model)
+        
+    def mark_success(self, model):
+        """Mark a model as successful and update cache."""
+        if model != self.forced_model:  # Don't cache forced models
+            self.cache.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+
 class OpenRouterProvider(LLMProvider):
     """Provider implementation for OpenRouter."""
     
     def __init__(self, forced_model=None):
         super().__init__("openrouter")
-        # Handle model selection internally
-        if forced_model:
-            print(f"Using forced model: {forced_model}")
-            self._selected_model = forced_model
-        elif not USE_RANDOM_MODELS:
-            # Check if we have a cached working model
-            cached_model = g_c.get("working_llm_model")
-            if cached_model and (cached_model in FREE_MODELS or cached_model == FALLBACK_MODEL):
-                print(f"Using cached working model: {cached_model}")
-                self._selected_model = cached_model
-            else:
-                if cached_model:
-                    print(f"Cached model {cached_model} is no longer valid. Clearing cache.")
-                    g_c.delete("working_llm_model")
-                available_models = [m for m in FREE_MODELS if m not in FAILED_MODELS]
-                if available_models:
-                    self._selected_model = random.choice(available_models)
-                    print(f"Randomly selected free model: {self._selected_model}")
-                else:
-                    print("No available models found, using fallback")
-                    self._selected_model = FALLBACK_MODEL
-        else:
-            available_models = [m for m in FREE_MODELS if m not in FAILED_MODELS]
-            if available_models:
-                self._selected_model = random.choice(available_models)
-                print(f"Randomly selected free model: {self._selected_model}")
-            else:
-                print("No available models found, using fallback")
-                self._selected_model = FALLBACK_MODEL
+        self.model_selector = ModelSelector(use_random=USE_RANDOM_MODELS, forced_model=forced_model)
+        self._selected_model = self.model_selector.get_next_model()
+        print(f"Selected model: {self._selected_model}")
     
     @property
     def api_key_env_var(self) -> str:
@@ -393,6 +405,33 @@ class OpenRouterProvider(LLMProvider):
         for header, value in headers.items():
             client._client.headers[header] = value
         print(f"[OpenRouter] Using headers: {headers}")
+        
+    def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
+        """Call models with fallback strategy."""
+        current_model = self.primary_model
+        max_attempts = 3  # Try up to 3 different models
+        
+        for attempt in range(max_attempts):
+            print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Attempt {attempt + 1}/{max_attempts}) ---")
+            
+            try:
+                response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
+                if response_text:
+                    self.model_selector.mark_success(current_model)
+                    return response_text, current_model
+            except Exception as e:
+                print(f"Model {current_model} failed: {str(e)}")
+                self.model_selector.mark_failed(current_model)
+            
+            # Get next model to try
+            next_model = self.model_selector.get_next_model(current_model)
+            if not next_model:
+                print("No more models available to try")
+                break
+                
+            current_model = next_model
+            
+        return None, None
 
 # Provider registry
 PROVIDERS = {
@@ -485,6 +524,10 @@ def _try_call_model(client, model, messages, max_tokens):
 
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text with multiple fallback strategies."""
+    if not text:
+        print("Warning: Empty text provided")
+        return []
+        
     # Try to find the marker by looking for the marker word with any surrounding characters
     marker_index = text.rfind(TITLE_MARKER)
     if marker_index != -1:
@@ -522,20 +565,13 @@ def extract_top_titles_from_ai(text):
         if not line:
             continue
 
-        # Clean up formatting first
-        line = re.sub(r'^\*+|\*+$', '', line)  # Remove asterisks
-        line = re.sub(r'^["\']|["\']$', '', line)  # Remove quotes
-        line = re.sub(r'^[-–—]+|[-–—]+$', '', line)  # Remove dashes
-        line = re.sub(r'\*\*', '', line)  # Remove markdown
-        line = re.sub(r'^[-–—\s]+', '', line)  # Remove leading dashes and spaces
-        line = re.sub(r'^[#\s]+', '', line)  # Remove leading # and spaces
-        line = re.sub(r'^[•\s]+', '', line)  # Remove leading bullet points
+        # Clean up formatting first - combine all regex operations into one
+        line = re.sub(r'^\*+|\*+$|^["\']|["\']$|^[-–—]+|[-–—]+$|\*\*|^[-–—\s]+|^[#\s]+|^[•\s]+', '', line)
         line = line.strip()
             
         # Use different regex patterns based on whether we're going forward or backward
         if should_reverse:
             # For bottom-up search, just find numbered lines
-            # The embeddings code will handle finding the actual match
             # Pattern explanation:
             # ^ - Start of line
             # \d+ - One or more digits
@@ -550,7 +586,8 @@ def extract_top_titles_from_ai(text):
             # When going forward after marker, accept any non-empty line as a potential title
             title = line
                 
-        if len(title) >= 10 and len(title) <= 200:
+        # Validate title length and content
+        if len(title) >= 10 and len(title) <= 200 and not title.startswith(('http://', 'https://', 'www.')):
             titles.append(title)
             if len(titles) == 3:
                 break

@@ -13,7 +13,8 @@ import time
 import os
 import yaml
 import logging
-from shared import PATH
+
+PATH: str = os.path.dirname(os.path.abspath(__file__))
 
 # --- Shared Reddit Fetch Config ---
 REDDIT_FETCH_CONFIG = {
@@ -116,6 +117,9 @@ def load_config():
                 if yaml_config and isinstance(yaml_config, dict):
                     # Handle admin section
                     if 'admin' in yaml_config and isinstance(yaml_config['admin'], dict):
+                        # Add settings section if not present
+                        if 'settings' not in yaml_config:
+                            yaml_config['settings'] = {}
                         return yaml_config
                     else:
                         raise ValueError("Missing 'admin' section in config file.")

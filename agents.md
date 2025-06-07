@@ -221,21 +221,17 @@ These files form the foundation of the application and should be carefully consi
 
 ## Additional Documentation
 
-The codebase includes several specialized documentation files that provide detailed information about specific aspects of the system:
+The codebase includes several specialized documentation files that provide detailed information about specific aspects of the system. Please read the caching.md file so that your code understand the existing implementation and uses it properly.
 
 1. **Main Documentation**:
    - `README.md`: Main project documentation with setup instructions and overview
    - `agents.md`: This file - guide for AI agents working with the codebase
 
 2. **System Architecture**:
-   - `Scaling.md`: Detailed information about system scaling and performance optimization
-   - `Caching.md`: Documentation about the caching system and strategies
-   - `Litestream.md`: Information about database replication and backup
+   - `Caching.md`: Documentation about the caching system and strategies including how Javascript is handled.
 
 3. **Storage and Sync**:
    - `README_object_storage_sync.md`: Documentation for object storage synchronization
-   - `ObjectStorageCacheWrapper.py`: Implementation details for cache wrapper
-   - `ObjectStorageLock.py`: Documentation for distributed locking system
 
 4. **Configuration**:
    - `config.yaml`: Main configuration file (with sensitive defaults)

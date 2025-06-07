@@ -15,6 +15,7 @@ from cacheout import Cache
 
 import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock, FileLockWrapper
+from models import load_config
 
 class Mode(str, Enum):
     """Enumeration for different report modes using string values."""
@@ -27,56 +28,13 @@ class Mode(str, Enum):
     SPACE_REPORT = "space"
     PV_REPORT = "pv"
 
-# Domains allowed for Content Security Policy (CSP) - controls which domains can load resources
-# like images, fonts, and scripts on our pages
-ALLOWED_DOMAINS = [
-    'https://linuxreport.net',
-    'https://www.linuxreport.net',
+# Load configuration
+config = load_config()
+settings = config.get('settings', {})
 
-    'https://covidreport.org',
-    'https://www.covidreport.org',
-
-    'https://aireport.keithcu.com',
-
-    'https://pvreport.org',
-    'https://www.pvreport.org',
-
-    'https://trumpreport.info',
-    'https://www.trumpreport.info',
-
-    'https://news.thedetroitilove.com',
-
-    'https://news.spaceelevatorwiki.com',
-
-    'http://127.0.0.1:5000',
-    'https://fonts.googleapis.com',
-    'https://fonts.gstatic.com',
-]
-
-# Domains allowed to make API requests to this server (CORS only)
-# These domains can send requests to our endpoints
-ALLOWED_REQUESTER_DOMAINS = [
-    'https://covidreport.org',
-    'https://www.covidreport.org',
-
-    'https://aireport.keithcu.com',
-
-    'https://pvreport.org',
-    'https://www.pvreport.org',
-
-    'https://trumpreport.info',
-    'https://www.trumpreport.info',
-
-    'https://news.thedetroitilove.com',
-
-    'https://linuxreport.net',
-    'https://www.linuxreport.net',
-
-    'https://news.spaceelevatorwiki.com',
-
-    # Add more domains as needed
-]
-
+# Export user-configurable settings
+ALLOWED_DOMAINS = settings.get('allowed_domains', [])
+ALLOWED_REQUESTER_DOMAINS = settings.get('allowed_requester_domains', [])
 ENABLE_CORS = True
 
 # Simple map from Mode enum to URL identifiers - identical to enum values
@@ -104,17 +62,17 @@ URLS_COOKIE_VERSION = "2"
 # Enable or disable URL customization functionality (both reordering and adding custom URLs)
 ENABLE_URL_CUSTOMIZATION = True
 
-# Enable CDN delivery for images - overrides the URL_IMAGES path with CDN URL
-ENABLE_URL_IMAGE_CDN_DELIVERY = True
-CDN_IMAGE_URL = "https://linuxreportstatic.us-ord-1.linodeobjects.com/"
+# CDN and image settings from config
+CDN_IMAGE_URL = settings['cdn']['image_url']
+ENABLE_URL_IMAGE_CDN_DELIVERY = settings['cdn']['enabled']
 
 # Enable fetching non-custom feeds from object store instead of original URLs
-ENABLE_OBJECT_STORE_FEEDS = False
-OBJECT_STORE_FEED_URL = "https://linuxreportupdates.us-ord-1.linodeobjects.com/feeds/"
-OBJECT_STORE_FEED_TIMEOUT = 15 * 60  # 15 minutes in seconds
+ENABLE_OBJECT_STORE_FEEDS = settings['object_store']['enabled']
+OBJECT_STORE_FEED_URL = settings['object_store']['feed_url']
+OBJECT_STORE_FEED_TIMEOUT = settings['object_store']['feed_timeout']
 
 # Enable publishing feeds to object store when fetched
-ENABLE_OBJECT_STORE_FEED_PUBLISH = False
+ENABLE_OBJECT_STORE_FEED_PUBLISH = settings['object_store']['enable_publish']
 
 # Enable infinite scroll view mode for mobile
 INFINITE_SCROLL_MOBILE = True
@@ -125,6 +83,9 @@ INFINITE_SCROLL_DEBUG = True
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
+
+# Welcome message from config
+WELCOME_HTML = settings.get('welcome_html', '')
 
 config_module_name = CONFIG_MODULES.get(MODE)
 if not config_module_name:
@@ -150,13 +111,6 @@ if ENABLE_URL_IMAGE_CDN_DELIVERY:
     FAVICON = CDN_IMAGE_URL + config_settings.CONFIG.FAVICON
     LOGO_URL = CDN_IMAGE_URL + config_settings.CONFIG.LOGO_URL
 
-
-WELCOME_HTML = (
-    '<font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"'
-    'href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"'
-    'href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>'
-    '<br/>Now using <a href="https://openrouter.ai" target="_blank">OpenRouter</a> to access a variety of free LLMs for selecting the top headlines.'
-)
 STANDARD_ORDER_STR = str(SITE_URLS)
 
 # 1) Define the order of your js modules
@@ -206,8 +160,6 @@ WEB_BOT_USER_AGENTS = [
     "DotBot",
     "Coccocbot"
 ]
-
-
 
 # Classes
 class RssFeed:

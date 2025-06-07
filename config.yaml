@@ -8,4 +8,57 @@ admin:
 # Storage settings - only secrets here
 storage:
   access_key: ""  # Add your access key here
-  secret_key: ""  # Add your secret key here 
+  secret_key: ""  # Add your secret key here
+
+# User-configurable settings
+# REQUIRED: All settings below must be configured for your installation
+settings:
+  # Domains for CSP and CORS - add your domains here
+  allowed_domains:
+    - "https://linuxreport.net"
+    - "https://www.linuxreport.net"
+    - "https://covidreport.org"
+    - "https://www.covidreport.org"
+    - "https://aireport.keithcu.com"
+    - "https://pvreport.org"
+    - "https://www.pvreport.org"
+    - "https://trumpreport.info"
+    - "https://www.trumpreport.info"
+    - "https://news.thedetroitilove.com"
+    - "https://news.spaceelevatorwiki.com"
+    - "http://127.0.0.1:5000"
+    - "https://fonts.googleapis.com"
+    - "https://fonts.gstatic.com"
+
+  # Domains allowed to make API requests to this server (CORS)
+  allowed_requester_domains:
+    - "https://covidreport.org"
+    - "https://www.covidreport.org"
+    - "https://aireport.keithcu.com"
+    - "https://pvreport.org"
+    - "https://www.pvreport.org"
+    - "https://trumpreport.info"
+    - "https://www.trumpreport.info"
+    - "https://news.thedetroitilove.com"
+    - "https://linuxreport.net"
+    - "https://www.linuxreport.net"
+    - "https://news.spaceelevatorwiki.com"
+
+  # CDN and image settings - configure your CDN here
+  cdn:
+    enabled: false  # Set to true to enable CDN
+    image_url: ""   # Your CDN URL for images
+
+  # Object store feed settings - configure your object store here
+  object_store:
+    enabled: false  # Set to true to enable object store feeds
+    feed_url: ""    # Your object store feed URL
+    feed_timeout: 900  # Timeout in seconds
+    enable_publish: false  # Set to true to enable publishing feeds to object store
+
+  # Welcome message - customize this for your site
+  welcome_html: |
+    <font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"
+    href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"
+    href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>
+    <br/>Now using <a href="https://openrouter.ai" target="_blank">OpenRouter</a> to access a variety of free LLMs for selecting the top headlines. 

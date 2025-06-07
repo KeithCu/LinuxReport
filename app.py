@@ -14,7 +14,7 @@ import glob
 from flask import Flask
 from flask_mobility import Mobility
 
-sys.path.insert(0, "/srv/http/LinuxReport2")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Local imports
 from shared import EXPIRE_WEEK, PATH, ABOVE_HTML_FILE, MODE
