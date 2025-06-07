@@ -72,11 +72,13 @@ FREE_MODELS = [
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
     "google/gemma-3-12b-it:free",
+    "google/gemma-3n-e4b-it:free",
     "meta-llama/llama-3.3-8b-instruct:free",
     "meta-llama/llama-4-scout:free",
     "meta-llama/llama-4-maverick:free",
-    "microsoft/phi-4-reasoning-plus:free",
-    "microsoft/phi-4-reasoning:free",
+    "meta-llama/llama-3.2-11b-vision-instruct:free",
+  #  "microsoft/phi-4-reasoning-plus:free", very long answers, often fails to follow instructions
+  #  "microsoft/phi-4-reasoning:free", 
     "microsoft/mai-ds-r1:free",
     "mistralai/devstral-small:free",
     "mistralai/mistral-7b-instruct:free",
@@ -85,6 +87,7 @@ FREE_MODELS = [
     "nousresearch/deephermes-3-llama-3-8b-preview:free",
     "nousresearch/deephermes-3-mistral-24b-preview:free",
     "nvidia/llama-3.3-nemotron-super-49b-v1:free",
+    "opengvlab/internvl3-14b:free",
     "open-r1/olympiccoder-32b:free",
     "qwen/qwen-2.5-72b-instruct:free",
     "qwen/qwen3-8b:free",
@@ -96,6 +99,7 @@ FREE_MODELS = [
     "shisa-ai/shisa-v2-llama3.3-70b:free",
     "thudm/glm-z1-32b:free",
     "thudm/glm-4-32b:free",
+    "tngtech/deepseek-r1t-chimera:free",
 ]
 
 # Fallback model to use if all free models fail
