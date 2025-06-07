@@ -286,34 +286,16 @@ class LLMProvider(ABC):
             print(f"Primary model {current_model} failed: {str(e)}")
             FAILED_MODELS.add(current_model)
         
-        # If primary model fails, try one random free model
-        available_models = [m for m in FREE_MODELS if m != current_model and m not in FAILED_MODELS]
-        print(f"\nAvailable fallback models: {len(available_models)}")
-        if available_models:
-            fallback_model = random.choice(available_models)
-            print(f"\n--- LLM Call: {self.name} / {fallback_model} / {prompt_mode} {label} (First Fallback) ---")
-            
+        # Let ModelSelector handle all model selection logic
+        current_model = self.model_selector.get_next_model(current_model)
+        if current_model:
+            print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Fallback) ---")
             try:
-                response_text = self.call_model(fallback_model, messages, MAX_TOKENS, f"{label}")
-                return response_text, fallback_model
+                response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
+                return response_text, current_model
             except Exception as e:
-                print(f"Fallback model {fallback_model} failed: {str(e)}")
-                FAILED_MODELS.add(fallback_model)
-        else:
-            print("No available fallback models found, skipping to final fallback")
-        
-        # If both attempts failed, try the final fallback model
-        final_fallback = self.fallback_model
-        if final_fallback not in FAILED_MODELS:
-            print(f"\nTrying final fallback model: {final_fallback}")
-            try:
-                response_text = self.call_model(final_fallback, messages, MAX_TOKENS, f"Final Fallback {label}")
-                return response_text, final_fallback
-            except Exception as fallback_e:
-                print(f"Final fallback model {final_fallback} failed: {str(fallback_e)}")
-                FAILED_MODELS.add(final_fallback)
-        else:
-            print(f"Final fallback model {final_fallback} was already tried and failed")
+                print(f"Fallback model {current_model} failed: {str(e)}")
+                FAILED_MODELS.add(current_model)
         
         return None, None
     
@@ -423,14 +405,12 @@ class OpenRouterProvider(LLMProvider):
                 print(f"Model {current_model} failed: {str(e)}")
                 self.model_selector.mark_failed(current_model)
             
-            # Get next model to try
-            next_model = self.model_selector.get_next_model(current_model)
-            if not next_model:
+            # Let ModelSelector handle all model selection logic
+            current_model = self.model_selector.get_next_model(current_model)
+            if not current_model:
                 print("No more models available to try")
                 break
                 
-            current_model = next_model
-            
         return None, None
 
 # Provider registry
