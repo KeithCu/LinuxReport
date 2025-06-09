@@ -7,9 +7,17 @@ admin:
 
 # Storage settings
 storage:
+  enabled: false  # Set to true to enable object storage
+  provider: "linode"  # options: "s3", "linode", "local"
+  region: "us-ord-1"
+  bucket_name: "linuxreportupdates"
   access_key: ""  # Add your access key here
   secret_key: ""  # Add your secret key here
+  host: "us-ord-1.linodeobjects.com"
+  sync_path: "feeds/"
+
   shared_path: "/run/linuxreport"  # Path for shared data like weather, etc.
+
 
 # Report modes configuration
 # Add any additional report modes here beyond the base modes
@@ -54,8 +62,8 @@ settings:
 
   # CDN and image settings - configure your CDN here
   cdn:
-    enabled: false  # Set to true to enable CDN
-    image_url: ""   # Your CDN URL for images
+    enabled: true  # Set to true to enable CDN
+    image_url: "https://linuxreportstatic.us-ord-1.linodeobjects.com/"
 
   # Object store feed settings - configure your object store here
   object_store:

@@ -4,16 +4,19 @@ import hashlib
 
 from models import load_config
 
-# Object Storage configuration
-STORAGE_ENABLED = False
-STORAGE_PROVIDER = "linode"  # options: "s3", "linode", "local"
-STORAGE_REGION = "us-ord-1"
-STORAGE_BUCKET_NAME = "linuxreportupdates"
-STORAGE_ACCESS_KEY = ""  # Loaded from config.yaml
-STORAGE_SECRET_KEY = ""  # Loaded from config.yaml
-STORAGE_HOST = "us-ord-1.linodeobjects.com"
-STORAGE_SYNC_PATH = "feeds/"
+# Load configuration from config.yaml
+config = load_config()
+storage_config = config.get('storage', {})
 
+# Object Storage configuration
+STORAGE_ENABLED = storage_config['enabled']
+STORAGE_PROVIDER = storage_config['provider']  # options: "s3", "linode", "local"
+STORAGE_REGION = storage_config['region']
+STORAGE_BUCKET_NAME = storage_config['bucket_name']
+STORAGE_ACCESS_KEY = storage_config['access_key']
+STORAGE_SECRET_KEY = storage_config['secret_key']
+STORAGE_HOST = storage_config['host']
+STORAGE_SYNC_PATH = storage_config['sync_path']
 
 # Common constants for all object storage modules
 DEFAULT_RETRY_INTERVAL = 1.0  # Base interval for lock acquisition retries
@@ -25,7 +28,6 @@ RETRY_MULTIPLIER = 1.0        # Multiplier for exponential backoff
 
 # Sync configuration
 SERVER_ID = hashlib.md5(os.uname().nodename.encode()).hexdigest()[:8] if hasattr(os, 'uname') else "default_server_id"
-
 
 # Libcloud imports for availability check and init_storage
 try:
