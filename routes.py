@@ -77,6 +77,10 @@ def update_performance_stats(render_time):
     stats_key = "admin_performance_stats"
     stats = g_cm.get(stats_key) or {"times": [], "count": 0}
     
+    current_time = time.time()
+    if "first_request_time" not in stats:
+        stats["first_request_time"] = current_time
+        
     stats["count"] += 1
     
     # Skip the first request (cold start)
@@ -114,12 +118,18 @@ def get_admin_stats_html():
     avg_time = sum(times) / len(times)
     count = stats.get("count", len(times))
     
+    # Calculate uptime
+    first_request_time = stats.get("first_request_time", time.time())
+    uptime_seconds = time.time() - first_request_time
+    uptime_str = str(datetime.timedelta(seconds=int(uptime_seconds)))
+    
     return f'''
-    <div style="position: fixed; top: 10px; right: 10px; background: #f0f0f0; color: #333; padding: 10px; 
+    <div style="position: fixed; top: 10px; right: 10px; background: #ccc; color: #333; padding: 10px; 
                 border-radius: 5px; font-family: monospace; font-size: 12px; z-index: 9999; 
-                border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <strong>Admin Stats (Page Render)</strong><br>
-        Samples: {len(times)} (Total: {count})<br>
+        Uptime: {uptime_str}<br>
+        Total Requests: {count}<br>
         Min: {min_time:.3f}s<br>
         Max: {max_time:.3f}s<br>
         Avg: {avg_time:.3f}s<br>
