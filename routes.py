@@ -72,6 +72,61 @@ def get_cached_above_html():
     """Return content of ABOVE_HTML_FILE using generic cache."""
     return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
 
+def update_performance_stats(render_time):
+    """Update performance statistics for admin mode."""
+    stats_key = "admin_performance_stats"
+    stats = g_cm.get(stats_key) or {"times": [], "count": 0}
+    
+    stats["count"] += 1
+    
+    # Skip the first request (cold start)
+    if stats["count"] > 1:
+        stats["times"].append(render_time)
+        
+        # Keep only last 1000 measurements
+        if len(stats["times"]) > 1000:
+            stats["times"] = stats["times"][-1000:]
+    
+    # Store back
+    g_cm.set(stats_key, stats, ttl=EXPIRE_DAY)
+
+def get_admin_stats_html():
+    """Generate HTML for admin performance stats."""
+    stats_key = "admin_performance_stats"
+    stats = g_cm.get(stats_key)
+    
+    if not stats or not stats.get("times"):
+        return None
+    
+    times = stats["times"]
+    if len(times) < 3:
+        return None
+    
+    # Calculate statistics
+    sorted_times = sorted(times)
+    min_time = min(sorted_times)
+    max_time = max(sorted_times)
+    
+    # Calculate 95th percentile
+    p95_index = int(len(sorted_times) * 0.95)
+    p95_time = sorted_times[p95_index] if p95_index < len(sorted_times) else sorted_times[-1]
+    
+    avg_time = sum(times) / len(times)
+    count = stats.get("count", len(times))
+    
+    return f'''
+    <div style="position: fixed; top: 10px; right: 10px; background: #f0f0f0; color: #333; padding: 10px; 
+                border-radius: 5px; font-family: monospace; font-size: 12px; z-index: 9999; 
+                border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <strong>Admin Stats (Page Render)</strong><br>
+        Samples: {len(times)} (Total: {count})<br>
+        Min: {min_time:.3f}s<br>
+        Max: {max_time:.3f}s<br>
+        Avg: {avg_time:.3f}s<br>
+        95%: {p95_time:.3f}s
+    </div>
+    '''
+
 # Function to initialize routes
 def init_app(flask_app):
     """Initialize Flask routes."""
@@ -128,6 +183,10 @@ def init_app(flask_app):
     # even if the page cache is expired.
     @flask_app.route('/')
     def index():
+        # Check if admin mode is enabled for performance tracking
+        is_admin = request.cookies.get('isAdmin') == '1'
+        start_time = timer() if is_admin else None
+        
         # Determine the order of RSS feeds to display.
         page_order = None
         if request.cookies.get('UrlsVer') == URLS_COOKIE_VERSION:
@@ -148,10 +207,10 @@ def init_app(flask_app):
             suffix = ":MOBILE"
             single_column = True
 
-        # Try full page cache using only page order and mobile flag
+        # Try full page cache using only page order and mobile flag (but not for admin mode)
         cache_key = f"page-cache:{page_order_s}{suffix}"
-        full_page = g_cm.get(cache_key)
-        if not DEBUG and full_page is not None:
+        full_page = g_cm.get(cache_key) if not is_admin else None
+        if not DEBUG and not is_admin and full_page is not None:
             response = make_response(full_page)
             return response
 
@@ -252,12 +311,22 @@ def init_app(flask_app):
                                INFINITE_SCROLL_MOBILE=INFINITE_SCROLL_MOBILE,
                                INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG)
 
-        # Store full page cache
-        if page_order_s == STANDARD_ORDER_STR:
+        # Store full page cache (but not for admin mode)
+        if not is_admin and page_order_s == STANDARD_ORDER_STR:
             expire = EXPIRE_MINUTES
             if need_fetch:
                 expire = 30
             g_cm.set(cache_key, page, ttl=expire)
+
+        # Track performance stats for admin mode
+        if is_admin and start_time is not None:
+            render_time = timer() - start_time
+            update_performance_stats(render_time)
+            
+            # Add stats display to the page for admin mode
+            stats_html = get_admin_stats_html()
+            if stats_html:
+                page = page.replace('</body>', f'{stats_html}</body>')
 
         # Trigger background fetching if needed
         if need_fetch:
