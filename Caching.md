@@ -4,7 +4,7 @@ This document outlines the different caching strategies employed within the code
 
 ## 1. In-Memory Caching (`functools.lru_cache`)
 
-*   **Location:** `app.py`
+*   **Location:** `caching.py`
 *   **Function:** `static_file_hash`
 *   **Mechanism:** Uses Python's built-in `@lru_cache()` decorator.
 *   **Purpose:** Caches the MD5 hash of static file contents (e.g., CSS, JavaScript) in memory. This avoids reading and hashing these files repeatedly when generating cache-busting URLs for static assets in templates.
@@ -44,7 +44,7 @@ The application utilizes the `diskcache` library (accessed via the `g_c` object,
 ## 4. File-Based Caching (via `_file_cache`)
 
 *   **AI-Generated Headlines Caching:**
-    *   **Location:** `shared.py` (via `get_cached_file_content()` function used by `get_cached_above_html()` in `routes.py`)
+    *   **Location:** `caching.py` (via `get_cached_file_content()` function used by `get_cached_above_html()` in `routes.py`)
     *   **Mechanism:** Uses a simple in-memory dictionary (`_file_cache`) that stores file content along with modification timestamps.
     *   **Process:**
         *   Stores file content with its last modified time (`mtime`) and last check time.
@@ -59,7 +59,7 @@ The application utilizes the `diskcache` library (accessed via the `g_c` object,
 
 ## 5. JavaScript Compilation and Caching
 
-*   **Location:** `app.py`
+*   **Location:** `caching.py`
 *   **Mechanism:** Uses a modular approach to JavaScript organization with compilation at application startup.
 *   **Process:**
     *   **File Organization:** JavaScript is split into multiple modular files (`core.js`, `weather.js`, `chat.js`, `config.js`) located in the `templates` directory for easier maintenance.

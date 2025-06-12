@@ -5,15 +5,7 @@ import os
 import datetime
 import time
 
-from shared import PATH
-
-# Define JS modules in order
-_JS_MODULES = [
-    'core.js',
-    'weather.js',
-    'chat.js',
-    'config.js'
-]
+from shared import PATH, _JS_MODULES
 
 def get_file_hash(filepath):
     """Get a hash of the file contents"""
