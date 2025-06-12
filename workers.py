@@ -27,7 +27,7 @@ from seleniumfetch import fetch_site_posts
 from shared import (
     ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
     USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,
-    ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_URL, OBJECT_STORE_FEED_TIMEOUT,
+    ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_TIMEOUT,
     ENABLE_OBJECT_STORE_FEED_PUBLISH
 )
 from Tor import fetch_via_tor

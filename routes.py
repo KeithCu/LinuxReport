@@ -15,7 +15,7 @@ import ipaddress
 import time
 
 # Third-party imports
-from flask import g, jsonify, render_template, request, make_response, Response, flash
+from flask import g, jsonify, render_template, request, make_response, Response
 from markupsafe import Markup
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
@@ -23,16 +23,17 @@ from flask_cors import CORS
 from forms import ConfigForm, CustomRSSForm, UrlForm
 from models import RssInfo, DEBUG, get_admin_password
 # Local imports
-from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_WEEK, EXPIRE_YEARS,
+from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, TZ, format_last_updated, 
-                    get_chat_cache, MODE_MAP, get_cached_file_content, clear_page_caches, _file_cache, 
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, format_last_updated, 
+                    get_chat_cache, MODE_MAP, clear_page_caches,
                     ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
                     ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS,
                     INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG)
 from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 from workers import fetch_urls_parallel, fetch_urls_thread
+from caching import get_cached_file_content, _file_cache
 
 # Global setting for background refreshes
 ENABLE_BACKGROUND_REFRESH = True
