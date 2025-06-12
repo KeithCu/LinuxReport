@@ -10,7 +10,7 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
 
 - **Primary Language**: Python 3.x
 - **Web Framework**: Flask
-- **Database**: SQLite (with SQLAlchemy ORM)
+- **Database**: Sqlite via Diskcache
 - **Template Engine**: Jinja2
 - **Key Dependencies**:
   - Flask and Flask_Mobility for web framework
@@ -18,7 +18,6 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
   - Feedparser for RSS feed handling
   - Selenium for web scraping
   - Pillow for image processing
-  - SQLAlchemy for database operations
   - OpenAI and sentence_transformers for LLM integration
 
 ## Project Structure
@@ -70,7 +69,6 @@ These files form the foundation of the application and should be carefully consi
 1. **File Organization**:
    - Place new Python modules in the root directory
    - Keep related functionality in dedicated modules
-   - Use descriptive file names in snake_case
 
 2. **Code Style**:
    - Follow PEP 8 guidelines
@@ -111,10 +109,6 @@ These files form the foundation of the application and should be carefully consi
    - Never commit sensitive data
    - Change default admin password
 
-2. **Database Operations**:
-   - Use SQLAlchemy models in `models.py`
-   - Follow existing migration patterns
-   - Use transactions for data consistency
 
 3. **Feed Processing**:
    - Follow patterns in `workers.py`
@@ -133,7 +127,6 @@ These files form the foundation of the application and should be carefully consi
    - Hardcode sensitive information
    - Bypass security measures
    - Create circular dependencies
-   - Modify database schema without migrations
 
 2. **Security Considerations**:
    - Always validate user input
@@ -215,7 +208,6 @@ These files form the foundation of the application and should be carefully consi
 ## Resources
 
 - [Flask Documentation](https://flask.palletsprojects.com/)
-- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
 - [Jinja2 Documentation](https://jinja.palletsprojects.com/)
 - [Python Style Guide](https://www.python.org/dev/peps/pep-0008/)
 
