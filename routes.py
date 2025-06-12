@@ -196,7 +196,9 @@ def init_app(flask_app):
     def index():
         # Check if admin mode is enabled for performance tracking
         is_admin = request.cookies.get('isAdmin') == '1'
-        start_time = timer() if is_admin else None
+
+        # Calculate performance stats for every request, but only display if in admin mode
+        start_time = timer()
         
         # Determine the order of RSS feeds to display.
         page_order = None
@@ -329,11 +331,11 @@ def init_app(flask_app):
                 expire = 30
             g_cm.set(cache_key, page, ttl=expire)
 
+        render_time = timer() - start_time
+        update_performance_stats(render_time)
+        
         # Track performance stats for admin mode
-        if is_admin and start_time is not None:
-            render_time = timer() - start_time
-            update_performance_stats(render_time)
-            
+        if is_admin:    
             # Add stats display to the page for admin mode
             stats_html = get_admin_stats_html()
             if stats_html:
