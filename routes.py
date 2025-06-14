@@ -103,9 +103,9 @@ def update_performance_stats(render_time):
     if stats["count"] > 1:
         stats["times"].append(render_time)
         
-        # Keep only last 1000 measurements
-        if len(stats["times"]) > 1000:
-            stats["times"] = stats["times"][-1000:]
+        # Keep only last 100 measurements
+        if len(stats["times"]) > 100:
+            stats["times"] = stats["times"][-100:]
     
     # Store back
     g_cm.set(stats_key, stats, ttl=EXPIRE_DAY)
