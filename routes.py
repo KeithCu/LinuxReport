@@ -76,12 +76,27 @@ def get_cached_above_html():
 def update_performance_stats(render_time):
     """Update performance statistics for admin mode."""
     stats_key = "admin_performance_stats"
-    stats = g_cm.get(stats_key) or {"times": [], "count": 0}
+    stats = g_cm.get(stats_key) or {
+        "times": [],
+        "count": 0,
+        "hourly_requests": {},  # Track requests per hour
+        "first_request_time": time.time()
+    }
     
     current_time = time.time()
-    if "first_request_time" not in stats:
-        stats["first_request_time"] = current_time
-        
+    current_hour = int(current_time / 3600)  # Get current hour timestamp
+    
+    # Initialize hourly request count if not exists
+    if current_hour not in stats["hourly_requests"]:
+        stats["hourly_requests"][current_hour] = 0
+    
+    # Update hourly request count
+    stats["hourly_requests"][current_hour] += 1
+    
+    # Clean up old hourly data (keep last 24 hours)
+    old_hour = current_hour - 24
+    stats["hourly_requests"] = {h: count for h, count in stats["hourly_requests"].items() if h > old_hour}
+    
     stats["count"] += 1
     
     # Skip the first request (cold start)
@@ -111,13 +126,18 @@ def get_admin_stats_html():
     sorted_times = sorted(times)
     min_time = min(sorted_times)
     max_time = max(sorted_times)
-    
-    # Calculate 95th percentile
-    p95_index = int(len(sorted_times) * 0.95)
-    p95_time = sorted_times[p95_index] if p95_index < len(sorted_times) else sorted_times[-1]
-    
     avg_time = sum(times) / len(times)
     count = stats.get("count", len(times))
+    
+    # Calculate request counts for different time windows
+    current_time = time.time()
+    current_hour = int(current_time / 3600)
+    
+    # Get request counts for different time windows
+    hourly_requests = stats.get("hourly_requests", {})
+    requests_1h = sum(count for hour, count in hourly_requests.items() if hour == current_hour)
+    requests_6h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 6)
+    requests_12h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 12)
     
     # Calculate uptime
     first_request_time = stats.get("first_request_time", time.time())
@@ -131,10 +151,12 @@ def get_admin_stats_html():
         <strong>Admin Stats (Page Render)</strong><br>
         Uptime: {uptime_str}<br>
         Total Requests: {count}<br>
+        Requests (1h): {requests_1h}<br>
+        Requests (6h): {requests_6h}<br>
+        Requests (12h): {requests_12h}<br>
         Min: {min_time:.3f}s<br>
         Max: {max_time:.3f}s<br>
-        Avg: {avg_time:.3f}s<br>
-        95%: {p95_time:.3f}s
+        Avg: {avg_time:.3f}s
     </div>
     '''
 
