@@ -59,7 +59,7 @@ def load_url_worker(url):
         res = None  # Ensure res is always defined
 
         # Check if we should use object store for this feed
-        use_object_store = ENABLE_OBJECT_STORE_FEEDS and not url.startswith("http://") and "fakefeed" not in url
+        use_object_store = ENABLE_OBJECT_STORE_FEEDS
         if use_object_store:
             # Use smart_fetch to get feed content with metadata
             content, metadata = smart_fetch(url, cache_expiry=OBJECT_STORE_FEED_TIMEOUT)
