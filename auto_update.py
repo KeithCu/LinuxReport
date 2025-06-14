@@ -67,7 +67,6 @@ FREE_MODELS = [
     "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "deepseek/deepseek-chat-v3-0324:free",
-    "deepseek/deepseek-r1-0528-qwen3-8b:free",
     "deepseek/deepseek-r1-0528:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
