@@ -48,6 +48,7 @@ class DiskcacheSqliteLock(LockBase):
             owner_prefix = f"pid{os.getpid()}_tid{threading.get_ident()}"
         self.owner_id = f"{owner_prefix}_{uuid.uuid4()}"
         self._locked = False
+        self._lock_expiry = 0
 
     def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
         """
@@ -59,7 +60,11 @@ class DiskcacheSqliteLock(LockBase):
             True if lock was acquired, False otherwise
         """
         if self._locked:
-            return True
+            # Check if our lock is still valid
+            if time.monotonic() < self._lock_expiry:
+                return True
+            # Our lock has expired, release it
+            self.release()
 
         start_time = time.monotonic()
         while True:
@@ -70,7 +75,9 @@ class DiskcacheSqliteLock(LockBase):
                 return False
             if (time.monotonic() - start_time) > timeout_seconds:
                 return False
-            time.sleep(0.5)  # Short sleep before retrying
+            # Exponential backoff with jitter
+            sleep_time = min(0.1 * (2 ** (time.monotonic() - start_time)), 1.0)
+            time.sleep(sleep_time)
 
     def _attempt_acquire(self, timeout_seconds: int) -> bool:
         """Internal method that attempts to acquire the lock once."""
@@ -81,7 +88,7 @@ class DiskcacheSqliteLock(LockBase):
 
                 # Lock exists and is still valid
                 if current_value is not None:
-                    expiry_time = current_value[1]
+                    owner_id, expiry_time = current_value
                     # Lock is still valid
                     if now < expiry_time:
                         return False
@@ -95,17 +102,16 @@ class DiskcacheSqliteLock(LockBase):
                 final_value = self.cache.get(self.lock_key)
                 if final_value is not None and final_value[0] == self.owner_id:
                     self._locked = True
+                    self._lock_expiry = expiry
                     return True
 
                 self._locked = False
                 return False
         except (diskcache.Timeout, Timeout) as e:
-            # Log the exception but don't crash
             print(f"Error acquiring lock {self.lock_key}: {e}")
             self._locked = False
             return False
         except Exception as e:
-            # Log the exception but don't crash
             print(f"Error acquiring lock {self.lock_key}: {e}")
             self._locked = False
             return False
@@ -116,7 +122,7 @@ class DiskcacheSqliteLock(LockBase):
         Returns True if the lock was successfully released, False otherwise.
         """
         if not self._locked:
-            return False  # We don't hold the lock
+            return False
 
         success = False
         try:
@@ -127,12 +133,11 @@ class DiskcacheSqliteLock(LockBase):
                     self.cache.delete(self.lock_key)
                     success = True
         except Exception as e:
-            # Log error if needed
             print(f"Error releasing lock {self.lock_key}: {e}")
             success = False
 
-        # Whether successful or not, we're no longer locked
         self._locked = False
+        self._lock_expiry = 0
         return success
 
     def __enter__(self):
@@ -145,7 +150,13 @@ class DiskcacheSqliteLock(LockBase):
 
     def locked(self) -> bool:
         """Check if the lock is currently held by this instance."""
-        return self._locked
+        if not self._locked:
+            return False
+        # Verify lock is still valid
+        if time.monotonic() >= self._lock_expiry:
+            self._locked = False
+            return False
+        return True
 
 class FileLockWrapper(LockBase):
     def __init__(self, lock_file_path: str):
@@ -153,12 +164,9 @@ class FileLockWrapper(LockBase):
         self._lock = FileLock(lock_file_path)
         self._is_locked = False
 
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+    def acquire(self, timeout_seconds: int = 60) -> bool:
         try:
-            if wait:
-                self._lock.acquire(timeout=timeout_seconds)
-            else:
-                self._lock.acquire(timeout=0)
+            self._lock.acquire(timeout=timeout_seconds)
             self._is_locked = True
             return True
         except Timeout:

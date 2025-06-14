@@ -197,8 +197,9 @@ def init_app(flask_app):
         # Check if admin mode is enabled for performance tracking
         is_admin = request.cookies.get('isAdmin') == '1'
 
-        # Calculate performance stats for every request, but only display if in admin mode
-        start_time = timer()
+        # Calculate performance stats for non-admin requests
+        if not is_admin:
+            start_time = timer()
         
         # Determine the order of RSS feeds to display.
         page_order = None
@@ -331,23 +332,23 @@ def init_app(flask_app):
                 expire = 30
             g_cm.set(cache_key, page, ttl=expire)
 
-        render_time = timer() - start_time
-        update_performance_stats(render_time)
-        
-        # Track performance stats for admin mode
-        if is_admin:    
+        # Track performance stats for non-admin mode
+        if not is_admin:
+            render_time = timer() - start_time
+            update_performance_stats(render_time)
+        else:
             # Add stats display to the page for admin mode
             stats_html = get_admin_stats_html()
             if stats_html:
                 page = page.replace('</body>', f'{stats_html}</body>')
 
         # Trigger background fetching if needed
-        if need_fetch:
+        if need_fetch and ENABLE_BACKGROUND_REFRESH:
             # Check if the request is from a web bot
             user_agent = request.headers.get('User-Agent', '')
             is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
             
-            if not is_web_bot and ENABLE_BACKGROUND_REFRESH:
+            if not is_web_bot:
                 fetch_urls_thread()
         
         response = make_response(page)

@@ -2,12 +2,15 @@
 import subprocess
 import re
 import sys
+import os
 from typing import List, Set
 
 def run_command(command: str) -> str:
     """Run a shell command and return its output."""
     try:
-        result = subprocess.run(command, shell=True, check=True, capture_output=True, text=True)
+        # Use shell=False on Windows to avoid shell interpretation issues
+        use_shell = os.name != 'nt'
+        result = subprocess.run(command, shell=use_shell, check=True, capture_output=True, text=True)
         return result.stdout
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {command}")
@@ -44,7 +47,9 @@ def set_file_permissions(files: Set[str]):
 def main():
     # Run the sync command
     print("Running s3cmd sync...")
-    sync_command = 's3cmd sync static/images s3://linuxreportstatic/ --delete-removed'
+    # Use os.path.join for cross-platform path handling
+    static_path = os.path.join('static', 'images')
+    sync_command = f's3cmd sync {static_path} s3://linuxreportstatic/ --delete-removed'
     sync_output = run_command(sync_command)
     
     # Extract changed files
