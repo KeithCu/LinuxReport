@@ -1,5 +1,7 @@
 <div class="box" id="feed-{{ feed_id }}">
-<img loading="lazy" src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height:100px;"/>
+<div style="display: flex; justify-content: center; align-items: center; padding: 8px 0;">
+  <img loading="lazy" src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height: 100px; display: block; margin: 0 auto;" />
+</div>
   <center>
     <small>Last updated: {{ last_fetch }}</small>
   </center>
@@ -12,7 +14,9 @@
     {% if e.link in top_images %}
     <div class="image-container">
       <a target="_blank" href="{{ e.link }}">
-<img loading="lazy" src="{{ top_images[e.link] }}" alt="{{ e.title | striptags }}"/>
+<div style="display: flex; justify-content: center; align-items: center; margin: 8px 0;">
+  <img loading="lazy" src="{{ top_images[e.link] }}" alt="{{ e.title | striptags }}" style="display: block; margin: 0 auto;" />
+</div>
       </a>
     </div>
     {% endif %}
