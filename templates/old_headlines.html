@@ -98,7 +98,7 @@
                             {% endif %}
                         </div>
                         {% if h.image_url %}
-                            <img src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
+<img loading="lazy" src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
                         {% endif %}
                         <div class="headline-timestamp">
                             {{ h.timestamp[:19].replace('T', ' ') if h.timestamp }}
