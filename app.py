@@ -36,7 +36,6 @@ class HeaderFilter(Filter):
         # Read the content
         content = _in.read()
         
-        # Calculate hash using the same logic as get_file_hash
         try:
             file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
         except:

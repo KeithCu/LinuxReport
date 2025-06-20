@@ -51,13 +51,19 @@ Instead, this plan focuses on a more appropriate architecture using object stora
 
 #### Handling Cache-Busting for Static Assets
 
-The application already utilizes cache-busting for CSS and JS files using version query parameters:
+The application utilizes Flask-Assets for automatic cache-busting of CSS and JS files:
 
 ```html
-<link rel="stylesheet" href="/static/linuxreport.css?v={{ static_file_hash('linuxreport.css') }}">
-<script src="/static/linuxreport.js?v={{ static_file_hash('linuxreport.js') }}"></script>
-```
+<!-- Link external CSS using Flask-Assets -->
+{% assets "css_all" %}
+<link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+{% endassets %}
 
+<!-- Link external JS using Flask-Assets -->
+{% assets "js_all" %}
+<script type="text/javascript" src="{{ ASSET_URL }}"></script>
+{% endassets %}
+```
 
 - **Graceful handling of outdated clients:**
   - Users with cached HTML pages from before an update will still request old JS/CSS versions
@@ -108,7 +114,15 @@ For even better CDN performance, consider embedding the version hash directly in
   app.jinja_env.globals['versioned_static'] = get_versioned_static_file
   
   # In the template
-  # <script src="/static/{{ versioned_static('linuxreport.js') }}"></script>
+  <!-- Link external CSS using Flask-Assets -->
+  {% assets "css_all" %}
+  <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+  {% endassets %}
+  
+  <!-- Link external JS using Flask-Assets -->
+  {% assets "js_all" %}
+  <script type="text/javascript" src="{{ ASSET_URL }}"></script>
+  {% endassets %}
   ```
 
 - **CDN integration:**

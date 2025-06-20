@@ -376,31 +376,25 @@ The application uses multiple caching layers that need to be integrated with the
 
 ### Existing Caching System
 
-1. **Static File Caching** (`functools.lru_cache`)
-   - Location: `app.py`
-   - Function: `static_file_hash`
-   - Purpose: Caches MD5 hashes of static files for cache-busting URLs
-   - Integration: Use this for service worker cache keys
-
-2. **In-Memory Caching** (`cacheout` - via `g_cm`)
+1. **In-Memory Caching** (`cacheout` - via `g_cm`)
    - Location: `shared.py`
    - Purpose: Caches full pages and RSS templates
    - Integration: Use for dynamic content caching in service worker
 
-3. **Disk-Based Caching** (`diskcache` - via `g_c`)
+2. **Disk-Based Caching** (`diskcache` - via `g_c`)
    - Location: `shared.py`
    - Purpose: Persistent storage for weather data, chat comments, banned IPs
    - Integration: Use for offline data storage
 
-5. **JavaScript Compilation**
+3. **Flask-Assets Asset Management**
    - Location: `app.py`
-   - Purpose: Combines JS modules into single file
-   - Integration: Use compiled file for service worker
+   - Purpose: Automatic asset bundling, minification, and cache busting
+   - Integration: Use compiled assets for service worker
 
 ### Service Worker Implementation
 
 1. **Cache Strategies**
-   - Static Assets: Cache First with `static_file_hash` for versioning
+   - Static Assets: Cache First with Flask-Assets versioning
    - Dynamic Content: Network First with fallback to cache
    - API Responses: Stale While Revalidate
    - Offline Content: Cache First with offline fallback
@@ -408,7 +402,7 @@ The application uses multiple caching layers that need to be integrated with the
 2. **Cache Management**
    - Use separate caches for different content types
    - Implement cache cleanup based on size and age
-   - Handle cache versioning using existing hash system
+   - Handle cache versioning using Flask-Assets system
 
 3. **Offline Support**
    - Cache essential static assets
@@ -417,7 +411,7 @@ The application uses multiple caching layers that need to be integrated with the
    - Sync data when back online
 
 4. **Performance Optimization**
-   - Use existing JS compilation system
+   - Use Flask-Assets compiled assets
    - Implement proper cache headers
    - Optimize asset loading
    - Handle background sync
@@ -468,7 +462,7 @@ The application uses multiple caching layers that need to be integrated with the
 ### Important Notes
 
 1. **Cache Versioning**
-   - Use `static_file_hash()` for cache keys
+   - Use Flask-Assets versioning
    - Update cache names when content changes
    - Handle cache cleanup properly
 

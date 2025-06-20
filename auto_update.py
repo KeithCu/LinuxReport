@@ -68,6 +68,7 @@ FREE_MODELS = [
     "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
     "deepseek/deepseek-chat-v3-0324:free",
     "deepseek/deepseek-r1-0528:free",
+    "deepseek/deepseek-r1-0528-qwen3-8b:free",
     "deepseek/deepseek-r1-distill-qwen-14b:free",
     "deepseek/deepseek-r1-distill-qwen-32b:free",
     "google/gemma-3-12b-it:free",
