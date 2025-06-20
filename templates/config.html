@@ -18,7 +18,10 @@
   <link rel="icon" type="image/png" href="{{favicon}}">
   <title>Customize</title>
   <!-- Use the same CSS as the main page for theme/font support -->
-  <link rel="stylesheet" href="/static/linuxreport.css?v={{ static_file_hash('linuxreport.css') }}">
+  <!-- Link external CSS using Flask-Assets -->
+  {% assets "css_all" %}
+  <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+  {% endassets %}
 </head>
 <body>
 <center>
@@ -75,6 +78,9 @@
     </div>
   </div>
 </center>
-<script src="/static/linuxreport.js?v={{ static_file_hash('linuxreport.js') }}"></script>
+<!-- Link external JS using Flask-Assets -->
+{% assets "js_all" %}
+<script type="text/javascript" src="{{ ASSET_URL }}"></script>
+{% endassets %}
 </body>
 </html>

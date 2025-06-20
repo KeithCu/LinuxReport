@@ -6,7 +6,10 @@
     <title>{{ title }}</title>
     <link rel="icon" type="image/png" href="{{ favicon }}">
     <meta name="description" content="{{ description }}">
-    <link rel="stylesheet" href="/static/linuxreport.css?v={{ static_file_hash('linuxreport.css') }}">
+    <!-- Link external CSS using Flask-Assets -->
+    {% assets "css_all" %}
+    <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+    {% endassets %}
     <style>
         body {
             background: var(--bg, #fff);
@@ -110,6 +113,9 @@
             <p>No old headlines found for this report.</p>
         {% endif %}
     </div>
-    <script src="/static/linuxreport.js?v={{ static_file_hash('linuxreport.js') }}"></script>
+    <!-- Link external JS using Flask-Assets -->
+    {% assets "js_all" %}
+    <script type="text/javascript" src="{{ ASSET_URL }}"></script>
+    {% endassets %}
 </body>
 </html>

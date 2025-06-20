@@ -5,17 +5,51 @@ Main entry point for the Flask application. Initializes the Flask app, configure
 """
 import sys
 import os
+import datetime
+import hashlib
 
 # Third-party imports
 from flask import Flask
 from flask_mobility import Mobility
+from flask_assets import Environment, Bundle
+from flask_assets import Filter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Local imports
-from shared import EXPIRE_WEEK
+from shared import EXPIRE_WEEK, _JS_MODULES
 from models import DEBUG
-from caching import static_file_hash, compile_js_files
+
+# Custom filter to add header information
+class HeaderFilter(Filter):
+    """Add header information to compiled files"""
+    
+    def __init__(self, source_files, file_type="JavaScript"):
+        super().__init__()
+        self.source_files = source_files
+        self.file_type = file_type
+    
+    def apply(self, _in, out):
+        # Get timestamp
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Read the content
+        content = _in.read()
+        
+        # Calculate hash using the same logic as get_file_hash
+        try:
+            file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
+        except:
+            # Return 'dev' plus a timestamp on error (same as get_file_hash)
+            file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
+        
+        # Write header
+        out.write(f'// Compiled: {timestamp}\n')
+        out.write(f'// Hash: {file_hash}\n')
+        out.write(f'// Source files: {", ".join(self.source_files)}\n\n')
+        
+        # Write the actual content
+        out.write(content)
 
 # Initialize Flask app
 g_app = Flask(__name__)
@@ -32,14 +66,37 @@ g_app.config['DEBUG'] = DEBUG
 # Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
 
-# Make static_file_hash available to all templates
-g_app.jinja_env.globals['static_file_hash'] = static_file_hash
+# Initialize Flask-Assets
+assets = Environment(g_app)
+assets.url = g_app.static_url_path
 
-# Compile JS files on startup
-if compile_js_files():
-    print("Successfully compiled linuxreport.js")
-else:
-    print("Warning: Failed to compile linuxreport.js")
+# Create JS bundle from individual modules in templates directory
+# Use absolute paths since files are in templates/ not static/templates/
+js_files = [os.path.join(os.path.dirname(__file__), 'templates', module) for module in _JS_MODULES]
+js_bundle = assets.register('js_all', Bundle(
+    *js_files,
+    filters=(HeaderFilter(_JS_MODULES, "JavaScript"), 'jsmin'),
+    output='linuxreport.js'
+))
+
+# Create CSS bundle for cache busting only (no modification)
+css_bundle = assets.register('css_all', Bundle(
+    'linuxreport.css',
+    output='linuxreport.css'
+))
+
+# Build assets on startup
+with g_app.app_context():
+    try:
+        js_bundle.build()
+        print("✓ JavaScript bundle built successfully")
+        css_bundle.build()
+        print("✓ CSS cache busting configured successfully")
+    except Exception as e:
+        print(f"Warning: Failed to build assets: {e}")
+
+# Make assets available to templates
+g_app.jinja_env.globals['assets'] = assets
 
 # Import only init_app to avoid circular import
 from routes import init_app
