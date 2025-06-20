@@ -73,9 +73,15 @@ assets.url = g_app.static_url_path
 # Create JS bundle from individual modules in templates directory
 # Use absolute paths since files are in templates/ not static/templates/
 js_files = [os.path.join(os.path.dirname(__file__), 'templates', module) for module in _JS_MODULES]
+
+# Only minify in production (not in debug mode)
+filters_list = [HeaderFilter(_JS_MODULES, "JavaScript")]
+if not DEBUG and not g_app.debug:
+    filters_list.append('jsmin')
+
 js_bundle = assets.register('js_all', Bundle(
     *js_files,
-    filters=(HeaderFilter(_JS_MODULES, "JavaScript"), 'jsmin'),
+    filters=filters_list,
     output='linuxreport.js'
 ))
 
@@ -89,9 +95,9 @@ css_bundle = assets.register('css_all', Bundle(
 with g_app.app_context():
     try:
         js_bundle.build()
-        print("✓ JavaScript bundle built successfully")
+        print("JavaScript bundle built successfully")
         css_bundle.build()
-        print("✓ CSS cache busting configured successfully")
+        print("CSS cache busting configured successfully")
     except Exception as e:
         print(f"Warning: Failed to build assets: {e}")
 
