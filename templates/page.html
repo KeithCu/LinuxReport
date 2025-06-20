@@ -133,5 +133,10 @@
     {% assets "js_all" %}
     <script type="text/javascript" src="{{ ASSET_URL }}"></script>
     {% endassets %}
+    
+    <!-- Pass admin status from Flask-Login to JavaScript -->
+    <script>
+      window.isAdmin = {{ 'true' if current_user.is_authenticated else 'false' }};
+    </script>
   </body>
 </html>

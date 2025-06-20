@@ -27,6 +27,17 @@
 <center>
   <div class="config-border-box">
     <div class="config-container">
+      <!-- Admin status and login/logout -->
+      <div class="admin-status" style="margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+        {% if is_admin %}
+          <span style="color: green;">✓ Logged in as Admin</span>
+          <a href="{{ url_for('logout') }}" style="margin-left: 15px; color: #dc3545; text-decoration: none;">Logout</a>
+        {% else %}
+          <span style="color: #6c757d;">Not logged in</span>
+          <a href="{{ url_for('login') }}" style="margin-left: 15px; color: #007bff; text-decoration: none;">Login</a>
+        {% endif %}
+      </div>
+
       <form method="POST">
         <div class="form-group">
           <label for="delete_cookie">Delete cookies:</label>
@@ -35,14 +46,6 @@
         <div class="form-group">
           <label for="no_underlines">No Underlines:</label>
           {{ form.no_underlines }}
-        </div>
-        <div class="form-group admin-section">
-          <label for="admin_mode">Admin Mode:</label>
-          {{ form.admin_mode }}
-          <div class="admin-password-field">
-            <label for="admin_password">Password:</label>
-            {{ form.admin_password }}
-          </div>
         </div>
 
         {% if is_admin %}

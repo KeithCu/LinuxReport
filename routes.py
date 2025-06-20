@@ -15,13 +15,14 @@ import ipaddress
 import time
 
 # Third-party imports
-from flask import g, jsonify, render_template, request, make_response, Response
+from flask import g, jsonify, render_template, request, make_response, Response, flash, redirect, url_for
 from markupsafe import Markup
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
+from flask_login import login_user, logout_user, login_required, current_user
 
-from forms import ConfigForm, CustomRSSForm, UrlForm
-from models import RssInfo, DEBUG, get_admin_password
+from forms import ConfigForm, CustomRSSForm, UrlForm, LoginForm
+from models import RssInfo, DEBUG, get_admin_password, User
 # Local imports
 from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
@@ -212,12 +213,42 @@ def init_app(flask_app):
             
             return response
 
+    # Login route
+    @flask_app.route('/login', methods=['GET', 'POST'])
+    def login():
+        if current_user.is_authenticated:
+            return redirect(url_for('index'))
+        
+        if request.method == 'POST':
+            form = LoginForm(request.form)
+            if form.validate():
+                user = User.authenticate(form.username.data, form.password.data)
+                if user:
+                    login_user(user, remember=form.remember_me.data)
+                    next_page = request.args.get('next')
+                    if not next_page or not next_page.startswith('/'):
+                        next_page = url_for('index')
+                    return redirect(next_page)
+                else:
+                    flash('Invalid username or password')
+        else:
+            form = LoginForm()
+        
+        return render_template('login.html', form=form)
+
+    # Logout route
+    @flask_app.route('/logout')
+    @login_required
+    def logout():
+        logout_user()
+        return redirect(url_for('index'))
+
     # The main page of LinuxReport. Most of the time, it won't need to hit the disk to return the page
     # even if the page cache is expired.
     @flask_app.route('/')
     def index():
-        # Check if admin mode is enabled for performance tracking
-        is_admin = request.cookies.get('isAdmin') == '1'
+        # Check if admin mode is enabled for performance tracking using Flask-Login
+        is_admin = current_user.is_authenticated
 
         # Calculate performance stats for non-admin requests
         if not is_admin:
@@ -381,15 +412,14 @@ def init_app(flask_app):
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
     def config():
-        is_admin = request.cookies.get('isAdmin') == '1'
+        # Use Flask-Login for admin authentication
+        is_admin = current_user.is_authenticated
 
         if request.method == 'GET':
             form = ConfigForm()
 
             no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
             form.no_underlines.data = no_underlines_cookie == "1"
-
-            form.admin_mode.data = is_admin
 
             # Load headlines HTML if in admin mode
             if is_admin:
@@ -443,33 +473,10 @@ def init_app(flask_app):
                 resp.delete_cookie('RssUrls')
                 resp.delete_cookie('Theme')
                 resp.delete_cookie('NoUnderlines')
-                resp.delete_cookie('isAdmin')
                 return resp
 
-            # Handle admin mode authentication
-            enable_admin = False
-            if form.admin_mode.data:
-                # First check if the user already has a valid admin cookie
-                if is_admin:
-                    enable_admin = True
-                else:
-                    # Get password from config file
-                    correct_password = get_admin_password()
-                    
-                    # Check if password matches
-                    if form.admin_password.data == correct_password:
-                        enable_admin = True
-                    else:
-                        # Invalid password
-                        template = render_template('configdone.html', 
-                                                  message="Invalid admin password. Admin mode not enabled.")
-                        resp = make_response(template)
-                        # Update other cookies but not admin mode
-                        resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
-                        return resp
-            
-            # Update is_admin based on authentication result
-            is_admin = enable_admin
+            # Use Flask-Login authentication - no need for manual password checking
+            is_admin = current_user.is_authenticated
 
             # Save headlines if in admin mode and headlines were provided
             if is_admin and form.headlines.data:
@@ -522,11 +529,6 @@ def init_app(flask_app):
                 resp.delete_cookie('UrlsVer')
 
             resp.set_cookie("NoUnderlines", "1" if form.no_underlines.data else "0", max_age=EXPIRE_YEARS)
-
-            if enable_admin:
-                resp.set_cookie('isAdmin', '1', max_age=EXPIRE_YEARS)
-            else:
-                resp.delete_cookie('isAdmin')
 
             return resp
 
@@ -608,7 +610,8 @@ def init_app(flask_app):
         grouped_headlines_list = [(date, headlines) for date, headlines in grouped_headlines.items()]
         grouped_headlines_list.sort(key=lambda x: datetime.datetime.strptime(x[0], '%B %d, %Y'), reverse=True)
 
-        is_admin = request.cookies.get('isAdmin') == '1'
+        # Use Flask-Login for admin authentication
+        is_admin = current_user.is_authenticated
         return render_template(
             'old_headlines.html',
             grouped_headlines=grouped_headlines_list,
@@ -621,11 +624,8 @@ def init_app(flask_app):
         )
 
     @flask_app.route('/api/delete_headline', methods=['POST'])
+    @login_required
     def delete_headline():
-        is_admin = request.cookies.get('isAdmin') == '1'
-        if not is_admin:
-            return jsonify({'error': 'Unauthorized'}), 403
-            
         data = request.get_json()
         url = data.get('url')
         timestamp = data.get('timestamp')
@@ -750,11 +750,8 @@ def init_app(flask_app):
         return jsonify({"success": True}), 201
 
     @flask_app.route('/api/comments/<comment_id>', methods=['DELETE'])
+    @login_required
     def delete_comment(comment_id):
-        is_admin = request.cookies.get('isAdmin') == '1'
-        if not is_admin:
-            return jsonify({"error": "Unauthorized"}), 403
-
         chat_cache = get_chat_cache()
         comments = chat_cache.get(COMMENTS_KEY) or []
         initial_length = len(comments)

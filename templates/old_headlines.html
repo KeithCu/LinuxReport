@@ -83,6 +83,9 @@
         var theme = match ? match[1] : 'light';
         document.body.classList.add('theme-' + theme);
       });
+      
+      // Pass admin status from Flask-Login to JavaScript
+      window.isAdmin = {{ 'true' if is_admin else 'false' }};
     </script>
 </head>
 <body>

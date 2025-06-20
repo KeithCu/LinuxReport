@@ -184,9 +184,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const archiveContainer = document.querySelector('.headline-archive-container');
   if (!archiveContainer) return;
 
-  const isAdmin = typeof window.isAdmin !== 'undefined'
-    ? window.isAdmin
-    : getCookie('isAdmin') === '1';
+  // Use admin status passed from Flask-Login
+  const isAdmin = typeof window.isAdmin !== 'undefined' ? window.isAdmin : false;
 
   if (isAdmin) {
     const deleteHandler = async function(e) {

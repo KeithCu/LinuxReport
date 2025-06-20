@@ -23,8 +23,12 @@ class CustomRSSForm(Form):
 class ConfigForm(Form):
     delete_cookie = BooleanField(label="Delete cookies")
     no_underlines = BooleanField(label="No Underlines")
-    admin_mode = BooleanField(label="Enable Admin Mode", default=False)
-    admin_password = PasswordField(label="Admin Password", validators=[validators.Optional()])
     headlines = TextAreaField(label="Headlines HTML", render_kw={"style": "width: 100%; height: 200px; font-family: monospace;"})
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
+
+# Form for login
+class LoginForm(Form):
+    username = StringField('Username', validators=[validators.DataRequired()], default='admin')
+    password = PasswordField('Password', validators=[validators.DataRequired()])
+    remember_me = BooleanField('Remember Me')

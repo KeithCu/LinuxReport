@@ -13,6 +13,7 @@ import time
 import os
 import yaml
 import logging
+from flask_login import UserMixin
 
 PATH: str = os.path.dirname(os.path.abspath(__file__))
 
@@ -50,6 +51,31 @@ class RssInfo:
         self.logo_url = logo_url
         self.logo_alt = logo_alt
         self.site_url = site_url
+
+
+class User(UserMixin):
+    """Simple user model for Flask-Login that works with config.yaml."""
+    
+    def __init__(self, user_id):
+        self.id = user_id
+        self.is_admin = True  # All users in this system are admins
+    
+    @staticmethod
+    def get(user_id):
+        """Get user by ID - in this simple system, any valid ID returns an admin user."""
+        if user_id == 'admin':
+            return User('admin')
+        return None
+    
+    @staticmethod
+    def authenticate(username, password):
+        """Authenticate user against config.yaml password."""
+        if username == 'admin':
+            config = load_config()
+            correct_password = config['admin']['password']
+            if password == correct_password:
+                return User('admin')
+        return None
 
 
 class LockBase(ABC):
@@ -133,3 +159,8 @@ def get_admin_password():
     """Get the admin password from configuration."""
     config = load_config()
     return config['admin']['password']
+
+def get_secret_key():
+    """Get the secret key from configuration."""
+    config = load_config()
+    return config['admin'].get('secret_key') or os.urandom(24).hex()

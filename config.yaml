@@ -4,6 +4,7 @@
 # Admin settings
 admin:
   password: "LinuxReportAdmin2024"
+  secret_key: "your-super-secret-key-change-this-in-production"
 
 # Storage settings
 storage:

@@ -4,7 +4,7 @@ class ChatWidget {
   constructor() {
     this.elements = {};
     this.state = {
-      isAdminMode: Cookie.get('isAdmin') === '1',
+      isAdminMode: typeof window.isAdmin !== 'undefined' ? window.isAdmin : false,
       isDragging: false,
       offsetX: 0,
       offsetY: 0,

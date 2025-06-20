@@ -1,3 +1,159 @@
+Cursor Flask plugins suggestions:
+
+## **High Priority Recommendations**
+
+### 1. **Flask-Login** - Session Management
+**Why you need it:** Your current admin authentication uses simple cookies, which is not secure for production.
+```python
+# Current: Simple cookie-based admin auth
+if form.admin_password.data == correct_password:
+    enable_admin = True
+```
+**Benefits:**
+- Secure session management
+- User authentication decorators
+- Remember me functionality
+- Session security features
+
+### 2. **Flask-SQLAlchemy** - Database ORM
+**Why you need it:** You're using diskcache for data storage, but for structured data like comments, users, and feed history, a proper ORM would be better.
+```python
+# Current: Using diskcache for everything
+g_cm.set(COMMENTS_KEY, comments, ttl=EXPIRE_DAY)
+```
+**Benefits:**
+- Structured data models
+- Database migrations
+- Better query capabilities
+- Relationship management
+
+### 3. **Flask-WTF** - Form Security
+**Why you need it:** You're using WTForms but missing CSRF protection.
+```python
+# Current: Basic WTForms without CSRF
+class ConfigForm(Form):
+    admin_password = PasswordField(label="Admin Password")
+```
+**Benefits:**
+- CSRF protection
+- Better form validation
+- File upload security
+- Session-based form tokens
+
+## **Medium Priority Recommendations**
+
+### 4. **Flask-Limiter** - Rate Limiting
+**Why you need it:** Your chat system and API endpoints need protection against abuse.
+```python
+# Current: Basic IP banning
+BANNED_IPS_KEY = "banned_ips"
+```
+**Benefits:**
+- Rate limiting by IP/user
+- API protection
+- Configurable limits
+- Better than manual IP banning
+
+### 5. **Flask-Compress** - Response Compression
+**Why you need it:** Your news aggregation site serves a lot of text content.
+**Benefits:**
+- Automatic gzip compression
+- Reduced bandwidth usage
+- Better performance
+- Works with Flask-Assets
+
+### 6. **Flask-Caching** - Advanced Caching
+**Why you need it:** You have custom caching logic that could be simplified.
+```python
+# Current: Custom caching with diskcache
+g_cm.set(stats_key, stats, ttl=EXPIRE_DAY)
+```
+**Benefits:**
+- Decorator-based caching
+- Multiple backend support
+- Cache invalidation
+- Simpler cache management
+
+### 7. **Flask-Mail** - Email Notifications
+**Why you need it:** For admin notifications about system issues or updates.
+**Benefits:**
+- Email notifications
+- Admin alerts
+- Error reporting
+- Update notifications
+
+## **Lower Priority but Useful**
+
+### 8. **Flask-Migrate** - Database Migrations
+**Why you need it:** If you implement Flask-SQLAlchemy, you'll need migrations.
+**Benefits:**
+- Database schema changes
+- Version control for database
+- Rollback capabilities
+- Team collaboration
+
+### 9. **Flask-Principals** - Role-Based Access
+**Why you need it:** For more sophisticated admin roles and permissions.
+**Benefits:**
+- Role-based access control
+- Permission management
+- Admin hierarchy
+- Better security
+
+### 10. **Flask-SocketIO** - Real-time Features
+**Why you need it:** Your chat system could benefit from real-time updates.
+```python
+# Current: Server-sent events for chat
+@flask_app.route('/api/comments/stream')
+def stream_comments():
+```
+**Benefits:**
+- Real-time chat updates
+- Live notifications
+- Better user experience
+- WebSocket support
+
+### 11. **Flask-APScheduler** - Task Scheduling
+**Why you need it:** Your auto-update system could be more robust.
+```python
+# Current: Custom scheduling in workers.py
+SCHEDULE: List[int]  # List of hours when auto-updates should run
+```
+**Benefits:**
+- Cron-like scheduling
+- Persistent job storage
+- Job monitoring
+- Better error handling
+
+### 12. **Flask-Monitoring** - Application Monitoring
+**Why you need it:** You have basic performance tracking that could be enhanced.
+```python
+# Current: Basic performance stats
+def update_performance_stats(render_time):
+```
+**Benefits:**
+- Request monitoring
+- Performance metrics
+- Error tracking
+- Health checks
+
+## **Implementation Priority**
+
+1. **Start with Flask-Login** - Security is critical
+2. **Add Flask-WTF CSRF protection** - Form security
+3. **Implement Flask-Limiter** - Protect your APIs
+4. **Consider Flask-SQLAlchemy** - For structured data
+5. **Add Flask-Compress** - Performance improvement
+
+## **Not Recommended for Your Use Case**
+
+- **Flask-Admin** - Too heavy for your simple admin needs
+- **Flask-RESTful** - Your API is simple enough without it
+- **Flask-Babel** - No internationalization needs
+- **Flask-OAuthlib** - No OAuth requirements
+
+Your current setup with Flask-Assets is a good start. The most impactful next steps would be improving security (Flask-Login, Flask-WTF) and adding rate limiting (Flask-Limiter) to protect your chat and API endpoints.
+
 Suggestions from O4-mini:
 Here are some next‑step ideas that don't appear to be in place yet:
 

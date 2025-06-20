@@ -13,12 +13,13 @@ from flask import Flask
 from flask_mobility import Mobility
 from flask_assets import Environment, Bundle
 from flask_assets import Filter
+from flask_login import LoginManager
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Local imports
 from shared import EXPIRE_WEEK, _JS_MODULES
-from models import DEBUG
+from models import DEBUG, User, get_secret_key
 
 # Custom filter to add header information
 class HeaderFilter(Filter):
@@ -39,7 +40,7 @@ class HeaderFilter(Filter):
         try:
             file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
         except:
-            # Return 'dev' plus a timestamp on error (same as get_file_hash)
+            # Return 'dev' plus a timestamp on error
             file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
         
         # Write header
@@ -62,6 +63,20 @@ g_app.config['SEND_FILE_MAX_AGE_DEFAULT'] = EXPIRE_WEEK
 g_app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # Limit uploads to 5MB
 g_app.config['DEBUG'] = DEBUG
 
+# Add a secret key for Flask-Login (required for session security)
+g_app.config['SECRET_KEY'] = get_secret_key()
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(g_app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user for Flask-Login."""
+    return User.get(user_id)
+
 # Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
 
@@ -75,8 +90,9 @@ js_files = [os.path.join(os.path.dirname(__file__), 'templates', module) for mod
 
 # Only minify in production (not in debug mode)
 filters_list = [HeaderFilter(_JS_MODULES, "JavaScript")]
-if not DEBUG and not g_app.debug:
-    filters_list.append('jsmin')
+# Note: jsmin doesn't support ES6 class syntax, so we're not using it
+# if not DEBUG and not g_app.debug:
+#     filters_list.append('jsmin')
 
 js_bundle = assets.register('js_all', Bundle(
     *js_files,
