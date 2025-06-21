@@ -5,7 +5,8 @@ import os
 import datetime
 import time
 
-from shared import PATH, EXPIRE_HOUR, ENABLE_COMPRESSION_CACHING, DEBUG, g_cm, clear_page_caches
+from shared import PATH, EXPIRE_HOUR, ENABLE_COMPRESSION_CACHING, g_cm, clear_page_caches
+from models import DEBUG
 
 _file_cache = {}
 _FILE_CHECK_INTERVAL_SECONDS = 5 * 60 # 5 minutes
