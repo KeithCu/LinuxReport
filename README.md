@@ -11,7 +11,7 @@ Simple and fast news site based on Python / Flask. Meant to be a http://drudgere
 
 ### DeepWiki provides great analysis of the codebase, including visual dependency graphs.
 
-Here's the running code for Linux, Covid, and AI, Solar / PV, and Detroit Techno:
+Here's the running code for Linux, Covid, AI, Solar / PV, Detroit Techno, and Space Exploration:
 
 https://linuxreport.net 
 
@@ -22,6 +22,9 @@ https://aireport.keithcu.com
 https://pvreport.org
 
 https://news.thedetroitilove.com
+
+https://news.spaceelevatorwiki.com
+
 
 Takes advantage of thread pools and Apache process pools to be high-performance and scalable. Some people incorrectly say that Python is slow, but this app typically starts returning the page after less than 10 lines of my Python code.
 
