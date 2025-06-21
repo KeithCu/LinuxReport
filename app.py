@@ -14,6 +14,7 @@ from flask_mobility import Mobility
 from flask_assets import Environment, Bundle
 from flask_assets import Filter
 from flask_compress import Compress
+from flask_login import LoginManager
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
