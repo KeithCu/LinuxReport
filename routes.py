@@ -105,7 +105,15 @@ def get_cached_above_html():
     return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
 
 def update_performance_stats(render_time):
-    """Update performance statistics for admin mode."""
+    """
+    Update performance statistics for admin monitoring.
+    
+    This function is called on EVERY request (high frequency),
+    so it must be fast and use memory cache for speed.
+    
+    Args:
+        render_time: Time taken to render the page in seconds
+    """
     stats_key = "admin_performance_stats"
     stats = g_cm.get(stats_key) or {
         "times": [],
@@ -142,82 +150,56 @@ def update_performance_stats(render_time):
     g_cm.set(stats_key, stats, ttl=EXPIRE_DAY)
 
 def track_rate_limit_event(ip, endpoint, limit_type="exceeded"):
-    """Track rate limit events for monitoring."""
+    """
+    Track rate limit events for long-term monitoring and security analysis.
+    
+    This function is called ONLY when rate limits are exceeded (rare events),
+    so it can be slower and use disk cache for persistence across restarts.
+    
+    Args:
+        ip: IP address that hit the rate limit
+        endpoint: Flask endpoint that was rate limited
+        limit_type: Type of rate limit violation (default: "exceeded")
+    """
+    # Store events in disk cache for persistence across restarts
+    rate_limit_events_key = "rate_limit_events"
+    events = g_c.get(rate_limit_events_key) or []
+    
+    current_time = time.time()
+    # Keep event data minimal - details can be found in Apache logs
+    event = {
+        "timestamp": current_time,
+        "ip": ip,
+        "endpoint": endpoint
+    }
+    
+    # Add to events list (keep last 1000 events)
+    events.append(event)
+    if len(events) > 1000:
+        events = events[-1000:]
+    
+    # Clean up old events (older than 30 days)
+    cutoff_time = current_time - (30 * 24 * 3600)  # 30 days
+    events = [e for e in events if e["timestamp"] > cutoff_time]
+    
+    # Store events in disk cache for persistence
+    g_c.put(rate_limit_events_key, events, timeout=EXPIRE_YEARS)
+    
+    # Keep minimal stats in disk cache for long-term tracking
     rate_limit_stats_key = "rate_limit_stats"
-    stats = g_cm.get(rate_limit_stats_key) or {
-        "events": [],
+    stats = g_c.get(rate_limit_stats_key) or {
         "by_ip": {},
         "by_endpoint": {}
     }
     
-    current_time = time.time()
-    event = {
-        "timestamp": current_time,
-        "ip": ip,
-        "endpoint": endpoint,
-        "type": limit_type
-    }
+    # Track by IP and endpoint
+    for key, data_dict in [("by_ip", ip), ("by_endpoint", endpoint)]:
+        if data_dict not in stats[key]:
+            stats[key][data_dict] = {"count": 0, "last_seen": current_time}
+        stats[key][data_dict]["count"] += 1
+        stats[key][data_dict]["last_seen"] = current_time
     
-    # Add to events list (keep last 1000 events)
-    stats["events"].append(event)
-    if len(stats["events"]) > 1000:
-        stats["events"] = stats["events"][-1000:]
-    
-    # Track by IP
-    if ip not in stats["by_ip"]:
-        stats["by_ip"][ip] = {"count": 0, "last_seen": current_time}
-    stats["by_ip"][ip]["count"] += 1
-    stats["by_ip"][ip]["last_seen"] = current_time
-    
-    # Track by endpoint
-    if endpoint not in stats["by_endpoint"]:
-        stats["by_endpoint"][endpoint] = {"count": 0, "last_seen": current_time}
-    stats["by_endpoint"][endpoint]["count"] += 1
-    stats["by_endpoint"][endpoint]["last_seen"] = current_time
-    
-    # Clean up old data (older than 24 hours)
-    cutoff_time = current_time - 86400
-    stats["events"] = [e for e in stats["events"] if e["timestamp"] > cutoff_time]
-    
-    g_cm.set(rate_limit_stats_key, stats, ttl=EXPIRE_DAY)
-
-def cleanup_rate_limit_data():
-    """Clean up old rate limit data to prevent memory bloat."""
-    # This function can be called periodically to clean up old rate limit keys
-    # Since we're using memory cache, we don't need to worry about disk space
-    # but we can still clean up very old data to keep memory usage reasonable
-    
-    # Get all keys that start with rate limit prefixes
-    # Note: cacheout doesn't have a keys() method, so we'll rely on TTL expiration
-    # The rate limit keys will automatically expire based on their TTL
-    
-    # For now, we'll just clean up the stats data periodically
-    rate_limit_stats_key = "rate_limit_stats"
-    stats = g_cm.get(rate_limit_stats_key)
-    
-    if stats:
-        current_time = time.time()
-        cutoff_time = current_time - 86400  # 24 hours
-        
-        # Clean up old events
-        if "events" in stats:
-            stats["events"] = [e for e in stats["events"] if e["timestamp"] > cutoff_time]
-        
-        # Clean up old IP entries
-        if "by_ip" in stats:
-            stats["by_ip"] = {
-                ip: data for ip, data in stats["by_ip"].items() 
-                if data["last_seen"] > cutoff_time
-            }
-        
-        # Clean up old endpoint entries
-        if "by_endpoint" in stats:
-            stats["by_endpoint"] = {
-                endpoint: data for endpoint, data in stats["by_endpoint"].items() 
-                if data["last_seen"] > cutoff_time
-            }
-        
-        g_cm.set(rate_limit_stats_key, stats, ttl=EXPIRE_DAY)
+    g_c.put(rate_limit_stats_key, stats, timeout=EXPIRE_YEARS)  # Store in disk cache for persistence
 
 def get_admin_stats_html():
     """Generate HTML for admin performance stats."""
@@ -269,56 +251,9 @@ def get_admin_stats_html():
     </div>
     '''
 
-# Flask-Limiter storage backend using your existing cache
-class CacheoutStorage:
-    """Custom storage backend for Flask-Limiter using your existing cacheout cache."""
-    
-    def __init__(self, cache_instance):
-        self.cache = cache_instance
-    
-    def get(self, key):
-        # Get the current minute-based key
-        current_minute = int(time.time() / 60)
-        minute_key = f"{key}:{current_minute}"
-        return self.cache.get(minute_key)
-    
-    def set(self, key, value, timeout=None):
-        # Use current minute as part of the key
-        current_minute = int(time.time() / 60)
-        minute_key = f"{key}:{current_minute}"
-        # Set with 120-second TTL to ensure it expires after the minute is over
-        return self.cache.set(minute_key, value, ttl=120)
-    
-    def incr(self, key, timeout=None):
-        # Use current minute as part of the key
-        current_minute = int(time.time() / 60)
-        minute_key = f"{key}:{current_minute}"
-        current = self.cache.get(minute_key) or 0
-        new_value = current + 1
-        # Set with 120-second TTL to ensure it expires after the minute is over
-        self.cache.set(minute_key, new_value, ttl=120)
-        return new_value
-    
-    def decr(self, key, timeout=None):
-        # Use current minute as part of the key
-        current_minute = int(time.time() / 60)
-        minute_key = f"{key}:{current_minute}"
-        current = self.cache.get(minute_key) or 0
-        new_value = max(0, current - 1)
-        # Set with 120-second TTL to ensure it expires after the minute is over
-        self.cache.set(minute_key, new_value, ttl=120)
-        return new_value
-    
-    def delete(self, key):
-        # Delete current minute key
-        current_minute = int(time.time() / 60)
-        minute_key = f"{key}:{current_minute}"
-        return self.cache.delete(minute_key)
-
 # Initialize Flask-Limiter with your cache
 limiter = Limiter(
     key_func=get_rate_limit_key,
-    storage_uri="memory://",  # We'll override this in init_app
     default_limits=["50 per minute"],
     strategy="fixed-window"
 )
@@ -328,8 +263,6 @@ def init_app(flask_app):
     """Initialize Flask routes."""
     # Initialize Flask-Limiter with your cache system
     limiter.init_app(flask_app)
-    # Override storage with your cache
-    limiter.storage = CacheoutStorage(g_cm)
     
     # Configure CORS and security headers only if enabled
     if ENABLE_CORS:
@@ -413,7 +346,7 @@ def init_app(flask_app):
     # The main page of LinuxReport. Most of the time, it won't need to hit the disk to return the page
     # even if the page cache is expired.
     @flask_app.route('/')
-    @limiter.limit("100 per minute")
+    @limiter.limit(dynamic_rate_limit)
     def index():
         # Check if admin mode is enabled for performance tracking using Flask-Login
         is_admin = current_user.is_authenticated
@@ -563,15 +496,6 @@ def init_app(flask_app):
             if stats_html:
                 page = page.replace('</body>', f'{stats_html}</body>')
 
-        # Periodic cleanup of rate limit data (every 1000 requests)
-        if not is_admin:
-            request_count = g_cm.get("request_count") or 0
-            request_count += 1
-            g_cm.set("request_count", request_count, ttl=EXPIRE_HOUR)
-            
-            if request_count % 1000 == 0:
-                cleanup_rate_limit_data()
-
         # Trigger background fetching if needed
         if need_fetch and ENABLE_BACKGROUND_REFRESH:
             # Check if the request is from a web bot
@@ -588,7 +512,7 @@ def init_app(flask_app):
         return response
 
     @flask_app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
-    @limiter.limit("20 per minute")
+    @limiter.limit(dynamic_rate_limit)
     def config():
         # Use Flask-Login for admin authentication
         is_admin = current_user.is_authenticated
@@ -711,7 +635,7 @@ def init_app(flask_app):
             return resp
 
     @flask_app.route('/api/weather')
-    @limiter.limit("10 per minute")
+    @limiter.limit(dynamic_rate_limit)
     def get_weather():
         ip = request.remote_addr
         units = request.args.get('units', 'imperial')
@@ -837,20 +761,29 @@ def init_app(flask_app):
     @login_required
     def get_rate_limit_stats():
         """Get rate limit statistics for admin monitoring."""
+        # Get events from disk cache (persistent)
+        rate_limit_events_key = "rate_limit_events"
+        events = g_c.get(rate_limit_events_key) or []
+        
+        # Get stats from disk cache (persistent)
         rate_limit_stats_key = "rate_limit_stats"
-        stats = g_cm.get(rate_limit_stats_key) or {
-            "events": [],
+        stats = g_c.get(rate_limit_stats_key) or {
             "by_ip": {},
             "by_endpoint": {}
         }
         
-        # Add current time for reference
-        stats["current_time"] = time.time()
-        stats["total_events"] = len(stats.get("events", []))
-        stats["unique_ips"] = len(stats.get("by_ip", {}))
-        stats["unique_endpoints"] = len(stats.get("by_endpoint", {}))
+        # Combine data
+        result = {
+            "events": events,
+            "by_ip": stats.get("by_ip", {}),
+            "by_endpoint": stats.get("by_endpoint", {}),
+            "current_time": time.time(),
+            "total_events": len(events),
+            "unique_ips": len(stats.get("by_ip", {})),
+            "unique_endpoints": len(stats.get("by_endpoint", {}))
+        }
         
-        return jsonify(stats)
+        return jsonify(result)
 
     @flask_app.route('/api/comments', methods=['GET'])
     def get_comments():
@@ -898,7 +831,7 @@ def init_app(flask_app):
         return Response(event_stream(), mimetype='text/event-stream')
 
     @flask_app.route('/api/comments', methods=['POST'])
-    @limiter.limit("10 per minute")
+    @limiter.limit(dynamic_rate_limit)
     def post_comment():
         ip = request.remote_addr
         chat_cache = get_chat_cache()
@@ -968,7 +901,7 @@ def init_app(flask_app):
             return jsonify({"error": "Comment not found"}), 404
 
     @flask_app.route('/api/upload_image', methods=['POST'])
-    @limiter.limit("5 per minute")
+    @limiter.limit(dynamic_rate_limit)
     def upload_image():
         ip = request.remote_addr
         chat_cache = get_chat_cache()
@@ -1052,5 +985,5 @@ def init_app(flask_app):
         return jsonify({
             "error": "Rate limit exceeded",
             "message": "Too many requests. Please try again later.",
-            "retry_after": e.retry_after if hasattr(e, 'retry_after') else 60
+            "retry_after": getattr(e, 'retry_after', 60)
         }), 429
