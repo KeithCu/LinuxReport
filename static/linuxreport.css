@@ -133,6 +133,15 @@ body.no-underlines a, body.no-underlines a * {
   color: var(--btn-hover-text) !important;
 }
 
+/* Colored navigation links - override default link colors */
+.nav-link-linux { color: #f47421 !important; }
+.nav-link-pv { color: #ffd700 !important; }
+.nav-link-ai { color: #00d4ff !important; }
+.nav-link-techno { color: #7b68ee !important; }
+.nav-link-covid { color: #ff6b6b !important; }
+.nav-link-truth { color: #32cd32 !important; }
+.nav-link-space { color: #b22222 !important; }
+
 /* Clear floats after the columns */
 .desktop-view .row:after {
   content: "";
@@ -146,6 +155,12 @@ body.no-underlines a, body.no-underlines a * {
   padding: 10px;
 }
 
+.mobile-view .nav-links-mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .mobile-view .nav-links-mobile a {
   display: block;
   font-size: 1.3em;
@@ -157,6 +172,7 @@ body.no-underlines a, body.no-underlines a * {
   border-radius: 8px;
   background: var(--btn-bg);
   color: var(--link) !important;
+  border: 1px solid transparent;
 }
 
 .mobile-view .nav-links-mobile a:active, 
@@ -164,6 +180,15 @@ body.no-underlines a, body.no-underlines a * {
   background: var(--btn-hover-bg);
   color: var(--btn-hover-text) !important;
 }
+
+/* Mobile colored navigation links with borders */
+.mobile-view .nav-link-linux { color: #f47421 !important; border-color: #f47421 !important; }
+.mobile-view .nav-link-pv { color: #ffd700 !important; border-color: #ffd700 !important; }
+.mobile-view .nav-link-ai { color: #00d4ff !important; border-color: #00d4ff !important; }
+.mobile-view .nav-link-techno { color: #7b68ee !important; border-color: #7b68ee !important; }
+.mobile-view .nav-link-covid { color: #ff6b6b !important; border-color: #ff6b6b !important; }
+.mobile-view .nav-link-truth { color: #32cd32 !important; border-color: #32cd32 !important; }
+.mobile-view .nav-link-space { color: #b22222 !important; border-color: #b22222 !important; }
 
 .pagination-controls {
   display: flex;

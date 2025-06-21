@@ -47,14 +47,14 @@
     <center>
       <div style="border: 2px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: large;">
         <div class="{% if g.is_mobile %}nav-links-mobile{% else %}nav-links-desktop{% endif %}">
-          <a href="https://linuxreport.net" target="_blank" style="margin: 2px; color: #f47421; text-decoration: none; font-weight: 500;">Linux</a>
-          <a href="https://pvreport.org" target="_blank" style="margin: 2px; color: #ffd700; text-decoration: none; font-weight: 500;">PV</a>
-          <a href="https://aireport.keithcu.com" target="_blank" style="margin: 2px; color: #00d4ff; text-decoration: none; font-weight: 500;">AI</a>
-          <a href="https://news.thedetroitilove.com" target="_blank" style="margin: 2px; color: #7b68ee; text-decoration: none; font-weight: 500;">Techno</a>
-          <a href="https://covidreport.org" target="_blank" style="margin: 2px; color: #ff6b6b; text-decoration: none; font-weight: 500;">Covid</a>
-          <a href="https://trumpreport.info" target="_blank" style="margin: 2px; color: #32cd32; text-decoration: none; font-weight: 500;">Truth</a>
-          <a href="https://news.spaceelevatorwiki.com" target="_blank" style="margin: 2px; color: #b22222; text-decoration: none; font-weight: 500;">Space!</a>
-          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" style="margin: 2px; color: inherit;">Me</a>
+          <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
+          <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
+          <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
+          <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
+          <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
+          <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
+          <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
+          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
         </div>
         <select id="theme-select" onchange="setTheme(this.value)" style="margin-left:20px; padding:5px;">
           <option value="light" style="background:#ffffff;color:#000;">Light</option>
