@@ -592,7 +592,8 @@ def extract_top_titles_from_ai(text):
             continue
 
         # Clean up formatting first - combine all regex operations into one
-        line = re.sub(r'^\*+|\*+$|^["\']|["\']$|^[-–—]+|[-–—]+$|\*\*|^[-–—\s]+|^[#\s]+|^[•\s]+', '', line)
+        # Remove: asterisks, quotes, dashes, bullets, numbers with periods, extra whitespace
+        line = re.sub(r'^\*+|\*+$|^["\']|["\']$|^[-–—]+|[-–—]+$|\*\*|^[-–—\s]+|^[#\s]+|^[•\s]+|^\d+\.?\s*', '', line)
         line = line.strip()
             
         # Use different regex patterns based on whether we're going forward or backward
@@ -744,15 +745,12 @@ def ask_ai_top_articles(articles):
     
     top_articles = []
     for title in top_titles:
-        # Clean the title by removing numbers and periods from the beginning
-        cleaned_title = re.sub(r'^\d+\.?\s*', '', title.strip())
-        
-        best_match = get_best_matching_article(cleaned_title, filtered_articles)
+        best_match = get_best_matching_article(title, filtered_articles)
         if (best_match):
             top_articles.append(best_match)
             print(f"Selected article: {best_match['title']} ({best_match['url']})")
         else:
-            print(f"Failed to find match for title: {title} (cleaned: {cleaned_title})")
+            print(f"Failed to find match for title: {title}")
 
     new_selections = [{"url": art["url"], "title": art["title"]}
                       for art in top_articles if art]
