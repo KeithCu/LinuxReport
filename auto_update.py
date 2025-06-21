@@ -744,12 +744,15 @@ def ask_ai_top_articles(articles):
     
     top_articles = []
     for title in top_titles:
-        best_match = get_best_matching_article(title, filtered_articles)
+        # Clean the title by removing numbers and periods from the beginning
+        cleaned_title = re.sub(r'^\d+\.?\s*', '', title.strip())
+        
+        best_match = get_best_matching_article(cleaned_title, filtered_articles)
         if (best_match):
             top_articles.append(best_match)
             print(f"Selected article: {best_match['title']} ({best_match['url']})")
         else:
-            print(f"Failed to find match for title: {title}")
+            print(f"Failed to find match for title: {title} (cleaned: {cleaned_title})")
 
     new_selections = [{"url": art["url"], "title": art["title"]}
                       for art in top_articles if art]
