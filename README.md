@@ -10,6 +10,8 @@
 
 **Simple, fast, and intelligent news aggregation platform** built with Python/Flask. Designed as a modern [drudgereport.com](http://drudgereport.com/) clone that automatically aggregates and curates news from multiple categories, updated 24/7 with AI-powered headline generation.
 
+This project is **free and open source software** released under the GNU Lesser General Public License v3.0 (LGPL v3).
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/KeithCu/LinuxReport)
 
 > DeepWiki provides excellent analysis of the codebase, including visual dependency graphs.
@@ -33,6 +35,7 @@
 - **🌙 Dark Mode**: User-customizable themes and font sizes
 - **📱 Mobile Responsive**: Optimized for all devices
 - **⚡ Advanced Caching**: Multi-layer caching system for optimal performance
+- **🌐 CDN Support**: s3cmd integration with long cache expiration headers for optimal image delivery
 - **🔒 Secure**: Rate limiting, admin authentication, input validation
 - **🛠️ Configurable**: Easy RSS feed management and customization
 
@@ -83,6 +86,7 @@ The system achieves high performance through:
 
 - **Thread Pools**: Concurrent RSS feed processing
 - **Multi-layer Caching**: Disk, memory, and file-based caching strategies
+- **CDN Integration**: s3cmd synchronization with long cache expiration headers for static assets
 - **Asset Optimization**: Automatic JavaScript bundling and CSS minification  
 - **Smart Deduplication**: Article deduplication across feeds and time periods
 - **Rate Limiting**: Intelligent request throttling and IP blocking
@@ -253,11 +257,22 @@ If considering a FastAPI migration, you would need to:
 
 ## 📄 License
 
-This project is open source. See the LICENSE file for details.
+This project is **free and open source software** released under the GNU Lesser General Public License v3.0 (LGPL v3). See the LICENSE file for complete details.
+
+### CDN and Static Asset Delivery
+
+LinuxReport includes sophisticated CDN support for optimal performance:
+
+- **s3cmd Integration**: Automated synchronization of static images to object storage
+- **Long Cache Headers**: HTTP expiration headers set to instruct clients to cache images for extended periods
+- **Bandwidth Optimization**: Significantly reduces server bandwidth usage and improves global load times
+- **Edge Delivery**: Static assets served from CDN edge locations closest to users
+
+The CDN configuration is easily managed through `config.yaml` and automatically handles cache-busting when needed.
 
 ---
 
 <div align="center">
-  <strong>Built with ❤️ for the open source community</strong>
+  <strong>Built with ❤️ for the free and open source community</strong>
 </div>
 

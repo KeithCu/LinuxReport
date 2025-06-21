@@ -6,6 +6,8 @@ This document provides guidance for AI agents (like Codex, GitHub Copilot, or ot
 
 LinuxReport is a Python/Flask-based news aggregation platform that provides real-time updates across multiple report types including Linux, COVID-19, AI, Solar/PV, Space, Trump, and Detroit Techno news. The project uses thread pools and process pools for high performance and includes automatic headline updates using LLMs.
 
+**License**: This project is free and open source software released under the GNU Lesser General Public License v3.0 (LGPL v3).
+
 ## Key Technologies
 
 - **Primary Language**: Python 3.x
@@ -101,6 +103,17 @@ LinuxReport supports multiple report types, each with its own configuration:
 ## Database and Caching System
 
 LinuxReport uses a sophisticated multi-layer caching system (see `Caching.md` for full details):
+
+### CDN and Image Delivery
+
+The system includes CDN support for optimal image delivery:
+
+- **s3cmd Integration**: Images are synchronized to object storage using `s3cmd` with long cache expiration headers
+- **Client-Side Caching**: HTTP headers are set to instruct browsers to cache images for extended periods, reducing server load
+- **CDN Configuration**: Configurable CDN URL in `config.yaml` for serving static images from edge locations
+- **Performance Optimization**: Long expiration dates significantly reduce bandwidth usage and improve load times
+
+### Core Caching Layers
 
 1. **Disk Cache (`diskcache` via `g_c`)**:
    - Primary persistent storage using SQLite backend
@@ -282,6 +295,7 @@ LinuxReport uses a sophisticated multi-layer caching system (see `Caching.md` fo
 - **Use existing caching infrastructure** rather than implementing custom storage
 - **Follow the modular route pattern** for new features  
 - **Leverage the multi-layer cache system** for optimal performance
+- **Configure CDN properly** for static asset delivery with appropriate cache headers
 - **Use type hints** and follow existing code patterns
 - **Test thoroughly** with pytest before deployment
 
@@ -291,6 +305,7 @@ LinuxReport uses a sophisticated multi-layer caching system (see `Caching.md` fo
 - **DO NOT** modify auto-generated files in `static/` directory
 - **DO NOT** create circular dependencies between modules
 - **DO NOT** commit sensitive information like passwords or API keys
+- **DO NOT** serve images locally when CDN is properly configured - always use the CDN URL for better performance
 
 ## Additional Documentation
 
