@@ -1,6 +1,8 @@
 <div class="box" id="feed-{{ feed_id }}">
 <div style="display: flex; justify-content: center; align-items: center; padding: 8px 0;">
-  <img loading="lazy" src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height: 100px; display: block; margin: 0 auto;" />
+  <a target="_blank" href="{{ link }}">
+    <img loading="lazy" src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height: 100px; display: block; margin: 0 auto;" />
+  </a>
 </div>
   <center>
     <small>Last updated: {{ last_fetch }}</small>
