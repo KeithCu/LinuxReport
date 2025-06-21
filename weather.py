@@ -466,14 +466,6 @@ def init_weather_routes(app):
             # Just return the data and status code
             return weather_data, status_code
         
-        def options(self):
-            """Handle OPTIONS requests for CORS"""
-            response = self.make_response('')
-            response.headers['Access-Control-Allow-Origin'] = '*'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
-            return response
-        
         def dispatch_request(self, *args, **kwargs):
             """Override to add cache headers to all responses"""
             response = super().dispatch_request(*args, **kwargs)
