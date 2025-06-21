@@ -233,6 +233,8 @@ Key performance metrics:
 
 The architecture achieves this performance through smart cache layering that serves most requests from memory while background workers continuously update feeds, proving that well-designed caching can deliver enterprise-grade speed without requiring specialized hardware or runtime optimizations.
 
+**Multi-Process Scalability**: LinuxReport elegantly sidesteps Python's GIL limitations by using multiple Apache processes with intelligent cache invalidation. Each process maintains its own memory cache but uses fast SQLite queries to detect when feeds have changed (checking `last_render_time` only when page cache expires). This eliminates the need for complex message queues, Redis, or inter-process communication while maintaining perfect cache consistency across all processes.
+
 ## 🔧 FastAPI vs Flask (Historical Context)
 
 While FastAPI is a modern, high-performance framework with excellent async support, this project intentionally uses Flask for several reasons:
