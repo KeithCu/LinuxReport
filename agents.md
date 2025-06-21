@@ -26,7 +26,11 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
 .
 ├── app.py                 # Main application entry point and core Flask setup
 ├── shared.py             # Shared utilities and core functionality
-├── routes.py             # Route definitions
+├── routes.py             # Main routing file and initializer for route modules
+├── config.py             # Route definitions for the configuration page
+├── weather.py            # Contains routes for the weather API
+├── chat.py               # Contains routes for the chat API
+├── admin_stats.py        # Provides statistics displayed via routes
 ├── models.py             # Database models
 ├── templates/            # Jinja2 templates and JavaScript files
 │   ├── *.html           # HTML templates
@@ -61,6 +65,12 @@ LinuxReport is a Python/Flask-based news aggregation site that provides real-tim
    - Reusable business logic
    - Common error handling
    - Shared configuration management
+
+3. **routes.py**:
+   - Main routing file for the application.
+   - Initializes route modules for different features (e.g., weather, chat, config).
+   - Contains primary routes like the main index page (`/`), login, and logout.
+   - Defines global handlers for errors (e.g., 429 Rate Limit).
 
 These files form the foundation of the application and should be carefully considered when making changes. They contain critical functionality that other parts of the application depend on.
 
@@ -157,7 +167,10 @@ These files form the foundation of the application and should be carefully consi
 ## Common Tasks
 
 1. **Adding New Features**:
-   - Create new route in `routes.py`
+   - Create a new module for the feature (e.g., `my_feature.py`).
+   - Define an `init_my_feature_routes(app)` function in the new module.
+   - Add the new route definitions within this function.
+   - In `routes.py`, import `init_my_feature_routes` and call it inside `init_app(flask_app)`.
    - Add template in `templates/`
    - Update static assets in `static/`
    - Add tests in `tests/`
