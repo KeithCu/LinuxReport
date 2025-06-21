@@ -2,30 +2,6 @@ Cursor Flask plugins suggestions:
 
 ## **High Priority Recommendations**
 
-### 1. **Flask-Login** - Session Management
-**Why you need it:** Your current admin authentication uses simple cookies, which is not secure for production.
-```python
-# Current: Simple cookie-based admin auth
-if form.admin_password.data == correct_password:
-    enable_admin = True
-```
-**Benefits:**
-- Secure session management
-- User authentication decorators
-- Remember me functionality
-- Session security features
-
-### 2. **Flask-SQLAlchemy** - Database ORM
-**Why you need it:** You're using diskcache for data storage, but for structured data like comments, users, and feed history, a proper ORM would be better.
-```python
-# Current: Using diskcache for everything
-g_cm.set(COMMENTS_KEY, comments, ttl=EXPIRE_DAY)
-```
-**Benefits:**
-- Structured data models
-- Database migrations
-- Better query capabilities
-- Relationship management
 
 ### 3. **Flask-WTF** - Form Security
 **Why you need it:** You're using WTForms but missing CSRF protection.
@@ -42,18 +18,6 @@ class ConfigForm(Form):
 
 ## **Medium Priority Recommendations**
 
-### 4. **Flask-Limiter** - Rate Limiting
-**Why you need it:** Your chat system and API endpoints need protection against abuse.
-```python
-# Current: Basic IP banning
-BANNED_IPS_KEY = "banned_ips"
-```
-**Benefits:**
-- Rate limiting by IP/user
-- API protection
-- Configurable limits
-- Better than manual IP banning
-
 ### 5. **Flask-Compress** - Response Compression
 **Why you need it:** Your news aggregation site serves a lot of text content.
 **Benefits:**
@@ -62,17 +26,6 @@ BANNED_IPS_KEY = "banned_ips"
 - Better performance
 - Works with Flask-Assets
 
-### 6. **Flask-Caching** - Advanced Caching
-**Why you need it:** You have custom caching logic that could be simplified.
-```python
-# Current: Custom caching with diskcache
-g_cm.set(stats_key, stats, ttl=EXPIRE_DAY)
-```
-**Benefits:**
-- Decorator-based caching
-- Multiple backend support
-- Cache invalidation
-- Simpler cache management
 
 ### 7. **Flask-Mail** - Email Notifications
 **Why you need it:** For admin notifications about system issues or updates.
@@ -84,13 +37,6 @@ g_cm.set(stats_key, stats, ttl=EXPIRE_DAY)
 
 ## **Lower Priority but Useful**
 
-### 8. **Flask-Migrate** - Database Migrations
-**Why you need it:** If you implement Flask-SQLAlchemy, you'll need migrations.
-**Benefits:**
-- Database schema changes
-- Version control for database
-- Rollback capabilities
-- Team collaboration
 
 ### 9. **Flask-Principals** - Role-Based Access
 **Why you need it:** For more sophisticated admin roles and permissions.
@@ -112,18 +58,6 @@ def stream_comments():
 - Live notifications
 - Better user experience
 - WebSocket support
-
-### 11. **Flask-APScheduler** - Task Scheduling
-**Why you need it:** Your auto-update system could be more robust.
-```python
-# Current: Custom scheduling in workers.py
-SCHEDULE: List[int]  # List of hours when auto-updates should run
-```
-**Benefits:**
-- Cron-like scheduling
-- Persistent job storage
-- Job monitoring
-- Better error handling
 
 ### 12. **Flask-Monitoring** - Application Monitoring
 **Why you need it:** You have basic performance tracking that could be enhanced.
@@ -775,4 +709,17 @@ The application uses multiple caching layers that need to be integrated with the
    - [ ] Works in Firefox
    - [ ] Works in Safari
    - [ ] Works in Edge
+
+from flask_monitoringdashboard import MonitoringDashboard
+from flask_monitoringdashboard.core.config import Config
+
+# Configure for memory-only storage
+config = Config()
+config.DATABASE = 'sqlite:///:memory:'  # In-memory SQLite
+# OR for pure memory (no disk at all):
+# config.DATABASE = 'memory://'
+
+# Initialize
+dashboard = MonitoringDashboard()
+dashboard.init_app(app, config)
 

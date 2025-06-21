@@ -9,6 +9,8 @@ Simple and fast news site based on Python / Flask. Meant to be a http://drudgere
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/KeithCu/LinuxReport)
 
+### DeepWiki provides great analysis of the codebase, including visual dependency graphs.
+
 Here's the running code for Linux, Covid, and AI, Solar / PV, and Detroit Techno:
 
 https://linuxreport.net 
