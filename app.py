@@ -14,6 +14,7 @@ from flask_mobility import Mobility
 from flask_assets import Environment, Bundle
 from flask_assets import Filter
 from flask_login import LoginManager
+from flask_compress import Compress
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -54,6 +55,7 @@ class HeaderFilter(Filter):
 # Initialize Flask app
 g_app = Flask(__name__)
 Mobility(g_app)
+Compress(g_app)  # Initialize Flask-Compress for response compression
 application = g_app
 
 if DEBUG or g_app.debug:

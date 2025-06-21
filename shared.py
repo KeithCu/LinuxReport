@@ -103,6 +103,9 @@ INFINITE_SCROLL_MOBILE = True
 # Debug mode for infinite scroll (enables on desktop)
 INFINITE_SCROLL_DEBUG = True
 
+# Enable compression caching for faster response times (disabled by default)
+ENABLE_COMPRESSION_CACHING = False
+
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
