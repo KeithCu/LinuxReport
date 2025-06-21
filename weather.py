@@ -17,6 +17,7 @@ import geoip2.database
 # Third-party imports
 import requests
 from flask import jsonify, request
+from flask_restful import Resource, reqparse, Api
 
 from shared import limiter, dynamic_rate_limit
 # Local imports
@@ -371,40 +372,105 @@ def test_weather_api_with_ips():
         print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
 
 def init_weather_routes(app):
-    @app.route('/api/weather')
-    @limiter.limit(dynamic_rate_limit)
-    def get_weather():
-        ip = request.remote_addr
-        units = request.args.get('units', 'imperial')
+    # Create request parser for weather API
+    weather_parser = reqparse.RequestParser()
+    weather_parser.add_argument('units', type=str, default='imperial', choices=['imperial', 'metric'], 
+                               help='Units must be either imperial or metric')
+    weather_parser.add_argument('lat', type=float, help='Latitude must be a valid number')
+    weather_parser.add_argument('lon', type=float, help='Longitude must be a valid number')
+
+    class WeatherResource(Resource):
+        """
+        Weather API Resource
         
-        # Check if request is from a web bot
-        user_agent = request.headers.get('User-Agent', '')
-        is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+        Provides weather data for a given location.
         
-        # For web bots or requests from news.thedetroitilove.com, use default (Detroit) coordinates
-        referrer = request.headers.get('Referer', '')
-        if is_web_bot or 'news.thedetroitilove.com' in referrer:
-            lat = DEFAULT_WEATHER_LAT
-            lon = DEFAULT_WEATHER_LON
-        else:
-            lat = request.args.get('lat')
-            lon = request.args.get('lon')
-            # Convert lat/lon to float if provided
-            if lat is not None and lon is not None:
-                try:
-                    lat = float(lat)
-                    lon = float(lon)
-                except ValueError:
-                    # If conversion fails, fall back to IP-based location
-                    lat = lon = None
-        
-        weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
-        
-        response = jsonify(weather_data)
-        # Add cache control headers for 4 hours (14400 seconds)
-        response.headers['Cache-Control'] = 'public, max-age=14400'
-        response.headers['Expires'] = (datetime.utcnow() + timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
-        return response, status_code
+        ---
+        parameters:
+          - name: units
+            in: query
+            type: string
+            enum: [imperial, metric]
+            default: imperial
+            description: Temperature units (Fahrenheit or Celsius)
+          - name: lat
+            in: query
+            type: number
+            description: Latitude coordinate (optional, uses IP location if not provided)
+          - name: lon
+            in: query
+            type: number
+            description: Longitude coordinate (optional, uses IP location if not provided)
+        responses:
+          200:
+            description: Weather data retrieved successfully
+            schema:
+              type: object
+              properties:
+                daily:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      dt:
+                        type: integer
+                        description: Unix timestamp for the day
+                      temp_min:
+                        type: number
+                        description: Minimum temperature
+                      temp_max:
+                        type: number
+                        description: Maximum temperature
+                      precipitation:
+                        type: integer
+                        description: Precipitation probability (0-100)
+                      weather:
+                        type: string
+                        description: Weather condition description
+                      weather_icon:
+                        type: string
+                        description: Weather icon code
+                city_name:
+                  type: string
+                  description: City name for the location
+                fetch_time:
+                  type: number
+                  description: Unix timestamp when data was fetched
+          400:
+            description: Invalid parameters
+          500:
+            description: Server error or API service unavailable
+        """
+        @limiter.limit(dynamic_rate_limit)
+        def get(self):
+            args = weather_parser.parse_args()
+            ip = request.remote_addr
+            units = args['units']
+            
+            # Check if request is from a web bot
+            user_agent = request.headers.get('User-Agent', '')
+            is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+            
+            # For web bots or requests from news.thedetroitilove.com, use default (Detroit) coordinates
+            referrer = request.headers.get('Referer', '')
+            if is_web_bot or 'news.thedetroitilove.com' in referrer:
+                lat = DEFAULT_WEATHER_LAT
+                lon = DEFAULT_WEATHER_LON
+            else:
+                lat = args['lat']
+                lon = args['lon']
+            
+            weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
+            
+            response = jsonify(weather_data)
+            # Add cache control headers for 4 hours (14400 seconds)
+            response.headers['Cache-Control'] = 'public, max-age=14400'
+            response.headers['Expires'] = (datetime.utcnow() + timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+            return response, status_code
+
+    # Register the resource with Flask-RESTful
+    api = Api(app)
+    api.add_resource(WeatherResource, '/api/weather')
 
 if __name__ == "__main__":
     print("Running weather API tests with test IP addresses...")
