@@ -305,12 +305,14 @@ def init_app(flask_app):
             
             # Add CSP header that allows connections to this domain and CDN if enabled
             img_src = "'self' data:"
+            default_src = "'self'"
             if ENABLE_URL_IMAGE_CDN_DELIVERY:
                 img_src += f" {CDN_IMAGE_URL}"
+                default_src += f" {CDN_IMAGE_URL}"
             
             csp_domains = " ".join(ALLOWED_DOMAINS)
             response.headers['Content-Security-Policy'] = (
-                f"default-src 'self'; "
+                f"default-src {default_src}; "
                 f"connect-src 'self' {csp_domains}; "  # Allow connections to all allowed domains
                 f"img-src {img_src} *; "  # Allow images from any domain
                 f"script-src 'self' 'unsafe-inline'; "
