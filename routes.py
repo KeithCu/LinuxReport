@@ -9,37 +9,29 @@ import os
 import json
 from timeit import default_timer as timer
 import datetime
-import html
-import uuid
-import ipaddress
 import time
-import gzip
-import hashlib
 
 # Third-party imports
-from flask import g, jsonify, render_template, request, make_response, Response, flash, redirect, url_for
+from flask import g, jsonify, render_template, request, make_response, flash, redirect, url_for
 from markupsafe import Markup
-from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from flask_login import login_user, logout_user, login_required, current_user
 from flask_limiter.util import get_remote_address
-from shared import limiter, dynamic_rate_limit
 
 from forms import LoginForm
-from models import RssInfo, DEBUG, get_admin_password, User
+from models import RssInfo, DEBUG, User
 # Local imports
-from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS,
+from shared import (limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS,
                     FAVICON, LOGO_URL, STANDARD_ORDER_STR,
                     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, MODE, PATH, format_last_updated, 
-                    get_chat_cache, MODE_MAP, clear_page_caches,
-                    ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
+                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, PATH, format_last_updated,
+                    ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
                     ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS,
-                    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, FLASK_DASHBOARD,
-                    ENABLE_COMPRESSION_CACHING, get_ip_prefix)
-from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON, init_weather_routes
+                    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG,
+                    ENABLE_COMPRESSION_CACHING)
+from weather import get_default_weather_html, init_weather_routes
 from workers import fetch_urls_parallel, fetch_urls_thread
-from caching import get_cached_file_content, _file_cache, get_cached_response_for_client
+from caching import get_cached_file_content, get_cached_response_for_client
 from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes

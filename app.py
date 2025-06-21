@@ -25,30 +25,30 @@ from models import DEBUG, User, get_secret_key
 # Custom filter to add header information
 class HeaderFilter(Filter):
     """Add header information to compiled files"""
-    
+
     def __init__(self, source_files, file_type="JavaScript"):
         super().__init__()
         self.source_files = source_files
         self.file_type = file_type
-    
+
     def apply(self, _in, out):
         # Get timestamp
         timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
+
         # Read the content
         content = _in.read()
-        
+
         try:
             file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
         except:
             # Return 'dev' plus a timestamp on error
             file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
-        
+
         # Write header
         out.write(f'// Compiled: {timestamp}\n')
         out.write(f'// Hash: {file_hash}\n')
         out.write(f'// Source files: {", ".join(self.source_files)}\n\n')
-        
+
         # Write the actual content
         out.write(content)
 
@@ -83,15 +83,15 @@ def load_user(user_id):
 if FLASK_DASHBOARD:
     import flask_monitoringdashboard as dashboard
     from flask_monitoringdashboard.core.config import Config
-    
+
     # Configure Flask-MonitoringDashboard
     config = Config()
     config.USERNAME = FLASK_DASHBOARD_USERNAME
     config.PASSWORD = FLASK_DASHBOARD_PASSWORD
-    
+
     # Set database to use SQLite file (persistent storage)
     config.DATABASE = 'sqlite:///flask_monitoringdashboard.db'
-    
+
     # Initialize with custom configuration
     dashboard.bind(g_app, config)
 
@@ -143,4 +143,3 @@ g_app.jinja_env.globals['assets'] = assets
 from routes import init_app
 
 init_app(g_app)
-

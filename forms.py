@@ -6,7 +6,7 @@ This file contains WTForms classes for handling user input in forms, including U
 
 # Third-party imports
 from wtforms import (BooleanField, FieldList, Form, FormField, IntegerField,
-                     SelectField, StringField, TextAreaField, validators, PasswordField)
+                     StringField, TextAreaField, validators, PasswordField)
 
 
 # Form for managing individual URLs.
