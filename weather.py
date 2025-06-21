@@ -375,9 +375,9 @@ def init_weather_routes(app):
     # Create request parser for weather API
     weather_parser = reqparse.RequestParser()
     weather_parser.add_argument('units', type=str, default='imperial', choices=['imperial', 'metric'], 
-                               help='Units must be either imperial or metric')
-    weather_parser.add_argument('lat', type=float, help='Latitude must be a valid number')
-    weather_parser.add_argument('lon', type=float, help='Longitude must be a valid number')
+                               location='args', help='Units must be either imperial or metric')
+    weather_parser.add_argument('lat', type=float, location='args', help='Latitude must be a valid number')
+    weather_parser.add_argument('lon', type=float, location='args', help='Longitude must be a valid number')
 
     class WeatherResource(Resource):
         """
