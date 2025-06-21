@@ -17,10 +17,11 @@ import json
 import geoip2.database
 # Third-party imports
 import requests
+from flask import jsonify, request
 
 # Local imports
-from shared import g_cs, get_lock, USER_AGENT, TZ
-from models import DEBUG
+from shared import g_cs, get_lock, USER_AGENT, TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE
+from models import DEBUG, get_weather_api_key
 
 # --- Arbitrary bucket resolution (miles-based) ---
 WEATHER_BUCKET_SIZE_MILES = 10  # default bucket diameter in miles (good balance for weather data)
@@ -306,23 +307,6 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         error_data = {"error": "Failed to process weather data from OpenWeather API", "fetch_time": fetch_time}
         return error_data, 500
 
-
-
-# Sample Python code for localizing 'Today' (commented out):
-# import locale
-# from datetime import date
-# import babel.dates
-#
-# user_locale = 'fr_FR'  # Example: get from user settings
-# today = date.today()
-# today_label = babel.dates.format_timedelta(
-#     today - today, locale=user_locale, granularity='day', add_direction=True
-# )
-# print(today_label)  # Should print 'aujourd'hui' in French
-
-# HTML rendering unused because weather is rendered via JavaScript. 
-# Separate page cache entries would be necessary for server-side rendering.
-# Data is cached on client and server, so not a priority.
 def get_weather_html(ip):
     weather_data, status_code = get_weather_data(ip=ip)
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
@@ -385,6 +369,28 @@ def test_weather_api_with_ips():
         if isinstance(fetch_time_from_data, float):
             fetch_time_from_data = f"{fetch_time_from_data:.2f}s"
         print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
+
+def init_weather_routes(app):
+    @app.route('/api/weather')
+    def get_weather_api():
+        """
+        API endpoint to get weather data.
+        
+        This endpoint is designed to be called from the frontend to dynamically update weather.
+        It uses the same caching and data fetching logic as the server-side rendering.
+        """
+        # Get lat/lon from query parameters, with default values
+        lat = request.args.get('lat', DEFAULT_WEATHER_LAT)
+        lon = request.args.get('lon', DEFAULT_WEATHER_LON)
+        
+        # Get weather data (will use cache if available)
+        weather_data = get_weather_data(lat, lon)
+        
+        if weather_data and 'error' not in weather_data:
+            return jsonify(weather_data)
+        else:
+            # Return error response if data fetching failed
+            return jsonify({"error": "Failed to retrieve weather data"}), 500
 
 if __name__ == "__main__":
     print("Running weather API tests with test IP addresses...")

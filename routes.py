@@ -36,22 +36,16 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
                     ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS,
                     INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, FLASK_DASHBOARD,
-                    ENABLE_COMPRESSION_CACHING)
-from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+                    ENABLE_COMPRESSION_CACHING, get_ip_prefix)
+from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON, init_weather_routes
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content, _file_cache
+from admin_stats import update_performance_stats, get_admin_stats_html
+from old_headlines import init_old_headlines_routes
+from chat import init_chat_routes
 
 # Global setting for background refreshes
 ENABLE_BACKGROUND_REFRESH = True
-
-# Constants for Chat Feature
-MAX_COMMENTS = 1000
-COMMENTS_KEY = "chat_comments"
-BANNED_IPS_KEY = "banned_ips" # Store as a set in cache
-WEB_UPLOAD_PATH = '/static/uploads' # Define the web-accessible path prefix
-UPLOAD_FOLDER = PATH + WEB_UPLOAD_PATH # Define absolute upload folder for server deployment
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'} # Allowed image types
-MAX_IMAGE_SIZE = 5 * 1024 * 1024 # 5 MB
 
 # Compression caching constants
 COMPRESSION_CACHE_TTL = EXPIRE_HOUR  # Cache compressed responses for 1 hour
@@ -127,28 +121,6 @@ def clear_page_caches_with_compression():
     if ENABLE_COMPRESSION_CACHING:
         clear_compression_cache()
 
-# Ensure upload folder exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# Function to check allowed file extensions
-def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-# Helper function to get IP prefix
-def get_ip_prefix(ip_str):
-    """Extracts the first part of IPv4 or the first block of IPv6."""
-    try:
-        ip = ipaddress.ip_address(ip_str)
-        if isinstance(ip, ipaddress.IPv4Address):
-            return ip_str.split('.')[0]
-        elif isinstance(ip, ipaddress.IPv6Address):
-            return ip_str.split(':')[0]
-    except ValueError:
-        return "Invalid IP"
-    return None
-
 def get_rate_limit_key():
     """Get rate limit key based on user type and IP."""
     ip = get_remote_address()
@@ -181,54 +153,6 @@ def get_cached_above_html():
     """Return content of ABOVE_HTML_FILE using generic cache."""
     return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
 
-def update_performance_stats(render_time):
-    """
-    Update performance statistics for admin monitoring.
-    
-    This function is called on EVERY request (high frequency),
-    so it must be fast and use memory cache for speed.
-    
-    Args:
-        render_time: Time taken to render the page in seconds
-    """
-    # Skip if Flask-MonitoringDashboard is enabled (it handles this automatically)
-    if FLASK_DASHBOARD:
-        return
-        
-    stats_key = "admin_performance_stats"
-    stats = g_cm.get(stats_key) or {
-        "times": [],
-        "count": 0,
-        "hourly_requests": {},  # Track requests per hour
-        "first_request_time": time.time()
-    }
-    
-    current_time = time.time()
-    current_hour = int(current_time / 3600)  # Get current hour timestamp
-    
-    # Initialize hourly request count if not exists
-    if current_hour not in stats["hourly_requests"]:
-        stats["hourly_requests"][current_hour] = 0
-    
-    # Update hourly request count
-    stats["hourly_requests"][current_hour] += 1
-    
-    # Clean up old hourly data (keep last 24 hours)
-    old_hour = current_hour - 24
-    stats["hourly_requests"] = {h: count for h, count in stats["hourly_requests"].items() if h > old_hour}
-    
-    stats["count"] += 1
-    
-    # Skip the first request (cold start)
-    if stats["count"] > 1:
-        stats["times"].append(render_time)
-        
-        # Keep only last 100 measurements
-        if len(stats["times"]) > 100:
-            stats["times"] = stats["times"][-100:]
-    
-    # Store back
-    g_cm.set(stats_key, stats, ttl=EXPIRE_DAY)
 
 def track_rate_limit_event(ip, endpoint, limit_type="exceeded"):
     """
@@ -282,59 +206,6 @@ def track_rate_limit_event(ip, endpoint, limit_type="exceeded"):
     
     g_c.put(rate_limit_stats_key, stats, timeout=EXPIRE_YEARS)  # Store in disk cache for persistence
 
-def get_admin_stats_html():
-    """Generate HTML for admin performance stats."""
-    # Skip if Flask-MonitoringDashboard is enabled (it has its own dashboard)
-    if FLASK_DASHBOARD:
-        return None
-        
-    stats_key = "admin_performance_stats"
-    stats = g_cm.get(stats_key)
-    
-    if not stats or not stats.get("times"):
-        return None
-    
-    times = stats["times"]
-    if len(times) < 3:
-        return None
-    
-    # Calculate statistics
-    sorted_times = sorted(times)
-    min_time = min(sorted_times)
-    max_time = max(sorted_times)
-    avg_time = sum(times) / len(times)
-    count = stats.get("count", len(times))
-    
-    # Calculate request counts for different time windows
-    current_time = time.time()
-    current_hour = int(current_time / 3600)
-    
-    # Get request counts for different time windows
-    hourly_requests = stats.get("hourly_requests", {})
-    requests_1h = sum(count for hour, count in hourly_requests.items() if hour == current_hour)
-    requests_6h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 6)
-    requests_12h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 12)
-    
-    # Calculate uptime
-    first_request_time = stats.get("first_request_time", time.time())
-    uptime_seconds = time.time() - first_request_time
-    uptime_str = str(datetime.timedelta(seconds=int(uptime_seconds)))
-    
-    return f'''
-    <div style="position: fixed; top: 10px; right: 10px; background: #ccc; color: #333; padding: 10px; 
-                border-radius: 5px; font-family: monospace; font-size: 12px; z-index: 9999; 
-                border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-        <strong>Admin Stats (Page Render)</strong><br>
-        Uptime: {uptime_str}<br>
-        Total Requests: {count}<br>
-        Requests (1h): {requests_1h}<br>
-        Requests (6h): {requests_6h}<br>
-        Requests (12h): {requests_12h}<br>
-        Min: {min_time:.3f}s<br>
-        Max: {max_time:.3f}s<br>
-        Avg: {avg_time:.3f}s
-    </div>
-    '''
 
 # Initialize Flask-Limiter with your cache
 limiter = Limiter(
@@ -348,6 +219,11 @@ def init_app(flask_app):
     """Initialize Flask routes."""
     # Initialize Flask-Limiter with your cache system
     limiter.init_app(flask_app)
+    
+    # Initialize routes from other modules
+    init_weather_routes(flask_app)
+    init_old_headlines_routes(flask_app)
+    init_chat_routes(flask_app, limiter, dynamic_rate_limit)
     
     # Configure CORS and security headers only if enabled
     if ENABLE_CORS:
@@ -742,128 +618,7 @@ def init_app(flask_app):
 
             return resp
 
-    @flask_app.route('/api/weather')
-    @limiter.limit(dynamic_rate_limit)
-    def get_weather():
-        ip = request.remote_addr
-        units = request.args.get('units', 'imperial')
-        
-        # Check if request is from a web bot
-        user_agent = request.headers.get('User-Agent', '')
-        is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
-        
-        # For web bots or requests from news.thedetroitilove.com, use default (Detroit) coordinates
-        referrer = request.headers.get('Referer', '')
-        if is_web_bot or 'news.thedetroitilove.com' in referrer:
-            lat = DEFAULT_WEATHER_LAT
-            lon = DEFAULT_WEATHER_LON
-        else:
-            lat = request.args.get('lat')
-            lon = request.args.get('lon')
-            # Convert lat/lon to float if provided
-            if lat is not None and lon is not None:
-                try:
-                    lat = float(lat)
-                    lon = float(lon)
-                except ValueError:
-                    # If conversion fails, fall back to IP-based location
-                    lat = lon = None
-        
-        weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
-        
-        response = jsonify(weather_data)
-        # Add cache control headers for 4 hours (14400 seconds)
-        response.headers['Cache-Control'] = 'public, max-age=14400'
-        response.headers['Expires'] = (datetime.datetime.utcnow() + datetime.timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
-        return response, status_code
 
-    @flask_app.route('/old_headlines')
-    def old_headlines():
-        mode_str = MODE_MAP.get(MODE)
-        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
-        headlines = []
-        try:
-            with open(archive_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line)
-                        # Convert timestamp to datetime object for grouping
-                        if 'timestamp' in entry:
-                            entry['date'] = datetime.datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00')).date()
-                        headlines.append(entry)
-                    except json.JSONDecodeError:
-                        continue
-        except FileNotFoundError:
-            pass
-        except IOError as e:
-            print(f"Error reading archive file {archive_file}: {e}")
-
-        # Sort headlines by timestamp
-        headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-        
-        # Skip the first 3 headlines (most recent)
-        if len(headlines) > 3:
-            headlines = headlines[3:]
-        else:
-            headlines = []
-
-        # Group headlines by date
-        grouped_headlines = {}
-        for headline in headlines:
-            date = headline.get('date')
-            if date:
-                date_str = date.strftime('%B %d, %Y')  # Format: January 1, 2024
-                if date_str not in grouped_headlines:
-                    grouped_headlines[date_str] = []
-                grouped_headlines[date_str].append(headline)
-
-        # Convert to list of tuples (date, headlines) and sort by date
-        grouped_headlines_list = [(date, headlines) for date, headlines in grouped_headlines.items()]
-        grouped_headlines_list.sort(key=lambda x: datetime.datetime.strptime(x[0], '%B %d, %Y'), reverse=True)
-
-        # Use Flask-Login for admin authentication
-        is_admin = current_user.is_authenticated
-        return render_template(
-            'old_headlines.html',
-            grouped_headlines=grouped_headlines_list,
-            mode=mode_str,
-            title=f"Old Headlines - {mode_str.title()}Report",
-            favicon=FAVICON,
-            logo_url=LOGO_URL,
-            description=WEB_DESCRIPTION,
-            is_admin=is_admin
-        )
-
-    @flask_app.route('/api/delete_headline', methods=['POST'])
-    @login_required
-    def delete_headline():
-        data = request.get_json()
-        url = data.get('url')
-        timestamp = data.get('timestamp')
-        mode_str = MODE_MAP.get(MODE)
-        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
-        try:
-            with open(archive_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            new_lines = []
-            deleted = False
-            for line in lines:
-                try:
-                    entry = json.loads(line)
-                    if entry.get('url') == url and entry.get('timestamp') == timestamp:
-                        deleted = True
-                        continue
-                except Exception:
-                    pass
-                new_lines.append(line)
-            if deleted:
-                with open(archive_file, "w", encoding="utf-8") as f:
-                    f.writelines(new_lines)
-                return jsonify({'success': True})
-            else:
-                return jsonify({'error': 'Not found'}), 404
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
 
     @flask_app.route('/api/rate_limit_stats')
     @login_required
@@ -893,158 +648,6 @@ def init_app(flask_app):
         
         return jsonify(result)
 
-    @flask_app.route('/api/comments', methods=['GET'])
-    def get_comments():
-        chat_cache = get_chat_cache()
-        comments = chat_cache.get(COMMENTS_KEY) or []
-        needs_update = False
-        for c in comments:
-            updated = False
-            if 'id' not in c:
-                c['id'] = str(uuid.uuid4())
-                updated = True
-            if 'ip_prefix' not in c and 'ip' in c:
-                c['ip_prefix'] = get_ip_prefix(c['ip'])
-                c.pop('ip', None)
-                updated = True
-            elif 'ip' in c:
-                c.pop('ip', None)
-                updated = True
-            if updated:
-                needs_update = True
-
-        if needs_update:
-            chat_cache.put(COMMENTS_KEY, comments)
-
-        return jsonify(comments)
-
-    @flask_app.route('/api/comments/stream')
-    def stream_comments():
-        def event_stream():
-            last_data_sent = None
-            chat_cache = get_chat_cache()
-            while True:
-                try:
-                    current_comments = chat_cache.get(COMMENTS_KEY) or []
-                    current_data = json.dumps(current_comments)
-                    if current_data != last_data_sent:
-                        yield f"event: new_comment\ndata: {current_data}\n\n"
-                        last_data_sent = current_data
-                    time.sleep(2)
-                except GeneratorExit:
-                    break
-                except Exception as e:
-                    print(f"SSE Error: {e}")
-                    break
-        return Response(event_stream(), mimetype='text/event-stream')
-
-    @flask_app.route('/api/comments', methods=['POST'])
-    @limiter.limit(dynamic_rate_limit)
-    def post_comment():
-        ip = request.remote_addr
-        chat_cache = get_chat_cache()
-        banned_ips = chat_cache.get(BANNED_IPS_KEY) or set()
-
-        if ip in banned_ips:
-            return jsonify({"error": "Banned"}), 403
-
-        data = request.get_json()
-        text = data.get('text', '').strip()
-        image_url = data.get('image_url', '').strip()
-
-        if not text and not image_url:
-            return jsonify({"error": "Comment cannot be empty"}), 400
-
-        sanitized_text = html.escape(text).replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
-
-        valid_image_url = None
-        if image_url:
-            is_local_upload = image_url.startswith(WEB_UPLOAD_PATH + '/')
-            is_external_url = image_url.startswith('http://') or image_url.startswith('https://')
-            is_data_url = image_url.startswith('data:image/')
-
-            if is_local_upload or is_external_url or is_data_url:
-                if not is_data_url:
-                    has_valid_extension = image_url.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp'))
-                    if has_valid_extension:
-                        valid_image_url = image_url
-                else:
-                    valid_image_url = image_url
-
-        comment_id = str(uuid.uuid4())
-        ip_prefix = get_ip_prefix(ip)
-
-        comment = {
-            "id": comment_id,
-            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
-            "ip_prefix": ip_prefix,
-            "text": sanitized_text,
-            "image_url": valid_image_url
-        }
-
-        comments = chat_cache.get(COMMENTS_KEY) or []
-        comments.append(comment)
-        comments = comments[-MAX_COMMENTS:]
-        chat_cache.put(COMMENTS_KEY, comments)
-
-        return jsonify({"success": True}), 201
-
-    @flask_app.route('/api/comments/<comment_id>', methods=['DELETE'])
-    @login_required
-    def delete_comment(comment_id):
-        chat_cache = get_chat_cache()
-        comments = chat_cache.get(COMMENTS_KEY) or []
-        initial_length = len(comments)
-
-        comments_after_delete = [c for c in comments if c.get('id') != comment_id]
-        final_length = len(comments_after_delete)
-
-        if final_length < initial_length:
-            try:
-                chat_cache.put(COMMENTS_KEY, comments_after_delete)
-                return jsonify({"success": True}), 200
-            except Exception as e:
-                return jsonify({"error": "Failed to update cache after deletion"}), 500
-        else:
-            return jsonify({"error": "Comment not found"}), 404
-
-    @flask_app.route('/api/upload_image', methods=['POST'])
-    @limiter.limit(dynamic_rate_limit)
-    def upload_image():
-        ip = request.remote_addr
-        chat_cache = get_chat_cache()
-        banned_ips = chat_cache.get(BANNED_IPS_KEY) or set()
-
-        if ip in banned_ips:
-            return jsonify({"error": "Banned"}), 403
-
-        if 'image' not in request.files:
-            return jsonify({"error": "No image file part"}), 400
-
-        file = request.files['image']
-
-        if file.filename == '':
-            return jsonify({"error": "No selected file"}), 400
-
-        if file and allowed_file(file.filename):
-            file.seek(0, os.SEEK_END)
-            file_length = file.tell()
-            if file_length > MAX_IMAGE_SIZE:
-                return jsonify({"error": "File size exceeds limit"}), 400
-            file.seek(0)
-
-            _, ext = os.path.splitext(file.filename)
-            filename = secure_filename(f"{uuid.uuid4()}{ext}")
-            filepath = os.path.join(UPLOAD_FOLDER, filename)
-
-            try:
-                file.save(filepath)
-                file_url = f"{WEB_UPLOAD_PATH}/{filename}"
-                return jsonify({"success": True, "url": file_url}), 201
-            except (IOError, OSError) as e:
-                return jsonify({"error": "Failed to save image"}), 500
-        else:
-            return jsonify({"error": "Invalid file type"}), 400
 
     @flask_app.route('/sitemap.xml')
     def sitemap():

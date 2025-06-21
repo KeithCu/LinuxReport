@@ -11,6 +11,7 @@ from typing import Any, Optional, Type
 
 import diskcache
 from cacheout import Cache
+import ipaddress
 
 import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
@@ -299,4 +300,16 @@ def clear_page_caches():
     for key in keys:
         if key.startswith('page-cache:'):
             g_cm.delete(key)
+
+def get_ip_prefix(ip_str):
+    """Extracts the first part of IPv4 or the first block of IPv6."""
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        if isinstance(ip, ipaddress.IPv4Address):
+            return ip_str.split('.')[0]
+        elif isinstance(ip, ipaddress.IPv6Address):
+            return ip_str.split(':')[0]
+    except ValueError:
+        return "Invalid IP"
+    return None
 

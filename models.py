@@ -164,3 +164,8 @@ def get_secret_key():
     """Get the secret key from configuration."""
     config = load_config()
     return config['admin'].get('secret_key') or os.urandom(24).hex()
+
+def get_weather_api_key():
+    """Get the weather API key from configuration."""
+    config = load_config()
+    return config['admin'].get('weather_api_key')
