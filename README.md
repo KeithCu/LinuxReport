@@ -225,10 +225,13 @@ Feel free to request new RSS feeds or suggest improvements.
 LinuxReport demonstrates that **Python can be incredibly fast** when properly architected. The system typically starts returning pages after less than 10 lines of Python code, dispelling myths about Python's performance.
 
 Key performance metrics:
-- **Ultra-fast response times**: Average 0.01 seconds
+- **Ultra-fast response times**: Averaged 0.01 seconds over a 4-hour production period (on AMD EPYC, standard Python without PyPy)
+- **Zero-read performance**: Multi-layer caching (page, sitebox) eliminates most database reads despite constant background feed updates
 - **Concurrent processing** of 20+ RSS feeds
 - **Automatic scaling** via Apache process pools
 - **Intelligent caching** reduces redundant processing by 95%+
+
+The architecture achieves this performance through smart cache layering that serves most requests from memory while background workers continuously update feeds, proving that well-designed caching can deliver enterprise-grade speed without requiring specialized hardware or runtime optimizations.
 
 ## 🔧 FastAPI vs Flask (Historical Context)
 
