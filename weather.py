@@ -462,11 +462,28 @@ def init_weather_routes(app):
             
             weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
             
-            response = jsonify(weather_data)
+            # Flask-RESTful handles JSON serialization automatically
+            # Just return the data and status code
+            return weather_data, status_code
+        
+        def options(self):
+            """Handle OPTIONS requests for CORS"""
+            response = self.make_response('')
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            return response
+        
+        def dispatch_request(self, *args, **kwargs):
+            """Override to add cache headers to all responses"""
+            response = super().dispatch_request(*args, **kwargs)
+            
             # Add cache control headers for 4 hours (14400 seconds)
-            response.headers['Cache-Control'] = 'public, max-age=14400'
-            response.headers['Expires'] = (datetime.utcnow() + timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
-            return response, status_code
+            if hasattr(response, 'headers'):
+                response.headers['Cache-Control'] = 'public, max-age=14400'
+                response.headers['Expires'] = (datetime.utcnow() + timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+            
+            return response
 
     # Register the resource with Flask-RESTful
     api = Api(app)
