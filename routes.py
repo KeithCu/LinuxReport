@@ -387,6 +387,11 @@ def init_app(flask_app):
         cache_key = f"page-cache:{page_order_s}{suffix}"
         full_page = g_cm.get(cache_key) if not is_admin else None
         if not DEBUG and not is_admin and full_page is not None:
+            # Track performance stats for cache hit
+            if not is_admin:
+                render_time = timer() - start_time
+                update_performance_stats(render_time)
+            
             response = make_response(full_page)
             return response
 
