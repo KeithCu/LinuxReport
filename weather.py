@@ -8,9 +8,8 @@ import os
 import math
 import time
 from collections import defaultdict
-# Standard library imports
 from datetime import date as date_obj
-from datetime import datetime
+from datetime import datetime, timedelta
 from bisect import bisect_left
 import json
 
@@ -19,8 +18,9 @@ import geoip2.database
 import requests
 from flask import jsonify, request
 
+from shared import limiter, dynamic_rate_limit
 # Local imports
-from shared import g_cs, get_lock, USER_AGENT, TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE
+from shared import g_cs, get_lock, USER_AGENT, TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS
 from models import DEBUG, get_weather_api_key
 
 # --- Arbitrary bucket resolution (miles-based) ---
@@ -372,25 +372,39 @@ def test_weather_api_with_ips():
 
 def init_weather_routes(app):
     @app.route('/api/weather')
-    def get_weather_api():
-        """
-        API endpoint to get weather data.
+    @limiter.limit(dynamic_rate_limit)
+    def get_weather():
+        ip = request.remote_addr
+        units = request.args.get('units', 'imperial')
         
-        This endpoint is designed to be called from the frontend to dynamically update weather.
-        It uses the same caching and data fetching logic as the server-side rendering.
-        """
-        # Get lat/lon from query parameters, with default values
-        lat = request.args.get('lat', DEFAULT_WEATHER_LAT)
-        lon = request.args.get('lon', DEFAULT_WEATHER_LON)
+        # Check if request is from a web bot
+        user_agent = request.headers.get('User-Agent', '')
+        is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
         
-        # Get weather data (will use cache if available)
-        weather_data = get_weather_data(lat, lon)
-        
-        if weather_data and 'error' not in weather_data:
-            return jsonify(weather_data)
+        # For web bots or requests from news.thedetroitilove.com, use default (Detroit) coordinates
+        referrer = request.headers.get('Referer', '')
+        if is_web_bot or 'news.thedetroitilove.com' in referrer:
+            lat = DEFAULT_WEATHER_LAT
+            lon = DEFAULT_WEATHER_LON
         else:
-            # Return error response if data fetching failed
-            return jsonify({"error": "Failed to retrieve weather data"}), 500
+            lat = request.args.get('lat')
+            lon = request.args.get('lon')
+            # Convert lat/lon to float if provided
+            if lat is not None and lon is not None:
+                try:
+                    lat = float(lat)
+                    lon = float(lon)
+                except ValueError:
+                    # If conversion fails, fall back to IP-based location
+                    lat = lon = None
+        
+        weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
+        
+        response = jsonify(weather_data)
+        # Add cache control headers for 4 hours (14400 seconds)
+        response.headers['Cache-Control'] = 'public, max-age=14400'
+        response.headers['Expires'] = (datetime.utcnow() + timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+        return response, status_code
 
 if __name__ == "__main__":
     print("Running weather API tests with test IP addresses...")

@@ -17,6 +17,11 @@ import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
 from models import load_config
 
+from flask import request
+from flask_login import current_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 # Flask-MonitoringDashboard configuration
 FLASK_DASHBOARD = False
 FLASK_DASHBOARD_USERNAME = "admin"  # Change this to your preferred username
@@ -187,6 +192,39 @@ WEB_BOT_USER_AGENTS = [
     "DotBot",
     "Coccocbot"
 ]
+
+# Rate Limiting
+def get_rate_limit_key():
+    """Get rate limit key based on user type and IP."""
+    # Check if user is authenticated (admin)
+    if current_user.is_authenticated:
+        return f"admin:{get_remote_address()}"
+
+    # Check if request is from a web bot
+    user_agent = request.headers.get('User-Agent', '')
+    is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+    
+    if is_web_bot:
+        return f"bot:{get_remote_address()}"
+    
+    return f"user:{get_remote_address()}"
+
+def dynamic_rate_limit():
+    """Return rate limit based on user type."""
+    key = get_rate_limit_key()
+    
+    if key.startswith("admin:"):
+        return "500 per minute"  # Higher limits for admins
+    elif key.startswith("bot:"):
+        return "20 per minute"    # Lower limits for bots
+    else:
+        return "100 per minute"  # Standard limits for users
+
+limiter = Limiter(
+    key_func=get_rate_limit_key,
+    default_limits=["50 per minute"],
+    strategy="fixed-window"
+)
 
 # Classes
 class RssFeed:

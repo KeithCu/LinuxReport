@@ -22,8 +22,7 @@ from markupsafe import Markup
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from flask_login import login_user, logout_user, login_required, current_user
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from shared import limiter, dynamic_rate_limit
 
 from forms import ConfigForm, CustomRSSForm, UrlForm, LoginForm
 from models import RssInfo, DEBUG, get_admin_password, User
@@ -121,34 +120,6 @@ def clear_page_caches_with_compression():
     if ENABLE_COMPRESSION_CACHING:
         clear_compression_cache()
 
-def get_rate_limit_key():
-    """Get rate limit key based on user type and IP."""
-    ip = get_remote_address()
-    
-    # Check if user is authenticated (admin)
-    if current_user.is_authenticated:
-        return f"admin:{ip}"
-    
-    # Check if request is from a web bot
-    user_agent = request.headers.get('User-Agent', '')
-    is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
-    
-    if is_web_bot:
-        return f"bot:{ip}"
-    
-    return f"user:{ip}"
-
-def dynamic_rate_limit():
-    """Return rate limit based on user type."""
-    key = get_rate_limit_key()
-    
-    if key.startswith("admin:"):
-        return "500 per minute"  # Higher limits for admins
-    elif key.startswith("bot:"):
-        return "20 per minute"    # Lower limits for bots
-    else:
-        return "100 per minute"  # Standard limits for users
-
 def get_cached_above_html():
     """Return content of ABOVE_HTML_FILE using generic cache."""
     return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
@@ -207,18 +178,11 @@ def track_rate_limit_event(ip, endpoint, limit_type="exceeded"):
     g_c.put(rate_limit_stats_key, stats, timeout=EXPIRE_YEARS)  # Store in disk cache for persistence
 
 
-# Initialize Flask-Limiter with your cache
-limiter = Limiter(
-    key_func=get_rate_limit_key,
-    default_limits=["50 per minute"],
-    strategy="fixed-window"
-)
-
 # Function to initialize routes
 def init_app(flask_app):
     """Initialize Flask routes."""
-    # Initialize Flask-Limiter with your cache system
-    limiter.init_app(flask_app)
+    # Initialize Flask-Limiter with your cache system - It's already initialized in app.py
+    # limiter.init_app(flask_app)
     
     # Initialize routes from other modules
     init_weather_routes(flask_app)

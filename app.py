@@ -13,13 +13,12 @@ from flask import Flask
 from flask_mobility import Mobility
 from flask_assets import Environment, Bundle
 from flask_assets import Filter
-from flask_login import LoginManager
 from flask_compress import Compress
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Local imports
-from shared import EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD
+from shared import EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, limiter
 from models import DEBUG, User, get_secret_key
 
 # Custom filter to add header information
@@ -123,6 +122,8 @@ css_bundle = assets.register('css_all', Bundle(
     'linuxreport.css',
     output='linuxreport.css'
 ))
+
+limiter.init_app(g_app)
 
 # Build assets on startup
 with g_app.app_context():
