@@ -104,3 +104,55 @@ def get_admin_stats_html():
         Avg: {avg_time:.3f}s
     </div>
     '''
+
+def track_rate_limit_event(ip, endpoint, limit_type="exceeded"):
+    """
+    Track rate limit events for long-term monitoring and security analysis.
+    
+    This function is called ONLY when rate limits are exceeded (rare events),
+    so it can be slower and use disk cache for persistence across restarts.
+    
+    Args:
+        ip: IP address that hit the rate limit
+        endpoint: Flask endpoint that was rate limited
+        limit_type: Type of rate limit violation (default: "exceeded")
+    """
+    # Store events in disk cache for persistence across restarts
+    rate_limit_events_key = "rate_limit_events"
+    events = g_c.get(rate_limit_events_key) or []
+    
+    current_time = time.time()
+    # Keep event data minimal - details can be found in Apache logs
+    event = {
+        "timestamp": current_time,
+        "ip": ip,
+        "endpoint": endpoint
+    }
+    
+    # Add to events list (keep last 1000 events)
+    events.append(event)
+    if len(events) > 1000:
+        events = events[-1000:]
+    
+    # Clean up old events (older than 30 days)
+    cutoff_time = current_time - (30 * 24 * 3600)  # 30 days
+    events = [e for e in events if e["timestamp"] > cutoff_time]
+    
+    # Store events in disk cache for persistence
+    g_c.put(rate_limit_events_key, events, timeout=EXPIRE_YEARS)
+    
+    # Keep minimal stats in disk cache for long-term tracking
+    rate_limit_stats_key = "rate_limit_stats"
+    stats = g_c.get(rate_limit_stats_key) or {
+        "by_ip": {},
+        "by_endpoint": {}
+    }
+    
+    # Track by IP and endpoint
+    for key, data_dict in [("by_ip", ip), ("by_endpoint", endpoint)]:
+        if data_dict not in stats[key]:
+            stats[key][data_dict] = {"count": 0, "last_seen": current_time}
+        stats[key][data_dict]["count"] += 1
+        stats[key][data_dict]["last_seen"] = current_time
+    
+    g_c.put(rate_limit_stats_key, stats, timeout=EXPIRE_YEARS)  # Store in disk cache for persistence

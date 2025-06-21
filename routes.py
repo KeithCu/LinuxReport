@@ -39,8 +39,8 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     ENABLE_COMPRESSION_CACHING, get_ip_prefix)
 from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON, init_weather_routes
 from workers import fetch_urls_parallel, fetch_urls_thread
-from caching import get_cached_file_content, _file_cache
-from admin_stats import update_performance_stats, get_admin_stats_html
+from caching import get_cached_file_content, _file_cache, get_cached_response_for_client
+from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
@@ -48,137 +48,10 @@ from config import init_config_routes
 # Global setting for background refreshes
 ENABLE_BACKGROUND_REFRESH = True
 
-# Compression caching constants
-COMPRESSION_CACHE_TTL = EXPIRE_HOUR  # Cache compressed responses for 1 hour
-COMPRESSION_LEVEL = 6  # Balance between speed and compression ratio
-
-def get_compression_cache_key(content, encoding_type='gzip'):
-    """Generate a cache key for compressed content."""
-    content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
-    return f"compressed_{encoding_type}_{content_hash}"
-
-def get_cached_compressed_response(content, encoding_type='gzip'):
-    """Get cached compressed response if available."""
-    cache_key = get_compression_cache_key(content, encoding_type)
-    return g_cm.get(cache_key)
-
-def cache_compressed_response(content, compressed_data, encoding_type='gzip'):
-    """Cache compressed response data."""
-    cache_key = get_compression_cache_key(content, encoding_type)
-    g_cm.set(cache_key, compressed_data, ttl=COMPRESSION_CACHE_TTL)
-
-def create_compressed_response(content, encoding_type='gzip'):
-    """Create compressed response with caching."""
-    # Check cache first
-    cached_response = get_cached_compressed_response(content, encoding_type)
-    if cached_response is not None:
-        return cached_response
-    
-    # Compress content
-    if encoding_type == 'gzip':
-        compressed_data = gzip.compress(content.encode('utf-8'), compresslevel=COMPRESSION_LEVEL)
-    else:
-        # Fallback to uncompressed
-        compressed_data = content.encode('utf-8')
-    
-    # Cache the compressed data
-    cache_compressed_response(content, compressed_data, encoding_type)
-    
-    return compressed_data
-
-def get_cached_response_for_client(content, supports_gzip):
-    """Get cached response (compressed or uncompressed) based on client capabilities."""
-    if supports_gzip:
-        # Try to get cached compressed response
-        cached_compressed = get_cached_compressed_response(content, 'gzip')
-        if cached_compressed is not None:
-            if DEBUG:
-                print(f"Compression cache HIT - returning cached gzip data ({len(cached_compressed)} bytes)")
-            return cached_compressed, True  # Return compressed data and flag as compressed
-        
-        # Create and cache compressed response
-        if DEBUG:
-            print(f"Compression cache MISS - creating new gzip data")
-        compressed_data = create_compressed_response(content, 'gzip')
-        return compressed_data, True
-    else:
-        # For clients that don't support gzip, return uncompressed
-        # We don't cache uncompressed responses since they're just the original content
-        if DEBUG:
-            print(f"Client doesn't support gzip - returning uncompressed data ({len(content)} bytes)")
-        # Return the content directly as bytes to avoid unnecessary encoding
-        return content.encode('utf-8'), False
-
-def clear_compression_cache():
-    """Clear all compression cache entries."""
-    # This is a simple approach - in a more sophisticated system, you might want to
-    # track compression cache keys and clear them individually
-    # For now, we'll rely on TTL expiration
-    pass
-
-def clear_page_caches_with_compression():
-    """Clear page caches and compression cache."""
-    clear_page_caches()
-    if ENABLE_COMPRESSION_CACHING:
-        clear_compression_cache()
 
 def get_cached_above_html():
     """Return content of ABOVE_HTML_FILE using generic cache."""
     return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
-
-
-def track_rate_limit_event(ip, endpoint, limit_type="exceeded"):
-    """
-    Track rate limit events for long-term monitoring and security analysis.
-    
-    This function is called ONLY when rate limits are exceeded (rare events),
-    so it can be slower and use disk cache for persistence across restarts.
-    
-    Args:
-        ip: IP address that hit the rate limit
-        endpoint: Flask endpoint that was rate limited
-        limit_type: Type of rate limit violation (default: "exceeded")
-    """
-    # Store events in disk cache for persistence across restarts
-    rate_limit_events_key = "rate_limit_events"
-    events = g_c.get(rate_limit_events_key) or []
-    
-    current_time = time.time()
-    # Keep event data minimal - details can be found in Apache logs
-    event = {
-        "timestamp": current_time,
-        "ip": ip,
-        "endpoint": endpoint
-    }
-    
-    # Add to events list (keep last 1000 events)
-    events.append(event)
-    if len(events) > 1000:
-        events = events[-1000:]
-    
-    # Clean up old events (older than 30 days)
-    cutoff_time = current_time - (30 * 24 * 3600)  # 30 days
-    events = [e for e in events if e["timestamp"] > cutoff_time]
-    
-    # Store events in disk cache for persistence
-    g_c.put(rate_limit_events_key, events, timeout=EXPIRE_YEARS)
-    
-    # Keep minimal stats in disk cache for long-term tracking
-    rate_limit_stats_key = "rate_limit_stats"
-    stats = g_c.get(rate_limit_stats_key) or {
-        "by_ip": {},
-        "by_endpoint": {}
-    }
-    
-    # Track by IP and endpoint
-    for key, data_dict in [("by_ip", ip), ("by_endpoint", endpoint)]:
-        if data_dict not in stats[key]:
-            stats[key][data_dict] = {"count": 0, "last_seen": current_time}
-        stats[key][data_dict]["count"] += 1
-        stats[key][data_dict]["last_seen"] = current_time
-    
-    g_c.put(rate_limit_stats_key, stats, timeout=EXPIRE_YEARS)  # Store in disk cache for persistence
-
 
 # Function to initialize routes
 def init_app(flask_app):
