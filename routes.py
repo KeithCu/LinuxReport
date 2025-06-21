@@ -33,7 +33,7 @@ from shared import (ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIR
                     get_chat_cache, MODE_MAP, clear_page_caches,
                     ENABLE_URL_CUSTOMIZATION, ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
                     ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS,
-                    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG)
+                    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, FLASK_DASHBOARD)
 from weather import get_default_weather_html, get_weather_data, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content, _file_cache
@@ -114,6 +114,10 @@ def update_performance_stats(render_time):
     Args:
         render_time: Time taken to render the page in seconds
     """
+    # Skip if Flask-MonitoringDashboard is enabled (it handles this automatically)
+    if FLASK_DASHBOARD:
+        return
+        
     stats_key = "admin_performance_stats"
     stats = g_cm.get(stats_key) or {
         "times": [],
@@ -203,6 +207,10 @@ def track_rate_limit_event(ip, endpoint, limit_type="exceeded"):
 
 def get_admin_stats_html():
     """Generate HTML for admin performance stats."""
+    # Skip if Flask-MonitoringDashboard is enabled (it has its own dashboard)
+    if FLASK_DASHBOARD:
+        return None
+        
     stats_key = "admin_performance_stats"
     stats = g_cm.get(stats_key)
     
@@ -966,12 +974,6 @@ def init_app(flask_app):
         response = make_response(sitemap_xml)
         response.headers['Content-Type'] = 'application/xml'
         return response
-
-    # If UPLOAD_FOLDER is 'static/uploads', Flask handles this automatically.
-    # If it were outside 'static', you'd need something like this:
-    # @flask_app.route('/uploads/<filename>')
-    # def uploaded_file(filename):
-    #     return send_from_directory(UPLOAD_FOLDER, filename)
 
     # Rate limit error handler
     @flask_app.errorhandler(429)

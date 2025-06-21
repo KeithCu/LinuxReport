@@ -16,6 +16,11 @@ import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
 from models import load_config
 
+# Flask-MonitoringDashboard configuration
+FLASK_DASHBOARD = False
+FLASK_DASHBOARD_USERNAME = "admin"  # Change this to your preferred username
+FLASK_DASHBOARD_PASSWORD = "admin"  # Change this to your preferred password
+
 # Load configuration
 config = load_config()
 settings = config.get('settings', {})

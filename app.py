@@ -18,7 +18,7 @@ from flask_login import LoginManager
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Local imports
-from shared import EXPIRE_WEEK, _JS_MODULES
+from shared import EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD
 from models import DEBUG, User, get_secret_key
 
 # Custom filter to add header information
@@ -76,6 +76,22 @@ login_manager.login_message = 'Please log in to access this page.'
 def load_user(user_id):
     """Load user for Flask-Login."""
     return User.get(user_id)
+
+# Initialize Flask-MonitoringDashboard if enabled
+if FLASK_DASHBOARD:
+    import flask_monitoringdashboard as dashboard
+    from flask_monitoringdashboard.core.config import Config
+    
+    # Configure Flask-MonitoringDashboard
+    config = Config()
+    config.USERNAME = FLASK_DASHBOARD_USERNAME
+    config.PASSWORD = FLASK_DASHBOARD_PASSWORD
+    
+    # Set database to use SQLite file (persistent storage)
+    config.DATABASE = 'sqlite:///flask_monitoringdashboard.db'
+    
+    # Initialize with custom configuration
+    dashboard.bind(g_app, config)
 
 # Mechanism to throw away old URL cookies if the feeds change.
 URLS_COOKIE_VERSION = "2"
