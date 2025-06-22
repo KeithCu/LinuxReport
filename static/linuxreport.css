@@ -155,10 +155,54 @@ body.no-underlines a, body.no-underlines a * {
   padding: 10px;
 }
 
+/* Mobile navigation container fixes */
 .mobile-view .nav-links-mobile {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Mobile container wrapper - override inline styles for mobile */
+@media (max-width: 768px) {
+  .mobile-view .nav-links-mobile {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  /* Target the container div that holds nav links and controls */
+  .mobile-view div[style*="inline-flex"] {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    width: 100% !important;
+    max-width: 350px !important;
+    padding: 10px !important;
+  }
+  
+  /* Make select dropdowns and buttons stack properly on mobile */
+  .mobile-view div[style*="inline-flex"] > * {
+    margin: 5px 0 !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 200px !important;
+  }
+  
+  /* Ensure theme and font selects don't overflow */
+  .mobile-view #theme-select,
+  .mobile-view #font-select {
+    width: 100% !important;
+    max-width: 200px !important;
+    margin: 5px 0 !important;
+  }
+  
+  /* Make buttons consistent width on mobile */
+  .mobile-view #chat-toggle-btn,
+  .mobile-view button[type="save"],
+  .mobile-view #view-mode-toggle {
+    width: 100% !important;
+    max-width: 200px !important;
+    margin: 5px 0 !important;
+  }
 }
 
 .mobile-view .nav-links-mobile a {
