@@ -178,7 +178,7 @@ def init_app(flask_app):
             if not is_admin:
                 # For cache hits, use tiny fixed time since they're very fast
                 render_time = 0.0001  # 100 microseconds
-                update_performance_stats(render_time, start_time)
+                update_performance_stats(render_time, time.time())
             
             response = make_response(full_page)
             return response
@@ -289,7 +289,7 @@ def init_app(flask_app):
         if not is_admin:
             end_time = timer()
             render_time = end_time - start_time
-            update_performance_stats(render_time, end_time)
+            update_performance_stats(render_time, time.time())
         else:
             # Add stats display to the page for admin mode
             stats_html = get_admin_stats_html()

@@ -1,6 +1,6 @@
 import time
 import datetime
-from shared import FLASK_DASHBOARD, g_cm, EXPIRE_DAY
+from shared import FLASK_DASHBOARD, g_cm, EXPIRE_DAY, g_c, EXPIRE_YEARS
 
 def update_performance_stats(render_time, current_time):
     """
@@ -25,7 +25,8 @@ def update_performance_stats(render_time, current_time):
         "first_request_time": current_time
     }
     
-    current_hour = int(current_time / 3600)  # Get current hour timestamp
+    # Use hour since epoch for consistent tracking
+    current_hour = int(current_time / 3600)
     
     # Initialize hourly request count if not exists
     if current_hour not in stats["hourly_requests"]:
@@ -81,9 +82,8 @@ def get_admin_stats_html():
     # Get request counts for different time windows
     hourly_requests = stats.get("hourly_requests", {})
     requests_1h = sum(count for hour, count in hourly_requests.items() if hour == current_hour)
-    requests_6h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 6)
-    requests_12h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 12)
-    
+    requests_6h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 5)  # Include current hour + 5 previous
+    requests_12h = sum(count for hour, count in hourly_requests.items() if hour >= current_hour - 11)  # Include current hour + 11 previous    
     # Calculate uptime
     first_request_time = stats.get("first_request_time", time.time())
     uptime_seconds = time.time() - first_request_time
@@ -101,7 +101,7 @@ def get_admin_stats_html():
         Requests (12h): {requests_12h}<br>
         Min: {min_time:.3f}s<br>
         Max: {max_time:.3f}s<br>
-        Avg: {avg_time:.3f}s
+        Avg: {avg_time:.3f}s<br>
     </div>
     '''
 
