@@ -112,12 +112,6 @@ INFINITE_SCROLL_DEBUG = True
 # Enable compression caching for faster response times (disabled by default)
 ENABLE_COMPRESSION_CACHING = False
 
-# --- Unified Last Fetch Cache ---
-# Set to True to use the unified cache for last fetch times.
-# This is more efficient as it reduces the number of cache gets during page render.
-# When False, the old method of storing last fetch times in separate keys is used.
-USE_UNIFIED_CACHE = True
-
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
@@ -220,15 +214,15 @@ def dynamic_rate_limit():
     key = get_rate_limit_key()
     
     if key.startswith("admin:"):
-        return "500 per minute"  # Higher limits for admins
+        return "50 per minute"  # Higher limits for admins
     elif key.startswith("bot:"):
-        return "20 per minute"    # Lower limits for bots
+        return "10 per minute"    # Lower limits for bots
     else:
-        return "100 per minute"  # Standard limits for users
+        return "20 per minute"  # Standard limits for users
 
 limiter = Limiter(
     key_func=get_rate_limit_key,
-    default_limits=["50 per minute"],
+    default_limits=["10 per minute"],
     strategy="fixed-window"
 )
 
@@ -287,39 +281,22 @@ class DiskCacheWrapper:
     def get_all_last_fetches(self, urls: list[str]) -> dict[str, Optional[datetime.datetime]]:
         """
         Get last fetch times for multiple URLs.
-
-        If USE_UNIFIED_CACHE is True, it fetches all last fetch times from a single
-        cached dictionary for efficiency. It also handles on-the-fly migration from
-        the old cache key format to the new unified cache.
-        
-        If False, it fetches them individually, which is slower.
         """
-        if USE_UNIFIED_CACHE:
-            all_fetches = self.get('all_last_fetches') or {}
-            return {url: all_fetches.get(url) for url in urls}
-        else:
-            # Fallback to the old, slower method for compatibility.
-            return {url: self.get_last_fetch(url) for url in urls}
+        all_fetches = self.get('all_last_fetches') or {}
+        return {url: all_fetches.get(url) for url in urls}
 
     def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
         """Get the last fetch time for a URL from the shared disk cache."""
-        if USE_UNIFIED_CACHE:
-            all_fetches = self.get('all_last_fetches')
-            if url in all_fetches:
-                return all_fetches[url]
-        
-        # Fallback to the old key if not in the new unified cache or if disabled.
-        return self.get(url + ":last_fetch")
+        all_fetches = self.get('all_last_fetches')
+        if url in all_fetches:
+            return all_fetches[url]
+        return None
 
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
         """Set the last fetch time for a URL in the shared disk cache."""
-        if USE_UNIFIED_CACHE:
-            all_fetches = self.get('all_last_fetches')
-            all_fetches[url] = timestamp
-            self.put('all_last_fetches', all_fetches, timeout)
-        else:
-            # Fallback to writing to the old key if the unified cache is disabled.
-            self.put(url + ":last_fetch", timestamp, timeout)
+        all_fetches = self.get('all_last_fetches')
+        all_fetches[url] = timestamp
+        self.put('all_last_fetches', all_fetches, timeout)
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history-{str(MODE.value)}")
