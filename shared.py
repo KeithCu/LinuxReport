@@ -304,7 +304,7 @@ class DiskCacheWrapper:
     def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
         """Get the last fetch time for a URL from the shared disk cache."""
         if USE_UNIFIED_CACHE:
-            all_fetches = self.get('all_last_fetches') or {}
+            all_fetches = self.get('all_last_fetches')
             if url in all_fetches:
                 return all_fetches[url]
         
@@ -314,7 +314,7 @@ class DiskCacheWrapper:
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
         """Set the last fetch time for a URL in the shared disk cache."""
         if USE_UNIFIED_CACHE:
-            all_fetches = self.get('all_last_fetches') or {}
+            all_fetches = self.get('all_last_fetches')
             all_fetches[url] = timestamp
             self.put('all_last_fetches', all_fetches, timeout)
         else:
