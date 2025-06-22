@@ -314,9 +314,10 @@ class DiskCacheWrapper:
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
         """Set the last fetch time for a URL in the shared disk cache."""
         if USE_UNIFIED_CACHE:
-            all_fetches = self.get('all_last_fetches') or {}
-            all_fetches[url] = timestamp
-            self.put('all_last_fetches', all_fetches, timeout)
+            with get_lock("all_last_fetches_lock"):
+                all_fetches = self.get('all_last_fetches') or {}
+                all_fetches[url] = timestamp
+                self.put('all_last_fetches', all_fetches, timeout)
         else:
             # Fallback to writing to the old key if the unified cache is disabled.
             self.put(url + ":last_fetch", timestamp, timeout)
@@ -364,25 +365,26 @@ def run_one_time_last_fetch_migration(all_urls):
     new unified 'all_last_fetches' cache. This is controlled by a flag to ensure
     it only runs once.
     """
-    if not g_c.has('last_fetch_migration_complete'):
-        print("Running one-time migration for last_fetch times...")
-        all_fetches = g_c.get('all_last_fetches') or {}
-        updated = False
-        
-        for url in all_urls:
-            if url not in all_fetches:
-                old_last_fetch = g_c.get(url + ":last_fetch")
-                if old_last_fetch:
-                    print(f"Migrating last_fetch for {url}.")
-                    all_fetches[url] = old_last_fetch
-                    updated = True
-        
-        if updated:
-            g_c.put('all_last_fetches', all_fetches, timeout=EXPIRE_YEARS)
+    with get_lock("last_fetch_migration_lock"):
+        if not g_c.has('last_fetch_migration_complete'):
+            print("Running one-time migration for last_fetch times...")
+            all_fetches = g_c.get('all_last_fetches') or {}
+            updated = False
             
-        # Set the flag to indicate migration is complete
-        g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
-        print("Last_fetch migration complete.")
+            for url in all_urls:
+                if url not in all_fetches:
+                    old_last_fetch = g_c.get(url + ":last_fetch")
+                    if old_last_fetch:
+                        print(f"Migrating last_fetch for {url}.")
+                        all_fetches[url] = old_last_fetch
+                        updated = True
+            
+            if updated:
+                g_c.put('all_last_fetches', all_fetches, timeout=EXPIRE_YEARS)
+                
+            # Set the flag to indicate migration is complete
+            g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
+            print("Last_fetch migration complete.")
 
 def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
     """Format the last fetch time as 'HH:MM AM/PM'."""
