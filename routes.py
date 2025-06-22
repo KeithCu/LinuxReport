@@ -287,8 +287,9 @@ def init_app(flask_app):
 
         # Track performance stats for non-admin mode
         if not is_admin:
-            render_time = timer() - start_time
-            update_performance_stats(render_time, start_time + render_time)
+            end_time = timer()
+            render_time = end_time - start_time
+            update_performance_stats(render_time, end_time)
         else:
             # Add stats display to the page for admin mode
             stats_html = get_admin_stats_html()
@@ -322,8 +323,12 @@ def init_app(flask_app):
             response.headers['Content-Length'] = str(len(page.encode('utf-8')))
         
         # Add cache control headers for 30 minutes (1800 seconds)
-        response.headers['Cache-Control'] = 'public, max-age=1800'
-        response.headers['Expires'] = (datetime.datetime.utcnow() + datetime.timedelta(hours=0.5)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+        # Use the end_time we already calculated for performance stats to avoid another timer() call
+        if not is_admin:
+            # Convert timer() time to datetime for the Expires header
+            response.headers['Cache-Control'] = 'public, max-age=1800'
+            expires_time = datetime.datetime.fromtimestamp(end_time) + datetime.timedelta(hours=0.5)
+            response.headers['Expires'] = expires_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
         return response
 
 
