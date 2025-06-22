@@ -2,7 +2,7 @@ import time
 import datetime
 from shared import FLASK_DASHBOARD, g_cm, EXPIRE_DAY
 
-def update_performance_stats(render_time):
+def update_performance_stats(render_time, current_time):
     """
     Update performance statistics for admin monitoring.
     
@@ -11,6 +11,7 @@ def update_performance_stats(render_time):
     
     Args:
         render_time: Time taken to render the page in seconds
+        current_time: Current time (required)
     """
     # Skip if Flask-MonitoringDashboard is enabled (it handles this automatically)
     if FLASK_DASHBOARD:
@@ -21,10 +22,9 @@ def update_performance_stats(render_time):
         "times": [],
         "count": 0,
         "hourly_requests": {},  # Track requests per hour
-        "first_request_time": time.time()
+        "first_request_time": current_time
     }
     
-    current_time = time.time()
     current_hour = int(current_time / 3600)  # Get current hour timestamp
     
     # Initialize hourly request count if not exists
