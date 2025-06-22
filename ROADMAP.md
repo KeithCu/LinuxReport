@@ -225,7 +225,6 @@ Based on LinuxReport's architecture and goals, here are some targeted Python lib
 - **python-dotenv**: Securely manage environment variables and secrets
 
 ### Web, APIs, and DevOps
-- **httpx**: Modern async HTTP client (for scraping or API integrations)
 - **requests-cache**: Transparent HTTP caching for feed fetching
 - **pytest-cov**: Test coverage reporting for your pytest suite
 - **pre-commit**: Git hook management for code quality and linting
