@@ -314,10 +314,9 @@ class DiskCacheWrapper:
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
         """Set the last fetch time for a URL in the shared disk cache."""
         if USE_UNIFIED_CACHE:
-            with get_lock("all_last_fetches_lock"):
-                all_fetches = self.get('all_last_fetches') or {}
-                all_fetches[url] = timestamp
-                self.put('all_last_fetches', all_fetches, timeout)
+            all_fetches = self.get('all_last_fetches') or {}
+            all_fetches[url] = timestamp
+            self.put('all_last_fetches', all_fetches, timeout)
         else:
             # Fallback to writing to the old key if the unified cache is disabled.
             self.put(url + ":last_fetch", timestamp, timeout)
