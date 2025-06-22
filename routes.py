@@ -192,9 +192,9 @@ def init_app(flask_app):
 
         needed_urls = []
         need_fetch = False
-        last_fetch_cache = {}  # Cache for last_fetch results
 
         # 1. See if we need to fetch any RSS feeds
+        last_fetch_cache = g_c.get_all_last_fetches(page_order)
         for url in page_order:
             rss_info = ALL_URLS.get(url, None)
 
@@ -202,9 +202,7 @@ def init_app(flask_app):
                 rss_info = RssInfo("Custom.png", "Custom site", url + "HTML")
                 ALL_URLS[url] = rss_info
 
-            # Cache the last_fetch result for later use
-            last_fetch = g_c.get_last_fetch(url)
-            last_fetch_cache[url] = last_fetch
+            last_fetch = last_fetch_cache.get(url)
             
             expired_rss = ENABLE_BACKGROUND_REFRESH and g_c.has_feed_expired(url, last_fetch)
 

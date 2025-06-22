@@ -112,6 +112,12 @@ INFINITE_SCROLL_DEBUG = True
 # Enable compression caching for faster response times (disabled by default)
 ENABLE_COMPRESSION_CACHING = False
 
+# --- Unified Last Fetch Cache ---
+# Set to True to use the unified cache for last fetch times.
+# This is more efficient as it reduces the number of cache gets during page render.
+# When False, the old method of storing last fetch times in separate keys is used.
+USE_UNIFIED_CACHE = True
+
 RSS_TIMEOUT = 30  # Timeout value in seconds for RSS feed operations
 
 MAX_ITEMS = 40  # Maximum number of items to process / remember in RSS feeds
@@ -278,15 +284,42 @@ class DiskCacheWrapper:
             return True
         return history.has_expired(url, last_fetch)
 
+    def get_all_last_fetches(self, urls: list[str]) -> dict[str, Optional[datetime.datetime]]:
+        """
+        Get last fetch times for multiple URLs.
+
+        If USE_UNIFIED_CACHE is True, it fetches all last fetch times from a single
+        cached dictionary for efficiency. It also handles on-the-fly migration from
+        the old cache key format to the new unified cache.
+        
+        If False, it fetches them individually, which is slower.
+        """
+        if USE_UNIFIED_CACHE:
+            all_fetches = self.get('all_last_fetches') or {}
+            return {url: all_fetches.get(url) for url in urls}
+        else:
+            # Fallback to the old, slower method for compatibility.
+            return {url: self.get_last_fetch(url) for url in urls}
+
     def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
         """Get the last fetch time for a URL from the shared disk cache."""
-        last_fetch = self.get(url + ":last_fetch")
-        return last_fetch
+        if USE_UNIFIED_CACHE:
+            all_fetches = self.get('all_last_fetches') or {}
+            if url in all_fetches:
+                return all_fetches[url]
+        
+        # Fallback to the old key if not in the new unified cache or if disabled.
+        return self.get(url + ":last_fetch")
 
     def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
         """Set the last fetch time for a URL in the shared disk cache."""
-        # Store in disk cache (g_c) - this is the shared, authoritative source.
-        self.put(url + ":last_fetch", timestamp, timeout)
+        if USE_UNIFIED_CACHE:
+            all_fetches = self.get('all_last_fetches') or {}
+            all_fetches[url] = timestamp
+            self.put('all_last_fetches', all_fetches, timeout)
+        else:
+            # Fallback to writing to the old key if the unified cache is disabled.
+            self.put(url + ":last_fetch", timestamp, timeout)
 
 # Global Variables
 history = FeedHistory.FeedHistory(data_file=f"{PATH}/feed_history-{str(MODE.value)}")
@@ -324,6 +357,33 @@ def get_lock(lock_name: str, owner_prefix: Optional[str] = None) -> LockBase:
 #         raise TypeError(f"Unsupported lock class: {LOCK_CLASS}")
 
 # Functions
+
+def run_one_time_last_fetch_migration(all_urls):
+    """
+    Performs a one-time migration of last_fetch times from old cache keys to the
+    new unified 'all_last_fetches' cache. This is controlled by a flag to ensure
+    it only runs once.
+    """
+    if not g_c.has('last_fetch_migration_complete'):
+        print("Running one-time migration for last_fetch times...")
+        all_fetches = g_c.get('all_last_fetches') or {}
+        updated = False
+        
+        for url in all_urls:
+            if url not in all_fetches:
+                old_last_fetch = g_c.get(url + ":last_fetch")
+                if old_last_fetch:
+                    print(f"Migrating last_fetch for {url}.")
+                    all_fetches[url] = old_last_fetch
+                    updated = True
+        
+        if updated:
+            g_c.put('all_last_fetches', all_fetches, timeout=EXPIRE_YEARS)
+            
+        # Set the flag to indicate migration is complete
+        g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
+        print("Last_fetch migration complete.")
+
 def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
     """Format the last fetch time as 'HH:MM AM/PM'."""
     if not last_fetch:

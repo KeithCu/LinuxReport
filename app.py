@@ -19,7 +19,7 @@ from flask_login import LoginManager
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Local imports
-from shared import EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, limiter
+from shared import EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, limiter, ALL_URLS, run_one_time_last_fetch_migration
 from models import DEBUG, User, get_secret_key
 
 # Custom filter to add header information
@@ -133,8 +133,12 @@ with g_app.app_context():
         print("JavaScript bundle built successfully")
         css_bundle.build()
         print("CSS cache busting configured successfully")
+
+        # Run the one-time migration of last_fetch times
+        run_one_time_last_fetch_migration(ALL_URLS.keys())
+
     except Exception as e:
-        print(f"Warning: Failed to build assets: {e}")
+        print(f"Warning: Failed to build assets or run migration: {e}")
 
 # Make assets available to templates
 g_app.jinja_env.globals['assets'] = assets

@@ -12,7 +12,6 @@ import threading
 from timeit import default_timer as timer
 from urllib.parse import urlparse
 from collections import defaultdict
-import json
 import pickle
 
 # Third-party imports
@@ -296,22 +295,15 @@ def refresh_thread():
     try:
         # Collect URLs that need refreshing
         urls_to_refresh = []
-        last_fetch_cache = {}  # Cache for last_fetch results
+
+        all_urls = list(ALL_URLS.keys())
+        last_fetch_cache = g_c.get_all_last_fetches(all_urls)
         
         for url, rss_info in ALL_URLS.items():
             if rss_info.logo_url != "Custom.png":
-                # Check if feed exists first
-                feed_exists = g_c.has(url)
                 
-                # Cache last_fetch to avoid duplicate calls
-                last_fetch = g_c.get_last_fetch(url)
-                
-                # If we have a feed but no last_fetch timestamp, something's wrong
-                if feed_exists and last_fetch is None:
-                    raise Exception(f"Last fetch missing from cache for URL {url} when feed exists")
-                
-                last_fetch_cache[url] = last_fetch
-                
+                last_fetch = last_fetch_cache.get(url)
+                                                
                 # Only check expiration if we have a feed or if we're checking a non-custom site
                 if g_c.has_feed_expired(url, last_fetch):
                     urls_to_refresh.append(url)
