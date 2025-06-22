@@ -19,7 +19,7 @@ from flask import request
 from flask_restx import Resource, Api, reqparse
 
 # Local imports
-from shared import limiter, dynamic_rate_limit, g_cs, get_lock, TZ, WEB_BOT_USER_AGENTS
+from shared import limiter, dynamic_rate_limit, g_cs, get_lock, TZ, WEB_BOT_USER_AGENTS, api as global_api
 from models import DEBUG
 
 # --- Arbitrary bucket resolution (miles-based) ---
@@ -370,9 +370,7 @@ def test_weather_api_with_ips():
         print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
 
 def init_weather_routes(app):
-    # Use Flask-RESTX Api with a prefix to avoid interfering with other routes
-    api = Api(app, prefix='/api', doc='/api/weather/docs')  # Swagger UI at this endpoint
-
+    api = global_api
     weather_parser = reqparse.RequestParser()
     weather_parser.add_argument('units', type=str, default='imperial', choices=['imperial', 'metric'], 
                                location='args', help='Units must be either imperial or metric')
@@ -470,7 +468,7 @@ def init_weather_routes(app):
                 response.headers['Expires'] = (datetime.utcnow() + timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
             return response
 
-    api.add_resource(WeatherResource, '/weather')  # This will be available at /api/weather
+    api.add_resource(WeatherResource, '/api/weather')
 
     if __name__ == "__main__":
         print("Running weather API tests with test IP addresses...")
