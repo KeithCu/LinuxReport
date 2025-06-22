@@ -172,27 +172,44 @@ body.no-underlines a, body.no-underlines a * {
   /* Target the navigation controls container directly by ID */
   .mobile-view #nav-controls-container {
     display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
+    flex-direction: row !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
     width: 100% !important;
-    max-width: 350px !important;
+    max-width: 100% !important;
     padding: 10px !important;
+    gap: 10px !important;
   }
   
-  /* Make select dropdowns and buttons stack properly on mobile */
-  .mobile-view #nav-controls-container > * {
-    margin: 5px 0 !important;
-    margin-left: 0 !important;
-    width: 100% !important;
-    max-width: 200px !important;
+  /* Left section: Navigation links */
+  .mobile-view .nav-section-left {
+    flex: 1 !important;
+    min-width: 0 !important;
+  }
+  
+  /* Middle section: Theme and font controls */
+  .mobile-view .nav-section-middle {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 5px !important;
+    min-width: 0 !important;
+  }
+  
+  /* Right section: Action buttons */
+  .mobile-view .nav-section-right {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 5px !important;
+    min-width: 0 !important;
   }
   
   /* Ensure theme and font selects don't overflow */
   .mobile-view #theme-select,
   .mobile-view #font-select {
     width: 100% !important;
-    max-width: 200px !important;
-    margin: 5px 0 !important;
+    max-width: 150px !important;
+    margin: 0 !important;
+    font-size: 0.9em !important;
   }
   
   /* Make buttons consistent width on mobile */
@@ -200,8 +217,10 @@ body.no-underlines a, body.no-underlines a * {
   .mobile-view button[type="save"],
   .mobile-view #view-mode-toggle {
     width: 100% !important;
-    max-width: 200px !important;
-    margin: 5px 0 !important;
+    max-width: 120px !important;
+    margin: 0 !important;
+    font-size: 0.9em !important;
+    padding: 8px 12px !important;
   }
 }
 

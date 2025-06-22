@@ -46,52 +46,63 @@
     <center><small>{{ welcome_html }}</small></center>
     <center>
       <div id="nav-controls-container" style="border: 2px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: large;">
-        <div class="{% if g.is_mobile %}nav-links-mobile{% else %}nav-links-desktop{% endif %}">
-          <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
-          <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
-          <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
-          <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
-          <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
-          <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
-          <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
-          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
+        <!-- Left section: Navigation links -->
+        <div class="nav-section-left">
+          <div class="{% if g.is_mobile %}nav-links-mobile{% else %}nav-links-desktop{% endif %}">
+            <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
+            <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
+            <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
+            <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
+            <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
+            <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
+            <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
+            <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
+          </div>
         </div>
-        <select id="theme-select" onchange="setTheme(this.value)" style="margin-left:20px; padding:5px;">
-          <option value="light" style="background:#ffffff;color:#000;">Light</option>
-          <option value="paper" style="background:#f5f5f5;color:#333;">Paper</option>
-          <option value="silver" style="background:#C0C0C0;color:#000;">Silver</option>
-          <option value="retro" style="background:#000080;color:#90ee90;">Retro</option>
-          <option value="dark" style="background:#1e1e1e;color:#d4d4d4;">Dark</option>
-          <option value="monokai" style="background:#272822;color:#e2e8f0;">Monokai</option>
-          <option value="futuristic" style="background:#0f0f0f;color:#7fbfbf;">Futuristic</option>
-          <option value="cyberpunk" style="background:#1e001f;color:#c080c0;">Cyberpunk</option>
-          <option value="midnight" style="background:#0f172a;color:#cbd5e1;">Midnight</option>
-          <option value="ocean" style="background:#0a192f;color:#cbd5e1;">Ocean</option>
-          <option value="nord" style="background:#2e3440;color:#d8dee9;">Nord</option>
-          <option value="forest" style="background:#2E4A2E;color:#E0EBD8;">Forest</option>
-          <option value="steampunk" style="background:#2b1b0e;color:#d5c1a1;">Steampunk</option>
-          <option value="autumn" style="background:#2c1810;color:#f5deb3;">Autumn</option>
-          <option value="sepia" style="background:#704214;color:#FFF8E7;">Sepia</option>
-          <option value="solarized" style="background:#fdf6e3;color:#657b83;">Solarized</option>
-          <option value="pastelle" style="background:#FFEFD5;color:#4B3621;">Pastelle</option>
-        </select>
-        <select id="font-select" onchange="setFont(this.value)" style="margin-left:20px; padding:5px;">
-          <option value="system">System Default</option>
-          <option value="sans-serif">Sans Serif</option>
-          <option value="monospace">Monospace</option>
-          <option value="inter">Inter</option>
-          <option value="roboto">Roboto</option>
-          <option value="open-sans">Open Sans</option>
-          <option value="source-sans">Source Sans</option>
-          <option value="noto-sans">Noto Sans</option>
-          <option value="lato">Lato</option>
-          <option value="raleway">Raleway</option>
-        </select>
-        <button id="chat-toggle-btn">Chat</button>
-        <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
-        {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
-        <button id="view-mode-toggle" style="margin-left: 20px;">Infinite View</button>
-        {% endif %}
+        
+        <!-- Middle section: Theme and font controls -->
+        <div class="nav-section-middle">
+          <select id="theme-select" onchange="setTheme(this.value)" style="margin-left:20px; padding:5px;">
+            <option value="light" style="background:#ffffff;color:#000;">Light</option>
+            <option value="paper" style="background:#f5f5f5;color:#333;">Paper</option>
+            <option value="silver" style="background:#C0C0C0;color:#000;">Silver</option>
+            <option value="retro" style="background:#000080;color:#90ee90;">Retro</option>
+            <option value="dark" style="background:#1e1e1e;color:#d4d4d4;">Dark</option>
+            <option value="monokai" style="background:#272822;color:#e2e8f0;">Monokai</option>
+            <option value="futuristic" style="background:#0f0f0f;color:#7fbfbf;">Futuristic</option>
+            <option value="cyberpunk" style="background:#1e001f;color:#c080c0;">Cyberpunk</option>
+            <option value="midnight" style="background:#0f172a;color:#cbd5e1;">Midnight</option>
+            <option value="ocean" style="background:#0a192f;color:#cbd5e1;">Ocean</option>
+            <option value="nord" style="background:#2e3440;color:#d8dee9;">Nord</option>
+            <option value="forest" style="background:#2E4A2E;color:#E0EBD8;">Forest</option>
+            <option value="steampunk" style="background:#2b1b0e;color:#d5c1a1;">Steampunk</option>
+            <option value="autumn" style="background:#2c1810;color:#f5deb3;">Autumn</option>
+            <option value="sepia" style="background:#704214;color:#FFF8E7;">Sepia</option>
+            <option value="solarized" style="background:#fdf6e3;color:#657b83;">Solarized</option>
+            <option value="pastelle" style="background:#FFEFD5;color:#4B3621;">Pastelle</option>
+          </select>
+          <select id="font-select" onchange="setFont(this.value)" style="margin-left:20px; padding:5px;">
+            <option value="system">System Default</option>
+            <option value="sans-serif">Sans Serif</option>
+            <option value="monospace">Monospace</option>
+            <option value="inter">Inter</option>
+            <option value="roboto">Roboto</option>
+            <option value="open-sans">Open Sans</option>
+            <option value="source-sans">Source Sans</option>
+            <option value="noto-sans">Noto Sans</option>
+            <option value="lato">Lato</option>
+            <option value="raleway">Raleway</option>
+          </select>
+        </div>
+        
+        <!-- Right section: Action buttons -->
+        <div class="nav-section-right">
+          <button id="chat-toggle-btn">Chat</button>
+          <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
+          {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
+          <button id="view-mode-toggle" style="margin-left: 20px;">Infinite View</button>
+          {% endif %}
+        </div>
       </div>
     </center>
   
