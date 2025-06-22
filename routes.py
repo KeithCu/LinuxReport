@@ -244,7 +244,7 @@ def init_app(flask_app):
                                            error_message=("Feed could not be loaded." if feed is None else None))
 
                 # Cache entry deleted by worker thread after fetch, however, that only effects the same process.
-                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_HOUR)
+                g_cm.set(rss_info.site_url, template, ttl=EXPIRE_DAY)
                 # Store the last fetch time when we rendered this template
                 g_cm.set(f"{rss_info.site_url}_render_time", last_fetch, ttl=EXPIRE_DAY)
 
