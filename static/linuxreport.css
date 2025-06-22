@@ -169,8 +169,8 @@ body.no-underlines a, body.no-underlines a * {
     max-width: 300px;
   }
   
-  /* Target the container div that holds nav links and controls - more specific selector */
-  .mobile-view center > div[style*="border: 2px solid var(--btn-border)"] {
+  /* Target the navigation controls container directly by ID */
+  .mobile-view #nav-controls-container {
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
@@ -180,7 +180,7 @@ body.no-underlines a, body.no-underlines a * {
   }
   
   /* Make select dropdowns and buttons stack properly on mobile */
-  .mobile-view center > div[style*="border: 2px solid var(--btn-border)"] > * {
+  .mobile-view #nav-controls-container > * {
     margin: 5px 0 !important;
     margin-left: 0 !important;
     width: 100% !important;
