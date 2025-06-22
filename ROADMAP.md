@@ -5,7 +5,7 @@
 These features are directly visible to and interact with your end users:
 
 - **User Accounts & Personalization**
-  - User registration/login (Flask-Login)
+  - User registration/login (Flask-Login, implemented and working)
   - Persistent user preferences (feed curation, layout, dark/light mode)
   - Server-side storage of favorites, feed order, and settings
 
@@ -84,7 +84,7 @@ These features improve the backend, admin experience, or codebase quality, but a
 
 - **Security & Protection**
   - Flask-WTF for CSRF protection and better form validation
-  - Flask-Limiter for API rate limiting
+  - Flask-Limiter for API rate limiting (implemented and working, continue to expand coverage and tune limits)
   - Flask-Compress for response compression
   - Flask-Principals for role-based access control
 
@@ -94,7 +94,7 @@ These features improve the backend, admin experience, or codebase quality, but a
   - Performance optimizations: lazy loading images, better caching, mobile performance
 
 - **Database & Data Management**
-  - Flask-SQLAlchemy for structured data
+  - Flask-SQLAlchemy for structured data (medium priority; may not be needed for simple blob storage)
   - Scheduled background jobs (Celery/APScheduler) for periodic feed updates, pruning, alerts
   - Full-text search and filtering (Whoosh/Elasticsearch)
   - API expansion: RESTful JSON API for feeds, entries, user settings; Swagger/OpenAPI docs; rate limiting and API keys
@@ -120,35 +120,56 @@ These features improve the backend, admin experience, or codebase quality, but a
 
 ---
 
+## API Frameworks & Implementation Notes
+
+- **Flask-RESTful** is now in use for the weather API and may be used for other endpoints. Continue expanding its use for a consistent API structure.
+- **Flask-RESTx** is a possible alternative or supplement to Flask-RESTful, offering built-in Swagger/OpenAPI documentation and more features. Consider evaluating it for future API work.
+- **Flask-Limiter** is implemented and working, but continue to expand its use and tune rate limits for all relevant endpoints.
+
+---
+
 ## Plugin & Library Recommendations
 
 - **High Priority**
-  - Flask-Login (user authentication)
+  - Flask-Login (user authentication, implemented)
   - Flask-WTF (form security)
-  - Flask-Limiter (rate limiting)
-  - Flask-SQLAlchemy (database)
+  - Flask-Limiter (rate limiting, implemented)
   - Flask-Compress (performance)
 
-- **Medium/Low Priority**
+- **Medium Priority**
+  - Flask-SQLAlchemy (database, only if more complex data storage is needed)
   - Flask-Mail (email notifications)
   - Flask-Principals (role-based access)
-  - Flask-SocketIO (real-time features)
+  - Flask-SocketIO (real-time features; see notes below)
   - Flask-MonitoringDashboard (monitoring)
+  - Flask-RESTx (API framework, see above)
 
 - **Not Recommended**
-  - Flask-Admin (too heavy for simple admin needs)
-  - Flask-RESTful (API is simple enough)
+  - Flask-Admin (see below)
+  - Flask-RESTful (already in use, but RESTx may be a better long-term fit)
   - Flask-Babel (no i18n needs yet)
   - Flask-OAuthlib (no OAuth requirements)
 
 ---
 
-## Implementation Notes
+## Flask-SocketIO & WSGI/Apache Notes
 
-- Start with security and user management (Flask-Login, Flask-WTF, Flask-Limiter)
-- Add database structure (Flask-SQLAlchemy)
-- Improve performance (Flask-Compress)
-- Expand user features and admin tools as needed
+- Flask-SocketIO enables real-time features (WebSockets, live updates, etc.), but compatibility with mod_wsgi and Apache (worker/event MPM) is limited. WebSocket support is not native to WSGI; production use typically requires a separate async server (e.g., eventlet, gevent, or running behind a reverse proxy like nginx with a dedicated socketio server). Research and test thoroughly before committing to this stack for real-time features.
+
+---
+
+## Flask-Admin: What Does It Provide?
+
+- Flask-Admin is a general-purpose admin interface generator for Flask apps. It provides a web UI for managing database models, users, and other objects. Features include CRUD operations, search, filtering, and custom views. It is powerful but can be overkill for simple admin needs, and adds dependencies and complexity. Consider only if you need a full-featured admin backend for managing lots of structured data.
+
+---
+
+## Implementation Reminders
+
+- Continue expanding Flask-Limiter coverage and tuning limits.
+- Continue implementing and expanding Flask-RESTful endpoints; consider Flask-RESTx for future API work.
+- Research Flask-SocketIO compatibility with your deployment stack (mod_wsgi, Apache worker/event MPM).
+- Re-evaluate Flask-Admin if you need a more robust admin interface in the future.
 
 ---
 
