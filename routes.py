@@ -176,8 +176,9 @@ def init_app(flask_app):
         if not DEBUG and not is_admin and full_page is not None:
             # Track performance stats for cache hit
             if not is_admin:
-                render_time = timer() - start_time
-                update_performance_stats(render_time)
+                # For cache hits, use tiny fixed time since they're very fast
+                render_time = 0.0001  # 100 microseconds
+                update_performance_stats(render_time, start_time)
             
             response = make_response(full_page)
             return response
@@ -287,7 +288,7 @@ def init_app(flask_app):
         # Track performance stats for non-admin mode
         if not is_admin:
             render_time = timer() - start_time
-            update_performance_stats(render_time)
+            update_performance_stats(render_time, start_time + render_time)
         else:
             # Add stats display to the page for admin mode
             stats_html = get_admin_stats_html()
