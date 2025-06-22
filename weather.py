@@ -11,16 +11,18 @@ from collections import defaultdict
 from datetime import date as date_obj
 from datetime import datetime, timedelta
 from bisect import bisect_left
+import json
 
 import geoip2.database
 # Third-party imports
 import requests
-from flask import request
-from flask_restx import Resource, Api, reqparse
+from flask import jsonify, request
+from flask_restful import Resource, reqparse, Api
 
+from shared import limiter, dynamic_rate_limit
 # Local imports
-from shared import limiter, dynamic_rate_limit, g_cs, get_lock, TZ, WEB_BOT_USER_AGENTS, api as global_api
-from models import DEBUG
+from shared import g_cs, get_lock, USER_AGENT, TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS
+from models import DEBUG, get_weather_api_key
 
 # --- Arbitrary bucket resolution (miles-based) ---
 WEATHER_BUCKET_SIZE_MILES = 10  # default bucket diameter in miles (good balance for weather data)
@@ -370,7 +372,7 @@ def test_weather_api_with_ips():
         print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
 
 def init_weather_routes(app):
-    api = global_api
+    # Create request parser for weather API
     weather_parser = reqparse.RequestParser()
     weather_parser.add_argument('units', type=str, default='imperial', choices=['imperial', 'metric'], 
                                location='args', help='Units must be either imperial or metric')
@@ -457,19 +459,28 @@ def init_weather_routes(app):
             else:
                 lat = args['lat']
                 lon = args['lon']
+            
             weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
+            
+            # Flask-RESTful handles JSON serialization automatically
+            # Just return the data and status code
             return weather_data, status_code
-
+        
         def dispatch_request(self, *args, **kwargs):
+            """Override to add cache headers to all responses"""
             response = super().dispatch_request(*args, **kwargs)
+            
             # Add cache control headers for 4 hours (14400 seconds)
             if hasattr(response, 'headers'):
                 response.headers['Cache-Control'] = 'public, max-age=14400'
                 response.headers['Expires'] = (datetime.utcnow() + timedelta(hours=4)).strftime('%a, %d %b %Y %H:%M:%S GMT')
+            
             return response
 
+    # Register the resource with Flask-RESTful
+    api = Api(app)
     api.add_resource(WeatherResource, '/api/weather')
 
-    if __name__ == "__main__":
-        print("Running weather API tests with test IP addresses...")
-        test_weather_api_with_ips()
+if __name__ == "__main__":
+    print("Running weather API tests with test IP addresses...")
+    test_weather_api_with_ips()
