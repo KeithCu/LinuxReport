@@ -263,7 +263,6 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
             
             # Run one-time migration of last_fetch times
             run_one_time_last_fetch_migration(ALL_URLS.keys())
-            print("Database migration completed successfully")
             
         except Exception as e:
             print(f"Warning: Failed to complete startup tasks: {e}")
