@@ -4,6 +4,7 @@ import hashlib
 import os
 import datetime
 import time
+import gzip
 
 from shared import PATH, EXPIRE_HOUR, ENABLE_COMPRESSION_CACHING, g_cm, clear_page_caches
 from models import DEBUG
