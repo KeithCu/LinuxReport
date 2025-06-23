@@ -157,37 +157,3 @@ class DiskcacheSqliteLock(LockBase):
             self._locked = False
             return False
         return True
-
-class FileLockWrapper(LockBase):
-    def __init__(self, lock_file_path: str):
-        self.lock_file_path = lock_file_path
-        self._lock = FileLock(lock_file_path)
-        self._is_locked = False
-
-    def acquire(self, timeout_seconds: int = 60) -> bool:
-        try:
-            self._lock.acquire(timeout=timeout_seconds)
-            self._is_locked = True
-            return True
-        except Timeout:
-            self._is_locked = False
-            return False
-
-    def release(self) -> bool:
-        if self._is_locked:
-            self._lock.release()
-            self._is_locked = False
-            return True
-        return False
-
-    def __enter__(self):
-        acquired = self.acquire()
-        if not acquired:
-            raise TimeoutError("Failed to acquire lock within the specified timeout.")
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.release()
-
-    def locked(self) -> bool:
-        return self._is_locked

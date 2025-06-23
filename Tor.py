@@ -1,3 +1,14 @@
+"""
+Tor.py
+
+Tor network integration module for fetching Reddit RSS feeds through the Tor network.
+Provides functionality for fetching content via curl through Tor SOCKS proxy and
+managing Tor circuit renewal for IP rotation.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import io
 import random
 import socket
@@ -7,28 +18,56 @@ import time
 import traceback
 from timeit import default_timer as timer
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import feedparser
-#Generate fake but valid user-agents to make Reddit happy.
 from fake_useragent import UserAgent
 
+# =============================================================================
+# LOCAL IMPORTS
+# =============================================================================
 import shared
 from shared import g_cs
 from seleniumfetch import fetch_site_posts
 
-ua = UserAgent()
+# =============================================================================
+# CONSTANTS AND CONFIGURATION
+# =============================================================================
 
 PASSWORD = "TESTPASSWORD"
 
+# =============================================================================
+# GLOBAL VARIABLES AND INITIALIZATION
+# =============================================================================
+
+ua = UserAgent()
+
+# Initialize Reddit user agent if not already set
 if not g_cs.has("REDDIT_USER_AGENT"):
-    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
+    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=shared.EXPIRE_YEARS)
 
+# Initialize Reddit method preference if not already set
 if not g_cs.has("REDDIT_METHOD"):
-    g_cs.put("REDDIT_METHOD", "curl", timeout = shared.EXPIRE_YEARS)
+    g_cs.put("REDDIT_METHOD", "curl", timeout=shared.EXPIRE_YEARS)
 
+# Thread lock for Tor fetch operations
 tor_fetch_lock = threading.Lock()
 
+# =============================================================================
+# TOR NETWORK OPERATIONS
+# =============================================================================
+
 def fetch_via_curl(url):
-    """Fetch Reddit RSS feeds using curl subprocess through TOR."""
+    """
+    Fetch Reddit RSS feeds using curl subprocess through Tor SOCKS proxy.
+    
+    Args:
+        url (str): The URL to fetch via Tor network
+        
+    Returns:
+        feedparser.FeedParserDict or None: Parsed RSS feed data or None if failed
+    """
     print(f"Using curl TOR method for: {url}")
     result = None
     
@@ -101,15 +140,22 @@ def fetch_via_curl(url):
     return result
 
 def renew_tor_ip():
-    '''Generate a new user agent, a new IP address and try again!'''
-    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout = shared.EXPIRE_YEARS)
+    """
+    Generate a new user agent and request a new Tor IP address.
+    
+    This function authenticates with the Tor control port and requests a new circuit
+    to obtain a fresh IP address. It also generates a new user agent for additional
+    anonymity. Waits 20-30 seconds for the new circuit to be established.
+    """
+    # Generate new user agent
+    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=shared.EXPIRE_YEARS)
 
     print("Requesting a new TOR IP address...")
 
     host = "127.0.0.1"
     port = 9051
 
-    # Create socket and connect
+    # Create socket and connect to Tor control port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
         s.send(f'AUTHENTICATE "{PASSWORD}"\r\n'.encode())
@@ -122,25 +168,44 @@ def renew_tor_ip():
         response = s.recv(1024).decode()
         print("New circuit requested:", response)
 
-    # Wait 20-30 seconds to give time for a circuit to be re-established.
+    # Wait 20-30 seconds to give time for a circuit to be re-established
     time.sleep(random.uniform(20, 30))
 
-def fetch_via_tor(url, site_url):
+# =============================================================================
+# MAIN FETCH FUNCTION
+# =============================================================================
 
+def fetch_via_tor(url, site_url):
+    """
+    Fetch content via Tor network with automatic fallback and retry logic.
+    
+    This function attempts to fetch content using the last successful method first,
+    then falls back to alternative methods. If all attempts fail, it renews the
+    Tor IP address and retries. Supports both curl and selenium methods.
+    
+    Args:
+        url (str): The RSS feed URL to fetch
+        site_url (str): The site URL for selenium-based fetching
+        
+    Returns:
+        dict: Parsed feed data with entries, or empty result dict if all methods fail
+    """
     last_success_method = g_cs.get("REDDIT_LAST_METHOD")
 
     with tor_fetch_lock:
-        max_attempts = 3  # define how many attempts we try
+        max_attempts = 3  # Define how many attempts we try
         result = None
         
         for attempt in range(max_attempts):
-            # On first try use last_success_method, otherwise start with selenium after renew_tor_ip.
+            # On first try use last_success_method, otherwise start with selenium after renew_tor_ip
             default_method = last_success_method if (attempt == 0 and last_success_method) else "selenium"
             
+            # Try default method
             if default_method == "curl":
                 result_default = fetch_via_curl(url)
             else:
                 result_default = fetch_site_posts(site_url, None)
+                
             if result_default is not None and len(result_default.get("entries", [])) > 0:
                 g_cs.put("REDDIT_METHOD", default_method, shared.EXPIRE_YEARS)
                 result = result_default
@@ -152,6 +217,7 @@ def fetch_via_tor(url, site_url):
                 result_alternative = fetch_via_curl(url)
             else:
                 result_alternative = fetch_site_posts(site_url, None)
+                
             if result_alternative is not None and len(result_alternative.get("entries", [])) > 0:
                 g_cs.put("REDDIT_METHOD", alternative_method, shared.EXPIRE_YEARS)
                 result = result_alternative
@@ -162,5 +228,10 @@ def fetch_via_tor(url, site_url):
         
         if result is None:
             print("All TOR methods failed, returning empty result")
-            result = {'entries': [], 'status': 'failed', 'bozo_exception': 'All TOR methods failed'}
+            result = {
+                'entries': [], 
+                'status': 'failed', 
+                'bozo_exception': 'All TOR methods failed'
+            }
+            
         return result

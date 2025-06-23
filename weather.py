@@ -1,56 +1,79 @@
 """
 weather.py
 
-Provides functions to fetch and cache weather data, including a fake API mode for testing. Includes HTML rendering for weather forecasts.
+Weather data fetching and caching module for the Flask application.
+Provides functions to fetch weather data from OpenWeather API, cache results,
+and render weather forecasts as HTML. Includes GeoIP location detection and
+rate limiting for API calls.
 """
 
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import os
 import math
 import time
+import json
 from collections import defaultdict
 from datetime import date as date_obj
 from datetime import datetime, timedelta
 from bisect import bisect_left
-import json
 
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 import geoip2.database
-# Third-party imports
 import requests
 from flask import jsonify, request
 from flask_restful import Resource, reqparse, Api
 
-from shared import limiter, dynamic_rate_limit
-# Local imports
-from shared import g_cs, get_lock, USER_AGENT, TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS
+# =============================================================================
+# LOCAL IMPORTS
+# =============================================================================
+from shared import (
+    limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT, 
+    TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS
+)
 from models import DEBUG, get_weather_api_key
 
-# --- Arbitrary bucket resolution (miles-based) ---
-WEATHER_BUCKET_SIZE_MILES = 10  # default bucket diameter in miles (good balance for weather data)
-_WEATHER_BUCKET_SIZE_DEG = WEATHER_BUCKET_SIZE_MILES / 69.0  # convert miles to degrees (~1° ≈ 69 miles)
+# =============================================================================
+# CONSTANTS AND CONFIGURATION
+# =============================================================================
 
-def _bucket_coord(val, bucket_size_deg=_WEATHER_BUCKET_SIZE_DEG):
-    """Buckets a coordinate into intervals of bucket_size_deg degrees."""
-    return math.floor(float(val) / bucket_size_deg) * bucket_size_deg
+# Weather bucket configuration for caching
+WEATHER_BUCKET_SIZE_MILES = 10  # Default bucket diameter in miles (good balance for weather data)
+_WEATHER_BUCKET_SIZE_DEG = WEATHER_BUCKET_SIZE_MILES / 69.0  # Convert miles to degrees (~1° ≈ 69 miles)
 
-def _bucket_key(lat, lon):
-    """Generates a cache key based on bucketed lat/lon coordinates."""
-    lat_b = _bucket_coord(lat)
-    lon_b = _bucket_coord(lon)
-    return f"{lat_b:.6f},{lon_b:.6f}"
-
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+# Cache timeout configuration
 if DEBUG:
     WEATHER_CACHE_TIMEOUT = 300
 else:
     WEATHER_CACHE_TIMEOUT = 3600 * 4  # 4 hours
 
-# Add default coordinates for weather (Detroit, MI)
+# Default coordinates for weather (Detroit, MI)
 DEFAULT_WEATHER_LAT = 42.3314
 DEFAULT_WEATHER_LON = -83.0458
 
-# --- GeoIP ---
+# Rate limiting configuration
+RL_KEY = "weather_api_call_timestamps_v2"
+RATE_LIMIT_WINDOW = 10  # seconds
+RATE_LIMIT_COUNT = 10   # calls per window
+
+# Cache entry prefix
+CACHE_ENTRY_PREFIX = 'weather:cache_entry:'
+
+# =============================================================================
+# GEOIP CONFIGURATION
+# =============================================================================
+
 def _get_geoip_db_path():
-    #Database stored in /srv/http/LinuxReport2/GeoLite2-City.mmdb
+    """
+    Get the path to the GeoIP database file.
+    
+    Returns:
+        str: Path to the GeoIP database file
+    """
+    # Database stored in /srv/http/LinuxReport2/GeoLite2-City.mmdb
     srv_path = os.path.join('/srv/http/LinuxReport2', 'GeoLite2-City.mmdb')
     if os.path.exists(srv_path):
         return srv_path
@@ -61,8 +84,54 @@ GEOIP_DB_PATH = _get_geoip_db_path()
 # Global reader for GeoIP database to avoid reopening the file
 _geoip_reader = None
 
+# =============================================================================
+# WEATHER API CONFIGURATION
+# =============================================================================
+
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+def _bucket_coord(val, bucket_size_deg=_WEATHER_BUCKET_SIZE_DEG):
+    """
+    Buckets a coordinate into intervals of bucket_size_deg degrees.
+    
+    Args:
+        val (float): Coordinate value to bucket
+        bucket_size_deg (float): Size of each bucket in degrees
+        
+    Returns:
+        float: Bucketed coordinate value
+    """
+    return math.floor(float(val) / bucket_size_deg) * bucket_size_deg
+
+def _bucket_key(lat, lon):
+    """
+    Generates a cache key based on bucketed lat/lon coordinates.
+    
+    Args:
+        lat (float): Latitude coordinate
+        lon (float): Longitude coordinate
+        
+    Returns:
+        str: Cache key for the bucketed coordinates
+    """
+    lat_b = _bucket_coord(lat)
+    lon_b = _bucket_coord(lon)
+    return f"{lat_b:.6f},{lon_b:.6f}"
+
 def get_location_from_ip(ip):
-    """Get geolocation coordinates from an IP address using MaxMind GeoIP database."""
+    """
+    Get geolocation coordinates from an IP address using MaxMind GeoIP database.
+    
+    Args:
+        ip (str): IP address to geolocate
+        
+    Returns:
+        tuple: (latitude, longitude) coordinates, or default coordinates if lookup fails
+    """
     global _geoip_reader
     if _geoip_reader is None:
         _geoip_reader = geoip2.database.Reader(GEOIP_DB_PATH)
@@ -75,13 +144,13 @@ def get_location_from_ip(ip):
     except:
         return DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
-
-RL_KEY = "weather_api_call_timestamps_v2"
-RATE_LIMIT_WINDOW = 10  # seconds
-RATE_LIMIT_COUNT = 10   # calls per window
-
 def rate_limit_check():
-    """Enforces RATE_LIMIT_COUNT calls per RATE_LIMIT_WINDOW seconds."""
+    """
+    Enforces RATE_LIMIT_COUNT calls per RATE_LIMIT_WINDOW seconds.
+    
+    This function implements a sliding window rate limiter for weather API calls.
+    If the rate limit is exceeded, it sleeps until the oldest request expires.
+    """
     now = datetime.now(TZ).timestamp()
     timestamps = g_cs.get(RL_KEY) or []
 
@@ -104,10 +173,33 @@ def rate_limit_check():
 
     g_cs.put(RL_KEY, timestamps_in_window, timeout=RATE_LIMIT_WINDOW + 1)
 
-CACHE_ENTRY_PREFIX = 'weather:cache_entry:'
+def fahrenheit_to_celsius(f_temp):
+    """
+    Convert Fahrenheit temperature to Celsius, rounded to a whole number.
+    
+    Args:
+        f_temp (float): Temperature in Fahrenheit
+        
+    Returns:
+        int or None: Temperature in Celsius, or None if input is None
+    """
+    if f_temp is None:
+        return None
+    return round((f_temp - 32) * 5/9)
+
+# =============================================================================
+# CACHE MANAGEMENT
+# =============================================================================
 
 def save_weather_cache_entry(lat, lon, data):
-    """Saves a weather data entry to the cache with timestamp and date, using bucketed key."""
+    """
+    Saves a weather data entry to the cache with timestamp and date, using bucketed key.
+    
+    Args:
+        lat (float): Latitude coordinate
+        lon (float): Longitude coordinate
+        data (dict): Weather data to cache
+    """
     key = _bucket_key(lat, lon)
     now = datetime.now(TZ).timestamp()
     today_str = date_obj.today().isoformat()
@@ -119,15 +211,32 @@ def save_weather_cache_entry(lat, lon, data):
     # Adjust timeout based on data age (remaining = total - elapsed)
     remaining_timeout = max(WEATHER_CACHE_TIMEOUT - time_since_fetch, 300)  # Minimum 5 minutes
     
-    entry = {'lat': str(lat), 'lon': str(lon), 'data': data, 'timestamp': now, 'date': today_str}
+    entry = {
+        'lat': str(lat), 
+        'lon': str(lon), 
+        'data': data, 
+        'timestamp': now, 
+        'date': today_str
+    }
     g_cs.put(CACHE_ENTRY_PREFIX + key, entry, timeout=remaining_timeout)
 
 def get_bucketed_weather_cache(lat, lon, units='imperial'):
-    """Returns cached weather data for the bucketed (lat, lon) if present and same day."""
+    """
+    Returns cached weather data for the bucketed (lat, lon) if present and same day.
+    
+    Args:
+        lat (float): Latitude coordinate
+        lon (float): Longitude coordinate
+        units (str): Temperature units ('imperial' or 'metric')
+        
+    Returns:
+        dict or None: Cached weather data or None if not available
+    """
     key = _bucket_key(lat, lon)
     entry = g_cs.get(CACHE_ENTRY_PREFIX + key)
     today_str = date_obj.today().isoformat()
     now = datetime.now(TZ).timestamp()
+    
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
         # print(f"[DEBUG] Cache hit for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
         data = entry['data']
@@ -137,13 +246,16 @@ def get_bucketed_weather_cache(lat, lon, units='imperial'):
     # print(f"[DEBUG] Cache miss for key {key}")
     return None
 
-def fahrenheit_to_celsius(f_temp):
-    """Convert Fahrenheit temperature to Celsius, rounded to a whole number."""
-    if f_temp is None:
-        return None
-    return round((f_temp - 32) * 5/9)
-
 def convert_weather_to_metric(data):
+    """
+    Convert weather data from imperial (Fahrenheit) to metric (Celsius) units.
+    
+    Args:
+        data (dict): Weather data in imperial units
+        
+    Returns:
+        dict: Weather data converted to metric units
+    """
     if 'daily' in data:
         for day in data['daily']:
             if 'temp_min' in day:
@@ -152,8 +264,21 @@ def convert_weather_to_metric(data):
                 day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
     return data
 
+# =============================================================================
+# WEATHER DATA PROCESSING
+# =============================================================================
+
 def _process_openweather_response(weather_data, fetch_time):
-    """Process the OpenWeather API response into the standard format."""
+    """
+    Process the OpenWeather API response into the standard format.
+    
+    Args:
+        weather_data (dict): Raw response from OpenWeather API
+        fetch_time (float): Timestamp when the data was fetched
+        
+    Returns:
+        tuple: (processed_data, city_name) - Processed weather data and city name
+    """
     # Determine city name for logging
     city_name = weather_data.get("city", {}).get("name", "Unknown location")
     # print(f"[DEBUG] Raw API response city data: {weather_data.get('city', {})}")
@@ -166,12 +291,14 @@ def _process_openweather_response(weather_data, fetch_time):
     processed_data = {"daily": []}
     today_date = datetime.now().date()
     days_added = 0
+    
     for date, entries in sorted(daily_data.items()):
         entry_date = datetime.strptime(date, "%Y-%m-%d").date()
         if entry_date < today_date:
             continue
         if days_added >= 5:
             break
+            
         temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
         temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
         pops = [e.get("pop", 0) for e in entries]
@@ -200,7 +327,16 @@ def _process_openweather_response(weather_data, fetch_time):
     return processed_data, city_name
 
 def _log_weather_result(processed_data, city_name, service_name, api_time, units):
-    """Log the weather API result."""
+    """
+    Log the weather API result.
+    
+    Args:
+        processed_data (dict): Processed weather data
+        city_name (str): Name of the city
+        service_name (str): Name of the weather service used
+        api_time (float): Time taken for API call
+        units (str): Temperature units used
+    """
     try:
         today_entry = processed_data["daily"][0]
         # Get the temp (already potentially converted)
@@ -211,8 +347,22 @@ def _log_weather_result(processed_data, city_name, service_name, api_time, units
         # Indicate error or missing data
         print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
 
+# =============================================================================
+# API FETCHING
+# =============================================================================
+
 def _fetch_from_openweather_api(lat, lon, fetch_time):
-    """Fetch weather data from OpenWeather API."""
+    """
+    Fetch weather data from OpenWeather API.
+    
+    Args:
+        lat (float): Latitude coordinate
+        lon (float): Longitude coordinate
+        fetch_time (float): Timestamp when the fetch was initiated
+        
+    Returns:
+        tuple: (processed_data, city_name, api_time, service_name, error_data, error_code)
+    """
     service_name = "OpenWeather"
     
     # Check for valid API key before proceeding
@@ -239,10 +389,21 @@ def _fetch_from_openweather_api(lat, lon, fetch_time):
     return processed_data, city_name, api_time, service_name, None, None
 
 def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
-    """Fetches weather data for given coordinates or IP address, using cache or API.
-    Returns a tuple of (data, status_code) where data includes 'fetch_time'
-    when the data was fetched from the API."""
+    """
+    Fetches weather data for given coordinates or IP address, using cache or API.
     
+    This function first checks the cache for existing weather data. If not found,
+    it fetches fresh data from the OpenWeather API and caches the result.
+    
+    Args:
+        lat (float, optional): Latitude coordinate
+        lon (float, optional): Longitude coordinate
+        ip (str, optional): IP address for geolocation
+        units (str): Temperature units ('imperial' or 'metric')
+        
+    Returns:
+        tuple: (data, status_code) where data includes 'fetch_time' when the data was fetched from the API
+    """
     # If IP is provided, use it to get lat/lon
     if ip and (not lat or not lon):
         lat, lon = get_location_from_ip(ip)
@@ -308,7 +469,20 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         error_data = {"error": "Failed to process weather data from OpenWeather API", "fetch_time": fetch_time}
         return error_data, 500
 
+# =============================================================================
+# HTML GENERATION
+# =============================================================================
+
 def get_weather_html(ip):
+    """
+    Generate HTML for weather forecast display.
+    
+    Args:
+        ip (str): IP address for location detection
+        
+    Returns:
+        str: HTML string for weather forecast display
+    """
     weather_data, status_code = get_weather_data(ip=ip)
     if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
         forecast_html = '<div id="weather-forecast" class="weather-forecast">'
@@ -346,7 +520,12 @@ def get_weather_html(ip):
         return get_default_weather_html()
 
 def get_default_weather_html():
-    """Returns the default HTML for the weather container (loading state)."""
+    """
+    Returns the default HTML for the weather container (loading state).
+    
+    Returns:
+        str: HTML string for default weather container
+    """
     return '''
     <div id="weather-container" class="weather-container">
         <h3>5-Day Weather</h3>
@@ -356,8 +535,17 @@ def get_default_weather_html():
     </div>
     '''
 
+# =============================================================================
+# TESTING AND DEBUGGING
+# =============================================================================
+
 def test_weather_api_with_ips():
-    """Test get_location_from_ip and get_weather_data for a list of IP addresses."""
+    """
+    Test get_location_from_ip and get_weather_data for a list of IP addresses.
+    
+    This function is used for debugging and testing the weather API functionality
+    with specific IP addresses.
+    """
     test_ips = [
         "100.19.21.35",
         "102.218.61.15",
@@ -371,13 +559,39 @@ def test_weather_api_with_ips():
             fetch_time_from_data = f"{fetch_time_from_data:.2f}s"
         print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
 
+# =============================================================================
+# FLASK ROUTES INITIALIZATION
+# =============================================================================
+
 def init_weather_routes(app):
+    """
+    Initialize weather API routes for the Flask application.
+    
+    Args:
+        app (Flask): Flask application instance
+    """
     # Create request parser for weather API
     weather_parser = reqparse.RequestParser()
-    weather_parser.add_argument('units', type=str, default='imperial', choices=['imperial', 'metric'], 
-                               location='args', help='Units must be either imperial or metric')
-    weather_parser.add_argument('lat', type=float, location='args', help='Latitude must be a valid number')
-    weather_parser.add_argument('lon', type=float, location='args', help='Longitude must be a valid number')
+    weather_parser.add_argument(
+        'units', 
+        type=str, 
+        default='imperial', 
+        choices=['imperial', 'metric'], 
+        location='args', 
+        help='Units must be either imperial or metric'
+    )
+    weather_parser.add_argument(
+        'lat', 
+        type=float, 
+        location='args', 
+        help='Latitude must be a valid number'
+    )
+    weather_parser.add_argument(
+        'lon', 
+        type=float, 
+        location='args', 
+        help='Longitude must be a valid number'
+    )
 
     class WeatherResource(Resource):
         """
@@ -443,6 +657,7 @@ def init_weather_routes(app):
         """
         @limiter.limit(dynamic_rate_limit)
         def get(self):
+            """Handle GET requests for weather data."""
             args = weather_parser.parse_args()
             ip = request.remote_addr
             units = args['units']
@@ -467,7 +682,16 @@ def init_weather_routes(app):
             return weather_data, status_code
         
         def dispatch_request(self, *args, **kwargs):
-            """Override to add cache headers to all responses"""
+            """
+            Override to add cache headers to all responses.
+            
+            Args:
+                *args: Variable length argument list
+                **kwargs: Arbitrary keyword arguments
+                
+            Returns:
+                Response: Flask response with cache headers added
+            """
             response = super().dispatch_request(*args, **kwargs)
             
             # Add cache control headers for 4 hours (14400 seconds)
@@ -480,6 +704,10 @@ def init_weather_routes(app):
     # Register the resource with Flask-RESTful
     api = Api(app)
     api.add_resource(WeatherResource, '/api/weather')
+
+# =============================================================================
+# MAIN EXECUTION
+# =============================================================================
 
 if __name__ == "__main__":
     print("Running weather API tests with test IP addresses...")
