@@ -661,6 +661,39 @@ def _prepare_messages(prompt_mode, filtered_articles):
         ]
     return messages
 
+def _try_fallback_model(provider1, messages, filtered_articles, reason):
+    """Try fallback model and return (success, top_articles, used_model)"""
+    fallback_model = provider1.fallback_model
+    if fallback_model not in provider1.model_selector.failed_models:
+        try:
+            response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback ({reason})")
+            if response_text:
+                top_titles = extract_top_titles_from_ai(response_text)
+                if top_titles:
+                    print(f"Successfully extracted headlines using fallback model: {fallback_model}")
+                    # Process articles with new titles
+                    top_articles = []
+                    for title in top_titles:
+                        best_match = get_best_matching_article(title, filtered_articles)
+                        if (best_match):
+                            top_articles.append(best_match)
+                            print(f"Selected article: {best_match['title']} ({best_match['url']})")
+                        else:
+                            print(f"Failed to find match for title: {title}")
+                    return True, top_articles, fallback_model
+                else:
+                    print("Fallback model also failed to extract headlines")
+                    provider1.model_selector.mark_failed(fallback_model)
+            return False, [], None
+        except Exception as e:
+            print(f"Fallback model failed during {reason}: {e}")
+            traceback.print_exc()
+            provider1.model_selector.mark_failed(fallback_model)
+            return False, [], None
+    else:
+        print(f"Fallback model {fallback_model} was already tried and failed")
+        return False, [], None
+
 def ask_ai_top_articles(articles):
     """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
     # --- Deduplication (remains the same) ---
@@ -717,31 +750,11 @@ def ask_ai_top_articles(articles):
     # If no headlines extracted, try fallback model
     if not top_titles:
         print("No headlines extracted from primary model, trying fallback model...")
-        fallback_model = provider1.fallback_model
-        if fallback_model not in provider1.model_selector.failed_models:
-            try:
-                response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, "Fallback (headline retry)")
-                if response_text:
-                    top_titles = extract_top_titles_from_ai(response_text)
-                    if top_titles:
-                        used_model = fallback_model
-                        print(f"Successfully extracted headlines using fallback model: {fallback_model}")
-                    else:
-                        print("Fallback model also failed to extract headlines")
-                        provider1.model_selector.mark_failed(fallback_model)
-                        return "No headlines could be extracted from AI response.", [], previous_selections, None
-            except Exception as e:
-                print(f"Fallback model failed during headline retry: {e}")
-                traceback.print_exc()
-                provider1.model_selector.mark_failed(fallback_model)
-                return "Fallback model failed to process headlines.", [], previous_selections, None
+        success, top_articles, used_model = _try_fallback_model(provider1, messages, filtered_articles, "headline retry")
+        if success:
+            return response_text, top_articles, previous_selections, used_model
         else:
-            print(f"Fallback model {fallback_model} was already tried and failed")
             return "No headlines could be extracted from AI response.", [], previous_selections, None
-    
-    # Only update model cache if we successfully extracted headlines
-    if top_titles and used_model:
-        update_model_cache(used_model)
     
     top_articles = []
     for title in top_titles:
@@ -751,6 +764,19 @@ def ask_ai_top_articles(articles):
             print(f"Selected article: {best_match['title']} ({best_match['url']})")
         else:
             print(f"Failed to find match for title: {title}")
+
+    # If fewer than 3 articles found, try fallback model
+    if len(top_articles) < 3 and top_articles:
+        print(f"Only {len(top_articles)} articles found, trying fallback model...")
+        success, top_articles, used_model = _try_fallback_model(provider1, messages, filtered_articles, "article count retry")
+        if success:
+            return response_text, top_articles, previous_selections, used_model
+        else:
+            return "No headlines could be extracted from AI response.", [], previous_selections, None
+
+    # Only update model cache if we successfully got 3 articles
+    if len(top_articles) >= 3 and used_model:
+        update_model_cache(used_model)
 
     new_selections = [{"url": art["url"], "title": art["title"]}
                       for art in top_articles if art]
