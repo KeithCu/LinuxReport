@@ -80,6 +80,8 @@ def init_app(flask_app):
         flask_app (Flask): The Flask application instance to configure
     """
     # Initialize routes from other modules
+    _register_main_routes(flask_app)
+    _register_authentication_routes(flask_app)
     init_weather_routes(flask_app)
     init_old_headlines_routes(flask_app)
     init_chat_routes(flask_app, limiter, dynamic_rate_limit)
