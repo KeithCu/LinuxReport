@@ -1,34 +1,42 @@
 """
 routes.py
 
-This file contains all the Flask route handlers for the application, including the main index page, configuration page, and weather API.
+This file contains all the Flask route handlers for the application, including the main index page, 
+configuration page, weather API, authentication, and various utility endpoints.
 """
 
-# Standard library imports
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import os
 import json
 from timeit import default_timer as timer
 import datetime
 import time
 
-# Third-party imports
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
 from flask import g, jsonify, render_template, request, make_response, flash, redirect, url_for
 from markupsafe import Markup
 from flask_cors import CORS
 from flask_login import login_user, logout_user, login_required, current_user
 from flask_limiter.util import get_remote_address
 
+# =============================================================================
+# LOCAL IMPORTS
+# =============================================================================
 from forms import LoginForm
 from models import RssInfo, DEBUG, User
-# Local imports
-from shared import (limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS,
-                    FAVICON, LOGO_URL, STANDARD_ORDER_STR,
-                    URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION,
-                    WEB_TITLE, WELCOME_HTML, g_c, g_cm, SITE_URLS, PATH, format_last_updated,
-                    ALLOWED_DOMAINS, ENABLE_CORS, ALLOWED_REQUESTER_DOMAINS,
-                    ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, WEB_BOT_USER_AGENTS,
-                    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG,
-                    ENABLE_COMPRESSION_CACHING)
+from shared import (
+    limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, 
+    EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS, FAVICON, LOGO_URL, STANDARD_ORDER_STR,
+    URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML, 
+    g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
+    ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
+    WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG,
+    ENABLE_COMPRESSION_CACHING
+)
 from weather import get_default_weather_html, init_weather_routes
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content, get_cached_response_for_client
@@ -37,20 +45,40 @@ from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
 
+# =============================================================================
+# GLOBAL CONFIGURATION
+# =============================================================================
+
 # Global setting for background refreshes
 ENABLE_BACKGROUND_REFRESH = True
 
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
 
 def get_cached_above_html():
-    """Return content of ABOVE_HTML_FILE using generic cache."""
+    """
+    Return content of ABOVE_HTML_FILE using generic cache.
+    
+    Returns:
+        str: Cached HTML content from the above HTML file
+    """
     return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
 
-# Function to initialize routes
+# =============================================================================
+# ROUTE INITIALIZATION
+# =============================================================================
+
 def init_app(flask_app):
-    """Initialize Flask routes."""
-    # Initialize Flask-Limiter with your cache system - It's already initialized in app.py
-    # limiter.init_app(flask_app)
+    """
+    Initialize Flask routes and configure the application.
     
+    This function sets up all route handlers, security headers, CORS configuration,
+    and initializes routes from other modules.
+    
+    Args:
+        flask_app (Flask): The Flask application instance to configure
+    """
     # Initialize routes from other modules
     init_weather_routes(flask_app)
     init_old_headlines_routes(flask_app)
@@ -108,9 +136,21 @@ def init_app(flask_app):
             
             return response
 
-    # Login route
+# =============================================================================
+# AUTHENTICATION ROUTES
+# =============================================================================
+
+def _register_authentication_routes(flask_app):
+    """
+    Register authentication-related routes.
+    
+    Args:
+        flask_app (Flask): The Flask application instance
+    """
+    
     @flask_app.route('/login', methods=['GET', 'POST'])
     def login():
+        """Handle user login."""
         if current_user.is_authenticated:
             return redirect(url_for('index'))
         
@@ -131,18 +171,35 @@ def init_app(flask_app):
         
         return render_template('login.html', form=form)
 
-    # Logout route
     @flask_app.route('/logout')
     @login_required
     def logout():
+        """Handle user logout."""
         logout_user()
         return redirect(url_for('index'))
 
-    # The main page of LinuxReport. Most of the time, it won't need to hit the disk to return the page
-    # even if the page cache is expired.
+# =============================================================================
+# MAIN APPLICATION ROUTES
+# =============================================================================
+
+def _register_main_routes(flask_app):
+    """
+    Register main application routes including the index page.
+    
+    Args:
+        flask_app (Flask): The Flask application instance
+    """
+    
     @flask_app.route('/')
     @limiter.limit(dynamic_rate_limit)
     def index():
+        """
+        Main page of LinuxReport.
+        
+        This is the primary route that handles the main page display. It includes
+        sophisticated caching, performance tracking, RSS feed management, and
+        background refresh capabilities.
+        """
         # Check if admin mode is enabled for performance tracking using Flask-Login
         is_admin = current_user.is_authenticated
 
@@ -162,7 +219,7 @@ def init_app(flask_app):
 
         page_order_s = str(page_order)
 
-        # Determine display settings based on user preferences and device type.
+        # Determine display settings based on user preferences and device type
         suffix = ""
         single_column = False
 
