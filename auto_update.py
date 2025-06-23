@@ -27,30 +27,36 @@ from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 
 from enum import Enum  # Ensure this is included if not already
 
+# =============================================================================
+# ENUMERATIONS AND CONSTANTS
+# =============================================================================
+
 class PromptMode(Enum):
     O3 = 'o3'
     THIRTY_B = '30b'  # Represents '30b' prompt
 
-# Randomly select between O3 and 30B prompts by default
-#PROMPT_MODE = random.choice([PromptMode.O3, PromptMode.THIRTY_B])
+# =============================================================================
+# CORE CONFIGURATION CONSTANTS
+# =============================================================================
 
-# Use O3 prompt mode by default for a while to try it out
-PROMPT_MODE = PromptMode.O3
+# Prompt mode selection
+PROMPT_MODE = PromptMode.O3  # Use O3 prompt mode by default
 
-
-# --- Configuration and Prompt Constants ---
-MAX_PREVIOUS_HEADLINES = 200 # Number of headlines to remember and filter out to the AI
-
-MAX_ARCHIVE_HEADLINES = 50 # Size of Headlines Archive page
-
+# Headlines and archive limits
+MAX_PREVIOUS_HEADLINES = 200  # Number of headlines to remember and filter out to the AI
+MAX_ARCHIVE_HEADLINES = 50    # Size of Headlines Archive page
 
 # Title marker used to separate reasoning from selected headlines
 TITLE_MARKER = "= HEADLINES ="
 
-# How many articles from each feed to consider for the LLM
-MAX_ARTICLES_PER_FEED_FOR_LLM = 5
+# Article processing limits
+MAX_ARTICLES_PER_FEED_FOR_LLM = 5  # How many articles from each feed to consider for the LLM
 
-# === Global LLM/AI config ===
+# =============================================================================
+# LLM/AI CONFIGURATION
+# =============================================================================
+
+# Global LLM/AI settings
 MAX_TOKENS = 10000
 TIMEOUT = 120
 MODEL_CACHE_DURATION = EXPIRE_DAY * 7
@@ -61,6 +67,14 @@ API_RESPONSE_LOG = "api_responses.jsonl"
 
 # AI Attribution configuration
 SHOW_AI_ATTRIBUTION = True  # Set to False to hide AI model attribution in headlines
+
+# Optional: include more article data (summary, etc) in LLM prompt
+INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
+
+# =============================================================================
+# MODEL CONFIGURATION
+# =============================================================================
+
 # List of free models to try
 FREE_MODELS = [
     "agentica-org/deepcoder-14b-preview:free",
@@ -105,8 +119,18 @@ FREE_MODELS = [
 # Fallback model to use if all free models fail
 FALLBACK_MODEL = "mistralai/mistral-small-3.1-24b-instruct"
 
-# Set to True to always try random models, False to use cached working model
-USE_RANDOM_MODELS = True
+# Model selection behavior
+USE_RANDOM_MODELS = True  # Set to True to always try random models, False to use cached working model
+
+# Models that don't support system instructions properly and need user-only instructions
+USER_ONLY_INSTRUCTION_MODELS = [
+    "google/gemma-3-27b-it:free",
+    "qwen/qwen3-8b:free",  # Added due to issues with system prompts
+]
+
+# =============================================================================
+# PROMPT TEMPLATES
+# =============================================================================
 
 PROMPT_30B = f""" Prompt:
 Given this list of news headlines, follow these steps:
@@ -121,7 +145,7 @@ Second Best headline
 Third Best headline
 """
 
-#O3-suggested alternate prompt for reasoning models
+# O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = f"""
 INSTRUCTIONS:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
@@ -156,19 +180,18 @@ Find the top 3 articles most interesting to:
 INPUT TITLES:
 """
 
-
-# --- Global Variables ---
-cache = g_c
-
-ALL_URLS = {} # Initialized here, passed to utils
+# =============================================================================
+# PROVIDER CONFIGURATION
+# =============================================================================
 
 # Global tracking with persistence
 FAILED_MODELS_CACHE_KEY = "failed_llm_models"
 FAILED_MODELS_RETRY_HOURS = 24  # Retry failed models after 24 hours
 
-# --- Global Configuration (Replaces Environment Variables except API Keys) ---
+# Run mode configuration
 RUN_MODE = "normal"  # options: "normal", "compare"
 
+# Provider configuration
 PROVIDER = "openrouter"
 
 # Configuration for the primary provider/model
@@ -177,6 +200,7 @@ MODEL_1 = None
 # Configuration for the secondary provider/model (for comparison mode)
 MODEL_2 = None  # Will be set based on provider
 
+# Mistral-specific configuration
 MISTRAL_EXTRA_PARAMS = {
     "provider": {
         "order": ["Mistral"], # Try to send the request to Mistral first
@@ -187,16 +211,13 @@ MISTRAL_EXTRA_PARAMS = {
 # Add unified provider client cache (for normal mode)
 provider_client_cache = None
 
-# Optional: include more article data (summary, etc) in LLM prompt
-INCLUDE_ARTICLE_SUMMARY_FOR_LLM = False
+# Global URL storage
+ALL_URLS = {}  # Initialized here, passed to utils
 
-# Models that don't support system instructions properly and need user-only instructions
-USER_ONLY_INSTRUCTION_MODELS = [
-    "google/gemma-3-27b-it:free",
-    "qwen/qwen3-8b:free",  # Added due to issues with system prompts
-]
+# =============================================================================
+# PROVIDER CLASS HIERARCHY
+# =============================================================================
 
-# Provider class hierarchy
 class LLMProvider(ABC):
     """Abstract base class for LLM providers."""
     
