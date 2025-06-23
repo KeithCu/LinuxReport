@@ -705,18 +705,9 @@ def ask_ai_top_articles(articles):
 
     previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
     previous_urls = [sel["url"] for sel in previous_selections]
-    print(f"Previous URLs in cache: {len(previous_urls)} total")
-    if previous_urls:
-        print("Most recent URLs in cache:")
-        for url in previous_urls[-3:]:  # Show last 3 as examples
-            print(f"  - {url}")
 
     # Log articles being filtered by URL
     print("\nFiltering articles by URL:")
-    for article in articles:
-        if article["url"] in previous_urls:
-            print(f"Filtered by URL match: {article['title']} ({article['url']})")
-
     articles = [article for article in articles if article["url"] not in previous_urls]
     print(f"\nRemaining articles after URL filtering: {len(articles)}")
     
@@ -766,7 +757,7 @@ def ask_ai_top_articles(articles):
             print(f"Failed to find match for title: {title}")
 
     # If fewer than 3 articles found, try fallback model
-    if len(top_articles) < 3 and top_articles:
+    if len(top_articles) < 3:
         print(f"Only {len(top_articles)} articles found, trying fallback model...")
         success, top_articles, used_model = _try_fallback_model(provider1, messages, filtered_articles, "article count retry")
         if success:
