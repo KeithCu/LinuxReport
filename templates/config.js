@@ -13,21 +13,30 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-const CONFIG = {
-  // Default values
-  DEFAULT_THEME: 'silver',
-  DEFAULT_FONT: 'sans-serif',
+// Use shared configuration with fallback
+const CONFIG_CONFIG = (function() {
+  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
+    return window.LINUXREPORT_CONFIG;
+  }
   
-  // Drag and drop settings
-  DRAG_OPACITY: '0.9',
-  DRAG_OPACITY_NORMAL: '1',
-  
-  // Priority calculation
-  PRIORITY_MULTIPLIER: 10,
-  
-  // API endpoints
-  DELETE_HEADLINE_ENDPOINT: '/api/delete_headline'
-};
+  // Fallback configuration if shared config is not available
+  console.warn('Shared configuration not found, using fallback config');
+  return {
+    // Default values
+    DEFAULT_THEME: 'silver',
+    DEFAULT_FONT: 'sans-serif',
+    
+    // Drag and drop settings
+    DRAG_OPACITY: '0.9',
+    DRAG_OPACITY_NORMAL: '1',
+    
+    // Priority calculation
+    PRIORITY_MULTIPLIER: 10,
+    
+    // API endpoints
+    DELETE_HEADLINE_ENDPOINT: '/api/delete_headline'
+  };
+})();
 
 // =============================================================================
 // UTILITY CLASSES
@@ -109,7 +118,7 @@ class SettingsManager {
    * Initialize theme setting.
    */
   static initTheme() {
-    const currentTheme = CookieManager.get('Theme') || CONFIG.DEFAULT_THEME;
+    const currentTheme = CookieManager.get('Theme') || CONFIG_CONFIG.DEFAULT_THEME;
     const themeSelect = document.querySelector('.config-container #theme-select');
     if (themeSelect) {
       themeSelect.value = currentTheme;
@@ -120,7 +129,7 @@ class SettingsManager {
    * Initialize font setting.
    */
   static initFont() {
-    const currentFont = CookieManager.get('FontFamily') || CONFIG.DEFAULT_FONT;
+    const currentFont = CookieManager.get('FontFamily') || CONFIG_CONFIG.DEFAULT_FONT;
     const fontSelect = document.querySelector('.config-container #font-select');
     if (fontSelect) {
       fontSelect.value = currentFont;
@@ -280,7 +289,7 @@ class DragDropManager {
     entry.dataset.originalDisplay = entry.style.display || '';
     this.draggedItem = entry;
     entry.classList.add('dragging');
-    entry.style.opacity = CONFIG.DRAG_OPACITY;
+    entry.style.opacity = CONFIG_CONFIG.DRAG_OPACITY;
   }
   
   /**
@@ -291,7 +300,7 @@ class DragDropManager {
    */
   handleDragEnd(e, entry) {
     entry.classList.remove('dragging');
-    entry.style.opacity = CONFIG.DRAG_OPACITY_NORMAL;
+    entry.style.opacity = CONFIG_CONFIG.DRAG_OPACITY_NORMAL;
     this.draggedItem = null;
   }
   
@@ -370,7 +379,7 @@ class DragDropManager {
     entries.forEach((entry, index) => {
       const priorityInput = entry.querySelector('input[type="number"]');
       if (priorityInput) {
-        priorityInput.value = (index + 1) * CONFIG.PRIORITY_MULTIPLIER;
+        priorityInput.value = (index + 1) * CONFIG_CONFIG.PRIORITY_MULTIPLIER;
       }
     });
   }
@@ -462,7 +471,7 @@ class ArchiveManager {
    */
   async performDelete(entry, url, timestamp) {
     try {
-      const response = await fetch(CONFIG.DELETE_HEADLINE_ENDPOINT, {
+      const response = await fetch(CONFIG_CONFIG.DELETE_HEADLINE_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, timestamp })
@@ -536,10 +545,9 @@ document.addEventListener('DOMContentLoaded', initializeConfigPage);
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    CookieManager,
     SettingsManager,
     DragDropManager,
     ArchiveManager,
-    CONFIG
+    CONFIG_CONFIG
   };
 }

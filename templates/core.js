@@ -13,86 +13,33 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-const CONFIG = {
-  // Auto-refresh settings
-  AUTO_REFRESH_INTERVAL: 3601 * 1000, // 1 hour + 1 second
-  ACTIVITY_TIMEOUT: 5 * 60 * 1000, // 5 minutes
+// Use shared configuration with fallback
+const CORE_CONFIG = (function() {
+  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
+    return window.LINUXREPORT_CONFIG;
+  }
   
-  // Pagination settings
-  ITEMS_PER_PAGE: 8,
-  INFINITE_ITEMS_PER_PAGE: 20,
-  
-  // Scroll restoration settings
-  SCROLL_TIMEOUT: 10000, // 10 seconds
-  
-  // Font families
-  FONT_CLASSES: [
-    'font-system', 'font-monospace', 'font-inter', 'font-roboto',
-    'font-open-sans', 'font-source-sans', 'font-noto-sans',
-    'font-lato', 'font-raleway', 'font-sans-serif'
-  ],
-  
-  // Default values
-  DEFAULT_THEME: 'silver',
-  DEFAULT_FONT: 'sans-serif'
-};
+  // Fallback configuration if shared config is not available
+  console.warn('Shared configuration not found, using fallback config');
+  return {
+    AUTO_REFRESH_INTERVAL: 3601 * 1000,
+    ACTIVITY_TIMEOUT: 5 * 60 * 1000,
+    ITEMS_PER_PAGE: 8,
+    INFINITE_ITEMS_PER_PAGE: 20,
+    SCROLL_TIMEOUT: 10000,
+    FONT_CLASSES: [
+      'font-system', 'font-monospace', 'font-inter', 'font-roboto',
+      'font-open-sans', 'font-source-sans', 'font-noto-sans',
+      'font-lato', 'font-raleway', 'font-sans-serif'
+    ],
+    DEFAULT_THEME: 'silver',
+    DEFAULT_FONT: 'sans-serif'
+  };
+})();
 
 // =============================================================================
 // UTILITY CLASSES
 // =============================================================================
-
-/**
- * Cookie management utility class.
- * Provides methods for getting and setting cookies with proper encoding/decoding.
- */
-class CookieManager {
-  /**
-   * Get a cookie value by name.
-   * 
-   * @param {string} name - The name of the cookie
-   * @returns {string|null} The cookie value or null if not found
-   */
-  static get(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    
-    if (parts.length === 2) {
-      const cookieValue = parts.pop().split(';').shift();
-      try {
-        return decodeURIComponent(cookieValue);
-      } catch (error) {
-        console.error('Cookie decode error:', error);
-        return null;
-      }
-    }
-    return null;
-  }
-  
-  /**
-   * Set a cookie with the given name, value, and options.
-   * 
-   * @param {string} name - The name of the cookie
-   * @param {string} value - The value to store
-   * @param {Object} options - Cookie options (path, expires, etc.)
-   */
-  static set(name, value, options = {}) {
-    const defaultOptions = {
-      path: '/',
-      ...options
-    };
-    
-    let cookieString = `${name}=${encodeURIComponent(value)}`;
-    
-    Object.entries(defaultOptions).forEach(([key, value]) => {
-      cookieString += `; ${key}`;
-      if (value !== true) {
-        cookieString += `=${value}`;
-      }
-    });
-    
-    document.cookie = cookieString;
-  }
-}
 
 /**
  * Scroll position management utility class.
@@ -124,7 +71,7 @@ class ScrollManager {
       
       const data = JSON.parse(saved);
       
-      if (Date.now() - data.timestamp > CONFIG.SCROLL_TIMEOUT) {
+      if (Date.now() - data.timestamp > CORE_CONFIG.SCROLL_TIMEOUT) {
         localStorage.removeItem('scrollPosition');
         return;
       }
@@ -153,8 +100,8 @@ class ScrollManager {
  */
 class AutoRefreshManager {
   constructor() {
-    this.interval = CONFIG.AUTO_REFRESH_INTERVAL;
-    this.activityTimeout = CONFIG.ACTIVITY_TIMEOUT;
+    this.interval = CORE_CONFIG.AUTO_REFRESH_INTERVAL;
+    this.activityTimeout = CORE_CONFIG.ACTIVITY_TIMEOUT;
     this.lastActivity = Date.now();
     this.timer = null;
   }
@@ -237,14 +184,14 @@ class ThemeManager {
    */
   static applySettings() {
     // Apply theme
-    const theme = CookieManager.get('Theme') || CONFIG.DEFAULT_THEME;
+    const theme = CookieManager.get('Theme') || CORE_CONFIG.DEFAULT_THEME;
     document.body.classList.add(`theme-${theme}`);
     
     const themeSelect = document.getElementById('theme-select');
     if (themeSelect) themeSelect.value = theme;
     
     // Apply font
-    const font = CookieManager.get('FontFamily') || CONFIG.DEFAULT_FONT;
+    const font = CookieManager.get('FontFamily') || CORE_CONFIG.DEFAULT_FONT;
     ThemeManager.applyFont(font);
     
     const fontSelect = document.getElementById('font-select');
@@ -263,7 +210,7 @@ class ThemeManager {
    * @param {string} font - The font family to apply
    */
   static applyFont(font) {
-    document.body.classList.remove(...CONFIG.FONT_CLASSES);
+    document.body.classList.remove(...CORE_CONFIG.FONT_CLASSES);
     document.body.classList.add(`font-${font}`);
   }
   
@@ -344,7 +291,7 @@ class PaginationManager {
     this.prevBtn = feedControls.querySelector('.prev-btn');
     this.nextBtn = feedControls.querySelector('.next-btn');
     this.currentPage = 0;
-    this.totalPages = Math.ceil(this.items.length / CONFIG.ITEMS_PER_PAGE);
+    this.totalPages = Math.ceil(this.items.length / CORE_CONFIG.ITEMS_PER_PAGE);
     
     this.setupEventListeners();
     this.update();
@@ -388,8 +335,8 @@ class PaginationManager {
    */
   update() {
     requestAnimationFrame(() => {
-      const startIdx = this.currentPage * CONFIG.ITEMS_PER_PAGE;
-      const endIdx = startIdx + CONFIG.ITEMS_PER_PAGE;
+      const startIdx = this.currentPage * CORE_CONFIG.ITEMS_PER_PAGE;
+      const endIdx = startIdx + CORE_CONFIG.ITEMS_PER_PAGE;
       
       this.items.forEach((item, i) => {
         if (window.currentViewMode === 'column') {
@@ -404,7 +351,6 @@ class PaginationManager {
     });
   }
 }
-
 
 // =============================================================================
 // GLOBAL STATE MANAGEMENT
@@ -502,12 +448,9 @@ document.addEventListener('DOMContentLoaded', initializeApplication);
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    CookieManager,
-    ScrollManager,
     AutoRefreshManager,
     ThemeManager,
     PaginationManager,
-    InfiniteScrollManager,
-    CONFIG
+    CORE_CONFIG
   };
 }

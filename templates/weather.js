@@ -13,135 +13,27 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-const CONFIG = {
-  // Widget toggle settings
-  WEATHER_WIDGET_TOGGLE_ENABLED: true,
-  WEATHER_DEFAULT_COLLAPSED: false, // Set to true for collapsed by default
-  
-  // Caching settings
-  WEATHER_CACHE_DURATION: 30 * 60 * 1000, // 30 minutes in milliseconds
-  
-  // API settings
-  USE_LINUXREPORT_WEATHER: false,
-  WEATHER_BASE_URL: '', // Set dynamically based on USE_LINUXREPORT_WEATHER
-  
-  // Debounce settings
-  DEBOUNCE_DELAY: 100,
-  
-  // Cookie settings
-  COOKIE_MAX_AGE: 31536000, // 1 year
-  COOKIE_SAME_SITE: 'Lax',
-  
-  // Imperial units regions
-  IMPERIAL_REGIONS: ['US', 'BS', 'BZ', 'KY', 'PW'],
-  
-  // Default locale
-  DEFAULT_LOCALE: 'en-US'
-};
-
-// Initialize base URL
-CONFIG.WEATHER_BASE_URL = CONFIG.USE_LINUXREPORT_WEATHER ? 'https://linuxreport.net' : '';
-
-// =============================================================================
-// UTILITY CLASSES
-// =============================================================================
-
-/**
- * Cookie management utility class.
- * Provides methods for getting and setting cookies with proper encoding/decoding.
- */
-class CookieManager {
-  /**
-   * Get a cookie value by name.
-   * 
-   * @param {string} name - The name of the cookie
-   * @returns {string|null} The cookie value or null if not found
-   */
-  static get(name) {
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    
-    if (parts.length === 2) {
-      const cookieValue = parts.pop().split(';').shift();
-      try {
-        return decodeURIComponent(cookieValue);
-      } catch (error) {
-        console.error('Cookie decode error:', error);
-        return null;
-      }
-    }
-    return null;
+// Use shared configuration with fallback
+const WEATHER_CONFIG = (function() {
+  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
+    return window.LINUXREPORT_CONFIG;
   }
   
-  /**
-   * Set a cookie with the given name, value, and options.
-   * 
-   * @param {string} name - The name of the cookie
-   * @param {string} value - The value to store
-   * @param {Object} options - Cookie options (path, expires, etc.)
-   */
-  static set(name, value, options = {}) {
-    const defaultOptions = {
-      path: '/',
-      'max-age': CONFIG.COOKIE_MAX_AGE,
-      'SameSite': CONFIG.COOKIE_SAME_SITE,
-      ...options
-    };
-    
-    let cookieString = `${name}=${encodeURIComponent(value)}`;
-    
-    Object.entries(defaultOptions).forEach(([key, value]) => {
-      cookieString += `; ${key}`;
-      if (value !== true) {
-        cookieString += `=${value}`;
-      }
-    });
-    
-    document.cookie = cookieString;
-  }
-}
-
-/**
- * Cache management utility class.
- * Handles session storage operations for weather data caching.
- */
-class CacheManager {
-  /**
-   * Get cached weather data if it exists and is not expired.
-   * 
-   * @returns {Object|null} The cached data or null if not found/expired
-   */
-  static getWeatherData() {
-    try {
-      const cached = sessionStorage.getItem('weatherData');
-      if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < CONFIG.WEATHER_CACHE_DURATION) {
-          return data;
-        }
-      }
-    } catch (error) {
-      console.error('Error reading cached weather data:', error);
-    }
-    return null;
-  }
-  
-  /**
-   * Cache weather data with current timestamp.
-   * 
-   * @param {Object} data - The weather data to cache
-   */
-  static setWeatherData(data) {
-    try {
-      sessionStorage.setItem('weatherData', JSON.stringify({
-        data,
-        timestamp: Date.now()
-      }));
-    } catch (error) {
-      console.error('Error caching weather data:', error);
-    }
-  }
-}
+  // Fallback configuration if shared config is not available
+  console.warn('Shared configuration not found, using fallback config');
+  return {
+    WEATHER_WIDGET_TOGGLE_ENABLED: true,
+    WEATHER_DEFAULT_COLLAPSED: false,
+    WEATHER_CACHE_DURATION: 30 * 60 * 1000,
+    USE_LINUXREPORT_WEATHER: false,
+    WEATHER_BASE_URL: '',
+    WEATHER_DEBOUNCE_DELAY: 100,
+    COOKIE_MAX_AGE: 31536000,
+    COOKIE_SAME_SITE: 'Lax',
+    IMPERIAL_REGIONS: ['US', 'BS', 'BZ', 'KY', 'PW'],
+    DEFAULT_LOCALE: 'en-US'
+  };
+})();
 
 // =============================================================================
 // WEATHER WIDGET TOGGLE MANAGEMENT
@@ -166,7 +58,7 @@ class WeatherToggleManager {
    * Initialize the weather toggle functionality.
    */
   init() {
-    if (!CONFIG.WEATHER_WIDGET_TOGGLE_ENABLED) {
+    if (!WEATHER_CONFIG.WEATHER_WIDGET_TOGGLE_ENABLED) {
       this.disableToggle();
       return;
     }
@@ -196,7 +88,7 @@ class WeatherToggleManager {
    */
   setInitialState() {
     const cookieValue = CookieManager.get('weatherCollapsed');
-    const isCollapsed = cookieValue !== null ? cookieValue === 'true' : CONFIG.WEATHER_DEFAULT_COLLAPSED;
+    const isCollapsed = cookieValue !== null ? cookieValue === 'true' : WEATHER_CONFIG.WEATHER_DEFAULT_COLLAPSED;
     
     if (isCollapsed) {
       this.container.classList.add('collapsed');
@@ -293,7 +185,7 @@ class WeatherDataManager {
     if (this.loadTimeout) {
       clearTimeout(this.loadTimeout);
     }
-    this.loadTimeout = setTimeout(() => this.load(), CONFIG.DEBOUNCE_DELAY);
+    this.loadTimeout = setTimeout(() => this.load(), WEATHER_CONFIG.WEATHER_DEBOUNCE_DELAY);
   }
   
   /**
@@ -309,7 +201,7 @@ class WeatherDataManager {
     }
     
     // Try to load from cache first
-    const cachedData = CacheManager.getWeatherData();
+    const cachedData = CacheManager.get('weatherData', WEATHER_CONFIG.WEATHER_CACHE_DURATION);
     if (cachedData) {
       this.render(cachedData, this.determineUnits());
       return;
@@ -325,8 +217,8 @@ class WeatherDataManager {
    * @returns {string} 'imperial' or 'metric'
    */
   determineUnits() {
-    const userLocale = new Intl.Locale(navigator.language || CONFIG.DEFAULT_LOCALE);
-    return CONFIG.IMPERIAL_REGIONS.includes(userLocale.region) ? 'imperial' : 'metric';
+    const userLocale = new Intl.Locale(navigator.language || WEATHER_CONFIG.DEFAULT_LOCALE);
+    return WEATHER_CONFIG.IMPERIAL_REGIONS.includes(userLocale.region) ? 'imperial' : 'metric';
   }
   
   /**
@@ -338,14 +230,14 @@ class WeatherDataManager {
     const useMetric = this.determineUnits() === 'metric';
     
     try {
-      const response = await fetch(`${CONFIG.WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
+      const response = await fetch(`${WEATHER_CONFIG.WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      CacheManager.setWeatherData(data);
+      CacheManager.set('weatherData', data);
       this.render(data, useMetric);
     } catch (error) {
       console.error('Weather fetch error:', error);
@@ -410,7 +302,7 @@ class WeatherDataManager {
     const todayYear = today.getFullYear();
     const todayMonth = today.getMonth();
     const todayDate = today.getDate();
-    const userLocale = navigator.language || CONFIG.DEFAULT_LOCALE;
+    const userLocale = navigator.language || WEATHER_CONFIG.DEFAULT_LOCALE;
     
     dailyData.forEach((day, index) => {
       const dayElement = this.createDayElement(day, {
@@ -543,10 +435,8 @@ document.addEventListener('DOMContentLoaded', initializeWeather);
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    CookieManager,
-    CacheManager,
     WeatherToggleManager,
     WeatherDataManager,
-    CONFIG
+    WEATHER_CONFIG
   };
 }

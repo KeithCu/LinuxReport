@@ -13,28 +13,28 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-const CONFIG = {
-  // Communication settings
-  USE_SSE: false, // Set to true to enable SSE, false for polling
-  POLLING_INTERVAL: 15000, // 15 seconds
+// Use shared configuration with fallback
+const CHAT_CONFIG = (function() {
+  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
+    return window.LINUXREPORT_CONFIG;
+  }
   
-  // Retry settings
-  MAX_RETRIES: 5,
-  BASE_RETRY_DELAY: 1000,
-  MAX_RETRY_DELAY: 30000,
-  
-  // Performance settings
-  FETCH_DEBOUNCE_DELAY: 1000,
-  RENDER_DEBOUNCE_DELAY: 100,
-  DRAG_THROTTLE_DELAY: 16, // ~60fps
-  
-  // File upload settings
-  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
-  ALLOWED_FILE_TYPES: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
-  
-  // UI settings
-  RESIZE_DEBOUNCE_DELAY: 250
-};
+  // Fallback configuration if shared config is not available
+  console.warn('Shared configuration not found, using fallback config');
+  return {
+    CHAT_USE_SSE: false,
+    CHAT_POLLING_INTERVAL: 15000,
+    CHAT_MAX_RETRIES: 5,
+    CHAT_BASE_RETRY_DELAY: 1000,
+    CHAT_MAX_RETRY_DELAY: 30000,
+    CHAT_FETCH_DEBOUNCE_DELAY: 1000,
+    CHAT_RENDER_DEBOUNCE_DELAY: 100,
+    CHAT_DRAG_THROTTLE_DELAY: 16,
+    CHAT_MAX_FILE_SIZE: 5 * 1024 * 1024,
+    CHAT_ALLOWED_FILE_TYPES: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
+    CHAT_RESIZE_DEBOUNCE_DELAY: 250
+  };
+})();
 
 // =============================================================================
 // UTILITY CLASSES
@@ -113,7 +113,7 @@ class ChatWidget {
 
     // Bind methods to prevent memory leaks
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
-    this.handleResize = debounce(this.handleResize.bind(this), CONFIG.RESIZE_DEBOUNCE_DELAY);
+    this.handleResize = debounce(this.handleResize.bind(this), CHAT_CONFIG.CHAT_RESIZE_DEBOUNCE_DELAY);
   }
 
   /**
@@ -242,7 +242,7 @@ class ChatWidget {
         container.style.left = newX + 'px';
         container.style.top = newY + 'px';
       });
-    }, CONFIG.DRAG_THROTTLE_DELAY);
+    }, CHAT_CONFIG.CHAT_DRAG_THROTTLE_DELAY);
 
     const onMouseUp = () => {
       if (this.state.isDragging) {
@@ -297,12 +297,12 @@ class ChatWidget {
    * @param {File} file - The file to upload
    */
   async uploadImage(file) {
-    if (!CONFIG.ALLOWED_FILE_TYPES.includes(file.type)) {
+    if (!CHAT_CONFIG.CHAT_ALLOWED_FILE_TYPES.includes(file.type)) {
       alert('Invalid file type. Allowed types: PNG, JPEG, GIF, WebP');
       return;
     }
 
-    if (file.size > CONFIG.MAX_FILE_SIZE) {
+    if (file.size > CHAT_CONFIG.CHAT_MAX_FILE_SIZE) {
       alert('File too large. Maximum size: 5MB');
       return;
     }
@@ -367,7 +367,7 @@ class ChatWidget {
       if (data.success) {
         messageInput.value = '';
         imageUrlInput.value = '';
-        if (!CONFIG.USE_SSE) {
+        if (!CHAT_CONFIG.CHAT_USE_SSE) {
           await this.fetchComments();
         }
       } else {
@@ -386,7 +386,7 @@ class ChatWidget {
    * Fetch comments from the server with debouncing.
    */
   async fetchComments() {
-    if (CONFIG.USE_SSE || this.elements['chat-container'].style.display === 'none') {
+    if (CHAT_CONFIG.CHAT_USE_SSE || this.elements['chat-container'].style.display === 'none') {
       return;
     }
 
@@ -410,7 +410,7 @@ class ChatWidget {
           loading.onclick = () => this.fetchComments();
         }
       }
-    }, CONFIG.FETCH_DEBOUNCE_DELAY);
+    }, CHAT_CONFIG.CHAT_FETCH_DEBOUNCE_DELAY);
   }
 
   /**
@@ -469,7 +469,7 @@ class ChatWidget {
       messagesContainer.innerHTML = '';
       messagesContainer.appendChild(fragment);
       this.state.lastComments = comments;
-    }, CONFIG.RENDER_DEBOUNCE_DELAY);
+    }, CHAT_CONFIG.CHAT_RENDER_DEBOUNCE_DELAY);
   }
 
   /**
@@ -553,7 +553,7 @@ class ChatWidget {
       
       if (data.success) {
         e.target.closest('.chat-message').remove();
-        if (!CONFIG.USE_SSE) {
+        if (!CHAT_CONFIG.CHAT_USE_SSE) {
           await this.fetchComments();
         }
       } else {
@@ -569,7 +569,7 @@ class ChatWidget {
    * Initialize Server-Sent Events connection.
    */
   initializeSSE() {
-    if (!CONFIG.USE_SSE || 
+    if (!CHAT_CONFIG.CHAT_USE_SSE || 
         this.state.eventSource || 
         this.elements['chat-container'].style.display === 'none') {
       return;
@@ -602,10 +602,10 @@ class ChatWidget {
           this.state.eventSource = null;
         }
 
-        if (retryCount < CONFIG.MAX_RETRIES) {
+        if (retryCount < CHAT_CONFIG.CHAT_MAX_RETRIES) {
           const delay = Math.min(
-            CONFIG.BASE_RETRY_DELAY * Math.pow(2, retryCount),
-            CONFIG.MAX_RETRY_DELAY
+            CHAT_CONFIG.CHAT_BASE_RETRY_DELAY * Math.pow(2, retryCount),
+            CHAT_CONFIG.CHAT_MAX_RETRY_DELAY
           );
           setTimeout(connect, delay);
           retryCount++;
@@ -626,7 +626,7 @@ class ChatWidget {
     if (document.hidden) {
       this.cleanup();
     } else if (this.elements['chat-container'].style.display !== 'none') {
-      if (CONFIG.USE_SSE) {
+      if (CHAT_CONFIG.CHAT_USE_SSE) {
         this.initializeSSE();
       } else {
         this.fetchComments();
@@ -669,7 +669,7 @@ class ChatWidget {
     container.style.display = isHidden ? 'flex' : 'none';
 
     if (isHidden) {
-      if (CONFIG.USE_SSE) {
+      if (CHAT_CONFIG.CHAT_USE_SSE) {
         this.initializeSSE();
       } else {
         if (this.state.lastComments.length === 0 && 
@@ -679,7 +679,7 @@ class ChatWidget {
         if (!this.state.pollingTimer) {
           this.state.pollingTimer = setInterval(
             () => this.fetchComments(), 
-            CONFIG.POLLING_INTERVAL
+            CHAT_CONFIG.CHAT_POLLING_INTERVAL
           );
         }
       }
@@ -693,13 +693,13 @@ class ChatWidget {
    */
   cleanup() {
     // Clean up SSE
-    if (CONFIG.USE_SSE && this.state.eventSource) {
+    if (CHAT_CONFIG.CHAT_USE_SSE && this.state.eventSource) {
       this.state.eventSource.close();
       this.state.eventSource = null;
     }
 
     // Clean up polling
-    if (!CONFIG.USE_SSE && this.state.pollingTimer) {
+    if (!CHAT_CONFIG.CHAT_USE_SSE && this.state.pollingTimer) {
       clearInterval(this.state.pollingTimer);
       this.state.pollingTimer = null;
     }
@@ -762,8 +762,6 @@ document.addEventListener('DOMContentLoaded', initializeChat);
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     ChatWidget,
-    CONFIG,
-    debounce,
-    throttle
+    CHAT_CONFIG
   };
 }
