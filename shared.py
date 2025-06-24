@@ -234,10 +234,11 @@ STANDARD_ORDER_STR = str(SITE_URLS)
 
 # Define the order of JavaScript modules for loading
 _JS_MODULES = [
+    'infinitescroll.js',
     'core.js',
     'weather.js',
     'chat.js',
-    'config.js'
+    'config.js',
 ]
 
 # =============================================================================
