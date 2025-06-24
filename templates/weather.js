@@ -1,215 +1,456 @@
-// Weather widget toggle and data fetching
+/**
+ * weather.js
+ * 
+ * Weather widget module for the LinuxReport application. Handles weather data fetching,
+ * caching, rendering, and widget toggle functionality. Provides a responsive weather
+ * display with automatic unit detection and error handling.
+ * 
+ * @author LinuxReport Team
+ * @version 2.0.0
+ */
 
-// Global flag to enable/disable weather widget toggle. Set to false to always show widget and hide toggle UI.
-const weatherWidgetToggleEnabled = true;
-const WEATHER_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
+// =============================================================================
+// CONSTANTS AND CONFIGURATION
+// =============================================================================
 
-// Flag to use linuxreport.net for weather data (cross-origin)
-const USE_LINUXREPORT_WEATHER = true;
-const WEATHER_BASE_URL = USE_LINUXREPORT_WEATHER ? 'https://linuxreport.net' : '';
+const CONFIG = {
+  // Widget toggle settings
+  WEATHER_WIDGET_TOGGLE_ENABLED: true,
+  WEATHER_DEFAULT_COLLAPSED: false, // Set to true for collapsed by default
+  
+  // Caching settings
+  WEATHER_CACHE_DURATION: 30 * 60 * 1000, // 30 minutes in milliseconds
+  
+  // API settings
+  USE_LINUXREPORT_WEATHER: false,
+  WEATHER_BASE_URL: '', // Set dynamically based on USE_LINUXREPORT_WEATHER
+  
+  // Debounce settings
+  DEBOUNCE_DELAY: 100,
+  
+  // Cookie settings
+  COOKIE_MAX_AGE: 31536000, // 1 year
+  COOKIE_SAME_SITE: 'Lax',
+  
+  // Imperial units regions
+  IMPERIAL_REGIONS: ['US', 'BS', 'BZ', 'KY', 'PW'],
+  
+  // Default locale
+  DEFAULT_LOCALE: 'en-US'
+};
 
-// --- Weather Widget Toggle ---
-const weatherDefaultCollapsed = false; // <<< SET TO true FOR COLLAPSED BY DEFAULT, false FOR OPEN BY DEFAULT >>>
+// Initialize base URL
+CONFIG.WEATHER_BASE_URL = CONFIG.USE_LINUXREPORT_WEATHER ? 'https://linuxreport.net' : '';
 
-document.addEventListener('DOMContentLoaded', function() {
-  const weatherContainer = document.getElementById('weather-widget-container');
-  const weatherContent = document.getElementById('weather-content');
-  const weatherToggleBtn = document.getElementById('weather-toggle-btn');
-  let weatherToggleHandler = null;
+// =============================================================================
+// UTILITY CLASSES
+// =============================================================================
 
-  if (!weatherWidgetToggleEnabled) {
-    if (weatherContainer) weatherContainer.classList.remove('collapsed');
-    if (weatherContent) weatherContent.style.display = '';
-    if (weatherToggleBtn) weatherToggleBtn.style.display = 'none';
-    const label = document.getElementById('weather-collapsed-label');
-    if (label) label.style.display = 'none';
-    return;
-  }
-
-  if (!weatherContainer || !weatherContent || !weatherToggleBtn) {
-    console.warn('Weather toggle elements not found.');
-    return;
-  }
-
-  function setInitialWeatherState() {
-    const cookieValue = document.cookie.split('; ').find(item => item.trim().startsWith('weatherCollapsed='));
-    let isCollapsed;
-
-    if (cookieValue) {
-      isCollapsed = cookieValue.split('=')[1] === 'true';
-    } else {
-      isCollapsed = weatherDefaultCollapsed;
-    }
-
-    if (isCollapsed) {
-      weatherContainer.classList.add('collapsed');
-      weatherToggleBtn.innerHTML = '&#9650;';
-    } else {
-      weatherContainer.classList.remove('collapsed');
-      weatherToggleBtn.innerHTML = '&#9660;';
-    }
-  }
-
-  setInitialWeatherState();
-
-  weatherToggleHandler = function(event) {
-    console.log('Weather toggle button clicked!');
-    event.stopPropagation();
-    const isCurrentlyCollapsed = weatherContainer.classList.toggle('collapsed');
-    if (isCurrentlyCollapsed) {
-      weatherToggleBtn.innerHTML = '&#9650;';
-      document.cookie = 'weatherCollapsed=true; path=/; max-age=31536000; SameSite=Lax';
-    } else {
-      weatherToggleBtn.innerHTML = '&#9660;';
-      document.cookie = 'weatherCollapsed=false; path=/; max-age=31536000; SameSite=Lax';
-    }
-  };
-
-  weatherToggleBtn.addEventListener('click', weatherToggleHandler);
-
-  // Cleanup handler on page unload
-  window.addEventListener('unload', () => {
-    if (weatherToggleBtn && weatherToggleHandler) {
-      weatherToggleBtn.removeEventListener('click', weatherToggleHandler);
-    }
-  });
-});
-
-// Weather data fetch and render with caching
-function getCachedWeatherData() {
-  try {
-    const cached = sessionStorage.getItem('weatherData');
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < WEATHER_CACHE_DURATION) {
-        return data;
+/**
+ * Cookie management utility class.
+ * Provides methods for getting and setting cookies with proper encoding/decoding.
+ */
+class CookieManager {
+  /**
+   * Get a cookie value by name.
+   * 
+   * @param {string} name - The name of the cookie
+   * @returns {string|null} The cookie value or null if not found
+   */
+  static get(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    
+    if (parts.length === 2) {
+      const cookieValue = parts.pop().split(';').shift();
+      try {
+        return decodeURIComponent(cookieValue);
+      } catch (error) {
+        console.error('Cookie decode error:', error);
+        return null;
       }
     }
-  } catch (error) {
-    console.error('Error reading cached weather data:', error);
+    return null;
   }
-  return null;
-}
-
-function setCachedWeatherData(data) {
-  try {
-    sessionStorage.setItem('weatherData', JSON.stringify({
-      data,
-      timestamp: Date.now()
-    }));
-  } catch (error) {
-    console.error('Error caching weather data:', error);
-  }
-}
-
-function loadWeather() {
-  const weatherContainer = document.getElementById('weather-container');
-  if (!weatherContainer) return;
   
-  const widgetWrapper = document.getElementById('weather-widget-container');
-  if ((widgetWrapper && widgetWrapper.classList.contains('collapsed')) ||
-      getComputedStyle(weatherContainer).display === 'none') return;
-
-  const cachedData = getCachedWeatherData();
-  if (cachedData) {
-    renderWeatherData(cachedData, determineUnits());
-    return;
+  /**
+   * Set a cookie with the given name, value, and options.
+   * 
+   * @param {string} name - The name of the cookie
+   * @param {string} value - The value to store
+   * @param {Object} options - Cookie options (path, expires, etc.)
+   */
+  static set(name, value, options = {}) {
+    const defaultOptions = {
+      path: '/',
+      'max-age': CONFIG.COOKIE_MAX_AGE,
+      'SameSite': CONFIG.COOKIE_SAME_SITE,
+      ...options
+    };
+    
+    let cookieString = `${name}=${encodeURIComponent(value)}`;
+    
+    Object.entries(defaultOptions).forEach(([key, value]) => {
+      cookieString += `; ${key}`;
+      if (value !== true) {
+        cookieString += `=${value}`;
+      }
+    });
+    
+    document.cookie = cookieString;
   }
-
-  fetchWeatherData();
 }
 
-function determineUnits() {
-  const userLocale = new Intl.Locale(navigator.language || 'en-US');
-  return ['US', 'BS', 'BZ', 'KY', 'PW'].includes(userLocale.region) ? 'imperial' : 'metric';
-}
-
-async function fetchWeatherData() {
-  const now = new Date();
-  const cacheBuster = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}`;
-  const useMetric = determineUnits() === 'metric';
-
-  try {
-
-    const response = await fetch(`${WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    const data = await response.json();
-    setCachedWeatherData(data);
-    renderWeatherData(data, useMetric);
-  } catch (error) {
-    console.error('Weather fetch error:', error);
-    const weatherLoading = document.getElementById('weather-loading');
-    const weatherError = document.getElementById('weather-error');
-    if (weatherLoading) weatherLoading.style.display = "none";
-    if (weatherError) {
-      weatherError.style.display = "block";
-      weatherError.textContent = "Unable to load weather data. Please try again later.";
+/**
+ * Cache management utility class.
+ * Handles session storage operations for weather data caching.
+ */
+class CacheManager {
+  /**
+   * Get cached weather data if it exists and is not expired.
+   * 
+   * @returns {Object|null} The cached data or null if not found/expired
+   */
+  static getWeatherData() {
+    try {
+      const cached = sessionStorage.getItem('weatherData');
+      if (cached) {
+        const { data, timestamp } = JSON.parse(cached);
+        if (Date.now() - timestamp < CONFIG.WEATHER_CACHE_DURATION) {
+          return data;
+        }
+      }
+    } catch (error) {
+      console.error('Error reading cached weather data:', error);
+    }
+    return null;
+  }
+  
+  /**
+   * Cache weather data with current timestamp.
+   * 
+   * @param {Object} data - The weather data to cache
+   */
+  static setWeatherData(data) {
+    try {
+      sessionStorage.setItem('weatherData', JSON.stringify({
+        data,
+        timestamp: Date.now()
+      }));
+    } catch (error) {
+      console.error('Error caching weather data:', error);
     }
   }
 }
 
-function renderWeatherData(data, useMetric) {
-  const weatherForecast = document.getElementById('weather-forecast');
-  const weatherLoading = document.getElementById('weather-loading');
-  const weatherError = document.getElementById('weather-error');
+// =============================================================================
+// WEATHER WIDGET TOGGLE MANAGEMENT
+// =============================================================================
+
+/**
+ * Weather widget toggle manager.
+ * Handles the collapsible weather widget functionality.
+ */
+class WeatherToggleManager {
+  constructor() {
+    this.container = document.getElementById('weather-widget-container');
+    this.content = document.getElementById('weather-content');
+    this.toggleBtn = document.getElementById('weather-toggle-btn');
+    this.collapsedLabel = document.getElementById('weather-collapsed-label');
+    this.toggleHandler = null;
+    
+    this.init();
+  }
   
-  if (!weatherForecast || !weatherLoading || !weatherError) {
-    console.error('Weather elements not found');
-    return;
+  /**
+   * Initialize the weather toggle functionality.
+   */
+  init() {
+    if (!CONFIG.WEATHER_WIDGET_TOGGLE_ENABLED) {
+      this.disableToggle();
+      return;
+    }
+    
+    if (!this.container || !this.content || !this.toggleBtn) {
+      console.warn('Weather toggle elements not found.');
+      return;
+    }
+    
+    this.setInitialState();
+    this.setupEventListeners();
+    this.setupCleanup();
   }
-
-  // Add this line to update the header with city name
-  const weatherHeader = document.querySelector('#weather-container h3');
-  if (weatherHeader && data.city_name) {
-    weatherHeader.textContent = `5-Day Weather (${data.city_name})`;
+  
+  /**
+   * Disable the toggle functionality and show widget permanently.
+   */
+  disableToggle() {
+    if (this.container) this.container.classList.remove('collapsed');
+    if (this.content) this.content.style.display = '';
+    if (this.toggleBtn) this.toggleBtn.style.display = 'none';
+    if (this.collapsedLabel) this.collapsedLabel.style.display = 'none';
   }
-
-  if (!data.daily || data.daily.length === 0) {
-    weatherLoading.style.display = "none";
-    weatherError.style.display = "block";
-    weatherError.textContent = "No weather data available.";
-    return;
+  
+  /**
+   * Set the initial collapsed state based on cookie or default.
+   */
+  setInitialState() {
+    const cookieValue = CookieManager.get('weatherCollapsed');
+    const isCollapsed = cookieValue !== null ? cookieValue === 'true' : CONFIG.WEATHER_DEFAULT_COLLAPSED;
+    
+    if (isCollapsed) {
+      this.container.classList.add('collapsed');
+      this.toggleBtn.innerHTML = '&#9650;';
+    } else {
+      this.container.classList.remove('collapsed');
+      this.toggleBtn.innerHTML = '&#9660;';
+    }
   }
+  
+  /**
+   * Set up event listeners for the toggle button.
+   */
+  setupEventListeners() {
+    this.toggleHandler = this.handleToggle.bind(this);
+    this.toggleBtn.addEventListener('click', this.toggleHandler);
+  }
+  
+  /**
+   * Handle toggle button click events.
+   * 
+   * @param {Event} event - The click event
+   */
+  handleToggle(event) {
+    console.log('Weather toggle button clicked!');
+    event.stopPropagation();
+    
+    const isCurrentlyCollapsed = this.container.classList.toggle('collapsed');
+    
+    if (isCurrentlyCollapsed) {
+      this.toggleBtn.innerHTML = '&#9650;';
+      CookieManager.set('weatherCollapsed', 'true');
+    } else {
+      this.toggleBtn.innerHTML = '&#9660;';
+      CookieManager.set('weatherCollapsed', 'false');
+    }
+  }
+  
+  /**
+   * Set up cleanup on page unload.
+   */
+  setupCleanup() {
+    window.addEventListener('unload', () => {
+      if (this.toggleBtn && this.toggleHandler) {
+        this.toggleBtn.removeEventListener('click', this.toggleHandler);
+      }
+    });
+  }
+}
 
-  // Create document fragment for better performance
-  const fragment = document.createDocumentFragment();
-  const today = new Date();
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth();
-  const todayDate = today.getDate();
-  const userLocale = navigator.language || 'en-US';
+// =============================================================================
+// WEATHER DATA MANAGEMENT
+// =============================================================================
 
-  data.daily.forEach((day, i) => {
+/**
+ * Weather data manager.
+ * Handles fetching, caching, and rendering of weather data.
+ */
+class WeatherDataManager {
+  constructor() {
+    this.container = document.getElementById('weather-container');
+    this.widgetWrapper = document.getElementById('weather-widget-container');
+    this.forecast = document.getElementById('weather-forecast');
+    this.loading = document.getElementById('weather-loading');
+    this.error = document.getElementById('weather-error');
+    this.header = document.querySelector('#weather-container h3');
+    
+    this.loadTimeout = null;
+    this.init();
+  }
+  
+  /**
+   * Initialize weather data management.
+   */
+  init() {
+    this.debouncedLoad();
+    
+    // Set up toggle button event listener
+    const toggleBtn = document.getElementById('weather-toggle-btn');
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => this.debouncedLoad());
+      
+      // Cleanup
+      window.addEventListener('unload', () => {
+        toggleBtn.removeEventListener('click', () => this.debouncedLoad());
+      });
+    }
+  }
+  
+  /**
+   * Load weather data with debouncing.
+   */
+  debouncedLoad() {
+    if (this.loadTimeout) {
+      clearTimeout(this.loadTimeout);
+    }
+    this.loadTimeout = setTimeout(() => this.load(), CONFIG.DEBOUNCE_DELAY);
+  }
+  
+  /**
+   * Load weather data from cache or API.
+   */
+  load() {
+    if (!this.container) return;
+    
+    // Check if widget is collapsed or hidden
+    if ((this.widgetWrapper && this.widgetWrapper.classList.contains('collapsed')) ||
+        getComputedStyle(this.container).display === 'none') {
+      return;
+    }
+    
+    // Try to load from cache first
+    const cachedData = CacheManager.getWeatherData();
+    if (cachedData) {
+      this.render(cachedData, this.determineUnits());
+      return;
+    }
+    
+    // Fetch fresh data
+    this.fetch();
+  }
+  
+  /**
+   * Determine units based on user locale.
+   * 
+   * @returns {string} 'imperial' or 'metric'
+   */
+  determineUnits() {
+    const userLocale = new Intl.Locale(navigator.language || CONFIG.DEFAULT_LOCALE);
+    return CONFIG.IMPERIAL_REGIONS.includes(userLocale.region) ? 'imperial' : 'metric';
+  }
+  
+  /**
+   * Fetch weather data from the API.
+   */
+  async fetch() {
+    const now = new Date();
+    const cacheBuster = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}${now.getHours().toString().padStart(2, '0')}`;
+    const useMetric = this.determineUnits() === 'metric';
+    
+    try {
+      const response = await fetch(`${CONFIG.WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&v=${cacheBuster}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      CacheManager.setWeatherData(data);
+      this.render(data, useMetric);
+    } catch (error) {
+      console.error('Weather fetch error:', error);
+      this.showError('Unable to load weather data. Please try again later.');
+    }
+  }
+  
+  /**
+   * Show error message.
+   * 
+   * @param {string} message - The error message to display
+   */
+  showError(message) {
+    if (this.loading) this.loading.style.display = 'none';
+    if (this.error) {
+      this.error.style.display = 'block';
+      this.error.textContent = message;
+    }
+  }
+  
+  /**
+   * Render weather data to the DOM.
+   * 
+   * @param {Object} data - The weather data
+   * @param {boolean} useMetric - Whether to use metric units
+   */
+  render(data, useMetric) {
+    if (!this.forecast || !this.loading || !this.error) {
+      console.error('Weather elements not found');
+      return;
+    }
+    
+    // Update header with city name
+    if (this.header && data.city_name) {
+      this.header.textContent = `5-Day Weather (${data.city_name})`;
+    }
+    
+    if (!data.daily || data.daily.length === 0) {
+      this.showError('No weather data available.');
+      return;
+    }
+    
+    // Create document fragment for better performance
+    const fragment = this.createWeatherFragment(data.daily, useMetric);
+    
+    this.forecast.innerHTML = '';
+    this.forecast.appendChild(fragment);
+    this.loading.style.display = 'none';
+    this.forecast.style.display = 'flex';
+  }
+  
+  /**
+   * Create weather forecast fragment.
+   * 
+   * @param {Array} dailyData - Array of daily weather data
+   * @param {boolean} useMetric - Whether to use metric units
+   * @returns {DocumentFragment} The weather forecast fragment
+   */
+  createWeatherFragment(dailyData, useMetric) {
+    const fragment = document.createDocumentFragment();
+    const today = new Date();
+    const todayYear = today.getFullYear();
+    const todayMonth = today.getMonth();
+    const todayDate = today.getDate();
+    const userLocale = navigator.language || CONFIG.DEFAULT_LOCALE;
+    
+    dailyData.forEach((day, index) => {
+      const dayElement = this.createDayElement(day, {
+        todayYear,
+        todayMonth,
+        todayDate,
+        userLocale,
+        useMetric
+      });
+      fragment.appendChild(dayElement);
+    });
+    
+    return fragment;
+  }
+  
+  /**
+   * Create a single day weather element.
+   * 
+   * @param {Object} day - The day's weather data
+   * @param {Object} options - Rendering options
+   * @returns {HTMLElement} The day element
+   */
+  createDayElement(day, options) {
+    const { todayYear, todayMonth, todayDate, userLocale, useMetric } = options;
+    
     const dayElement = document.createElement('div');
     dayElement.className = 'weather-day';
-
-    const date = new Date(day.dt * 1000);
-    let dayName;
     
-    if (date.getFullYear() === todayYear &&
-        date.getMonth() === todayMonth &&
-        date.getDate() === todayDate) {
-      dayName = userLocale.startsWith('en') ? 'Today' : date.toLocaleDateString(userLocale, { weekday: 'long' });
-    } else {
-      dayName = date.toLocaleDateString(userLocale, { weekday: 'short' });
-    }
-
+    // Day name
+    const dayName = this.getDayName(day, { todayYear, todayMonth, todayDate, userLocale });
     const dayNameDiv = document.createElement('div');
     dayNameDiv.className = 'weather-day-name';
     dayNameDiv.textContent = dayName;
     dayElement.appendChild(dayNameDiv);
-
-    const img = document.createElement('img');
-    img.className = 'weather-icon';
-    img.src = `https://openweathermap.org/img/wn/${day.weather_icon}.png`;
-    img.alt = day.weather;
-    img.loading = 'lazy';
-    img.onerror = function() {
-      this.onerror = null;
-      this.src = '/static/weather-fallback.png'; // Make sure to create this fallback icon
-    };
+    
+    // Weather icon
+    const img = this.createWeatherIcon(day);
     dayElement.appendChild(img);
-
+    
+    // Temperature
     const tempDiv = document.createElement('div');
     tempDiv.className = 'weather-temp';
     tempDiv.innerHTML = `
@@ -217,41 +458,95 @@ function renderWeatherData(data, useMetric) {
       <span class="temp-min">${Math.round(day.temp_min)}°${useMetric ? 'C' : 'F'}</span>
     `;
     dayElement.appendChild(tempDiv);
-
+    
+    // Precipitation
     const precipDiv = document.createElement('div');
     precipDiv.className = 'weather-precip';
     precipDiv.textContent = `${Math.round(day.precipitation)}% precip`;
     dayElement.appendChild(precipDiv);
-
-    fragment.appendChild(dayElement);
-  });
-
-  weatherForecast.innerHTML = '';
-  weatherForecast.appendChild(fragment);
-  weatherLoading.style.display = "none";
-  weatherForecast.style.display = "flex";
-}
-
-// Initialize weather fetch with debouncing
-let weatherLoadTimeout = null;
-function debouncedLoadWeather() {
-  if (weatherLoadTimeout) {
-    clearTimeout(weatherLoadTimeout);
+    
+    return dayElement;
   }
-  weatherLoadTimeout = setTimeout(loadWeather, 100);
+  
+  /**
+   * Get the display name for a day.
+   * 
+   * @param {Object} day - The day's weather data
+   * @param {Object} options - Date comparison options
+   * @returns {string} The day name
+   */
+  getDayName(day, options) {
+    const { todayYear, todayMonth, todayDate, userLocale } = options;
+    const date = new Date(day.dt * 1000);
+    
+    if (date.getFullYear() === todayYear &&
+        date.getMonth() === todayMonth &&
+        date.getDate() === todayDate) {
+      return userLocale.startsWith('en') ? 'Today' : date.toLocaleDateString(userLocale, { weekday: 'long' });
+    } else {
+      return date.toLocaleDateString(userLocale, { weekday: 'short' });
+    }
+  }
+  
+  /**
+   * Create weather icon element.
+   * 
+   * @param {Object} day - The day's weather data
+   * @returns {HTMLImageElement} The weather icon element
+   */
+  createWeatherIcon(day) {
+    const img = document.createElement('img');
+    img.className = 'weather-icon';
+    img.src = `https://openweathermap.org/img/wn/${day.weather_icon}.png`;
+    img.alt = day.weather;
+    img.loading = 'lazy';
+    img.onerror = function() {
+      this.onerror = null;
+      this.src = '/static/weather-fallback.png';
+    };
+    return img;
+  }
 }
 
-// Initialize weather fetch
-debouncedLoadWeather();
+// =============================================================================
+// GLOBAL INSTANCES
+// =============================================================================
 
-const weatherToggleBtn = document.getElementById('weather-toggle-btn');
-if (weatherToggleBtn) {
-  weatherToggleBtn.addEventListener('click', debouncedLoadWeather);
+let weatherToggleManager = null;
+let weatherDataManager = null;
+
+// =============================================================================
+// APPLICATION INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize the weather functionality.
+ */
+function initializeWeather() {
+  // Initialize weather toggle
+  weatherToggleManager = new WeatherToggleManager();
   
-  // Cleanup
-  window.addEventListener('unload', () => {
-    if (weatherToggleBtn) {
-      weatherToggleBtn.removeEventListener('click', debouncedLoadWeather);
-    }
-  });
+  // Initialize weather data management
+  weatherDataManager = new WeatherDataManager();
+}
+
+// =============================================================================
+// EVENT LISTENERS
+// =============================================================================
+
+// Initialize weather when DOM is ready
+document.addEventListener('DOMContentLoaded', initializeWeather);
+
+// =============================================================================
+// EXPORT FOR MODULE SYSTEMS (if needed)
+// =============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    CookieManager,
+    CacheManager,
+    WeatherToggleManager,
+    WeatherDataManager,
+    CONFIG
+  };
 }

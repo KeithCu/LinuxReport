@@ -1,6 +1,96 @@
-// Chat widget: SSE/Polling, draggable, send/delete, mute-beep
+/**
+ * chat.js
+ * 
+ * Chat widget module for the LinuxReport application. Handles real-time messaging,
+ * SSE/polling communication, draggable interface, image uploads, and admin controls.
+ * Provides a responsive and feature-rich chat experience with proper error handling.
+ * 
+ * @author LinuxReport Team
+ * @version 2.0.0
+ */
 
+// =============================================================================
+// CONSTANTS AND CONFIGURATION
+// =============================================================================
+
+const CONFIG = {
+  // Communication settings
+  USE_SSE: false, // Set to true to enable SSE, false for polling
+  POLLING_INTERVAL: 15000, // 15 seconds
+  
+  // Retry settings
+  MAX_RETRIES: 5,
+  BASE_RETRY_DELAY: 1000,
+  MAX_RETRY_DELAY: 30000,
+  
+  // Performance settings
+  FETCH_DEBOUNCE_DELAY: 1000,
+  RENDER_DEBOUNCE_DELAY: 100,
+  DRAG_THROTTLE_DELAY: 16, // ~60fps
+  
+  // File upload settings
+  MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
+  ALLOWED_FILE_TYPES: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
+  
+  // UI settings
+  RESIZE_DEBOUNCE_DELAY: 250
+};
+
+// =============================================================================
+// UTILITY CLASSES
+// =============================================================================
+
+/**
+ * Debounce utility function.
+ * Limits the rate at which a function can fire.
+ * 
+ * @param {Function} func - The function to debounce
+ * @param {number} wait - The debounce delay in milliseconds
+ * @returns {Function} The debounced function
+ */
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+/**
+ * Throttle utility function.
+ * Ensures a function is called at most once in a specified time period.
+ * 
+ * @param {Function} func - The function to throttle
+ * @param {number} limit - The throttle limit in milliseconds
+ * @returns {Function} The throttled function
+ */
+function throttle(func, limit) {
+  let inThrottle;
+  return function executedFunction(...args) {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  };
+}
+
+// =============================================================================
+// CHAT WIDGET CLASS
+// =============================================================================
+
+/**
+ * Chat widget class.
+ * Handles all chat functionality including messaging, UI interactions, and real-time updates.
+ */
 class ChatWidget {
+  /**
+   * Initialize the chat widget.
+   */
   constructor() {
     this.elements = {};
     this.state = {
@@ -13,22 +103,8 @@ class ChatWidget {
       eventSource: null,
       pollingTimer: null,
       beepEnabled: true,
-      // Add debounce timers
       fetchDebounceTimer: null,
       renderDebounceTimer: null
-    };
-
-    // Configuration
-    this.config = {
-      useSSE: false, // <<< SET TO true TO ENABLE SSE, false FOR POLLING >>>
-      pollingInterval: 15000,
-      maxRetries: 5,
-      baseRetryDelay: 1000,
-      maxRetryDelay: 30000,
-      // Add configuration for debouncing and throttling
-      fetchDebounceDelay: 1000,
-      renderDebounceDelay: 100,
-      dragThrottleDelay: 16 // ~60fps
     };
 
     // Initialize beep sound with lazy loading
@@ -37,11 +113,15 @@ class ChatWidget {
 
     // Bind methods to prevent memory leaks
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
-    this.handleResize = this.debounce(this.handleResize.bind(this), 250);
+    this.handleResize = debounce(this.handleResize.bind(this), CONFIG.RESIZE_DEBOUNCE_DELAY);
   }
 
+  /**
+   * Initialize the chat widget and set up all required elements.
+   * 
+   * @returns {boolean} True if initialization was successful
+   */
   init() {
-    // Get all required elements
     const requiredElements = [
       'chat-container',
       'chat-header',
@@ -79,58 +159,11 @@ class ChatWidget {
     return true;
   }
 
-  // Add utility methods for debouncing and throttling
-  debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
-
-  throttle(func, limit) {
-    let inThrottle;
-    return function executedFunction(...args) {
-      if (!inThrottle) {
-        func(...args);
-        inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
-      }
-    };
-  }
-
-  // Add handlers for visibility and resize
-  handleVisibilityChange() {
-    if (document.hidden) {
-      this.cleanup();
-    } else if (this.elements['chat-container'].style.display !== 'none') {
-      if (this.config.useSSE) {
-        this.initializeSSE();
-      } else {
-        this.fetchComments();
-      }
-    }
-  }
-
-  handleResize() {
-    const container = this.elements['chat-container'];
-    if (container.style.display === 'none') return;
-
-    // Ensure chat container stays within viewport
-    const rect = container.getBoundingClientRect();
-    const maxX = window.innerWidth - rect.width;
-    const maxY = window.innerHeight - rect.height;
-
-    if (rect.left > maxX) container.style.left = maxX + 'px';
-    if (rect.top > maxY) container.style.top = maxY + 'px';
-  }
-
+  /**
+   * Initialize beep sound with lazy loading.
+   * Loads the sound only on first user interaction to comply with browser policies.
+   */
   initBeepSound() {
-    // Lazy load the beep sound
     const loadBeep = () => {
       if (!this.beepSound) {
         this.beepSound = new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAD//w==');
@@ -145,11 +178,15 @@ class ChatWidget {
         document.removeEventListener(event, loadBeepOnce)
       );
     };
+    
     userInteractionEvents.forEach(event => 
       document.addEventListener(event, loadBeepOnce, { once: true })
     );
   }
 
+  /**
+   * Set up all event listeners for the chat widget.
+   */
   setupEventListeners() {
     // Draggable window
     this.setupDraggable();
@@ -174,6 +211,9 @@ class ChatWidget {
     window.addEventListener('unload', () => this.cleanup());
   }
 
+  /**
+   * Set up draggable functionality for the chat window.
+   */
   setupDraggable() {
     const header = this.elements['chat-header'];
     const container = this.elements['chat-container'];
@@ -192,7 +232,7 @@ class ChatWidget {
     };
 
     // Throttle mouse move for better performance
-    const onMouseMove = this.throttle(e => {
+    const onMouseMove = throttle(e => {
       if (!this.state.isDragging) return;
       requestAnimationFrame(() => {
         const newX = Math.max(0, Math.min(e.clientX - this.state.offsetX, 
@@ -202,7 +242,7 @@ class ChatWidget {
         container.style.left = newX + 'px';
         container.style.top = newY + 'px';
       });
-    }, this.config.dragThrottleDelay);
+    }, CONFIG.DRAG_THROTTLE_DELAY);
 
     const onMouseUp = () => {
       if (this.state.isDragging) {
@@ -220,6 +260,9 @@ class ChatWidget {
     this.dragHandlers = { onMouseDown, onMouseMove, onMouseUp };
   }
 
+  /**
+   * Set up image upload functionality with drag and drop support.
+   */
   setupImageUpload() {
     const inputArea = this.elements['chat-input-area'];
     
@@ -248,16 +291,18 @@ class ChatWidget {
     this.dragUploadHandlers = dragEvents;
   }
 
+  /**
+   * Upload an image file to the server.
+   * 
+   * @param {File} file - The file to upload
+   */
   async uploadImage(file) {
-    const allowed = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
-
-    if (!allowed.includes(file.type)) {
+    if (!CONFIG.ALLOWED_FILE_TYPES.includes(file.type)) {
       alert('Invalid file type. Allowed types: PNG, JPEG, GIF, WebP');
       return;
     }
 
-    if (file.size > maxSize) {
+    if (file.size > CONFIG.MAX_FILE_SIZE) {
       alert('File too large. Maximum size: 5MB');
       return;
     }
@@ -291,6 +336,9 @@ class ChatWidget {
     }
   }
 
+  /**
+   * Send a comment to the server.
+   */
   async sendComment() {
     const messageInput = this.elements['chat-message-input'];
     const imageUrlInput = this.elements['chat-image-url-input'];
@@ -319,7 +367,7 @@ class ChatWidget {
       if (data.success) {
         messageInput.value = '';
         imageUrlInput.value = '';
-        if (!this.config.useSSE) {
+        if (!CONFIG.USE_SSE) {
           await this.fetchComments();
         }
       } else {
@@ -334,8 +382,11 @@ class ChatWidget {
     }
   }
 
+  /**
+   * Fetch comments from the server with debouncing.
+   */
   async fetchComments() {
-    if (this.config.useSSE || this.elements['chat-container'].style.display === 'none') {
+    if (CONFIG.USE_SSE || this.elements['chat-container'].style.display === 'none') {
       return;
     }
 
@@ -359,9 +410,14 @@ class ChatWidget {
           loading.onclick = () => this.fetchComments();
         }
       }
-    }, this.config.fetchDebounceDelay);
+    }, CONFIG.FETCH_DEBOUNCE_DELAY);
   }
 
+  /**
+   * Render comments to the DOM with debouncing and performance optimizations.
+   * 
+   * @param {Array} comments - Array of comment objects
+   */
   async renderComments(comments) {
     // Debounce render updates
     if (this.state.renderDebounceTimer) {
@@ -385,7 +441,7 @@ class ChatWidget {
       if (newMessagesExist && 
           this.elements['chat-container'].style.display !== 'none' && 
           this.state.beepEnabled &&
-          !document.hidden) {  // Only play when tab is visible
+          !document.hidden) {
         this.playBeep();
       }
 
@@ -399,55 +455,7 @@ class ChatWidget {
 
       if (comments.length) {
         comments.forEach(comment => {
-          const messageDiv = document.createElement('div');
-          messageDiv.className = `chat-message${comment.is_admin ? ' admin-message' : ''}`;
-          messageDiv.dataset.commentId = comment.id;
-
-          // Create timestamp
-          const timestamp = document.createElement('span');
-          timestamp.className = 'timestamp';
-          timestamp.textContent = new Date(comment.timestamp)
-            .toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-          messageDiv.appendChild(timestamp);
-
-          // Create message text (safely)
-          const messageText = document.createElement('span');
-          messageText.className = 'message-text';
-          messageText.textContent = comment.text;
-          messageDiv.appendChild(messageText);
-
-          // Add image if present
-          if (comment.image_url) {
-            const br = document.createElement('br');
-            const link = document.createElement('a');
-            link.href = comment.image_url;
-            link.target = '_blank';
-            link.rel = 'noopener'; // Security improvement
-            
-            const img = document.createElement('img');
-            img.src = comment.image_url;
-            img.className = 'chat-image';
-            img.alt = 'Chat image';
-            img.onerror = () => {
-              img.src = '/static/image-error.png';
-              img.alt = 'Image failed to load';
-            };
-            
-            link.appendChild(img);
-            messageDiv.appendChild(br);
-            messageDiv.appendChild(link);
-          }
-
-          // Add delete button for admin
-          if (this.state.isAdminMode) {
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'delete-comment-btn';
-            deleteBtn.dataset.commentId = comment.id;
-            deleteBtn.textContent = '❌';
-            deleteBtn.onclick = e => this.handleDelete(e);
-            messageDiv.appendChild(deleteBtn);
-          }
-
+          const messageDiv = this.createMessageElement(comment);
           fragment.appendChild(messageDiv);
         });
       } else {
@@ -461,9 +469,73 @@ class ChatWidget {
       messagesContainer.innerHTML = '';
       messagesContainer.appendChild(fragment);
       this.state.lastComments = comments;
-    }, this.config.renderDebounceDelay);
+    }, CONFIG.RENDER_DEBOUNCE_DELAY);
   }
 
+  /**
+   * Create a message element for rendering.
+   * 
+   * @param {Object} comment - The comment object
+   * @returns {HTMLElement} The message element
+   */
+  createMessageElement(comment) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message${comment.is_admin ? ' admin-message' : ''}`;
+    messageDiv.dataset.commentId = comment.id;
+
+    // Create timestamp
+    const timestamp = document.createElement('span');
+    timestamp.className = 'timestamp';
+    timestamp.textContent = new Date(comment.timestamp)
+      .toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    messageDiv.appendChild(timestamp);
+
+    // Create message text (safely)
+    const messageText = document.createElement('span');
+    messageText.className = 'message-text';
+    messageText.textContent = comment.text;
+    messageDiv.appendChild(messageText);
+
+    // Add image if present
+    if (comment.image_url) {
+      const br = document.createElement('br');
+      const link = document.createElement('a');
+      link.href = comment.image_url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      
+      const img = document.createElement('img');
+      img.src = comment.image_url;
+      img.className = 'chat-image';
+      img.alt = 'Chat image';
+      img.onerror = () => {
+        img.src = '/static/image-error.png';
+        img.alt = 'Image failed to load';
+      };
+      
+      link.appendChild(img);
+      messageDiv.appendChild(br);
+      messageDiv.appendChild(link);
+    }
+
+    // Add delete button for admin
+    if (this.state.isAdminMode) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-comment-btn';
+      deleteBtn.dataset.commentId = comment.id;
+      deleteBtn.textContent = '❌';
+      deleteBtn.onclick = e => this.handleDelete(e);
+      messageDiv.appendChild(deleteBtn);
+    }
+
+    return messageDiv;
+  }
+
+  /**
+   * Handle comment deletion for admin users.
+   * 
+   * @param {Event} e - The click event
+   */
   async handleDelete(e) {
     const id = e.target.dataset.commentId;
     if (!id) return;
@@ -481,7 +553,7 @@ class ChatWidget {
       
       if (data.success) {
         e.target.closest('.chat-message').remove();
-        if (!this.config.useSSE) {
+        if (!CONFIG.USE_SSE) {
           await this.fetchComments();
         }
       } else {
@@ -493,8 +565,11 @@ class ChatWidget {
     }
   }
 
+  /**
+   * Initialize Server-Sent Events connection.
+   */
   initializeSSE() {
-    if (!this.config.useSSE || 
+    if (!CONFIG.USE_SSE || 
         this.state.eventSource || 
         this.elements['chat-container'].style.display === 'none') {
       return;
@@ -527,10 +602,10 @@ class ChatWidget {
           this.state.eventSource = null;
         }
 
-        if (retryCount < this.config.maxRetries) {
+        if (retryCount < CONFIG.MAX_RETRIES) {
           const delay = Math.min(
-            this.config.baseRetryDelay * Math.pow(2, retryCount),
-            this.config.maxRetryDelay
+            CONFIG.BASE_RETRY_DELAY * Math.pow(2, retryCount),
+            CONFIG.MAX_RETRY_DELAY
           );
           setTimeout(connect, delay);
           retryCount++;
@@ -544,11 +619,48 @@ class ChatWidget {
     connect();
   }
 
+  /**
+   * Handle visibility change events.
+   */
+  handleVisibilityChange() {
+    if (document.hidden) {
+      this.cleanup();
+    } else if (this.elements['chat-container'].style.display !== 'none') {
+      if (CONFIG.USE_SSE) {
+        this.initializeSSE();
+      } else {
+        this.fetchComments();
+      }
+    }
+  }
+
+  /**
+   * Handle window resize events.
+   */
+  handleResize() {
+    const container = this.elements['chat-container'];
+    if (container.style.display === 'none') return;
+
+    // Ensure chat container stays within viewport
+    const rect = container.getBoundingClientRect();
+    const maxX = window.innerWidth - rect.width;
+    const maxY = window.innerHeight - rect.height;
+
+    if (rect.left > maxX) container.style.left = maxX + 'px';
+    if (rect.top > maxY) container.style.top = maxY + 'px';
+  }
+
+  /**
+   * Close the chat widget.
+   */
   closeChat() {
     this.elements['chat-container'].style.display = 'none';
     this.cleanup();
   }
 
+  /**
+   * Toggle the chat widget visibility.
+   */
   toggleChat() {
     const container = this.elements['chat-container'];
     const isHidden = container.style.display === 'none' || 
@@ -557,7 +669,7 @@ class ChatWidget {
     container.style.display = isHidden ? 'flex' : 'none';
 
     if (isHidden) {
-      if (this.config.useSSE) {
+      if (CONFIG.USE_SSE) {
         this.initializeSSE();
       } else {
         if (this.state.lastComments.length === 0 && 
@@ -567,7 +679,7 @@ class ChatWidget {
         if (!this.state.pollingTimer) {
           this.state.pollingTimer = setInterval(
             () => this.fetchComments(), 
-            this.config.pollingInterval
+            CONFIG.POLLING_INTERVAL
           );
         }
       }
@@ -576,15 +688,18 @@ class ChatWidget {
     }
   }
 
+  /**
+   * Clean up resources and event listeners.
+   */
   cleanup() {
     // Clean up SSE
-    if (this.config.useSSE && this.state.eventSource) {
+    if (CONFIG.USE_SSE && this.state.eventSource) {
       this.state.eventSource.close();
       this.state.eventSource = null;
     }
 
     // Clean up polling
-    if (!this.config.useSSE && this.state.pollingTimer) {
+    if (!CONFIG.USE_SSE && this.state.pollingTimer) {
       clearInterval(this.state.pollingTimer);
       this.state.pollingTimer = null;
     }
@@ -602,6 +717,9 @@ class ChatWidget {
     window.removeEventListener('resize', this.handleResize);
   }
 
+  /**
+   * Play the beep sound for new messages.
+   */
   playBeep() {
     if (this.beepSound) {
       this.beepSound.play().catch(console.error);
@@ -609,11 +727,43 @@ class ChatWidget {
   }
 }
 
-// Initialize chat widget when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  const chat = new ChatWidget();
-  if (chat.init()) {
+// =============================================================================
+// GLOBAL INSTANCES
+// =============================================================================
+
+let chatWidget = null;
+
+// =============================================================================
+// APPLICATION INITIALIZATION
+// =============================================================================
+
+/**
+ * Initialize the chat widget when DOM is ready.
+ */
+function initializeChat() {
+  chatWidget = new ChatWidget();
+  if (chatWidget.init()) {
     // Store instance for potential external access
-    window.chatWidget = chat;
+    window.chatWidget = chatWidget;
   }
-});
+}
+
+// =============================================================================
+// EVENT LISTENERS
+// =============================================================================
+
+// Initialize chat widget when DOM is ready
+document.addEventListener('DOMContentLoaded', initializeChat);
+
+// =============================================================================
+// EXPORT FOR MODULE SYSTEMS (if needed)
+// =============================================================================
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    ChatWidget,
+    CONFIG,
+    debounce,
+    throttle
+  };
+}
