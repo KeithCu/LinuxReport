@@ -11,7 +11,6 @@ import traceback
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
-import enum
 import random
 
 from image_parser import custom_fetch_largest_image
@@ -873,7 +872,7 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
 
     try:
         # Pass ALL_URLS and cache to fetch_recent_articles
-        articles = fetch_recent_articles(ALL_URLS, cache)
+        articles = fetch_recent_articles(ALL_URLS, g_c)
         if not articles:
             print(f"No articles found for mode: {mode}")
             sys.exit(1) # Keep exit for no articles
