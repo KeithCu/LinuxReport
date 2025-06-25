@@ -59,12 +59,29 @@ def create_driver(use_tor, user_agent):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument(f"--user-agent={user_agent}")
+    # Additional options to reduce resource usage
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-plugins")
+    options.add_argument("--disable-images")
+    options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-renderer-backgrounding")
+    options.add_argument("--disable-features=TranslateUI")
+    options.add_argument("--disable-ipc-flooding-protection")
+    options.add_argument("--memory-pressure-off")
+    options.add_argument("--max_old_space_size=4096")  # Limit memory usage
+    
     if use_tor:
         options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
 
     service = Service(ChromeDriverManager(
         chrome_type=ChromeType.CHROMIUM).install())
     driver = webdriver.Chrome(service=service, options=options)
+    
+    # Set timeouts to prevent hanging
+    driver.set_page_load_timeout(30)  # 30 second page load timeout
+    driver.set_script_timeout(30)     # 30 second script timeout
+    
     # Disable compression by setting Accept-Encoding to identity via CDP
     driver.execute_cdp_cmd("Network.enable", {})
     driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {"Accept-Encoding": "identity"}})
@@ -129,12 +146,26 @@ class SharedSeleniumDriver:
                 if cls._instance:
                     try:
                         cls._instance.driver.quit()
-                    except Exception:
-                        pass
-                cls._instance = SharedSeleniumDriver(use_tor, user_agent)
-            cls._instance.last_used = time.time()
-            cls._reset_timer()
-            return cls._instance.driver
+                    except Exception as e:
+                        print(f"Error quitting old driver: {e}")
+                        try:
+                            cls._instance.driver.close()
+                        except Exception as e2:
+                            print(f"Error closing old driver: {e2}")
+                    finally:
+                        cls._instance = None
+                
+                try:
+                    cls._instance = SharedSeleniumDriver(use_tor, user_agent)
+                except Exception as e:
+                    print(f"Error creating new driver: {e}")
+                    return None
+            
+            if cls._instance:
+                cls._instance.last_used = time.time()
+                cls._reset_timer()
+                return cls._instance.driver
+            return None
 
     @classmethod
     def acquire_fetch_lock(cls):
@@ -147,7 +178,11 @@ class SharedSeleniumDriver:
         Returns:
             bool: True if lock was acquired successfully
         """
-        return cls._fetch_lock.acquire()
+        try:
+            return cls._fetch_lock.acquire(timeout=30)  # 30 second timeout
+        except Exception as e:
+            print(f"Error acquiring fetch lock: {e}")
+            return False
 
     @classmethod
     def release_fetch_lock(cls):
@@ -176,12 +211,20 @@ class SharedSeleniumDriver:
             bool: True if current instance matches configuration
         """
         # Only reuse if config matches
-        return (
-            cls._instance and
-            cls._instance.use_tor == use_tor and
-            cls._instance.user_agent == user_agent and
-            hasattr(cls._instance, 'driver')
-        )
+        if not (cls._instance and
+                cls._instance.use_tor == use_tor and
+                cls._instance.user_agent == user_agent and
+                hasattr(cls._instance, 'driver')):
+            return False
+        
+        # Check if driver is still responsive
+        try:
+            # Try to get current URL to test if driver is alive
+            cls._instance.driver.current_url
+            return True
+        except Exception as e:
+            print(f"Driver health check failed: {e}")
+            return False
 
     @classmethod
     def _reset_timer(cls):
@@ -191,11 +234,21 @@ class SharedSeleniumDriver:
         Cancels any existing timer and starts a new one to ensure
         the driver is cleaned up after the timeout period.
         """
-        if cls._timer:
-            cls._timer.cancel()
-        cls._timer = threading.Timer(cls._timeout, cls._shutdown)
-        cls._timer.daemon = True
-        cls._timer.start()
+        try:
+            if cls._timer:
+                cls._timer.cancel()
+                cls._timer = None
+        except Exception as e:
+            print(f"Error cancelling timer: {e}")
+        
+        try:
+            cls._timer = threading.Timer(cls._timeout, cls._shutdown)
+            cls._timer.daemon = True
+            cls._timer.start()
+        except Exception as e:
+            print(f"Error creating timer: {e}")
+            # If timer creation fails, try to shutdown immediately
+            cls._shutdown()
 
     @classmethod
     def _shutdown(cls):
@@ -208,11 +261,51 @@ class SharedSeleniumDriver:
         with cls._lock:
             if cls._instance:
                 try:
+                    # Close all windows and quit the driver
                     cls._instance.driver.quit()
-                except Exception:
-                    pass
-                cls._instance = None
+                except Exception as e:
+                    print(f"Error quitting WebDriver: {e}")
+                    try:
+                        # Fallback: try to close the driver
+                        cls._instance.driver.close()
+                    except Exception as e2:
+                        print(f"Error closing WebDriver: {e2}")
+                finally:
+                    cls._instance = None
+            
+            # Cancel any existing timer
+            try:
+                if cls._timer:
+                    cls._timer.cancel()
+            except Exception as e:
+                print(f"Error cancelling timer during shutdown: {e}")
+            finally:
                 cls._timer = None
+
+    @classmethod
+    def force_cleanup(cls):
+        """
+        Shutdown and cleanup the current driver instance.
+        
+        This method can be called manually to ensure the WebDriver
+        is properly shut down, useful for debugging or emergency cleanup.
+        """
+        print("Forcing WebDriver cleanup...")
+        cls._shutdown()
+
+# =============================================================================
+# GLOBAL CLEANUP FUNCTION
+# =============================================================================
+
+def cleanup_selenium_drivers():
+    """
+    Global cleanup function to ensure all Selenium drivers are properly shut down.
+    
+    This function can be called from other modules or during application shutdown
+    to ensure no WebDriver instances are left running.
+    """
+    print("Cleaning up all Selenium drivers...")
+    SharedSeleniumDriver.force_cleanup()
 
 # =============================================================================
 # COMPATIBILITY AND UTILITY CLASSES
@@ -346,19 +439,30 @@ def fetch_site_posts(url, user_agent):
             user_agent = g_cs.get("REDDIT_USER_AGENT")
         
         # Acquire the fetch lock before starting the fetch operation
-        SharedSeleniumDriver.acquire_fetch_lock()
+        if not SharedSeleniumDriver.acquire_fetch_lock():
+            print(f"Failed to acquire fetch lock for {url}, skipping...")
+            return []
+        
         try:
             driver = SharedSeleniumDriver.get_driver(config["needs_tor"], user_agent)
+            if not driver:
+                print(f"Failed to get driver for {url}")
+                return []
             try:
                 driver.get(url)
                 if base_domain == "reddit.com":
                     pass
                 else:
-                    WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                    try:
+                        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                    except Exception as wait_error:
+                        print(f"Timeout waiting for elements on {url}: {wait_error}")
+                        # Continue anyway, might still find some content
+                
                 print(f"Some content loaded for {url} with agent: {user_agent}")
                 posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
                 if not posts:
-                    snippet = driver.page_source[:1000]
+                    snippet = driver.page_source[:500]
                     print("No posts found. Page source snippet:", snippet)
                     raise Exception("No posts found")
                 for post in posts:
