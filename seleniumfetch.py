@@ -36,6 +36,43 @@ from webdriver_manager.core.os_manager import ChromeType
 from shared import g_cs, CUSTOM_FETCH_CONFIG
 
 # =============================================================================
+# TIMEOUT CONSTANTS
+# =============================================================================
+
+# WebDriver timeouts - for browser operations
+WEBDRIVER_TIMEOUT = 10  # 30 seconds for page load and script execution
+
+# Network operation timeouts - for HTTP requests and element waiting
+NETWORK_TIMEOUT = 10  # 10 seconds for HTTP requests and WebDriverWait operations
+
+# Thread synchronization timeout - for coordinating fetch operations
+FETCH_LOCK_TIMEOUT = 30  # 30 seconds for acquiring fetch lock (longer due to thread coordination)
+
+# Driver lifecycle timeout - for resource management
+DRIVER_RECYCLE_TIMEOUT = 300  # 5 minutes - timeout for driver recycling
+
+# Legacy constants for backward compatibility (deprecated - use above constants instead)
+PAGE_LOAD_TIMEOUT = WEBDRIVER_TIMEOUT
+SCRIPT_TIMEOUT = WEBDRIVER_TIMEOUT
+WEBDRIVER_WAIT_TIMEOUT = NETWORK_TIMEOUT
+HTTP_REQUEST_TIMEOUT = NETWORK_TIMEOUT
+
+# =============================================================================
+# SPECIAL SITE CONFIGURATIONS
+# =============================================================================
+
+# Configuration for keithcu.com RSS feed
+KEITHCU_RSS_CONFIG = {
+    "needs_selenium": True,  # RSS feeds don't need Selenium
+    "needs_tor": False,
+    "post_container": "item",  # RSS items are wrapped in <item> tags
+    "title_selector": "title",
+    "link_selector": "link", 
+    "link_attr": "text",  # RSS links are text content, not href attributes
+    "filter_pattern": ""
+}
+
+# =============================================================================
 # WEBDRIVER CONFIGURATION AND CREATION
 # =============================================================================
 
@@ -79,8 +116,8 @@ def create_driver(use_tor, user_agent):
     driver = webdriver.Chrome(service=service, options=options)
     
     # Set timeouts to prevent hanging
-    driver.set_page_load_timeout(30)  # 30 second page load timeout
-    driver.set_script_timeout(30)     # 30 second script timeout
+    driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)  # 30 second page load timeout
+    driver.set_script_timeout(SCRIPT_TIMEOUT)     # 30 second script timeout
     
     # Disable compression by setting Accept-Encoding to identity via CDP
     driver.execute_cdp_cmd("Network.enable", {})
@@ -111,7 +148,7 @@ class SharedSeleniumDriver:
     _lock = threading.Lock()
     _fetch_lock = threading.Lock()  # New lock for synchronizing fetch operations
     _timer = None
-    _timeout = 300  # 5 minutes
+    _timeout = DRIVER_RECYCLE_TIMEOUT  # 5 minutes
 
     def __init__(self, use_tor, user_agent):
         """
@@ -179,7 +216,7 @@ class SharedSeleniumDriver:
             bool: True if lock was acquired successfully
         """
         try:
-            return cls._fetch_lock.acquire(timeout=30)  # 30 second timeout
+            return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)  # 30 second timeout
         except Exception as e:
             print(f"Error acquiring fetch lock: {e}")
             return False
@@ -238,6 +275,7 @@ class SharedSeleniumDriver:
             if cls._timer:
                 cls._timer.cancel()
                 cls._timer = None
+                print(f"Timer cancelled, timeout was {cls._timeout} seconds")
         except Exception as e:
             print(f"Error cancelling timer: {e}")
         
@@ -245,6 +283,7 @@ class SharedSeleniumDriver:
             cls._timer = threading.Timer(cls._timeout, cls._shutdown)
             cls._timer.daemon = True
             cls._timer.start()
+            print(f"New timer started with {cls._timeout} second timeout")
         except Exception as e:
             print(f"Error creating timer: {e}")
             # If timer creation fails, try to shutdown immediately
@@ -258,29 +297,35 @@ class SharedSeleniumDriver:
         Safely closes the WebDriver and resets the singleton instance
         to allow for fresh driver creation.
         """
+        print(f"Shutdown called - instance exists: {cls._instance is not None}")
         with cls._lock:
             if cls._instance:
                 try:
                     # Close all windows and quit the driver
                     cls._instance.driver.quit()
+                    print("WebDriver quit successfully")
                 except Exception as e:
                     print(f"Error quitting WebDriver: {e}")
                     try:
                         # Fallback: try to close the driver
                         cls._instance.driver.close()
+                        print("WebDriver closed successfully")
                     except Exception as e2:
                         print(f"Error closing WebDriver: {e2}")
                 finally:
                     cls._instance = None
+                    print("Instance set to None")
             
             # Cancel any existing timer
             try:
                 if cls._timer:
                     cls._timer.cancel()
+                    print("Timer cancelled during shutdown")
             except Exception as e:
                 print(f"Error cancelling timer during shutdown: {e}")
             finally:
                 cls._timer = None
+                print("Timer set to None")
 
     @classmethod
     def force_cleanup(cls):
@@ -380,7 +425,11 @@ def extract_post_data(post, config, url, use_selenium):
             link_element = post.select_one(config["link_selector"])
             if not link_element:
                 return None
-            link = link_element.get(config["link_attr"])
+            # Handle RSS feeds where links are text content, not href attributes
+            if config["link_attr"] == "text":
+                link = link_element.get_text().strip()
+            else:
+                link = link_element.get(config["link_attr"])
             if link and link.startswith('/'):
                 link = urljoin(url, link)
     except Exception:
@@ -426,6 +475,11 @@ def fetch_site_posts(url, user_agent):
     config = CUSTOM_FETCH_CONFIG.get(base_domain)
     if not config:
         config = CUSTOM_FETCH_CONFIG.get(parsed.netloc)
+    
+    # Special case for keithcu.com RSS feed
+    if not config and "keithcu.com" in base_domain:
+        config = KEITHCU_RSS_CONFIG
+    
     if not config:
         print(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
         return []
@@ -454,7 +508,7 @@ def fetch_site_posts(url, user_agent):
                     pass
                 else:
                     try:
-                        WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                        WebDriverWait(driver, WEBDRIVER_WAIT_TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
                     except Exception as wait_error:
                         print(f"Timeout waiting for elements on {url}: {wait_error}")
                         # Continue anyway, might still find some content
@@ -477,7 +531,7 @@ def fetch_site_posts(url, user_agent):
     else:
         print(f"Fetching {base_domain} using requests (no Selenium)")
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             posts = soup.select(config["post_container"])
