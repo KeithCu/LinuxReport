@@ -1,18 +1,22 @@
 """
 Shared Utilities Module for LinuxReport
 
-This module contains shared utilities, classes, constants, and configuration management
+This module contains core shared utilities, constants, and configuration management
 for the LinuxReport project. It provides centralized access to common functionality
-across the application including caching, rate limiting, RSS feed management, and
-configuration handling.
+across the application including caching, mode management, RSS feed data structures,
+and configuration handling.
 
 Key Features:
 - Configuration management and mode handling
 - Distributed caching with diskcache and memory caches
-- Rate limiting with dynamic limits based on user type
 - RSS feed data structures and utilities
-- Web bot detection and filtering
 - Lock management for distributed operations
+- Application-wide constants and settings
+- Dynamic configuration loading based on report modes
+
+Note: Rate limiting, web bot detection, and request utilities have been moved to
+request_utils.py. Application initialization and Flask setup have been moved to
+app.py. Database models and cache wrappers have been moved to models.py.
 
 Author: LinuxReport System
 License: See LICENSE file
@@ -37,7 +41,7 @@ import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
 from app_config import load_config
 from request_utils import get_rate_limit_key, dynamic_rate_limit, WEB_BOT_USER_AGENTS, get_ip_prefix, format_last_updated
-from models import DiskCacheWrapper
+from models import DiskCacheWrapper, RssFeed
 
 # =============================================================================
 # FLASK MONITORING DASHBOARD CONFIGURATION
@@ -253,44 +257,6 @@ limiter = Limiter(
     strategy="fixed-window"
 )
 
-# =============================================================================
-# DATA STRUCTURES AND CLASSES
-# =============================================================================
-
-class RssFeed:
-    """
-    Represents an RSS feed with entries and optional top articles.
-    
-    This class encapsulates RSS feed data and provides methods for
-    managing feed entries and top article tracking.
-    """
-    
-    def __init__(self, entries: list, top_articles: Optional[list] = None) -> None:
-        """
-        Initialize an RSS feed with entries and optional top articles.
-        
-        Args:
-            entries (list): List of RSS feed entries
-            top_articles (Optional[list]): List of top articles to track
-        """
-        self.entries = entries
-        self.top_articles = top_articles if top_articles else []
-        self.__post_init__()
-
-    def __post_init__(self) -> None:
-        """Ensure top_articles attribute is properly initialized."""
-        if not hasattr(self, 'top_articles'):
-            object.__setattr__(self, 'top_articles', [])
-
-    def __setstate__(self, state: dict) -> None:
-        """
-        Restore state and reinitialize attributes during unpickling.
-        
-        Args:
-            state (dict): State dictionary from pickle
-        """
-        object.__setattr__(self, '__dict__', state)
-        self.__post_init__()
 
 # =============================================================================
 # GLOBAL CACHE INSTANCES
@@ -356,37 +322,6 @@ def get_chat_cache() -> DiskCacheWrapper:
 # =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
-
-def run_one_time_last_fetch_migration(all_urls):
-    """
-    Performs a one-time migration of last_fetch times from old cache keys to the
-    new unified 'all_last_fetches' cache. This is controlled by a flag to ensure
-    it only runs once.
-    
-    Args:
-        all_urls (list): List of all URLs to migrate
-    """
-    with get_lock("last_fetch_migration_lock"):
-        if not g_c.has('last_fetch_migration_complete'):
-            print("Running one-time migration for last_fetch times...")
-            all_fetches = g_c.get('all_last_fetches') or {}
-            updated = False
-            
-            for url in all_urls:
-                if url not in all_fetches:
-                    old_last_fetch = g_c.get(url + ":last_fetch")
-                    if old_last_fetch:
-                        print(f"Migrating last_fetch for {url}.")
-                        all_fetches[url] = old_last_fetch
-                        updated = True
-            
-            if updated:
-                g_c.put('all_last_fetches', all_fetches, timeout=EXPIRE_YEARS)
-                
-            # Set the flag to indicate migration is complete
-            g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
-            print("Last_fetch migration complete.")
-
 
 def clear_page_caches():
     """

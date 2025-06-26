@@ -55,6 +55,41 @@ class RssInfo:
         self.logo_alt = logo_alt
         self.site_url = site_url
 
+class RssFeed:
+    """
+    Represents an RSS feed with entries and optional top articles.
+    
+    This class encapsulates RSS feed data and provides methods for
+    managing feed entries and top article tracking.
+    """
+    
+    def __init__(self, entries: list, top_articles: Optional[list] = None) -> None:
+        """
+        Initialize an RSS feed with entries and optional top articles.
+        
+        Args:
+            entries (list): List of RSS feed entries
+            top_articles (Optional[list]): List of top articles to track
+        """
+        self.entries = entries
+        self.top_articles = top_articles if top_articles else []
+        self.__post_init__()
+
+    def __post_init__(self) -> None:
+        """Ensure top_articles attribute is properly initialized."""
+        if not hasattr(self, 'top_articles'):
+            object.__setattr__(self, 'top_articles', [])
+
+    def __setstate__(self, state: dict) -> None:
+        """
+        Restore state and reinitialize attributes during unpickling.
+        
+        Args:
+            state (dict): State dictionary from pickle
+        """
+        object.__setattr__(self, '__dict__', state)
+        self.__post_init__()
+
 class DiskCacheWrapper:
     """
     Wrapper for diskcache to manage caching operations with additional functionality.

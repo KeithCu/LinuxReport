@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shared import (
     EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, 
     FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, 
-    limiter, ALL_URLS, run_one_time_last_fetch_migration
+    limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS
 )
 from app_config import DEBUG, get_secret_key
 from models import User
@@ -88,6 +88,36 @@ class HeaderFilter(Filter):
 
         # Write the actual content
         out.write(content)
+
+def run_one_time_last_fetch_migration(all_urls):
+    """
+    Performs a one-time migration of last_fetch times from old cache keys to the
+    new unified 'all_last_fetches' cache. This is controlled by a flag to ensure
+    it only runs once.
+    
+    Args:
+        all_urls (list): List of all URLs to migrate
+    """
+    with get_lock("last_fetch_migration_lock"):
+        if not g_c.has('last_fetch_migration_complete'):
+            print("Running one-time migration for last_fetch times...")
+            all_fetches = g_c.get('all_last_fetches') or {}
+            updated = False
+            
+            for url in all_urls:
+                if url not in all_fetches:
+                    old_last_fetch = g_c.get(url + ":last_fetch")
+                    if old_last_fetch:
+                        print(f"Migrating last_fetch for {url}.")
+                        all_fetches[url] = old_last_fetch
+                        updated = True
+            
+            if updated:
+                g_c.put('all_last_fetches', all_fetches, timeout=EXPIRE_YEARS)
+                
+            # Set the flag to indicate migration is complete
+            g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
+            print("Last_fetch migration complete.")
 
 # =============================================================================
 # FLASK APPLICATION INITIALIZATION
