@@ -1,4 +1,3 @@
-
 """
 chat.py
 
@@ -21,12 +20,13 @@ import time
 # =============================================================================
 from flask import jsonify, Response, request
 from flask_login import login_required
+from flask_restful import Resource, reqparse
 from werkzeug.utils import secure_filename
 
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from shared import get_chat_cache, get_ip_prefix, PATH
+from shared import get_chat_cache, get_ip_prefix, PATH, API, limiter, dynamic_rate_limit
 
 # =============================================================================
 # CHAT CONSTANTS
@@ -60,18 +60,12 @@ def allowed_file(filename):
 # CHAT ROUTE INITIALIZATION
 # =============================================================================
 
-def init_chat_routes(app, limiter, dynamic_rate_limit):
+class CommentsResource(Resource):
     """
-    Initializes all chat-related routes for the Flask application.
-
-    Args:
-        app (Flask): The Flask application instance.
-        limiter (Flask-Limiter): The rate limiter instance.
-        dynamic_rate_limit (function): Function to determine rate limit string.
+    Resource for handling GET and POST requests to /api/comments.
     """
-
-    @app.route('/api/comments', methods=['GET'])
-    def get_comments():
+    
+    def get(self):
         """
         Fetches and returns all chat comments from the cache.
         Performs a one-time migration for older comment formats.
@@ -100,35 +94,10 @@ def init_chat_routes(app, limiter, dynamic_rate_limit):
         if needs_update:
             chat_cache.put(COMMENTS_KEY, comments)
 
-        return jsonify(comments)
+        return comments, 200
 
-    @app.route('/api/comments/stream')
-    def stream_comments():
-        """
-        Provides a real-time stream of comments using Server-Sent Events (SSE).
-        Pushes updates to clients whenever the comment list changes.
-        """
-        def event_stream():
-            last_data_sent = None
-            chat_cache = get_chat_cache()
-            while True:
-                try:
-                    current_comments = chat_cache.get(COMMENTS_KEY) or []
-                    current_data = json.dumps(current_comments)
-                    if current_data != last_data_sent:
-                        yield f"event: new_comment\ndata: {current_data}\n\n"
-                        last_data_sent = current_data
-                    time.sleep(2)
-                except GeneratorExit:
-                    break
-                except Exception as e:
-                    print(f"SSE Error in chat stream: {e}")
-                    break
-        return Response(event_stream(), mimetype='text/event-stream')
-
-    @app.route('/api/comments', methods=['POST'])
     @limiter.limit(dynamic_rate_limit)
-    def post_comment():
+    def post(self):
         """
         Handles new comment submissions. Validates input, sanitizes content,
         and adds the new comment to the cache.
@@ -138,14 +107,14 @@ def init_chat_routes(app, limiter, dynamic_rate_limit):
         banned_ips = chat_cache.get(BANNED_IPS_KEY) or set()
 
         if ip in banned_ips:
-            return jsonify({"error": "Your IP address has been banned from commenting."}), 403
+            return {"error": "Your IP address has been banned from commenting."}, 403
 
         data = request.get_json()
         text = data.get('text', '').strip()
         image_url = data.get('image_url', '').strip()
 
         if not text and not image_url:
-            return jsonify({"error": "Comment cannot be empty."}), 400
+            return {"error": "Comment cannot be empty."}, 400
 
         # Sanitize HTML, allowing only <b> tags
         sanitized_text = html.escape(text).replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')
@@ -178,11 +147,45 @@ def init_chat_routes(app, limiter, dynamic_rate_limit):
         comments = comments[-MAX_COMMENTS:]
         chat_cache.put(COMMENTS_KEY, comments)
 
-        return jsonify({"success": True}), 201
+        return {"success": True}, 201
 
-    @app.route('/api/comments/<comment_id>', methods=['DELETE'])
+
+class CommentStreamResource(Resource):
+    """
+    Resource for handling GET requests to /api/comments/stream.
+    """
+    
+    def get(self):
+        """
+        Provides a real-time stream of comments using Server-Sent Events (SSE).
+        Pushes updates to clients whenever the comment list changes.
+        """
+        def event_stream():
+            last_data_sent = None
+            chat_cache = get_chat_cache()
+            while True:
+                try:
+                    current_comments = chat_cache.get(COMMENTS_KEY) or []
+                    current_data = json.dumps(current_comments)
+                    if current_data != last_data_sent:
+                        yield f"event: new_comment\ndata: {current_data}\n\n"
+                        last_data_sent = current_data
+                    time.sleep(2)
+                except GeneratorExit:
+                    break
+                except Exception as e:
+                    print(f"SSE Error in chat stream: {e}")
+                    break
+        return Response(event_stream(), mimetype='text/event-stream')
+
+
+class CommentResource(Resource):
+    """
+    Resource for handling DELETE requests to /api/comments/<comment_id>.
+    """
+    
     @login_required
-    def delete_comment(comment_id):
+    def delete(self, comment_id):
         """
         Deletes a specific comment by its ID. Requires admin login.
         """
@@ -193,13 +196,18 @@ def init_chat_routes(app, limiter, dynamic_rate_limit):
 
         if len(comments_after_delete) < len(comments):
             chat_cache.put(COMMENTS_KEY, comments_after_delete)
-            return jsonify({"success": True}), 200
+            return {"success": True}, 200
         else:
-            return jsonify({"error": "Comment not found"}), 404
+            return {"error": "Comment not found"}, 404
 
-    @app.route('/api/upload_image', methods=['POST'])
+
+class ImageUploadResource(Resource):
+    """
+    Resource for handling POST requests to /api/upload_image.
+    """
+    
     @limiter.limit(dynamic_rate_limit)
-    def upload_image():
+    def post(self):
         """
         Handles image uploads for chat comments. Validates file type and size,
         saves the file, and returns a web-accessible URL.
@@ -209,23 +217,23 @@ def init_chat_routes(app, limiter, dynamic_rate_limit):
         banned_ips = chat_cache.get(BANNED_IPS_KEY) or set()
 
         if ip in banned_ips:
-            return jsonify({"error": "Your IP address has been banned from uploading."}), 403
+            return {"error": "Your IP address has been banned from uploading."}, 403
 
         if 'image' not in request.files:
-            return jsonify({"error": "No image file part in the request."}), 400
+            return {"error": "No image file part in the request."}, 400
 
         file = request.files['image']
         if file.filename == '':
-            return jsonify({"error": "No file selected for upload."}), 400
+            return {"error": "No file selected for upload."}, 400
 
         if not file or not allowed_file(file.filename):
-            return jsonify({"error": "Invalid file type. Allowed types: " + ", ".join(ALLOWED_EXTENSIONS)}), 400
+            return {"error": "Invalid file type. Allowed types: " + ", ".join(ALLOWED_EXTENSIONS)}, 400
 
         # Check file size
         file.seek(0, os.SEEK_END)
         file_length = file.tell()
         if file_length > MAX_IMAGE_SIZE:
-            return jsonify({"error": f"File size exceeds the limit of {MAX_IMAGE_SIZE // 1024 // 1024} MB."}), 400
+            return {"error": f"File size exceeds the limit of {MAX_IMAGE_SIZE // 1024 // 1024} MB."}, 400
         file.seek(0)
 
         # Save file with a secure, unique name
@@ -239,8 +247,24 @@ def init_chat_routes(app, limiter, dynamic_rate_limit):
         try:
             file.save(filepath)
             file_url = f"{WEB_UPLOAD_PATH}/{filename}"
-            return jsonify({"success": True, "url": file_url}), 201
+            return {"success": True, "url": file_url}, 201
         except (IOError, OSError) as e:
             print(f"Error saving uploaded image: {e}")
-            return jsonify({"error": "Failed to save the uploaded image on the server."}), 500
+            return {"error": "Failed to save the uploaded image on the server."}, 500
+
+
+def init_chat_routes(app, limiter, dynamic_rate_limit):
+    """
+    Initializes all chat-related routes for the Flask application using Flask-RESTful.
+
+    Args:
+        app (Flask): The Flask application instance.
+        limiter (Flask-Limiter): The rate limiter instance.
+        dynamic_rate_limit (function): Function to determine rate limit string.
+    """
+    # Register Flask-RESTful resources
+    API.add_resource(CommentsResource, '/api/comments')
+    API.add_resource(CommentStreamResource, '/api/comments/stream')
+    API.add_resource(CommentResource, '/api/comments/<comment_id>')
+    API.add_resource(ImageUploadResource, '/api/upload_image')
 
