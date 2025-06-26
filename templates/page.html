@@ -52,56 +52,58 @@
       </a>
 
       <!-- Navigation Links - Moved here from nav section -->
-      <div id="nav-controls-container" class="nav-controls">
-        <div class="nav-links-desktop">
-          <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
-          <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
-          <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
-          <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
-          <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
-          <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
-          <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
-          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
-        </div>
-        <div class="nav-section-middle">
-          <select id="theme-select" class="theme-select">
-            <option value="light">Light</option>
-            <option value="paper">Paper</option>
-            <option value="silver">Silver</option>
-            <option value="retro">Retro</option>
-            <option value="dark">Dark</option>
-            <option value="monokai">Monokai</option>
-            <option value="futuristic">Futuristic</option>
-            <option value="cyberpunk">Cyberpunk</option>
-            <option value="midnight">Midnight</option>
-            <option value="ocean">Ocean</option>
-            <option value="nord">Nord</option>
-            <option value="forest">Forest</option>
-            <option value="steampunk">Steampunk</option>
-            <option value="autumn">Autumn</option>
-            <option value="sepia">Sepia</option>
-            <option value="solarized">Solarized</option>
-            <option value="pastelle">Pastelle</option>
-          </select>
-          <select id="font-select" class="font-select">
-            <option value="system">System Default</option>
-            <option value="sans-serif">Sans Serif</option>
-            <option value="monospace">Monospace</option>
-            <option value="inter">Inter</option>
-            <option value="roboto">Roboto</option>
-            <option value="open-sans">Open Sans</option>
-            <option value="source-sans">Source Sans</option>
-            <option value="noto-sans">Noto Sans</option>
-            <option value="lato">Lato</option>
-            <option value="raleway">Raleway</option>
-          </select>
-        </div>
-        <div class="nav-section-right">
-          <button id="chat-toggle-btn" class="btn">Chat</button>
-          <button id="config-btn" class="btn">Config...</button>
-          {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
-          <button id="view-mode-toggle" class="btn">Infinite</button>
-          {% endif %}
+      <div style="text-align: center; width: 100%;">
+        <div id="nav-controls-container" class="nav-controls">
+          <div class="nav-links-desktop">
+            <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
+            <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
+            <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
+            <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
+            <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
+            <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
+            <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
+            <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
+          </div>
+          <div class="nav-section-middle">
+            <select id="theme-select" class="theme-select">
+              <option value="light">Light</option>
+              <option value="paper">Paper</option>
+              <option value="silver">Silver</option>
+              <option value="retro">Retro</option>
+              <option value="dark">Dark</option>
+              <option value="monokai">Monokai</option>
+              <option value="futuristic">Futuristic</option>
+              <option value="cyberpunk">Cyberpunk</option>
+              <option value="midnight">Midnight</option>
+              <option value="ocean">Ocean</option>
+              <option value="nord">Nord</option>
+              <option value="forest">Forest</option>
+              <option value="steampunk">Steampunk</option>
+              <option value="autumn">Autumn</option>
+              <option value="sepia">Sepia</option>
+              <option value="solarized">Solarized</option>
+              <option value="pastelle">Pastelle</option>
+            </select>
+            <select id="font-select" class="font-select">
+              <option value="system">System Default</option>
+              <option value="sans-serif">Sans Serif</option>
+              <option value="monospace">Monospace</option>
+              <option value="inter">Inter</option>
+              <option value="roboto">Roboto</option>
+              <option value="open-sans">Open Sans</option>
+              <option value="source-sans">Source Sans</option>
+              <option value="noto-sans">Noto Sans</option>
+              <option value="lato">Lato</option>
+              <option value="raleway">Raleway</option>
+            </select>
+          </div>
+          <div class="nav-section-right">
+            <button id="chat-toggle-btn" class="btn">Chat</button>
+            <button id="config-btn" class="btn">Config...</button>
+            {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
+            <button id="view-mode-toggle" class="btn">Infinite</button>
+            {% endif %}
+          </div>
         </div>
       </div>
 
