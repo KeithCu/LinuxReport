@@ -27,7 +27,8 @@ from flask_limiter.util import get_remote_address
 # LOCAL IMPORTS
 # =============================================================================
 from forms import LoginForm
-from models import RssInfo, DEBUG, User
+from models import RssInfo, User
+from app_config import DEBUG
 from shared import (
     limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, 
     EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS, FAVICON, LOGO_URL, STANDARD_ORDER_STR,

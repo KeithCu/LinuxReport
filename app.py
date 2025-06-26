@@ -33,7 +33,8 @@ from shared import (
     FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, 
     limiter, ALL_URLS, run_one_time_last_fetch_migration
 )
-from models import DEBUG, User, get_secret_key
+from app_config import DEBUG, get_secret_key
+from models import User
 
 # =============================================================================
 # CUSTOM FILTERS AND UTILITIES

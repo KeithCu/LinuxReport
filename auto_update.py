@@ -797,6 +797,8 @@ def ask_ai_top_articles(articles):
         print(f"Trimmed selections to {len(updated_selections)} entries")
 
     print(f"Updating cache with {len(updated_selections)} selections")
+    g_c.put("previously_selected_selections_2", updated_selections, timeout=EXPIRE_WEEK)
+    print(f"Cache update status: {g_c.get('previously_selected_selections_2') is not None}")
     return response_text, top_articles, updated_selections, used_model
 
 

@@ -38,7 +38,7 @@ from flask_limiter.util import get_remote_address
 # Local application imports
 import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
-from models import load_config
+from app_config import load_config
 
 # =============================================================================
 # FLASK MONITORING DASHBOARD CONFIGURATION

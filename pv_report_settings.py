@@ -5,7 +5,6 @@ CONFIG: SiteConfig = SiteConfig(
         "https://www.pv-tech.org/feed": RssInfo("pv-tech-logo.webp", "PV Tech", "https://www.pv-tech.org"),
         "https://www.solarpowerworldonline.com/feed/": RssInfo("solarpowerworld.svg", "Solar power World Online", "https://www.solarpowerworldonline.com"),
         "https://www.pv-magazine.com/feed/": RssInfo("pv-magazine-logo.png", "PV Magazine", "https://www.pv-magazine.com"),
-       # "https://solartribune.com/fakefeed": RssInfo("solartribune.webp", "Solar Tribune", "https://solartribune.com"),
         "https://solarmagazine.com/fakefeed": RssInfo("solar-magazine-logo.webp", "Solar Magazine", "https://solarmagazine.com"),
         "https://cleantechnica.com/feed/": RssInfo("cleantechnica-logo.webp", "Clean Technica", "https://cleantechnica.com"),
         "https://www.renewableenergyworld.com/feed": RssInfo("renewableenergyworld-logo.svg", "Renewable Energy World", "https://www.renewableenergyworld.com"),

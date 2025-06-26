@@ -1,6 +1,7 @@
 from typing import Dict, List
 
-from models import RssInfo, SiteConfig, REDDIT_FETCH_CONFIG
+from models import RssInfo, SiteConfig
+from app_config import REDDIT_FETCH_CONFIG
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
