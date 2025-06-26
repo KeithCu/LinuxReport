@@ -101,6 +101,7 @@
         {% endwith %}
         
         <form method="POST" class="login-form">
+            {{ form.hidden_tag() }}
             <div class="form-group">
                 {{ form.username.label }}
                 {{ form.username() }}

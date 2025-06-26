@@ -22,6 +22,7 @@ from flask_assets import Environment, Bundle, Filter
 from flask_compress import Compress
 from flask_login import LoginManager
 from flask_restful import Api
+from flask_wtf.csrf import CSRFProtect
 
 # =============================================================================
 # LOCAL IMPORTS
@@ -191,6 +192,10 @@ def initialize_extensions(app):
     # Initialize Flask-RESTful API
     api_instance = Api(app)
     set_flask_restful_api(api_instance)
+    
+    # Initialize Flask-WTF CSRF protection
+    csrf = CSRFProtect()
+    csrf.init_app(app)
     
     return login_manager
 

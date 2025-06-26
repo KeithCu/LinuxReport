@@ -1,6 +1,6 @@
 import os
 import json
-from flask import request, render_template, make_response
+from flask import request, render_template, make_response, flash
 from flask_login import current_user
 from shared import (
     limiter, dynamic_rate_limit, PATH, ABOVE_HTML_FILE,
@@ -68,7 +68,16 @@ def init_config_routes(app):
                                   favicon=FAVICON, enable_url_customization=ENABLE_URL_CUSTOMIZATION)
             return page
         else:
-            form = ConfigForm(request.form)
+            form = ConfigForm()
+            
+            # Validate form with CSRF protection
+            if not form.validate():
+                # Form validation failed, re-render with errors
+                flash('Please correct the errors below.', 'error')
+                page = render_template('config.html', form=form, is_admin=is_admin, 
+                                      favicon=FAVICON, enable_url_customization=ENABLE_URL_CUSTOMIZATION)
+                return page
+            
             if form.delete_cookie.data:
                 template = render_template('configdone.html', message="Deleted cookies.")
                 resp = make_response(template)
@@ -87,8 +96,10 @@ def init_config_routes(app):
                     with open(above_html_path, 'w', encoding='utf-8') as f:
                         f.write(form.headlines.data)
                     print(f"Saved headlines to {above_html_path}.")
+                    flash('Headlines saved successfully.', 'success')
                 except Exception as e:
                     print(f"Error saving headlines file: {e}")
+                    flash('Error saving headlines. Please try again.', 'error')
 
                 # Clear the cache for the above HTML file (in-memory and diskcache)
                 above_html_full_path = os.path.join(PATH, ABOVE_HTML_FILE)

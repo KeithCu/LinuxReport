@@ -17,6 +17,7 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 - **Asset Management**: Flask-Assets for bundling/minification
 - **Key Dependencies**:
   - Flask, Flask-Mobility, Flask-Login, Flask-Limiter for web framework
+  - Flask-WTF for CSRF protection and form validation
   - BeautifulSoup4 for HTML parsing
   - Feedparser for RSS feed handling
   - Selenium for web scraping (with Tor support)
@@ -62,7 +63,7 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 ├── feedfilter.py             # RSS feed filtering and processing
 ├── old_headlines.py          # Legacy headlines processing
 ├── stats.py                  # Statistics and analytics
-├── forms.py                  # Flask-WTF forms for user input
+├── forms.py                  # Flask-WTF forms for user input with CSRF protection
 ├── object_storage_config.py  # Object storage configuration
 ├── object_storage_sync.py    # Object storage synchronization
 ├── migrate_to_sqlite.py      # Database migration utilities
@@ -247,6 +248,7 @@ The project includes a comprehensive image processing pipeline:
 ## Security and Authentication
 
 - **Admin Authentication**: Flask-Login with config.yaml password storage
+- **Form Security**: Flask-WTF with CSRF protection and comprehensive form validation
 - **Rate Limiting**: Flask-Limiter with dynamic rate adjustment
 - **CORS Configuration**: Configurable allowed domains for API access
 - **Input Validation**: Secure file uploads with size/type restrictions

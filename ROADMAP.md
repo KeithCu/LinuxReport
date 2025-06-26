@@ -83,7 +83,7 @@ These features are directly visible to and interact with your end users:
 These features improve the backend, admin experience, or codebase quality, but are not directly visible to end users:
 
 - **Security & Protection**
-  - Flask-WTF for CSRF protection and better form validation
+  - Flask-WTF for CSRF protection and better form validation (implemented)
   - Flask-Limiter for API rate limiting (implemented and working, continue to expand coverage and tune limits)
   - Flask-Compress for response compression
   - Flask-Principals for role-based access control
@@ -131,7 +131,7 @@ These features improve the backend, admin experience, or codebase quality, but a
 
 - **High Priority**
   - Flask-Login (user authentication, implemented)
-  - Flask-WTF (form security)
+  - Flask-WTF (form security, implemented)
   - Flask-Limiter (rate limiting, implemented)
   - Flask-Compress (performance)
 

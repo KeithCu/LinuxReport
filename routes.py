@@ -199,7 +199,7 @@ def _register_authentication_routes(flask_app):
             return redirect(url_for('index'))
         
         if request.method == 'POST':
-            form = LoginForm(request.form)
+            form = LoginForm()
             if form.validate():
                 user = User.authenticate(form.username.data, form.password.data)
                 if user:
@@ -209,7 +209,10 @@ def _register_authentication_routes(flask_app):
                         next_page = url_for('index')
                     return redirect(next_page)
                 else:
-                    flash('Invalid username or password')
+                    flash('Invalid username or password', 'error')
+            else:
+                # Form validation failed
+                flash('Please correct the errors below.', 'error')
         else:
             form = LoginForm()
         
