@@ -51,55 +51,6 @@ URLS_COOKIE_VERSION = "2"
 # CUSTOM FILTERS AND UTILITIES
 # =============================================================================
 
-class HeaderFilter(Filter):
-    """
-    Custom filter to add header information to compiled files.
-    
-    Adds timestamp, hash, and source file information to compiled JavaScript files
-    for debugging and cache busting purposes.
-    """
-
-    def __init__(self, source_files, file_type="JavaScript"):
-        """
-        Initialize the header filter.
-        
-        Args:
-            source_files (list): List of source files being compiled
-            file_type (str): Type of file being processed (default: "JavaScript")
-        """
-        super().__init__()
-        self.source_files = source_files
-        self.file_type = file_type
-
-    def apply(self, _in, out):
-        """
-        Apply the header filter to the input stream.
-        
-        Args:
-            _in: Input stream containing the file content
-            out: Output stream where the processed content will be written
-        """
-        # Get current timestamp
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-        # Read the content
-        content = _in.read()
-
-        # Generate file hash for cache busting
-        try:
-            file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
-        except Exception:
-            # Fallback hash on error
-            file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
-
-        # Write header information
-        out.write(f'// Compiled: {timestamp}\n')
-        out.write(f'// Hash: {file_hash}\n')
-        out.write(f'// Source files: {", ".join(self.source_files)}\n\n')
-
-        # Write the actual content
-        out.write(content)
-
 def run_one_time_last_fetch_migration(all_urls):
     """
     Performs a one-time migration of last_fetch times from old cache keys to the
@@ -262,16 +213,9 @@ def setup_asset_bundles(app):
         for module in JS_MODULES
     ]
     
-    # Configure filters for JavaScript bundling
-    filters_list = [HeaderFilter(JS_MODULES, "JavaScript")]
-    # Note: jsmin doesn't support ES6 class syntax, so we're not using it
-    # if not DEBUG and not app.debug:
-    #     filters_list.append('jsmin')
-    
     # Register JavaScript bundle
     js_bundle = assets.register('js_all', Bundle(
         *js_files,
-        filters=filters_list,
         output='linuxreport.js'
     ))
     
@@ -307,6 +251,30 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
             # Build asset bundles
             js_bundle.build()
             print("JavaScript bundle built successfully")
+            
+            # Manually add header information to the compiled JS file
+            js_output_path = os.path.join(app.static_folder, 'linuxreport.js')
+            if os.path.exists(js_output_path):
+                with open(js_output_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Generate header information
+                timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                try:
+                    file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
+                except Exception:
+                    file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
+                
+                # Create header
+                header = f'// Compiled: {timestamp}\n'
+                header += f'// Hash: {file_hash}\n'
+                header += f'// Source files: {", ".join(JS_MODULES)}\n\n'
+                
+                # Write back with header
+                with open(js_output_path, 'w', encoding='utf-8') as f:
+                    f.write(header + content)
+                
+                print("Header information added to JavaScript bundle")
             
             css_bundle.build()
             print("CSS cache busting configured successfully")
