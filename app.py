@@ -31,7 +31,7 @@ from flask_wtf.csrf import CSRFProtect
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from shared import (
-    EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, 
+    EXPIRE_WEEK, JS_MODULES, FLASK_DASHBOARD, 
     FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, 
     limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS,
     API, set_flask_restful_api
@@ -259,11 +259,11 @@ def setup_asset_bundles(app):
     # Create JS bundle from individual modules
     js_files = [
         os.path.join(os.path.dirname(__file__), 'templates', module) 
-        for module in _JS_MODULES
+        for module in JS_MODULES
     ]
     
     # Configure filters for JavaScript bundling
-    filters_list = [HeaderFilter(_JS_MODULES, "JavaScript")]
+    filters_list = [HeaderFilter(JS_MODULES, "JavaScript")]
     # Note: jsmin doesn't support ES6 class syntax, so we're not using it
     # if not DEBUG and not app.debug:
     #     filters_list.append('jsmin')
