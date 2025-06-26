@@ -2,9 +2,10 @@ import timeit
 import random
 import string
 import tempfile
-from shared import g_cm, DiskCacheWrapper
+from shared import g_cm
+from models import DiskCacheWrapper
 
-g_cs = DiskCacheWrapper("tempfile.gettempdir()")
+g_cs = DiskCacheWrapper(".")
 
 # --- Test Configuration ---
 NUM_ELEMENTS = 30
