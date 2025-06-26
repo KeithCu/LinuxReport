@@ -282,8 +282,6 @@ main > div:first-child {
 
 #old-headlines-link {
   display: block;
-  flex-direction: column;
-  align-items: center;
   text-decoration: none;
   color: var(--text);
   padding: 15px;
@@ -294,11 +292,21 @@ main > div:first-child {
   transition: all 0.3s ease;
   max-width: 400px;
   text-align: center;
-  gap: 4px;
   position: relative;
   font-weight: bold;
   animation: pulse 3s infinite;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+#old-headlines-link .old-headlines-title {
+  display: block;
+  margin-bottom: 4px;
+}
+
+#old-headlines-link .old-headlines-subtitle {
+  display: block;
+  font-size: 0.7em;
+  opacity: 0.8;
 }
 
 /* Mobile Responsive */
