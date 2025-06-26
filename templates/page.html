@@ -4,7 +4,7 @@
     <link rel="icon" type="image/png" href="{{favicon}}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content = "{{description}}">
+    <meta name="description" content="{{description}}">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>{{title}}</title>
     <!-- Preload critical fonts -->
@@ -19,33 +19,45 @@
   </head>
   <body>
 
-<center>
-  <div id="weather-widget-container" style="border: 1px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-block; font-size: small; position: relative;">
-    <div id="weather-content">
-      <a href="https://openweathermap.org" target="_blank" style="text-decoration: none; color: inherit;">
-        <center>{{ weather_html }}</center>
-        <div style="position: absolute; bottom: 0; right: 0; font-size: 8px; color: var(--link);">Data by OpenWeather</div>
+    <!-- Weather Widget -->
+    <div class="weather-widget-wrapper">
+      <div id="weather-widget-container" class="weather-widget">
+        <div id="weather-content">
+          <a href="https://openweathermap.org" target="_blank" class="weather-link">
+            <div class="weather-content-inner">{{ weather_html }}</div>
+            <div class="weather-attribution">Data by OpenWeather</div>
+          </a>
+        </div>
+        <span id="weather-collapsed-label" class="weather-collapsed-label">🌤️ Weather</span>
+        <button id="weather-toggle-btn" class="weather-toggle-btn" title="Toggle Weather">&#9660;</button>
+      </div>
+    </div>
+
+    <!-- Above Content -->
+    <div class="above-content">{{ above_html }}</div>
+
+    <!-- Old Headlines Section -->
+    <div class="old-headlines-section">
+      <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
+        <span class="old-headlines-title">📰 Old Headlines Archive</span>
+        <br>
+        <small class="old-headlines-subtitle">See the big stories you missed</small>
       </a>
     </div>
-    <!-- Moved button outside the a tag -->
-    <span id="weather-collapsed-label" style="display: none; vertical-align: middle;">🌤️ Weather</span> <!-- Label shown when collapsed -->
-    <button id="weather-toggle-btn" title="Toggle Weather" style="position: absolute; top: 0; right: 0; background: none; border: none; font-size: 1.2em; cursor: pointer; color: var(--text); padding: 0 5px; z-index: 1; vertical-align: middle;">&#9660;</button> <!-- Down arrow initially -->
-  </div>
-</center>
-    <center>{{ above_html }}</center>
-      <!-- Enhanced Old Headlines Section -->
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="/old_headlines" id="old-headlines-link" style="display: inline-block; padding: 15px 30px; font-size: 1.2em; text-decoration: none; color: var(--text); background: var(--btn-bg); border: 2px solid var(--btn-border); border-radius: 8px; transition: all 0.3s ease; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-          <span style="font-weight: bold;">📰 Old Headlines Archive</span>
-          <br>
-          <small style="opacity: 0.8;">See the big stories you missed</small>
-        </a>
-      </div>
-    
-<center><img loading="lazy" src="{{logo_url}}" alt = "{{ title }}" style="max-height:250px;"></center>
-    <center><small>{{ welcome_html }}</small></center>
-    <center>
-      <div id="nav-controls-container" style="border: 2px solid var(--btn-border); padding: 5px; margin: 5px; display: inline-flex; align-items: center; font-size: large;">
+
+    <!-- Logo -->
+    <div class="logo-section">
+      <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
+    </div>
+
+    <!-- Welcome Message -->
+    <div class="welcome-section">
+      <small>{{ welcome_html }}</small>
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="nav-wrapper">
+      <div id="nav-controls-container" class="nav-controls">
         <!-- Left section: Navigation links -->
         <div class="nav-section-left">
           <div class="{% if g.is_mobile %}nav-links-mobile{% else %}nav-links-desktop{% endif %}">
@@ -62,26 +74,26 @@
         
         <!-- Middle section: Theme and font controls -->
         <div class="nav-section-middle">
-          <select id="theme-select" onchange="setTheme(this.value)" style="margin-left:20px; padding:5px;">
-            <option value="light" style="background:#ffffff;color:#000;">Light</option>
-            <option value="paper" style="background:#f5f5f5;color:#333;">Paper</option>
-            <option value="silver" style="background:#C0C0C0;color:#000;">Silver</option>
-            <option value="retro" style="background:#000080;color:#90ee90;">Retro</option>
-            <option value="dark" style="background:#1e1e1e;color:#d4d4d4;">Dark</option>
-            <option value="monokai" style="background:#272822;color:#e2e8f0;">Monokai</option>
-            <option value="futuristic" style="background:#0f0f0f;color:#7fbfbf;">Futuristic</option>
-            <option value="cyberpunk" style="background:#1e001f;color:#c080c0;">Cyberpunk</option>
-            <option value="midnight" style="background:#0f172a;color:#cbd5e1;">Midnight</option>
-            <option value="ocean" style="background:#0a192f;color:#cbd5e1;">Ocean</option>
-            <option value="nord" style="background:#2e3440;color:#d8dee9;">Nord</option>
-            <option value="forest" style="background:#2E4A2E;color:#E0EBD8;">Forest</option>
-            <option value="steampunk" style="background:#2b1b0e;color:#d5c1a1;">Steampunk</option>
-            <option value="autumn" style="background:#2c1810;color:#f5deb3;">Autumn</option>
-            <option value="sepia" style="background:#704214;color:#FFF8E7;">Sepia</option>
-            <option value="solarized" style="background:#fdf6e3;color:#657b83;">Solarized</option>
-            <option value="pastelle" style="background:#FFEFD5;color:#4B3621;">Pastelle</option>
+          <select id="theme-select" class="theme-select" onchange="setTheme(this.value)">
+            <option value="light">Light</option>
+            <option value="paper">Paper</option>
+            <option value="silver">Silver</option>
+            <option value="retro">Retro</option>
+            <option value="dark">Dark</option>
+            <option value="monokai">Monokai</option>
+            <option value="futuristic">Futuristic</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="midnight">Midnight</option>
+            <option value="ocean">Ocean</option>
+            <option value="nord">Nord</option>
+            <option value="forest">Forest</option>
+            <option value="steampunk">Steampunk</option>
+            <option value="autumn">Autumn</option>
+            <option value="sepia">Sepia</option>
+            <option value="solarized">Solarized</option>
+            <option value="pastelle">Pastelle</option>
           </select>
-          <select id="font-select" onchange="setFont(this.value)" style="margin-left:20px; padding:5px;">
+          <select id="font-select" class="font-select" onchange="setFont(this.value)">
             <option value="system">System Default</option>
             <option value="sans-serif">Sans Serif</option>
             <option value="monospace">Monospace</option>
@@ -97,23 +109,22 @@
         
         <!-- Right section: Action buttons -->
         <div class="nav-section-right">
-          <button id="chat-toggle-btn">Chat</button>
-          <button type="save" name="save" onclick="redirect()" style="margin-left: 20px;">Config...</button>
+          <button id="chat-toggle-btn" class="action-btn">Chat</button>
+          <button type="save" name="save" onclick="redirect()" class="action-btn">Config...</button>
           {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
-          <button id="view-mode-toggle" style="margin-left: 20px;">Infinite</button>
+          <button id="view-mode-toggle" class="action-btn">Infinite</button>
           {% endif %}
         </div>
       </div>
-    </center>
-  
-    <!-- Infinite Scroll View -->
-    <div id="infinite-scroll-container" style="display: none; max-width: 800px; margin: 0 auto; padding: 0 15px;">
-      <div id="infinite-content" class="mobile-view"></div>
-      <div id="loading-indicator" style="display: none; text-align: center; padding: 20px;">
-        Loading more stories...
-      </div>
     </div>
 
+    <!-- Infinite Scroll View -->
+    <div id="infinite-scroll-container" class="infinite-scroll-container">
+      <div id="infinite-content" class="infinite-content mobile-view"></div>
+      <div id="loading-indicator" class="loading-indicator">Loading more stories...</div>
+    </div>
+
+    <!-- Main Content -->
     <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}">
       <div class="column">{{ columns[0] }}</div>
       {% if not g.is_mobile %}
@@ -122,24 +133,24 @@
       {% endif %}
     </div>
 
-    <!-- Chat Window HTML -->
-    <div id="chat-container">
-      <div id="chat-header">
+    <!-- Chat Window -->
+    <div id="chat-container" class="chat-container">
+      <div id="chat-header" class="chat-header">
         <span>Visitor Chat</span>
-        <button id="chat-close-btn" title="Close Chat">&times;</button>
+        <button id="chat-close-btn" class="chat-close-btn" title="Close Chat">&times;</button>
       </div>
-      <div id="chat-messages">
-        <!-- Messages will be loaded here -->
-        <div id="chat-loading" style="text-align: center; padding: 10px;">Loading messages...</div>
+      <div id="chat-messages" class="chat-messages">
+        <div id="chat-loading" class="chat-loading">Loading messages...</div>
       </div>
-      <div id="chat-input-area">
-         <div style="display: flex; flex-direction: column; flex-grow: 1;">
-             <textarea id="chat-message-input" placeholder="Type your message (use <b>text</b> for bold)" rows="2"></textarea>
-             <input type="text" id="chat-image-url-input" placeholder="Optional: Image URL or base64">
-         </div>
-        <button id="chat-send-btn">Send</button>
+      <div id="chat-input-area" class="chat-input-area">
+        <div class="chat-input-wrapper">
+          <textarea id="chat-message-input" class="chat-message-input" placeholder="Type your message (use <b>text</b> for bold)" rows="2"></textarea>
+          <input type="text" id="chat-image-url-input" class="chat-image-input" placeholder="Optional: Image URL or base64">
+        </div>
+        <button id="chat-send-btn" class="chat-send-btn">Send</button>
       </div>
     </div>
+
     <!-- Link external JS using Flask-Assets -->
     {% assets "js_all" %}
     <script type="text/javascript" src="{{ ASSET_URL }}"></script>
