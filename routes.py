@@ -433,10 +433,19 @@ def _register_main_routes(flask_app):
         
         # Create response (compression already handled in cache storage/retrieval)
         if compression_enabled and not is_admin:
-            # Response is already compressed from cache
-            response = make_response(page)
+            # Get the compressed content from cache (should already be there from earlier storage)
+            compressed_page = g_cm.get(cache_key)
+            if compressed_page is None:
+                # CRASH: This shouldn't happen - we should have stored compressed content earlier
+                raise RuntimeError(f"Compressed content missing from cache! Key: {cache_key}, compression_enabled: {compression_enabled}")
+            
+            # CRASH: Verify it's actually compressed (bytes)
+            if not isinstance(compressed_page, bytes):
+                raise RuntimeError(f"Cache contains uncompressed content for compressed key! Key: {cache_key}, type: {type(compressed_page)}")
+            
+            response = make_response(compressed_page)
             response.headers['Content-Encoding'] = 'gzip'
-            response.headers['Content-Length'] = str(len(page))
+            response.headers['Content-Length'] = str(len(compressed_page))
         else:
             # Return uncompressed response
             response = make_response(page)
