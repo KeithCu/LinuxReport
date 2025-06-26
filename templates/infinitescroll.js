@@ -83,12 +83,14 @@
                     items.forEach(item => {
                         if (window.getComputedStyle(item).display !== 'none') {
                             const timestamp = parseInt(item.getAttribute('data-index') || '0');
+                            const published = item.getAttribute('data-published') || '';
                             allItems.push({
                                 title: item.textContent,
                                 link: item.href,
                                 source_name: feedInfo.name,
                                 source_icon: feedInfo.icon,
-                                timestamp: timestamp
+                                timestamp: timestamp,
+                                published: published
                             });
                         }
                     });
@@ -126,7 +128,12 @@
                     currentGroup = { name: item.source_name, icon: sourceInfo.get(item.source_name).icon, items: [] };
                     groupedItems.push(currentGroup);
                 }
-                currentGroup.items.push({ title: item.title, link: item.link });
+                currentGroup.items.push({ 
+                    title: item.title, 
+                    link: item.link, 
+                    published: item.published,
+                    timestamp: item.timestamp
+                });
             });
             return groupedItems;
         }
@@ -156,7 +163,39 @@
         createItemElement(item) {
             const itemElement = document.createElement('div');
             itemElement.style.margin = '10px 0';
-            itemElement.innerHTML = `<a href="${item.link}" target="_blank" style="color: var(--link); text-decoration: none; font-size: 1.1em;">${item.title}</a>`;
+            itemElement.style.padding = '8px 0';
+            itemElement.style.borderBottom = '1px solid var(--btn-border)';
+            
+            const titleElement = document.createElement('div');
+            titleElement.innerHTML = `<a href="${item.link}" target="_blank" style="color: var(--link); text-decoration: none; font-size: 1.1em;">${item.title}</a>`;
+            
+            // Commented out published date display - uncomment to show timestamps
+            /*
+            const timeElement = document.createElement('div');
+            timeElement.style.fontSize = '0.8em';
+            timeElement.style.color = 'var(--text-secondary)';
+            timeElement.style.marginTop = '4px';
+            
+            if (item.published) {
+                // Try to parse and format the published time
+                try {
+                    const date = new Date(item.published);
+                    if (!isNaN(date.getTime())) {
+                        timeElement.textContent = `Published: ${date.toLocaleString()}`;
+                    } else {
+                        timeElement.textContent = `Published: ${item.published}`;
+                    }
+                } catch (e) {
+                    timeElement.textContent = `Published: ${item.published}`;
+                }
+            } else {
+                timeElement.textContent = `Timestamp: ${item.timestamp}`;
+            }
+            
+            itemElement.appendChild(timeElement);
+            */
+            
+            itemElement.appendChild(titleElement);
             return itemElement;
         }
     }

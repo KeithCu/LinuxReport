@@ -51,6 +51,24 @@ URLS_COOKIE_VERSION = "2"
 # CUSTOM FILTERS AND UTILITIES
 # =============================================================================
 
+def timestamp_to_int(timestamp):
+    """
+    Convert a time.struct_time object to an integer timestamp.
+    
+    Args:
+        timestamp: time.struct_time object or None
+        
+    Returns:
+        int: Unix timestamp as integer, or 0 if timestamp is None
+    """
+    if timestamp is None:
+        return 0
+    try:
+        import time
+        return int(time.mktime(timestamp))
+    except (TypeError, ValueError):
+        return 0
+
 def run_one_time_last_fetch_migration(all_urls):
     """
     Performs a one-time migration of last_fetch times from old cache keys to the
@@ -102,6 +120,9 @@ def create_app():
         'DEBUG': DEBUG,
         'SECRET_KEY': get_secret_key()
     })
+    
+    # Register custom Jinja2 filters
+    app.jinja_env.filters['timestamp_to_int'] = timestamp_to_int
     
     return app
 

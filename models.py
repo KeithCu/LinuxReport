@@ -201,7 +201,7 @@ class DiskCacheWrapper:
         Returns:
             Optional[datetime.datetime]: Last fetch timestamp or None if not found
         """
-        all_fetches = self.get('all_last_fetches')
+        all_fetches = self.get('all_last_fetches') or {}
         if url in all_fetches:
             return all_fetches[url]
         return None
@@ -215,7 +215,7 @@ class DiskCacheWrapper:
             timestamp (Any): Timestamp to store
             timeout (Optional[int]): Cache expiration time
         """
-        all_fetches = self.get('all_last_fetches')
+        all_fetches = self.get('all_last_fetches') or {}
         all_fetches[url] = timestamp
         self.put('all_last_fetches', all_fetches, timeout)
 

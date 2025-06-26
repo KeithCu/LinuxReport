@@ -177,6 +177,25 @@ def load_url_worker(url):
             else:
                 entry['html_content'] = entry.get('summary', '')
 
+            # Ensure timestamps are properly set
+            if not entry.get('published_parsed'):
+                # Try to parse published time if available
+                if entry.get('published'):
+                    try:
+                        import time
+                        from email.utils import parsedate_to_datetime
+                        parsed_date = parsedate_to_datetime(entry['published'])
+                        entry['published_parsed'] = parsed_date.timetuple()
+                    except Exception as e:
+                        # Fallback to current time if parsing fails
+                        entry['published_parsed'] = time.gmtime()
+                        entry['published'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', entry['published_parsed'])
+                else:
+                    # No published time available, use current time
+                    import time
+                    entry['published_parsed'] = time.gmtime()
+                    entry['published'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', entry['published_parsed'])
+
             # Special handling for Reddit feeds - override links to external content
             if "reddit" in url:
                 if "reddit" not in entry.get('underlying_url'):

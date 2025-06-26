@@ -8,7 +8,7 @@
     <button class="next-btn">&gt;</button>
   </div>  
   {%- for e in entries %}
-  <div class="linkclass" data-index="{{ loop.index0 }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
+  <div class="linkclass" data-index="{{ e.published_parsed | timestamp_to_int if e.published_parsed else loop.index0 }}" data-published="{{ e.published if e.published else '' }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
     {% if e.link in top_images %}
     <div class="image-container">
       <a target="_blank" href="{{ e.link }}">
