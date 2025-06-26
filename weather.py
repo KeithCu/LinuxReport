@@ -34,7 +34,7 @@ from shared import (
     limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT, 
     TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS
 )
-from models import DEBUG, get_weather_api_key
+from app_config import DEBUG, get_weather_api_key
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION

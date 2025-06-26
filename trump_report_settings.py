@@ -1,4 +1,5 @@
-from models import RssInfo, SiteConfig, REDDIT_FETCH_CONFIG
+from models import RssInfo, SiteConfig
+from app_config import REDDIT_FETCH_CONFIG
 import shared
 import datetime
 

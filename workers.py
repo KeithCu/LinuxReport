@@ -45,7 +45,7 @@ from shared import (
     ENABLE_OBJECT_STORE_FEED_PUBLISH
 )
 from Tor import fetch_via_tor
-from models import DEBUG, USE_TOR
+from app_config import DEBUG, USE_TOR
 from object_storage_sync import smart_fetch, publish_bytes
 
 # =============================================================================
