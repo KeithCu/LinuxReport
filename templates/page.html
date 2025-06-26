@@ -41,8 +41,17 @@
       <small>{{ welcome_html }}</small>
     </header>
 
-    <!-- Navigation -->
-    <nav>
+    <main>
+      <!-- Above Content -->
+      <div>{{ above_html }}</div>
+
+      <!-- Old Headlines Link -->
+      <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
+        <span class="old-headlines-title">📰 Old Headlines Archive</span>
+        <small class="old-headlines-subtitle">See the big stories you missed</small>
+      </a>
+
+      <!-- Navigation Links - Moved here from nav section -->
       <div id="nav-controls-container" class="nav-controls">
         <div class="nav-links-desktop">
           <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
@@ -95,17 +104,6 @@
           {% endif %}
         </div>
       </div>
-    </nav>
-
-    <main>
-      <!-- Above Content -->
-      <div>{{ above_html }}</div>
-
-      <!-- Old Headlines Link -->
-      <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
-        <span class="old-headlines-title">📰 Old Headlines Archive</span>
-        <small class="old-headlines-subtitle">See the big stories you missed</small>
-      </a>
 
       <!-- Infinite Scroll Container -->
       <div id="infinite-scroll-container" class="infinite-scroll-container">
