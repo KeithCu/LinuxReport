@@ -78,7 +78,7 @@ def load_url_worker(url):
     - Falls back to standard RSS parsing if needed
     - Processes and filters feed entries
     - Handles special cases (LWN.net, Reddit)
-    - Publishes processed feeds to object storage
+    - Publishes processed feeds to object store
     - Updates local cache with results
     
     Args:
@@ -305,24 +305,33 @@ def handle_lwn_feed(url):
 # LOCKING AND THREADING UTILITIES
 # =============================================================================
 
-def wait_and_set_fetch_mode():
+def _acquire_fetch_lock():
     """
-    Acquires a global lock to prevent thundering herd for fetch cycles.
-    
-    This function implements a distributed locking mechanism to ensure that
-    only one fetch operation runs at a time across all processes/threads.
+    Acquire the global fetch lock with timeout.
     
     Returns:
         SqliteLock or None: The acquired lock object, or None if acquisition failed
     """
-    # Attempt to acquire the lock, waiting if necessary
     lock = get_lock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_mode_{os.getpid()}")
-    if lock.acquire(timeout_seconds=60, wait=True):  # Wait up to 60 seconds
+    if lock.acquire(timeout_seconds=60, wait=True):
         print("Acquired global fetch lock.")
         return lock
     else:
         print("Failed to acquire global fetch lock after waiting.")
         return None
+
+def _check_fetch_lock_available():
+    """
+    Check if fetch lock is available without acquiring it.
+    
+    Returns:
+        bool: True if lock is available, False otherwise
+    """
+    check_lock = get_lock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_check_{os.getpid()}")
+    if check_lock.acquire(wait=False):
+        check_lock.release()
+        return True
+    return False
 
 # =============================================================================
 # DOMAIN PROCESSING UTILITIES
@@ -410,7 +419,7 @@ def fetch_urls_parallel(urls):
     Args:
         urls (list): List of URLs to fetch in parallel
     """
-    lock = wait_and_set_fetch_mode()
+    lock = _acquire_fetch_lock()
     if not lock:
         print("Aborting parallel fetch due to inability to acquire global lock.")
         return
@@ -418,7 +427,7 @@ def fetch_urls_parallel(urls):
     try:
         process_urls_in_parallel(urls, "fetching")
     finally:
-        lock.release()  # Ensure lock is released
+        lock.release()
         print("Released global fetch lock.")
 
 def refresh_thread():
@@ -431,7 +440,7 @@ def refresh_thread():
     - Processes them in parallel with domain-based throttling
     - Maintains proper locking throughout the operation
     """
-    lock = wait_and_set_fetch_mode()
+    lock = _acquire_fetch_lock()
     if not lock:
         print("Aborting refresh thread due to inability to acquire global lock.")
         return
@@ -469,20 +478,11 @@ def fetch_urls_thread():
     operations from running simultaneously. It only starts a new refresh
     thread if no other fetch/refresh operation is currently running.
     """
-    # Check if a fetch/refresh operation is already running using the global lock
-    
-    # Create a lock instance just for checking, don't hold it long
-    check_lock = get_lock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_check_{os.getpid()}")
-
-    if not check_lock.acquire(wait=False):
+    if not _check_fetch_lock_available():
         print("Fetch/refresh operation already in progress. Skipping background refresh trigger.")
         return
-    else:
-        # If acquire returns True, it means no fetch/refresh was running *at this moment*.
-        # We acquired the lock, but we don't need to hold it. Release it immediately
-        # so the actual refresh_thread (or a parallel fetch) can acquire it.
-        check_lock.release()
-        print("No fetch operation running. Starting background refresh thread...")
-        t = threading.Thread(target=refresh_thread, args=())
-        t.daemon = True
-        t.start()
+    
+    print("No fetch operation running. Starting background refresh thread...")
+    t = threading.Thread(target=refresh_thread, args=())
+    t.daemon = True
+    t.start()
