@@ -40,7 +40,7 @@ from flask_restful import Api
 # Local application imports
 import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
-from app_config import load_config
+from app_config import get_settings_config, get_allowed_domains, get_allowed_requester_domains, get_cdn_config, get_object_store_config, get_welcome_html, get_reports_config, get_storage_config
 from request_utils import get_rate_limit_key, dynamic_rate_limit, WEB_BOT_USER_AGENTS, get_ip_prefix, format_last_updated
 from models import DiskCacheWrapper, RssFeed
 
@@ -57,13 +57,12 @@ FLASK_DASHBOARD_PASSWORD = "admin"  # Change this to your preferred password
 # CONFIGURATION LOADING AND SETTINGS
 # =============================================================================
 
-# Load configuration from models
-config = load_config()
-settings = config.get('settings', {})
+# Load configuration from centralized config manager
+settings = get_settings_config()
 
 # Export user-configurable settings
-ALLOWED_DOMAINS = settings.get('allowed_domains', [])
-ALLOWED_REQUESTER_DOMAINS = settings.get('allowed_requester_domains', [])
+ALLOWED_DOMAINS = get_allowed_domains()
+ALLOWED_REQUESTER_DOMAINS = get_allowed_requester_domains()
 ENABLE_CORS = True
 
 # =============================================================================
@@ -111,7 +110,8 @@ class Mode(str, Enum):
         return Enum('Mode', mode_dict, type=str)
 
 # Create Mode enum with config modes
-Mode = Mode.from_config(config['reports']['modes'])
+reports_config = get_reports_config()
+Mode = Mode.from_config(reports_config.get('modes', []))
 
 # Simple map from Mode enum to URL identifiers - identical to enum values
 MODE_MAP = {mode: mode.value for mode in Mode}
@@ -127,7 +127,8 @@ CONFIG_MODULES = {mode: f"{mode.value}_report_settings" for mode in Mode}
 PATH: str = os.path.dirname(os.path.abspath(__file__))
 
 # Shared path for weather, etc.
-SPATH: str = config['storage']['shared_path']
+storage_config = get_storage_config()
+SPATH: str = storage_config['shared_path']
 TZ = FeedHistory.FeedConfig.TZ
 
 # =============================================================================
@@ -159,20 +160,22 @@ ENABLE_URL_CUSTOMIZATION = True
 # =============================================================================
 
 # CDN and image settings from config
-CDN_IMAGE_URL = settings['cdn']['image_url']
-ENABLE_URL_IMAGE_CDN_DELIVERY = settings['cdn']['enabled']
+cdn_config = get_cdn_config()
+CDN_IMAGE_URL = cdn_config['image_url']
+ENABLE_URL_IMAGE_CDN_DELIVERY = cdn_config['enabled']
 
 # =============================================================================
 # OBJECT STORAGE CONFIGURATION
 # =============================================================================
 
 # Enable fetching non-custom feeds from object store instead of original URLs
-ENABLE_OBJECT_STORE_FEEDS = settings['object_store']['enabled']
-OBJECT_STORE_FEED_URL = settings['object_store']['feed_url']
-OBJECT_STORE_FEED_TIMEOUT = settings['object_store']['feed_timeout']
+object_store_config = get_object_store_config()
+ENABLE_OBJECT_STORE_FEEDS = object_store_config['enabled']
+OBJECT_STORE_FEED_URL = object_store_config['feed_url']
+OBJECT_STORE_FEED_TIMEOUT = object_store_config['feed_timeout']
 
 # Enable publishing feeds to object store when fetched
-ENABLE_OBJECT_STORE_FEED_PUBLISH = settings['object_store']['enable_publish']
+ENABLE_OBJECT_STORE_FEED_PUBLISH = object_store_config['enable_publish']
 
 # =============================================================================
 # USER INTERFACE SETTINGS
@@ -198,7 +201,7 @@ RSS_TIMEOUT = 30
 MAX_ITEMS = 40
 
 # Welcome message from config
-WELCOME_HTML = settings['welcome_html']
+WELCOME_HTML = get_welcome_html()
 
 # =============================================================================
 # DYNAMIC CONFIGURATION LOADING

@@ -21,7 +21,7 @@ import diskcache
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from app_config import load_config
+from app_config import get_admin_password
 import FeedHistory
 
 # =============================================================================
@@ -236,8 +236,7 @@ class User(UserMixin):
     @staticmethod
     def authenticate(username, password):
         if username == 'admin':
-            config = load_config()
-            correct_password = config['admin']['password']
+            correct_password = get_admin_password()
             if password == correct_password:
                 return User('admin')
         return None

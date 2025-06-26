@@ -2,11 +2,11 @@ import os
 import os.path
 import hashlib
 
-from models import load_config
+from app_config import get_storage_config, config_manager
 
-# Load configuration from config.yaml
-config = load_config()
-storage_config = config.get('storage', {})
+# Load configuration from centralized config manager
+config = config_manager.get_config()
+storage_config = get_storage_config()
 
 # Object Storage configuration
 STORAGE_ENABLED = storage_config['enabled']
@@ -70,8 +70,8 @@ def load_storage_secrets():
     """Load storage secrets from config.yaml"""
     global STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY, _secrets_loaded
     try:
-        config = load_config()
-        storage_config = config.get('storage')
+        config = config_manager.get_config()
+        storage_config = get_storage_config()
         
         if not storage_config:
             raise ConfigurationError("Missing 'storage' section in config.yaml")
