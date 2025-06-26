@@ -306,7 +306,7 @@ body[data-font="sans-serif"] {
 body {
   color: var(--text);
   background-color: var(--bg);
-  margin: 0;
+  margin: 0 0.5em;
   padding: 0;
   line-height: 1.6;
 }
