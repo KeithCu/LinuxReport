@@ -122,8 +122,7 @@ These features improve the backend, admin experience, or codebase quality, but a
 
 ## API Frameworks & Implementation Notes
 
-- **Flask-RESTful** is now in use for the weather API and may be used for other endpoints. Continue expanding its use for a consistent API structure.
-- **Flask-RESTx** is a possible alternative or supplement to Flask-RESTful, offering built-in Swagger/OpenAPI documentation and more features. Consider evaluating it for future API work.
+- **Flask-RESTx** is a possible alternative or supplement to Flask-RESTful, offering built-in Swagger/OpenAPI documentation and more features. Consider evaluating it for future API work although it doesn't work with mod_wsgi.
 - **Flask-Limiter** is implemented and working, but continue to expand its use and tune rate limits for all relevant endpoints.
 
 ---
@@ -146,7 +145,6 @@ These features improve the backend, admin experience, or codebase quality, but a
 
 - **Not Recommended**
   - Flask-Admin (see below)
-  - Flask-RESTful (already in use, but RESTx may be a better long-term fit)
   - Flask-Babel (no i18n needs yet)
   - Flask-OAuthlib (no OAuth requirements)
 
@@ -167,7 +165,7 @@ These features improve the backend, admin experience, or codebase quality, but a
 ## Implementation Reminders
 
 - Continue expanding Flask-Limiter coverage and tuning limits.
-- Continue implementing and expanding Flask-RESTful endpoints; consider Flask-RESTx for future API work.
+- Consider Flask-RESTx for future API work.
 - Research Flask-SocketIO compatibility with your deployment stack (mod_wsgi, Apache worker/event MPM).
 - Re-evaluate Flask-Admin if you need a more robust admin interface in the future.
 

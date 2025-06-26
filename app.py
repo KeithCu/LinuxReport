@@ -39,6 +39,14 @@ from app_config import DEBUG, get_secret_key
 from models import User
 
 # =============================================================================
+# COOKIE VERSIONING
+# =============================================================================
+
+# Mechanism to invalidate old URL cookies if feeds change
+URLS_COOKIE_VERSION = "2"
+
+
+# =============================================================================
 # CUSTOM FILTERS AND UTILITIES
 # =============================================================================
 
@@ -322,9 +330,3 @@ init_app(g_app)
 if DEBUG or g_app.debug:
     print("Warning: Application is running in debug mode")
 
-# =============================================================================
-# COOKIE VERSIONING
-# =============================================================================
-
-# Mechanism to invalidate old URL cookies if feeds change
-URLS_COOKIE_VERSION = "2"
