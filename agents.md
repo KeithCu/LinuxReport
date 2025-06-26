@@ -73,13 +73,12 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 ├── *_report_settings.py      # Site-specific configurations (ai_, linux_, covid_, space_, trump_, pv_, techno_)
 ├── templates/                # Jinja2 templates and modular JavaScript
 │   ├── *.html               # HTML templates
+│   ├── app.js               # Main application JavaScript
 │   ├── core.js              # Core JavaScript (themes, auto-refresh, scroll)
 │   ├── config.js            # Configuration UI logic
 │   ├── chat.js              # Chat interface functionality
 │   ├── weather.js           # Weather widget functionality
-│   ├── shared-utils.js      # Shared JavaScript utilities
-│   ├── shared-config.js     # Shared configuration utilities
-│   └── infinitescroll.js    # Infinite scroll functionality
+│   ├── infinitescroll.js    # Infinite scroll functionality
 ├── static/                   # Static assets and compiled JavaScript/CSS
 │   ├── images/              # Site logos and favicons
 │   ├── linuxreport.css      # Main stylesheet
@@ -258,7 +257,7 @@ The project includes a comprehensive image processing pipeline:
 ## JavaScript Architecture
 
 1. **Modular System**:
-   - Source files in `templates/`: `core.js`, `config.js`, `chat.js`, `weather.js`, `app.js`, `infinitescroll.js`
+   - Source files in `templates/`: `app.js`, `core.js`, `config.js`, `chat.js`, `weather.js`, `infinitescroll.js`, `image-optimizer-unused.js`
    - Automatic bundling into `static/linuxreport.js` via Flask-Assets
    - Development mode: unminified for debugging
    - Production mode: minified with source file headers
@@ -269,6 +268,7 @@ The project includes a comprehensive image processing pipeline:
    - Infinite scroll with mobile detection
    - Auto-refresh with configurable intervals
    - CSRF token handling for secure AJAX requests
+   - Image optimization utilities (currently unused)
 
 3. **Integration Patterns**:
    - Jinja2 templating for dynamic JavaScript content

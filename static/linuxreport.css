@@ -687,12 +687,12 @@ main > div:first-child {
   text-decoration: none;
   color: var(--text);
   padding: var(--spacing-md);
-  margin: var(--spacing-lg) auto;
+  margin: var(--spacing-sm) auto;
   border: 2px solid var(--btn-border);
   border-radius: var(--border-radius-lg);
   background: var(--btn-bg);
   transition: all var(--transition-normal);
-  max-width: 400px;
+  max-width: 300px;
   text-align: center;
   position: relative;
   font-weight: bold;
@@ -702,12 +702,13 @@ main > div:first-child {
 
 #old-headlines-link .old-headlines-title {
   display: block;
-  margin-bottom: var(--spacing-xs);
+  margin-bottom: 0;
+  font-size: 1.2em;
 }
 
 #old-headlines-link .old-headlines-subtitle {
   display: block;
-  font-size: 0.7em;
+  font-size: 1em;
   opacity: 0.8;
 }
 
