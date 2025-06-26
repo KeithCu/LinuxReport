@@ -17,11 +17,14 @@ import time
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
-from flask import g, jsonify, render_template, request, make_response, flash, redirect, url_for
+from flask import g, jsonify, render_template, request, make_response, Response, flash, redirect, url_for
 from markupsafe import Markup
+from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from flask_login import login_user, logout_user, login_required, current_user
+from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_restful import Resource
 
 # =============================================================================
 # LOCAL IMPORTS
@@ -36,7 +39,7 @@ from shared import (
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
     WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG,
-    ENABLE_COMPRESSION_CACHING
+    ENABLE_COMPRESSION_CACHING, API
 )
 from weather import get_default_weather_html, init_weather_routes
 from workers import fetch_urls_parallel, fetch_urls_thread
@@ -65,6 +68,41 @@ def get_cached_above_html():
         str: Cached HTML content from the above HTML file
     """
     return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
+
+class RateLimitStatsResource(Resource):
+    """
+    Resource for handling GET requests to /api/rate_limit_stats.
+    Provides rate limit statistics for admin monitoring.
+    """
+    
+    @login_required
+    def get(self):
+        """
+        Get rate limit statistics for admin monitoring.
+        """
+        # Get events from disk cache (persistent)
+        rate_limit_events_key = "rate_limit_events"
+        events = g_c.get(rate_limit_events_key) or []
+        
+        # Get stats from disk cache (persistent)
+        rate_limit_stats_key = "rate_limit_stats"
+        stats = g_c.get(rate_limit_stats_key) or {
+            "by_ip": {},
+            "by_endpoint": {}
+        }
+        
+        # Combine data
+        result = {
+            "events": events,
+            "by_ip": stats.get("by_ip", {}),
+            "by_endpoint": stats.get("by_endpoint", {}),
+            "current_time": time.time(),
+            "total_events": len(events),
+            "unique_ips": len(stats.get("by_ip", {})),
+            "unique_endpoints": len(stats.get("by_endpoint", {}))
+        }
+        
+        return result, 200
 
 # =============================================================================
 # ROUTE INITIALIZATION
@@ -138,6 +176,9 @@ def init_app(flask_app):
             )
             
             return response
+
+    # Register Flask-RESTful resources
+    API.add_resource(RateLimitStatsResource, '/api/rate_limit_stats')
 
 # =============================================================================
 # AUTHENTICATION ROUTES
@@ -390,38 +431,6 @@ def _register_main_routes(flask_app):
             expires_time = datetime.datetime.fromtimestamp(end_time) + datetime.timedelta(hours=0.5)
             response.headers['Expires'] = expires_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
         return response
-
-
-
-
-    @flask_app.route('/api/rate_limit_stats')
-    @login_required
-    def get_rate_limit_stats():
-        """Get rate limit statistics for admin monitoring."""
-        # Get events from disk cache (persistent)
-        rate_limit_events_key = "rate_limit_events"
-        events = g_c.get(rate_limit_events_key) or []
-        
-        # Get stats from disk cache (persistent)
-        rate_limit_stats_key = "rate_limit_stats"
-        stats = g_c.get(rate_limit_stats_key) or {
-            "by_ip": {},
-            "by_endpoint": {}
-        }
-        
-        # Combine data
-        result = {
-            "events": events,
-            "by_ip": stats.get("by_ip", {}),
-            "by_endpoint": stats.get("by_endpoint", {}),
-            "current_time": time.time(),
-            "total_events": len(events),
-            "unique_ips": len(stats.get("by_ip", {})),
-            "unique_endpoints": len(stats.get("by_endpoint", {}))
-        }
-        
-        return jsonify(result)
-
 
     @flask_app.route('/sitemap.xml')
     def sitemap():
