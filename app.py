@@ -21,6 +21,7 @@ from flask_mobility import Mobility
 from flask_assets import Environment, Bundle, Filter
 from flask_compress import Compress
 from flask_login import LoginManager
+from flask_restful import Api
 
 # =============================================================================
 # LOCAL IMPORTS
@@ -31,7 +32,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from shared import (
     EXPIRE_WEEK, _JS_MODULES, FLASK_DASHBOARD, 
     FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, 
-    limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS
+    limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS,
+    API, set_flask_restful_api
 )
 from app_config import DEBUG, get_secret_key
 from models import User
@@ -177,6 +179,10 @@ def initialize_extensions(app):
     
     # Initialize rate limiter
     limiter.init_app(app)
+    
+    # Initialize Flask-RESTful API
+    api_instance = Api(app)
+    set_flask_restful_api(api_instance)
     
     return login_manager
 

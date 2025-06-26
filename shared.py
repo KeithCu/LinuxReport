@@ -35,6 +35,7 @@ import ipaddress
 
 # Flask-related imports
 from flask_limiter import Limiter
+from flask_restful import Api
 
 # Local application imports
 import FeedHistory
@@ -257,6 +258,22 @@ limiter = Limiter(
     strategy="fixed-window"
 )
 
+# =============================================================================
+# FLASK-RESTFUL API GLOBAL
+# =============================================================================
+
+# Global Flask-RESTful API instance (initialized in app.py)
+API = None
+
+def set_flask_restful_api(api_instance):
+    """
+    Set the global Flask-RESTful API instance.
+    
+    Args:
+        api_instance: Flask-RESTful API instance
+    """
+    global API
+    API = api_instance
 
 # =============================================================================
 # GLOBAL CACHE INSTANCES

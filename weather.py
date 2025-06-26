@@ -25,14 +25,15 @@ from bisect import bisect_left
 import geoip2.database
 import requests
 from flask import jsonify, request
-from flask_restful import Resource, reqparse, Api
+from flask_restful import Resource, reqparse
 
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
 from shared import (
     limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT, 
-    TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS
+    TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS,
+    API
 )
 from app_config import DEBUG, get_weather_api_key
 
@@ -702,8 +703,7 @@ def init_weather_routes(app):
             return response
 
     # Register the resource with Flask-RESTful
-    api = Api(app)
-    api.add_resource(WeatherResource, '/api/weather')
+    API.add_resource(WeatherResource, '/api/weather')
 
 # =============================================================================
 # MAIN EXECUTION

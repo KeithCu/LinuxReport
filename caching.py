@@ -1,4 +1,13 @@
-'''Various misc caching routines'''
+"""
+caching.py
+
+Various caching routines for file content and compression. Provides efficient caching mechanisms
+for file content with automatic invalidation and compression caching for HTTP responses.
+"""
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 from functools import lru_cache
 import hashlib
 import os
@@ -6,15 +15,40 @@ import datetime
 import time
 import gzip
 
+# =============================================================================
+# LOCAL IMPORTS
+# =============================================================================
 from shared import PATH, EXPIRE_HOUR, ENABLE_COMPRESSION_CACHING, g_cm, clear_page_caches
 from app_config import DEBUG
 
+# =============================================================================
+# GLOBAL VARIABLES AND CONSTANTS
+# =============================================================================
+
 _file_cache = {}
-_FILE_CHECK_INTERVAL_SECONDS = 5 * 60 # 5 minutes
+_FILE_CHECK_INTERVAL_SECONDS = 5 * 60  # 5 minutes
+
+# Compression caching constants
+COMPRESSION_CACHE_TTL = EXPIRE_HOUR  # Cache compressed responses for 1 hour
+COMPRESSION_LEVEL = 6  # Balance between speed and compression ratio
+
+# =============================================================================
+# FILE CACHING FUNCTIONS
+# =============================================================================
 
 def get_cached_file_content(file_path, encoding='utf-8'):
-    """Return content of any file, caching and invalidating when it changes.
+    """
+    Return content of any file, caching and invalidating when it changes.
+    
     Checks mtime only if _FILE_CHECK_INTERVAL_SECONDS have passed since the last check.
+    This provides a balance between performance and freshness.
+    
+    Args:
+        file_path (str): Path to the file to read and cache
+        encoding (str): File encoding to use when reading (default: 'utf-8')
+        
+    Returns:
+        str: File content, or empty string if file doesn't exist or is inaccessible
     """
     now = time.monotonic()
     entry = _file_cache.get(file_path)
@@ -28,7 +62,7 @@ def get_cached_file_content(file_path, encoding='utf-8'):
         mtime = os.path.getmtime(file_path)
     except OSError:
         # File doesn't exist or inaccessible
-        if entry: # Remove stale entry if it exists
+        if entry:  # Remove stale entry if it exists
             del _file_cache[file_path]
         return ''
 
@@ -44,33 +78,68 @@ def get_cached_file_content(file_path, encoding='utf-8'):
     except FileNotFoundError:
         content = ''
         # Ensure mtime reflects the non-existent state if we somehow got here
-        mtime = -1 # Or some other indicator that it's gone
+        mtime = -1  # Or some other indicator that it's gone
 
     _file_cache[file_path] = {'mtime': mtime, 'content': content, 'last_check_time': now}
     return content
 
-
-# Compression caching constants
-COMPRESSION_CACHE_TTL = EXPIRE_HOUR  # Cache compressed responses for 1 hour
-COMPRESSION_LEVEL = 6  # Balance between speed and compression ratio
+# =============================================================================
+# COMPRESSION CACHING FUNCTIONS
+# =============================================================================
 
 def get_compression_cache_key(content, encoding_type='gzip'):
-    """Generate a cache key for compressed content."""
+    """
+    Generate a cache key for compressed content.
+    
+    Args:
+        content (str): The content to be compressed
+        encoding_type (str): Type of compression encoding (default: 'gzip')
+        
+    Returns:
+        str: Cache key for the compressed content
+    """
     content_hash = hashlib.md5(content.encode('utf-8')).hexdigest()
     return f"compressed_{encoding_type}_{content_hash}"
 
 def get_cached_compressed_response(content, encoding_type='gzip'):
-    """Get cached compressed response if available."""
+    """
+    Get cached compressed response if available.
+    
+    Args:
+        content (str): The content to check for cached compression
+        encoding_type (str): Type of compression encoding (default: 'gzip')
+        
+    Returns:
+        bytes or None: Cached compressed data if available, None otherwise
+    """
     cache_key = get_compression_cache_key(content, encoding_type)
     return g_cm.get(cache_key)
 
 def cache_compressed_response(content, compressed_data, encoding_type='gzip'):
-    """Cache compressed response data."""
+    """
+    Cache compressed response data.
+    
+    Args:
+        content (str): The original content that was compressed
+        compressed_data (bytes): The compressed data to cache
+        encoding_type (str): Type of compression encoding (default: 'gzip')
+    """
     cache_key = get_compression_cache_key(content, encoding_type)
     g_cm.set(cache_key, compressed_data, ttl=COMPRESSION_CACHE_TTL)
 
 def create_compressed_response(content, encoding_type='gzip'):
-    """Create compressed response with caching."""
+    """
+    Create compressed response with caching.
+    
+    Checks cache first, then compresses and caches the result if not found.
+    
+    Args:
+        content (str): The content to compress
+        encoding_type (str): Type of compression encoding (default: 'gzip')
+        
+    Returns:
+        bytes: Compressed data
+    """
     # Check cache first
     cached_response = get_cached_compressed_response(content, encoding_type)
     if cached_response is not None:
@@ -89,7 +158,16 @@ def create_compressed_response(content, encoding_type='gzip'):
     return compressed_data
 
 def get_cached_response_for_client(content, supports_gzip):
-    """Get cached response (compressed or uncompressed) based on client capabilities."""
+    """
+    Get cached response (compressed or uncompressed) based on client capabilities.
+    
+    Args:
+        content (str): The content to serve to the client
+        supports_gzip (bool): Whether the client supports gzip compression
+        
+    Returns:
+        tuple: (bytes, bool) - Response data and whether it's compressed
+    """
     if supports_gzip:
         # Try to get cached compressed response
         cached_compressed = get_cached_compressed_response(content, 'gzip')
@@ -111,15 +189,29 @@ def get_cached_response_for_client(content, supports_gzip):
         # Return the content directly as bytes to avoid unnecessary encoding
         return content.encode('utf-8'), False
 
+# =============================================================================
+# CACHE MANAGEMENT FUNCTIONS
+# =============================================================================
+
 def clear_compression_cache():
-    """Clear all compression cache entries."""
+    """
+    Clear all compression cache entries.
+    
+    Note: This is a simple approach - in a more sophisticated system, you might want to
+    track compression cache keys and clear them individually. For now, we'll rely on TTL expiration.
+    """
     # This is a simple approach - in a more sophisticated system, you might want to
     # track compression cache keys and clear them individually
     # For now, we'll rely on TTL expiration
     pass
 
 def clear_page_caches_with_compression():
-    """Clear page caches and compression cache."""
+    """
+    Clear page caches and compression cache.
+    
+    This function provides a unified way to clear all caches when needed,
+    such as when content is updated.
+    """
     clear_page_caches()
     if ENABLE_COMPRESSION_CACHING:
         clear_compression_cache()
