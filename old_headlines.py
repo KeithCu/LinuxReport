@@ -3,9 +3,58 @@ import json
 import datetime
 from flask import render_template, request, jsonify
 from flask_login import current_user, login_required
-from shared import MODE_MAP, MODE, PATH, FAVICON, LOGO_URL, WEB_DESCRIPTION
+from flask_restful import Resource
+from shared import MODE_MAP, MODE, PATH, FAVICON, LOGO_URL, WEB_DESCRIPTION, API
+
+
+class DeleteHeadlineResource(Resource):
+    """
+    Resource for handling DELETE requests to delete headlines from the archive.
+    """
+    
+    @login_required
+    def post(self):
+        """
+        Deletes a headline from the archive file based on URL and timestamp.
+        """
+        data = request.get_json()
+        url = data.get('url')
+        timestamp = data.get('timestamp')
+        mode_str = MODE_MAP.get(MODE)
+        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
+        
+        try:
+            with open(archive_file, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            new_lines = []
+            deleted = False
+            for line in lines:
+                try:
+                    entry = json.loads(line)
+                    if entry.get('url') == url and entry.get('timestamp') == timestamp:
+                        deleted = True
+                        continue
+                except Exception:
+                    pass
+                new_lines.append(line)
+            if deleted:
+                with open(archive_file, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+                return {'success': True}, 200
+            else:
+                return {'error': 'Not found'}, 404
+        except Exception as e:
+            return {'error': str(e)}, 500
+
 
 def init_old_headlines_routes(app):
+    """
+    Initialize old headlines routes for the Flask application.
+    
+    Args:
+        app (Flask): Flask application instance
+    """
+    # Register the page route (kept as traditional Flask route)
     @app.route('/old_headlines')
     def old_headlines():
         mode_str = MODE_MAP.get(MODE)
@@ -62,34 +111,6 @@ def init_old_headlines_routes(app):
             description=WEB_DESCRIPTION,
             is_admin=is_admin
         )
-
-    @app.route('/api/delete_headline', methods=['POST'])
-    @login_required
-    def delete_headline():
-        data = request.get_json()
-        url = data.get('url')
-        timestamp = data.get('timestamp')
-        mode_str = MODE_MAP.get(MODE)
-        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
-        try:
-            with open(archive_file, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-            new_lines = []
-            deleted = False
-            for line in lines:
-                try:
-                    entry = json.loads(line)
-                    if entry.get('url') == url and entry.get('timestamp') == timestamp:
-                        deleted = True
-                        continue
-                except Exception:
-                    pass
-                new_lines.append(line)
-            if deleted:
-                with open(archive_file, "w", encoding="utf-8") as f:
-                    f.writelines(new_lines)
-                return jsonify({'success': True})
-            else:
-                return jsonify({'error': 'Not found'}), 404
-        except Exception as e:
-            return jsonify({'error': str(e)}), 500
+    
+    # Register Flask-RESTful resource
+    API.add_resource(DeleteHeadlineResource, '/api/delete_headline')
