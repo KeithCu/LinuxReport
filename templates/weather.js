@@ -13,27 +13,12 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-// Use shared configuration with fallback
-const WEATHER_CONFIG = (function() {
-  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
-    return window.LINUXREPORT_CONFIG;
-  }
-  
-  // Fallback configuration if shared config is not available
-  console.warn('Shared configuration not found, using fallback config');
-  return {
-    WEATHER_WIDGET_TOGGLE_ENABLED: true,
-    WEATHER_DEFAULT_COLLAPSED: false,
-    WEATHER_CACHE_DURATION: 30 * 60 * 1000,
-    USE_LINUXREPORT_WEATHER: false,
-    WEATHER_BASE_URL: '',
-    WEATHER_DEBOUNCE_DELAY: 100,
-    COOKIE_MAX_AGE: 31536000,
-    COOKIE_SAME_SITE: 'Lax',
-    IMPERIAL_REGIONS: ['US', 'BS', 'BZ', 'KY', 'PW'],
-    DEFAULT_LOCALE: 'en-US'
-  };
-})();
+// Use shared configuration - fail fast if not available
+if (typeof window.LINUXREPORT_CONFIG === 'undefined') {
+  throw new Error('LINUXREPORT_CONFIG is not available. Make sure shared-config.js is loaded first.');
+}
+
+const WEATHER_CONFIG = window.LINUXREPORT_CONFIG;
 
 // =============================================================================
 // WEATHER WIDGET TOGGLE MANAGEMENT

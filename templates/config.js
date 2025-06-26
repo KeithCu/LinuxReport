@@ -13,30 +13,12 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-// Use shared configuration with fallback
-const CONFIG_CONFIG = (function() {
-  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
-    return window.LINUXREPORT_CONFIG;
-  }
-  
-  // Fallback configuration if shared config is not available
-  console.warn('Shared configuration not found, using fallback config');
-  return {
-    // Default values
-    DEFAULT_THEME: 'silver',
-    DEFAULT_FONT: 'sans-serif',
-    
-    // Drag and drop settings
-    DRAG_OPACITY: '0.9',
-    DRAG_OPACITY_NORMAL: '1',
-    
-    // Priority calculation
-    PRIORITY_MULTIPLIER: 10,
-    
-    // API endpoints
-    DELETE_HEADLINE_ENDPOINT: '/api/delete_headline'
-  };
-})();
+// Use shared configuration - fail fast if not available
+if (typeof window.LINUXREPORT_CONFIG === 'undefined') {
+  throw new Error('LINUXREPORT_CONFIG is not available. Make sure shared-config.js is loaded first.');
+}
+
+const CONFIG_CONFIG = window.LINUXREPORT_CONFIG;
 
 // =============================================================================
 // UTILITY CLASSES

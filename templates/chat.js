@@ -13,28 +13,12 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-// Use shared configuration with fallback
-const CHAT_CONFIG = (function() {
-  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
-    return window.LINUXREPORT_CONFIG;
-  }
-  
-  // Fallback configuration if shared config is not available
-  console.warn('Shared configuration not found, using fallback config');
-  return {
-    CHAT_USE_SSE: false,
-    CHAT_POLLING_INTERVAL: 15000,
-    CHAT_MAX_RETRIES: 5,
-    CHAT_BASE_RETRY_DELAY: 1000,
-    CHAT_MAX_RETRY_DELAY: 30000,
-    CHAT_FETCH_DEBOUNCE_DELAY: 1000,
-    CHAT_RENDER_DEBOUNCE_DELAY: 100,
-    CHAT_DRAG_THROTTLE_DELAY: 16,
-    CHAT_MAX_FILE_SIZE: 5 * 1024 * 1024,
-    CHAT_ALLOWED_FILE_TYPES: ['image/png', 'image/jpeg', 'image/gif', 'image/webp'],
-    CHAT_RESIZE_DEBOUNCE_DELAY: 250
-  };
-})();
+// Use shared configuration - fail fast if not available
+if (typeof window.LINUXREPORT_CONFIG === 'undefined') {
+  throw new Error('LINUXREPORT_CONFIG is not available. Make sure shared-config.js is loaded first.');
+}
+
+const CHAT_CONFIG = window.LINUXREPORT_CONFIG;
 
 // =============================================================================
 // UTILITY CLASSES

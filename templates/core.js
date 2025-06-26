@@ -13,29 +13,12 @@
 // CONSTANTS AND CONFIGURATION
 // =============================================================================
 
-// Use shared configuration with fallback
-const CORE_CONFIG = (function() {
-  if (typeof window.LINUXREPORT_CONFIG !== 'undefined') {
-    return window.LINUXREPORT_CONFIG;
-  }
-  
-  // Fallback configuration if shared config is not available
-  console.warn('Shared configuration not found, using fallback config');
-  return {
-    AUTO_REFRESH_INTERVAL: 3601 * 1000,
-    ACTIVITY_TIMEOUT: 5 * 60 * 1000,
-    ITEMS_PER_PAGE: 8,
-    INFINITE_ITEMS_PER_PAGE: 20,
-    SCROLL_TIMEOUT: 10000,
-    FONT_CLASSES: [
-      'font-system', 'font-monospace', 'font-inter', 'font-roboto',
-      'font-open-sans', 'font-source-sans', 'font-noto-sans',
-      'font-lato', 'font-raleway', 'font-sans-serif'
-    ],
-    DEFAULT_THEME: 'silver',
-    DEFAULT_FONT: 'sans-serif'
-  };
-})();
+// Use shared configuration - fail fast if not available
+if (typeof window.LINUXREPORT_CONFIG === 'undefined') {
+  throw new Error('LINUXREPORT_CONFIG is not available. Make sure shared-config.js is loaded first.');
+}
+
+const CORE_CONFIG = window.LINUXREPORT_CONFIG;
 
 // =============================================================================
 // UTILITY CLASSES
