@@ -400,7 +400,7 @@ def extract_post_data(post, config, url, use_selenium):
         use_selenium (bool): Whether using Selenium or BeautifulSoup for extraction
         
     Returns:
-        dict: Extracted post data with title, link, id, and summary, or None if extraction fails
+        dict: Extracted post data with title, link, id, summary, and timestamps, or None if extraction fails
     """
     try:
         if use_selenium:
@@ -439,7 +439,21 @@ def extract_post_data(post, config, url, use_selenium):
     if filter_pattern and filter_pattern not in link:
         return None
     
-    return {"title": title, "link": link, "id": link, "summary": post.text.strip()}
+    # TODO: Future enhancement - extract actual published timestamps from site-specific selectors
+    # For now, use current time as a reasonable approximation
+    # This ensures proper sorting in infinite scroll while avoiding complex parsing logic
+    import time
+    published_parsed = time.gmtime()
+    published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
+    
+    return {
+        "title": title, 
+        "link": link, 
+        "id": link, 
+        "summary": post.text.strip(),
+        "published": published,
+        "published_parsed": published_parsed
+    }
 
 # =============================================================================
 # MAIN SITE FETCHING FUNCTION
