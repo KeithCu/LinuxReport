@@ -28,34 +28,22 @@
   <div class="config-border-box">
     <div class="config-container">
       <!-- Admin status and login/logout -->
-      <div class="admin-status" style="margin-bottom: 20px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+      <div class="admin-status">
         {% if is_admin %}
-          <span style="color: green;">✓ Logged in as Admin</span>
-          <a href="{{ url_for('logout') }}" style="margin-left: 15px; color: #dc3545; text-decoration: none;">Logout</a>
+          <span class="admin-logged-in">✓ Logged in as Admin</span>
+          <a href="{{ url_for('logout') }}" class="admin-logout">Logout</a>
         {% else %}
-          <span style="color: #6c757d;">Not logged in</span>
-          <a href="{{ url_for('login') }}" style="margin-left: 15px; color: #007bff; text-decoration: none;">Login</a>
+          <span class="admin-not-logged">Not logged in</span>
+          <a href="{{ url_for('login') }}" class="admin-login">Login</a>
         {% endif %}
       </div>
 
       <!-- Flash messages -->
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-          <div style="margin-bottom: 20px;">
+          <div class="flash-messages">
             {% for category, message in messages %}
-              {% if category == 'error' %}
-                <div style="padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;">
-                  {{ message }}
-                </div>
-              {% elif category == 'success' %}
-                <div style="padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #d4edda; color: #155724; border: 1px solid #c3e6cb;">
-                  {{ message }}
-                </div>
-              {% else %}
-                <div style="padding: 10px; border-radius: 4px; margin-bottom: 10px; background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb;">
-                  {{ message }}
-                </div>
-              {% endif %}
+              <div class="flash-message flash-{{ category }}">{{ message }}</div>
             {% endfor %}
           </div>
         {% endif %}
@@ -73,9 +61,9 @@
         </div>
 
         {% if is_admin %}
-        <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--btn-border); padding-top: 20px;">
+        <div class="form-group admin-section">
           <h3>Headlines Editor</h3>
-          <p style="font-size: 0.9em; color: var(--text-secondary);">
+          <p class="admin-description">
             Edit the HTML content that appears above the main content. Changes are saved when you click "Save".
           </p>
           {{ render_field(form.headlines) }}
@@ -83,21 +71,23 @@
         {% endif %}
 
         {% if enable_url_customization %}
-        <div><i>Drag and Drop to have a custom order.</i></div>
-        <div class="url-list">
-          {% for urlf in form.urls %}
-          <div class="url-entry" draggable="true">
-            {{ render_field(urlf.pri) }}
-            {{ render_field(urlf.url) }}
+        <div class="url-customization">
+          <div class="url-instructions"><i>Drag and Drop to have a custom order.</i></div>
+          <div class="url-list">
+            {% for urlf in form.urls %}
+            <div class="url-entry" draggable="true">
+              {{ render_field(urlf.pri) }}
+              {{ render_field(urlf.url) }}
+            </div>
+            {% endfor %}
+            <div class="url-instructions"><i>Add Custom RSS feeds here. More coming...</i></div>
+            {% for rssf in form.url_custom %}
+            <div class="url-entry" draggable="true">
+              {{ render_field(rssf.pri) }}
+              {{ render_field(rssf.url) }}
+            </div>
+            {% endfor %}
           </div>
-          {% endfor %}
-          <div><i>Add Custom RSS feeds here. More coming...</i></div>
-          {% for rssf in form.url_custom %}
-          <div class="url-entry" draggable="true">
-            {{ render_field(rssf.pri) }}
-            {{ render_field(rssf.url) }}
-          </div>
-          {% endfor %}
         </div>
         {% endif %}
         <button type="submit" name="save">Save</button>

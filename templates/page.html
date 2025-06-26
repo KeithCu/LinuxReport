@@ -19,30 +19,30 @@
   </head>
   <body>
 
-    <header class="main-header">
-      <div class="weather-widget-wrapper">
-        <div id="weather-widget-container" class="weather-widget">
-          <div id="weather-content">
-            <a href="https://openweathermap.org" target="_blank" class="weather-link">
-              <div class="weather-content-inner">{{ weather_html }}</div>
-              <div class="weather-attribution">Data by OpenWeather</div>
-            </a>
-          </div>
-          <span id="weather-collapsed-label" class="weather-collapsed-label">🌤️ Weather</span>
-          <button id="weather-toggle-btn" class="weather-toggle-btn" title="Toggle Weather">&#9660;</button>
+    <!-- Weather Widget - Positioned at top of page -->
+    <div style="text-align: center; width: 100%;">
+      <div id="weather-widget-container" class="weather-widget">
+        <div id="weather-content">
+          <a href="https://openweathermap.org" target="_blank" class="weather-link">
+            <div class="weather-content-inner">{{ weather_html }}</div>
+            <div class="weather-attribution">Data by OpenWeather</div>
+          </a>
         </div>
+        <span id="weather-collapsed-label" class="weather-collapsed-label">🌤️ Weather</span>
+        <button id="weather-toggle-btn" class="weather-toggle-btn" title="Toggle Weather">&#9660;</button>
       </div>
+    </div>
 
-      <div class="logo-section">
-        <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
-      </div>
+    <header>
+      <!-- Logo -->
+      <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
 
-      <div class="welcome-section">
-        <small>{{ welcome_html }}</small>
-      </div>
+      <!-- Welcome Message -->
+      <small>{{ welcome_html }}</small>
     </header>
 
-    <nav class="nav-wrapper">
+    <!-- Navigation -->
+    <nav>
       <div id="nav-controls-container" class="nav-controls">
         <div class="nav-links-desktop">
           <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
@@ -97,21 +97,23 @@
       </div>
     </nav>
 
-    <main class="main-content">
-      <div class="above-content">{{ above_html }}</div>
+    <main>
+      <!-- Above Content -->
+      <div>{{ above_html }}</div>
 
-      <div class="old-headlines-section">
-        <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
+      <!-- Old Headlines Link -->
+      <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
         <span class="old-headlines-title">📰 Old Headlines Archive</span>
         <small class="old-headlines-subtitle">See the big stories you missed</small>
       </a>
-      </div>
 
+      <!-- Infinite Scroll Container -->
       <div id="infinite-scroll-container" class="infinite-scroll-container">
         <div id="infinite-content" class="infinite-content mobile-view"></div>
         <div id="loading-indicator" class="loading-indicator">Loading more stories...</div>
       </div>
 
+      <!-- Main Content Columns -->
       <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}">
         <div class="column">{{ columns[0] }}</div>
         {% if not g.is_mobile %}
@@ -121,6 +123,7 @@
       </div>
     </main>
 
+    <!-- Chat Sidebar -->
     <aside id="chat-container" class="chat-container">
       <div id="chat-header" class="chat-header">
         <span>Visitor Chat</span>

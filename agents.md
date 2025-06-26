@@ -258,7 +258,7 @@ The project includes a comprehensive image processing pipeline:
 ## JavaScript Architecture
 
 1. **Modular System**:
-   - Source files in `templates/`: `core.js`, `config.js`, `chat.js`, `weather.js`, `shared-utils.js`, `shared-config.js`, `infinitescroll.js`
+   - Source files in `templates/`: `core.js`, `config.js`, `chat.js`, `weather.js`, `app.js`, `infinitescroll.js`
    - Automatic bundling into `static/linuxreport.js` via Flask-Assets
    - Development mode: unminified for debugging
    - Production mode: minified with source file headers

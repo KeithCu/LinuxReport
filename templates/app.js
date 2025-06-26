@@ -1,4 +1,3 @@
-
 /**
  * app.js
  *
@@ -197,7 +196,7 @@
   app.utils.ThemeManager = {
     applySettings() {
       const theme = app.utils.CookieManager.get('Theme') || app.config.DEFAULT_THEME;
-      document.body.classList.add(`theme-${theme}`);
+      document.body.setAttribute('data-theme', theme);
       const themeSelect = document.getElementById('theme-select');
       if (themeSelect) themeSelect.value = theme;
 
@@ -212,8 +211,7 @@
       }
     },
     applyFont(font) {
-      document.body.classList.remove(...app.config.FONT_CLASSES);
-      document.body.classList.add(`font-${font}`);
+      document.body.setAttribute('data-font', font);
     },
     setTheme(theme) {
       app.utils.ScrollManager.savePosition();
