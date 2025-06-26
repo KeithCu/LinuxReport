@@ -241,8 +241,7 @@ STANDARD_ORDER_STR = str(SITE_URLS)
 
 # Define the order of JavaScript modules for loading
 JS_MODULES = [
-    'shared-config.js',
-    'shared-utils.js',
+    'app.js',
     'infinitescroll.js',
     'core.js',
     'weather.js',

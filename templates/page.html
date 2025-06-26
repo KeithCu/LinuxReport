@@ -19,62 +19,43 @@
   </head>
   <body>
 
-    <!-- Weather Widget -->
-    <div class="weather-widget-wrapper">
-      <div id="weather-widget-container" class="weather-widget">
-        <div id="weather-content">
-          <a href="https://openweathermap.org" target="_blank" class="weather-link">
-            <div class="weather-content-inner">{{ weather_html }}</div>
-            <div class="weather-attribution">Data by OpenWeather</div>
-          </a>
-        </div>
-        <span id="weather-collapsed-label" class="weather-collapsed-label">🌤️ Weather</span>
-        <button id="weather-toggle-btn" class="weather-toggle-btn" title="Toggle Weather">&#9660;</button>
-      </div>
-    </div>
-
-    <!-- Above Content -->
-    <div class="above-content">{{ above_html }}</div>
-
-    <!-- Old Headlines Section -->
-    <div class="old-headlines-section">
-      <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
-        <span class="old-headlines-title">📰 Old Headlines Archive</span>
-        <br>
-        <small class="old-headlines-subtitle">See the big stories you missed</small>
-      </a>
-    </div>
-
-    <!-- Logo -->
-    <div class="logo-section">
-      <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
-    </div>
-
-    <!-- Welcome Message -->
-    <div class="welcome-section">
-      <small>{{ welcome_html }}</small>
-    </div>
-
-    <!-- Navigation Controls -->
-    <div class="nav-wrapper">
-      <div id="nav-controls-container" class="nav-controls">
-        <!-- Left section: Navigation links -->
-        <div class="nav-section-left">
-          <div class="{% if g.is_mobile %}nav-links-mobile{% else %}nav-links-desktop{% endif %}">
-            <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
-            <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
-            <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
-            <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
-            <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
-            <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
-            <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
-            <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
+    <header class="main-header">
+      <div class="weather-widget-wrapper">
+        <div id="weather-widget-container" class="weather-widget">
+          <div id="weather-content">
+            <a href="https://openweathermap.org" target="_blank" class="weather-link">
+              <div class="weather-content-inner">{{ weather_html }}</div>
+              <div class="weather-attribution">Data by OpenWeather</div>
+            </a>
           </div>
+          <span id="weather-collapsed-label" class="weather-collapsed-label">🌤️ Weather</span>
+          <button id="weather-toggle-btn" class="weather-toggle-btn" title="Toggle Weather">&#9660;</button>
         </div>
-        
-        <!-- Middle section: Theme and font controls -->
+      </div>
+
+      <div class="logo-section">
+        <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
+      </div>
+
+      <div class="welcome-section">
+        <small>{{ welcome_html }}</small>
+      </div>
+    </header>
+
+    <nav class="nav-wrapper">
+      <div id="nav-controls-container" class="nav-controls">
+        <div class="nav-links-desktop">
+          <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
+          <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
+          <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
+          <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
+          <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
+          <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
+          <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
+          <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
+        </div>
         <div class="nav-section-middle">
-          <select id="theme-select" class="theme-select" onchange="setTheme(this.value)">
+          <select id="theme-select" class="theme-select">
             <option value="light">Light</option>
             <option value="paper">Paper</option>
             <option value="silver">Silver</option>
@@ -93,7 +74,7 @@
             <option value="solarized">Solarized</option>
             <option value="pastelle">Pastelle</option>
           </select>
-          <select id="font-select" class="font-select" onchange="setFont(this.value)">
+          <select id="font-select" class="font-select">
             <option value="system">System Default</option>
             <option value="sans-serif">Sans Serif</option>
             <option value="monospace">Monospace</option>
@@ -106,35 +87,41 @@
             <option value="raleway">Raleway</option>
           </select>
         </div>
-        
-        <!-- Right section: Action buttons -->
         <div class="nav-section-right">
-          <button id="chat-toggle-btn" class="action-btn">Chat</button>
-          <button type="save" name="save" onclick="redirect()" class="action-btn">Config...</button>
+          <button id="chat-toggle-btn" class="btn">Chat</button>
+          <button id="config-btn" class="btn">Config...</button>
           {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
-          <button id="view-mode-toggle" class="action-btn">Infinite</button>
+          <button id="view-mode-toggle" class="btn">Infinite</button>
           {% endif %}
         </div>
       </div>
-    </div>
+    </nav>
 
-    <!-- Infinite Scroll View -->
-    <div id="infinite-scroll-container" class="infinite-scroll-container">
-      <div id="infinite-content" class="infinite-content mobile-view"></div>
-      <div id="loading-indicator" class="loading-indicator">Loading more stories...</div>
-    </div>
+    <main class="main-content">
+      <div class="above-content">{{ above_html }}</div>
 
-    <!-- Main Content -->
-    <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}">
-      <div class="column">{{ columns[0] }}</div>
-      {% if not g.is_mobile %}
-      <div class="column">{{ columns[1] }}</div>
-      <div class="column">{{ columns[2] }}</div>
-      {% endif %}
-    </div>
+      <div class="old-headlines-section">
+        <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
+        <span class="old-headlines-title">📰 Old Headlines Archive</span>
+        <small class="old-headlines-subtitle">See the big stories you missed</small>
+      </a>
+      </div>
 
-    <!-- Chat Window -->
-    <div id="chat-container" class="chat-container">
+      <div id="infinite-scroll-container" class="infinite-scroll-container">
+        <div id="infinite-content" class="infinite-content mobile-view"></div>
+        <div id="loading-indicator" class="loading-indicator">Loading more stories...</div>
+      </div>
+
+      <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}">
+        <div class="column">{{ columns[0] }}</div>
+        {% if not g.is_mobile %}
+        <div class="column">{{ columns[1] }}</div>
+        <div class="column">{{ columns[2] }}</div>
+        {% endif %}
+      </div>
+    </main>
+
+    <aside id="chat-container" class="chat-container">
       <div id="chat-header" class="chat-header">
         <span>Visitor Chat</span>
         <button id="chat-close-btn" class="chat-close-btn" title="Close Chat">&times;</button>
@@ -142,14 +129,14 @@
       <div id="chat-messages" class="chat-messages">
         <div id="chat-loading" class="chat-loading">Loading messages...</div>
       </div>
-      <div id="chat-input-area" class="chat-input-area">
+      <form id="chat-input-area" class="chat-input-area">
         <div class="chat-input-wrapper">
           <textarea id="chat-message-input" class="chat-message-input" placeholder="Type your message (use <b>text</b> for bold)" rows="2"></textarea>
           <input type="text" id="chat-image-url-input" class="chat-image-input" placeholder="Optional: Image URL or base64">
         </div>
-        <button id="chat-send-btn" class="chat-send-btn">Send</button>
-      </div>
-    </div>
+        <button id="chat-send-btn" class="btn">Send</button>
+      </form>
+    </aside>
 
     <!-- Link external JS using Flask-Assets -->
     {% assets "js_all" %}
