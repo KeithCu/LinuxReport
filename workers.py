@@ -447,7 +447,7 @@ def refresh_thread():
             if rss_info.logo_url != "Custom.png":
                 
                 last_fetch = last_fetch_cache.get(url)
-                                                
+                
                 # Only check expiration if we have a feed or if we're checking a non-custom site
                 if g_c.has_feed_expired(url, last_fetch):
                     urls_to_refresh.append(url)

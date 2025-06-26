@@ -5,6 +5,10 @@ Provides utilities related to handling and identifying incoming web requests,
 including rate limiting logic and web bot detection.
 """
 
+import ipaddress
+from typing import Optional
+import datetime
+
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
@@ -105,3 +109,37 @@ def dynamic_rate_limit():
         return "10 per minute"    # Lower limits for bots
     else:
         return "20 per minute"  # Standard limits for users
+
+def get_ip_prefix(ip_str):
+    """
+    Extract the first part of IPv4 or the first block of IPv6 for grouping purposes.
+    
+    Args:
+        ip_str (str): IP address string to process
+        
+    Returns:
+        str: First octet of IPv4 or first block of IPv6, or "Invalid IP" on error
+    """
+    try:
+        ip = ipaddress.ip_address(ip_str)
+        if isinstance(ip, ipaddress.IPv4Address):
+            return ip_str.split('.')[0]
+        elif isinstance(ip, ipaddress.IPv6Address):
+            return ip_str.split(':')[0]
+    except ValueError:
+        return "Invalid IP"
+    return None
+
+def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
+    """
+    Format the last fetch time as 'HH:MM AM/PM' for display.
+    
+    Args:
+        last_fetch (Optional[datetime.datetime]): Timestamp to format
+        
+    Returns:
+        str: Formatted time string or "Unknown" if no timestamp
+    """
+    if not last_fetch:
+        return "Unknown"
+    return last_fetch.strftime("%I:%M %p")

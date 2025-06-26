@@ -9,13 +9,20 @@ Defines data models and configuration structures for the LinuxReport project.
 # =============================================================================
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
 from flask_login import UserMixin
+import datetime
+
+# =============================================================================
+# THIRD-PARTY IMPORTS
+# =============================================================================
+import diskcache
 
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
 from app_config import load_config
+import FeedHistory
 
 # =============================================================================
 # DATA MODELS AND CONFIGURATION CLASSES
@@ -47,6 +54,135 @@ class RssInfo:
         self.logo_url = logo_url
         self.logo_alt = logo_alt
         self.site_url = site_url
+
+class DiskCacheWrapper:
+    """
+    Wrapper for diskcache to manage caching operations with additional functionality.
+    
+    This wrapper provides a consistent interface for disk-based caching operations
+    and adds custom methods for feed management and expiration checking.
+    """
+    
+    def __init__(self, cache_dir: str) -> None:
+        """
+        Initialize the cache wrapper with a directory.
+        
+        Args:
+            cache_dir (str): Directory path for cache storage
+        """
+        self.cache = diskcache.Cache(cache_dir)
+
+    def get(self, key: str) -> Any:
+        """
+        Retrieve a value from the cache.
+        
+        Args:
+            key (str): Cache key to retrieve
+            
+        Returns:
+            Any: Cached value or None if not found
+        """
+        return self.cache.get(key)
+
+    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
+        """
+        Store a value in the cache with optional expiration.
+        
+        Args:
+            key (str): Cache key
+            value (Any): Value to store
+            timeout (Optional[int]): Expiration time in seconds
+        """
+        self.cache.set(key, value, expire=timeout)
+
+    def delete(self, key: str) -> None:
+        """
+        Remove a key from the cache.
+        
+        Args:
+            key (str): Cache key to delete
+        """
+        self.cache.delete(key)
+
+    def has(self, key: str) -> bool:
+        """
+        Check if a key exists in the cache.
+        
+        Args:
+            key (str): Cache key to check
+            
+        Returns:
+            bool: True if key exists, False otherwise
+        """
+        return key in self.cache
+
+    def has_feed_expired(self, url: str, last_fetch: Optional[datetime.datetime] = None, history: Optional[FeedHistory.FeedHistory] = None) -> bool:
+        """
+        Check if a feed has expired based on the last fetch time.
+        
+        Args:
+            url (str): The URL of the feed to check
+            last_fetch (Optional[datetime.datetime]): Pre-fetched last_fetch timestamp 
+                                                    to avoid duplicate calls
+            history (Optional[FeedHistory.FeedHistory]): FeedHistory instance to use for expiration checking.
+                                                       If None, uses the global history instance from shared.py
+        
+        Returns:
+            bool: True if the feed has expired, False otherwise
+        """
+        if last_fetch is None:
+            last_fetch = self.get_last_fetch(url)
+        if last_fetch is None:
+            return True
+        
+        # Use provided history instance or the global one from shared
+        if history is None:
+            # Import here to avoid circular imports
+            import shared
+            history = shared.history
+        
+        return history.has_expired(url, last_fetch)
+
+    def get_all_last_fetches(self, urls: List[str]) -> Dict[str, Optional[datetime.datetime]]:
+        """
+        Get last fetch times for multiple URLs in a single operation.
+        
+        Args:
+            urls (List[str]): List of URLs to check
+            
+        Returns:
+            Dict[str, Optional[datetime.datetime]]: Dictionary mapping URLs to their last fetch times
+        """
+        all_fetches = self.get('all_last_fetches') or {}
+        return {url: all_fetches.get(url) for url in urls}
+
+    def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
+        """
+        Get the last fetch time for a URL from the shared disk cache.
+        
+        Args:
+            url (str): URL to get last fetch time for
+            
+        Returns:
+            Optional[datetime.datetime]: Last fetch timestamp or None if not found
+        """
+        all_fetches = self.get('all_last_fetches')
+        if url in all_fetches:
+            return all_fetches[url]
+        return None
+
+    def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
+        """
+        Set the last fetch time for a URL in the shared disk cache.
+        
+        Args:
+            url (str): URL to set last fetch time for
+            timestamp (Any): Timestamp to store
+            timeout (Optional[int]): Cache expiration time
+        """
+        all_fetches = self.get('all_last_fetches')
+        all_fetches[url] = timestamp
+        self.put('all_last_fetches', all_fetches, timeout)
 
 class User(UserMixin):
     """

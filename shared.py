@@ -36,7 +36,8 @@ from flask_limiter import Limiter
 import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
 from app_config import load_config
-from request_utils import get_rate_limit_key, dynamic_rate_limit, WEB_BOT_USER_AGENTS
+from request_utils import get_rate_limit_key, dynamic_rate_limit, WEB_BOT_USER_AGENTS, get_ip_prefix, format_last_updated
+from models import DiskCacheWrapper
 
 # =============================================================================
 # FLASK MONITORING DASHBOARD CONFIGURATION
@@ -291,126 +292,6 @@ class RssFeed:
         object.__setattr__(self, '__dict__', state)
         self.__post_init__()
 
-class DiskCacheWrapper:
-    """
-    Wrapper for diskcache to manage caching operations with additional functionality.
-    
-    This wrapper provides a consistent interface for disk-based caching operations
-    and adds custom methods for feed management and expiration checking.
-    """
-    
-    def __init__(self, cache_dir: str) -> None:
-        """
-        Initialize the cache wrapper with a directory.
-        
-        Args:
-            cache_dir (str): Directory path for cache storage
-        """
-        self.cache = diskcache.Cache(cache_dir)
-
-    def get(self, key: str) -> Any:
-        """
-        Retrieve a value from the cache.
-        
-        Args:
-            key (str): Cache key to retrieve
-            
-        Returns:
-            Any: Cached value or None if not found
-        """
-        return self.cache.get(key)
-
-    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
-        """
-        Store a value in the cache with optional expiration.
-        
-        Args:
-            key (str): Cache key
-            value (Any): Value to store
-            timeout (Optional[int]): Expiration time in seconds
-        """
-        self.cache.set(key, value, expire=timeout)
-
-    def delete(self, key: str) -> None:
-        """
-        Remove a key from the cache.
-        
-        Args:
-            key (str): Cache key to delete
-        """
-        self.cache.delete(key)
-
-    def has(self, key: str) -> bool:
-        """
-        Check if a key exists in the cache.
-        
-        Args:
-            key (str): Cache key to check
-            
-        Returns:
-            bool: True if key exists, False otherwise
-        """
-        return key in self.cache
-
-    def has_feed_expired(self, url: str, last_fetch: Optional[datetime.datetime] = None) -> bool:
-        """
-        Check if a feed has expired based on the last fetch time.
-        
-        Args:
-            url (str): The URL of the feed to check
-            last_fetch (Optional[datetime.datetime]): Pre-fetched last_fetch timestamp 
-                                                    to avoid duplicate calls
-        
-        Returns:
-            bool: True if the feed has expired, False otherwise
-        """
-        if last_fetch is None:
-            last_fetch = self.get_last_fetch(url)
-        if last_fetch is None:
-            return True
-        return history.has_expired(url, last_fetch)
-
-    def get_all_last_fetches(self, urls: list[str]) -> dict[str, Optional[datetime.datetime]]:
-        """
-        Get last fetch times for multiple URLs in a single operation.
-        
-        Args:
-            urls (list[str]): List of URLs to check
-            
-        Returns:
-            dict[str, Optional[datetime.datetime]]: Dictionary mapping URLs to their last fetch times
-        """
-        all_fetches = self.get('all_last_fetches') or {}
-        return {url: all_fetches.get(url) for url in urls}
-
-    def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
-        """
-        Get the last fetch time for a URL from the shared disk cache.
-        
-        Args:
-            url (str): URL to get last fetch time for
-            
-        Returns:
-            Optional[datetime.datetime]: Last fetch timestamp or None if not found
-        """
-        all_fetches = self.get('all_last_fetches')
-        if url in all_fetches:
-            return all_fetches[url]
-        return None
-
-    def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
-        """
-        Set the last fetch time for a URL in the shared disk cache.
-        
-        Args:
-            url (str): URL to set last fetch time for
-            timestamp (Any): Timestamp to store
-            timeout (Optional[int]): Cache expiration time
-        """
-        all_fetches = self.get('all_last_fetches')
-        all_fetches[url] = timestamp
-        self.put('all_last_fetches', all_fetches, timeout)
-
 # =============================================================================
 # GLOBAL CACHE INSTANCES
 # =============================================================================
@@ -506,19 +387,6 @@ def run_one_time_last_fetch_migration(all_urls):
             g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
             print("Last_fetch migration complete.")
 
-def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
-    """
-    Format the last fetch time as 'HH:MM AM/PM' for display.
-    
-    Args:
-        last_fetch (Optional[datetime.datetime]): Timestamp to format
-        
-    Returns:
-        str: Formatted time string or "Unknown" if no timestamp
-    """
-    if not last_fetch:
-        return "Unknown"
-    return last_fetch.strftime("%I:%M %p")
 
 def clear_page_caches():
     """
@@ -534,23 +402,4 @@ def clear_page_caches():
         if key.startswith('page-cache:'):
             g_cm.delete(key)
 
-def get_ip_prefix(ip_str):
-    """
-    Extract the first part of IPv4 or the first block of IPv6 for grouping purposes.
-    
-    Args:
-        ip_str (str): IP address string to process
-        
-    Returns:
-        str: First octet of IPv4 or first block of IPv6, or "Invalid IP" on error
-    """
-    try:
-        ip = ipaddress.ip_address(ip_str)
-        if isinstance(ip, ipaddress.IPv4Address):
-            return ip_str.split('.')[0]
-        elif isinstance(ip, ipaddress.IPv6Address):
-            return ip_str.split(':')[0]
-    except ValueError:
-        return "Invalid IP"
-    return None
 
