@@ -341,6 +341,7 @@ code {
 .linkclass {
   margin-bottom: var(--spacing-sm);
   font-size: large;
+  line-height: 1.2;
 }
 
 .linkclass a,
