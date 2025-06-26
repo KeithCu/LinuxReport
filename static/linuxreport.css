@@ -200,12 +200,14 @@ nav {
 .nav-controls {
   border: 2px solid var(--btn-border);
   padding: 10px;
-  margin: 10px;
+  margin: 10px auto;
   display: inline-flex;
   align-items: center;
   gap: 20px;
   font-size: large;
   text-align: center;
+  justify-content: center;
+  max-width: fit-content;
 }
 
 .nav-links-desktop, .nav-links-mobile {
