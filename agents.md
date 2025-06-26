@@ -41,20 +41,58 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 ├── auto_update.py            # Automatic headline updates using LLMs
 ├── caching.py                # Core caching functionality and utilities
 ├── html_generation.py        # AI headline generation and HTML rendering
-├── *_report_settings.py      # Site-specific configurations (ai_, linux_, etc.)
+├── app_config.py             # Application configuration and setup utilities
+├── request_utils.py          # HTTP request utilities and helpers
+├── seleniumfetch.py          # Selenium-based web scraping functionality
+├── Tor.py                    # Tor network integration and utilities
+├── SqliteLock.py             # SQLite locking mechanisms for concurrency
+├── ObjectStorageLock.py      # Object storage locking for distributed systems
+├── article_deduplication.py  # Article deduplication algorithms
+├── FeedHistory.py            # Feed history tracking and management
+├── Reddit.py                 # Reddit-specific fetching and processing
+├── custom_site_handlers.py   # Custom site-specific handlers
+├── image_processing.py       # Image processing and optimization
+├── image_parser.py           # Image parsing and extraction
+├── image_utils.py            # Image utility functions
+├── image_candidate_selector.py # Image selection algorithms
+├── image_html_parser.py      # HTML image parsing utilities
+├── combinefiles.py           # File combination utilities
+├── convert_png_to_webp.py    # PNG to WebP conversion utilities
+├── png_to_webp_converter.py  # Alternative WebP conversion implementation
+├── feedfilter.py             # RSS feed filtering and processing
+├── old_headlines.py          # Legacy headlines processing
+├── stats.py                  # Statistics and analytics
+├── forms.py                  # Flask-WTF forms for user input
+├── object_storage_config.py  # Object storage configuration
+├── object_storage_sync.py    # Object storage synchronization
+├── migrate_to_sqlite.py      # Database migration utilities
+├── sync_static.py            # Static file synchronization
+├── generate_dependency_graph.py # Dependency graph generation
+├── generate_docs.py          # Documentation generation utilities
+├── *_report_settings.py      # Site-specific configurations (ai_, linux_, covid_, space_, trump_, pv_, techno_)
 ├── templates/                # Jinja2 templates and modular JavaScript
 │   ├── *.html               # HTML templates
 │   ├── core.js              # Core JavaScript (themes, auto-refresh, scroll)
 │   ├── config.js            # Configuration UI logic
 │   ├── chat.js              # Chat interface functionality
-│   └── weather.js           # Weather widget functionality
+│   ├── weather.js           # Weather widget functionality
+│   ├── shared-utils.js      # Shared JavaScript utilities
+│   ├── shared-config.js     # Shared configuration utilities
+│   └── infinitescroll.js    # Infinite scroll functionality
 ├── static/                   # Static assets and compiled JavaScript/CSS
 │   ├── images/              # Site logos and favicons
 │   ├── linuxreport.css      # Main stylesheet
 │   └── linuxreport.js       # Compiled/bundled JavaScript (auto-generated)
-├── forms.py                  # Flask-WTF forms for user input
 ├── tests/                    # Test directory with pytest tests
-└── config.yaml              # Main configuration file
+│   ├── __init__.py          # Test package initialization
+│   ├── test_article_deduplication.py # Article deduplication tests
+│   ├── test_extract_titles.py # Title extraction tests
+│   ├── test_sqlitelock.py   # SQLite lock tests
+│   └── selenium_test.py     # Selenium integration tests
+├── config.yaml              # Main configuration file
+├── requirements.txt          # Python dependencies
+├── pyproject.toml           # Project configuration
+└── LICENSE                  # GNU LGPL v3 license
 ```
 
 ## Core Application Files
@@ -87,11 +125,41 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
    - Reddit fetch configuration templates
    - Configuration loading utilities
 
+5. **app_config.py**:
+   - Application configuration utilities
+   - Environment-specific setup functions
+   - Configuration validation and loading
+
+6. **request_utils.py**:
+   - HTTP request utilities and helpers
+   - Request retry logic and error handling
+   - User agent management and request headers
+
+7. **seleniumfetch.py**:
+   - Selenium-based web scraping functionality
+   - Browser automation for complex sites
+   - JavaScript rendering support
+
+8. **Tor.py**:
+   - Tor network integration and utilities
+   - Anonymous browsing capabilities
+   - Tor circuit management
+
+9. **SqliteLock.py**:
+   - SQLite locking mechanisms for concurrency
+   - Database-level locking utilities
+   - Thread-safe database operations
+
+10. **ObjectStorageLock.py**:
+    - Object storage locking for distributed systems
+    - Cloud storage synchronization
+    - Distributed lock management
+
 ## Report Type System
 
 LinuxReport supports multiple report types, each with its own configuration:
 
-- **Report Settings Files**: `*_report_settings.py` (e.g., `ai_report_settings.py`, `linux_report_settings.py`)
+- **Report Settings Files**: `*_report_settings.py` (e.g., `ai_report_settings.py`, `linux_report_settings.py`, `covid_report_settings.py`, `space_report_settings.py`, `trump_report_settings.py`, `pv_report_settings.py`, `techno_report_settings.py`)
 - **Configuration Structure**: Each file contains a `CONFIG` object with:
   - `ALL_URLS`: Dictionary mapping RSS feeds to RssInfo objects
   - `SITE_URLS`: Ordered list of feeds to process
@@ -145,6 +213,18 @@ The system includes CDN support for optimal image delivery:
 - **Deduplication**: Article deduplication across feeds and time periods
 - **Image Processing**: Automatic WebP conversion and optimization
 
+## Image Processing System
+
+The project includes a comprehensive image processing pipeline:
+
+1. **image_processing.py**: Core image processing and optimization
+2. **image_parser.py**: Image parsing and extraction from HTML
+3. **image_utils.py**: Image utility functions and helpers
+4. **image_candidate_selector.py**: Image selection algorithms
+5. **image_html_parser.py**: HTML image parsing utilities
+6. **convert_png_to_webp.py**: PNG to WebP conversion utilities
+7. **png_to_webp_converter.py**: Alternative WebP conversion implementation
+
 ## Coding Conventions
 
 1. **File Organization**:
@@ -176,7 +256,7 @@ The system includes CDN support for optimal image delivery:
 ## JavaScript Architecture
 
 1. **Modular System**:
-   - Source files in `templates/`: `core.js`, `config.js`, `chat.js`, `weather.js`
+   - Source files in `templates/`: `core.js`, `config.js`, `chat.js`, `weather.js`, `shared-utils.js`, `shared-config.js`, `infinitescroll.js`
    - Automatic bundling into `static/linuxreport.js` via Flask-Assets
    - Development mode: unminified for debugging
    - Production mode: minified with source file headers
@@ -314,6 +394,13 @@ Refer to these specialized documentation files for detailed information:
 - `README.md`: Project overview and setup instructions
 - `Caching.md`: Comprehensive caching system documentation
 - `README_object_storage_sync.md`: Object storage and CDN configuration
+- `PWA.md`: Progressive Web App implementation details
+- `PERFORMANCE_OPTIMIZATIONS.md`: Performance optimization strategies
+- `MONITORING.md`: Application monitoring and metrics
+- `Scaling.md`: Scaling strategies and considerations
+- `api_docs.md`: API documentation and endpoints
+- `function_dependencies.md`: Function dependency analysis
+- `ROADMAP.md`: Project roadmap and future plans
 - `config.yaml`: Configuration file with inline comments
 - `httpd-vhosts-sample.conf`: Apache production deployment configuration
 
