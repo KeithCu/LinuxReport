@@ -370,7 +370,7 @@ img {
 .weather-widget {
   border: 1px solid var(--btn-border);
   padding: var(--spacing-xs);
-  margin: var(--spacing-xs);
+  margin: calc(var(--spacing-xs) / 2);
   display: inline-block;
   font-size: small;
   position: relative;
@@ -388,10 +388,13 @@ img {
 
 .weather-attribution {
   position: absolute;
-  bottom: 0;
-  right: 0;
+  bottom: 8px;
+  right: 5px;
   font-size: 8px;
   color: var(--link);
+  background-color: transparent;
+  padding: 1px 2px;
+  border-radius: 1px;
 }
 
 .weather-collapsed-label {
@@ -433,8 +436,8 @@ img {
 
 .weather-container {
   max-width: 100%;
-  margin: var(--spacing-sm) auto;
-  padding: var(--spacing-sm);
+  margin: calc(var(--spacing-sm) / 2) auto;
+  padding: calc(var(--spacing-sm) / 2) calc(var(--spacing-sm) / 2) 20px calc(var(--spacing-sm) / 2);
   background-color: var(--btn-bg);
   color: var(--text);
   border-radius: var(--border-radius-md);
@@ -443,7 +446,7 @@ img {
 }
 
 .weather-container h3 {
-  margin: 0 0 var(--spacing-sm) 0;
+  margin: 0 0 calc(var(--spacing-sm) / 2) 0;
 }
 
 .weather-forecast {
@@ -456,8 +459,8 @@ img {
 .weather-day {
   flex: 1;
   min-width: 80px;
-  margin: var(--spacing-xs);
-  padding: var(--spacing-sm);
+  margin: calc(var(--spacing-xs) / 2);
+  padding: calc(var(--spacing-sm) / 2);
   background-color: var(--btn-bg);
   border: 1px solid var(--btn-border);
   border-radius: var(--border-radius-sm);
@@ -471,7 +474,7 @@ img {
 
 .weather-day-name {
   font-weight: bold;
-  margin-bottom: var(--spacing-xs);
+  margin-bottom: calc(var(--spacing-xs) / 2);
 }
 
 .weather-icon {
@@ -480,7 +483,7 @@ img {
 }
 
 .weather-temp {
-  margin: var(--spacing-xs) 0;
+  margin: calc(var(--spacing-xs) / 2) 0;
 }
 
 .weather-precip {
@@ -511,9 +514,8 @@ header small {
 #weather-widget-container {
   display: inline-block;
   text-align: center;
-  margin: var(--spacing-sm) auto;
+  margin: calc(var(--spacing-sm) / 2) auto;
   width: auto;
-  position: relative;
 }
 
 /* =============================================================================
