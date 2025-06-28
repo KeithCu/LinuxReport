@@ -269,12 +269,17 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
     """
     with app.app_context():
         try:
-            # Build asset bundles
+            # Clear existing compiled JS file to ensure fresh build
+            js_output_path = os.path.join(app.static_folder, 'linuxreport.js')
+            if os.path.exists(js_output_path):
+                os.remove(js_output_path)
+                print("Removed existing JavaScript bundle for fresh build")
+            
+            # Build asset bundles (this should create a fresh file)
             js_bundle.build()
             print("JavaScript bundle built successfully")
             
-            # Manually add header information to the compiled JS file
-            js_output_path = os.path.join(app.static_folder, 'linuxreport.js')
+            # Add header information to the freshly compiled JS file
             if os.path.exists(js_output_path):
                 with open(js_output_path, 'r', encoding='utf-8') as f:
                     content = f.read()
@@ -296,6 +301,8 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
                     f.write(header + content)
                 
                 print("Header information added to JavaScript bundle")
+            else:
+                print("Warning: JavaScript bundle was not created after build")
             
             css_bundle.build()
             print("CSS cache busting configured successfully")
