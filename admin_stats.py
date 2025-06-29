@@ -90,7 +90,7 @@ def get_admin_stats_html():
     uptime_str = str(datetime.timedelta(seconds=int(uptime_seconds)))
     
     return f'''
-    <div style="position: fixed; top: 10px; right: 10px; background: #ccc; color: #333; padding: 10px; 
+    <div style="position: fixed; top: 10px; right: 10px; background: #ccc; color: #333; padding: 5px; 
                 border-radius: 5px; font-size: 10px; z-index: 9999; 
                 border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <strong>Admin Stats (Page Render)</strong><br>
