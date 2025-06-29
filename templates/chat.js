@@ -62,13 +62,14 @@
             this.setupDraggable();
             this.setupImageUpload();
             
-            const eventMap = {
+            // Simplified event handling
+            const events = {
                 'chat-close-btn': () => this.closeChat(),
                 'chat-toggle-btn': () => this.toggleChat(),
                 'chat-send-btn': () => this.sendComment()
             };
             
-            Object.entries(eventMap).forEach(([id, handler]) => {
+            Object.entries(events).forEach(([id, handler]) => {
                 this.elements[id].addEventListener('click', handler);
             });
             
@@ -198,144 +199,143 @@
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 await this.renderComments(await response.json());
             } catch (error) {
-                if (this.elements['chat-messages'].children.length <= 1) {
-                    this.elements['chat-loading'].textContent = 'Error loading. Click to retry.';
-                    this.elements['chat-loading'].onclick = () => this.fetchComments();
-                }
+                console.error('Error fetching comments:', error);
             }
         }
 
         async renderComments(comments) {
-            const newMessagesExist = comments.length && 
-                (!this.state.lastCommentTimestamp || new Date(comments[0].timestamp).getTime() > this.state.lastCommentTimestamp);
+            if (!comments || !Array.isArray(comments)) return;
             
-            this.state.lastCommentTimestamp = comments.length ? 
-                new Date(comments[0].timestamp).getTime() : this.state.lastCommentTimestamp;
+            const messagesContainer = this.elements['chat-messages'];
+            if (!messagesContainer) return;
 
-            if (newMessagesExist && this.elements['chat-container'].style.display !== 'none' && 
-                this.state.beepEnabled && !document.hidden) {
-                this.playBeep();
+            // Check for new comments
+            const newComments = comments.filter(comment => 
+                !this.state.lastComments.some(last => 
+                    last.id === comment.id && last.timestamp === comment.timestamp
+                )
+            );
+
+            if (newComments.length > 0) {
+                newComments.forEach(comment => {
+                    messagesContainer.appendChild(this.createMessageElement(comment));
+                });
+                
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                this.state.lastComments = comments;
+                
+                // Play beep for new comments if not from current user
+                if (this.state.beepEnabled && newComments.some(c => !c.is_own)) {
+                    this.playBeep();
+                }
             }
-
-            if (JSON.stringify(comments) === JSON.stringify(this.state.lastComments)) return;
-
-            const fragment = document.createDocumentFragment();
-            if (comments.length) {
-                comments.forEach(comment => fragment.appendChild(this.createMessageElement(comment)));
-            } else {
-                const noMessages = document.createElement('div');
-                noMessages.className = 'chat-message system-message';
-                noMessages.textContent = 'No messages yet.';
-                fragment.appendChild(noMessages);
-            }
-            
-            this.elements['chat-messages'].innerHTML = '';
-            this.elements['chat-messages'].appendChild(fragment);
-            this.state.lastComments = comments;
         }
 
         createMessageElement(comment) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message${this.state.isAdminMode ? ' admin-message' : ''}`;
-            messageDiv.dataset.commentId = comment.id;
+            messageDiv.className = 'chat-message';
+            messageDiv.style.margin = '8px 0';
+            messageDiv.style.padding = '8px';
+            messageDiv.style.borderRadius = '8px';
+            messageDiv.style.backgroundColor = comment.is_own ? 'var(--accent)' : 'var(--bg-secondary)';
+            messageDiv.style.color = comment.is_own ? 'white' : 'var(--text)';
             
-            const timeStr = new Date(comment.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-            messageDiv.innerHTML = `
-                <span class="timestamp">${timeStr}</span>
-                <span class="message-text">${comment.text}</span>
-            `;
-
+            const textDiv = document.createElement('div');
+            textDiv.textContent = comment.text;
+            messageDiv.appendChild(textDiv);
+            
             if (comment.image_url) {
-                const link = document.createElement('a');
-                link.href = comment.image_url;
-                link.target = '_blank';
-                link.rel = 'noopener';
-                link.innerHTML = `<br><img src="${comment.image_url}" class="chat-image" alt="Chat image">`;
-                messageDiv.appendChild(link);
+                const img = document.createElement('img');
+                img.src = comment.image_url;
+                img.style.maxWidth = '200px';
+                img.style.maxHeight = '200px';
+                img.style.marginTop = '8px';
+                img.style.borderRadius = '4px';
+                messageDiv.appendChild(img);
             }
-
-            if (this.state.isAdminMode) {
+            
+            if (this.state.isAdminMode && comment.id) {
                 const deleteBtn = document.createElement('button');
-                deleteBtn.className = 'delete-comment-btn';
-                deleteBtn.dataset.commentId = comment.id;
-                deleteBtn.textContent = '❌';
-                deleteBtn.onclick = e => this.handleDelete(e);
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.style.marginTop = '4px';
+                deleteBtn.style.fontSize = '0.8em';
+                deleteBtn.style.padding = '2px 6px';
+                deleteBtn.addEventListener('click', (e) => this.handleDelete(e, comment.id));
                 messageDiv.appendChild(deleteBtn);
             }
+            
             return messageDiv;
         }
 
-        async handleDelete(e) {
-            const id = e.target.dataset.commentId;
-            if (!id || !confirm('Are you sure?')) return;
+        async handleDelete(e, commentId) {
+            e.preventDefault();
+            if (!confirm('Delete this comment?')) return;
             
             try {
-                const response = await fetch(`/api/comments/${id}`, { method: 'DELETE' });
-                const data = await response.json();
+                const response = await fetch(`/api/comments/${commentId}`, { method: 'DELETE' });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 
+                const data = await response.json();
                 if (data.success) {
                     e.target.closest('.chat-message').remove();
-                    if (!app.config.CHAT_USE_SSE) await this.fetchComments();
                 } else {
                     throw new Error(data.error || 'Unknown error');
                 }
             } catch (error) {
-                alert(`Error deleting comment: ${error.message}`);
+                alert(`Delete failed: ${error.message}`);
             }
         }
 
         initializeSSE() {
-            if (!app.config.CHAT_USE_SSE || this.state.eventSource || 
-                this.elements['chat-container'].style.display === 'none') return;
+            if (!app.config.CHAT_USE_SSE) return;
             
-            let retryCount = 0;
             const connect = () => {
-                this.state.eventSource = new EventSource('/api/comments/stream');
-                this.state.eventSource.onopen = () => { 
-                    this.elements['chat-loading'].style.display = 'none'; 
-                    retryCount = 0; 
-                };
-                this.state.eventSource.onmessage = async e => { 
-                    await this.renderComments(JSON.parse(e.data)); 
-                };
-                this.state.eventSource.onerror = () => {
-                    this.elements['chat-loading'].textContent = 'Connection error. Retrying...';
-                    this.elements['chat-loading'].style.display = 'block';
-                    if (this.state.eventSource) this.state.eventSource.close();
-                    this.state.eventSource = null;
+                try {
+                    this.state.eventSource = new EventSource('/api/comments/stream');
                     
-                    if (retryCount < app.config.CHAT_MAX_RETRIES) {
-                        setTimeout(connect, Math.min(
-                            app.config.CHAT_BASE_RETRY_DELAY * (2 ** retryCount), 
-                            app.config.CHAT_MAX_RETRY_DELAY
-                        ));
-                        retryCount++;
-                    } else {
-                        this.elements['chat-loading'].textContent = 'Connection failed. Please refresh.';
-                    }
-                };
+                    this.state.eventSource.onmessage = (event) => {
+                        try {
+                            const comment = JSON.parse(event.data);
+                            this.renderComments([comment]);
+                        } catch (error) {
+                            console.error('Error parsing SSE data:', error);
+                        }
+                    };
+                    
+                    this.state.eventSource.onerror = () => {
+                        this.state.eventSource.close();
+                        setTimeout(connect, app.config.CHAT_BASE_RETRY_DELAY);
+                    };
+                } catch (error) {
+                    console.error('SSE connection failed:', error);
+                    setTimeout(connect, app.config.CHAT_BASE_RETRY_DELAY);
+                }
             };
+            
             connect();
         }
 
         handleVisibilityChange() {
             if (document.hidden) {
                 this.cleanup();
-            } else if (this.elements['chat-container'].style.display !== 'none') {
-                if (app.config.CHAT_USE_SSE) this.initializeSSE(); 
-                else this.fetchComments();
+            } else {
+                this.initializeSSE();
+                if (!app.config.CHAT_USE_SSE) {
+                    this.fetchComments();
+                }
             }
         }
 
         handleResize() {
             const container = this.elements['chat-container'];
-            if (container.style.display === 'none') return;
+            if (!container) return;
             
+            // Ensure chat stays within viewport bounds
             const rect = container.getBoundingClientRect();
-            if (rect.left > window.innerWidth - rect.width) {
+            if (rect.right > window.innerWidth) {
                 container.style.left = `${window.innerWidth - rect.width}px`;
             }
-            if (rect.top > window.innerHeight - rect.height) {
+            if (rect.bottom > window.innerHeight) {
                 container.style.top = `${window.innerHeight - rect.height}px`;
             }
         }
@@ -346,38 +346,35 @@
         }
 
         toggleChat() {
-            const isHidden = this.elements['chat-container'].style.display === 'none' || 
-                            this.elements['chat-container'].style.display === '';
+            const container = this.elements['chat-container'];
+            const isVisible = container.style.display !== 'none';
             
-            this.elements['chat-container'].style.display = isHidden ? 'flex' : 'none';
-            
-            if (isHidden) {
-                if (app.config.CHAT_USE_SSE) {
-                    this.initializeSSE();
-                } else {
-                    if (this.state.lastComments.length === 0) this.fetchComments();
-                    if (!this.state.pollingTimer) {
-                        this.state.pollingTimer = setInterval(() => this.fetchComments(), app.config.CHAT_POLLING_INTERVAL);
-                    }
-                }
+            if (isVisible) {
+                this.closeChat();
             } else {
-                this.cleanup();
+                container.style.display = 'block';
+                this.initializeSSE();
+                if (!app.config.CHAT_USE_SSE) {
+                    this.fetchComments();
+                }
             }
         }
 
         cleanup() {
-            if (app.config.CHAT_USE_SSE && this.state.eventSource) {
+            if (this.state.eventSource) {
                 this.state.eventSource.close();
                 this.state.eventSource = null;
             }
-            if (!app.config.CHAT_USE_SSE && this.state.pollingTimer) {
+            if (this.state.pollingTimer) {
                 clearInterval(this.state.pollingTimer);
                 this.state.pollingTimer = null;
             }
         }
 
         playBeep() {
-            if (this.beepSound) this.beepSound.play().catch(console.error);
+            if (this.beepSound && this.state.beepEnabled) {
+                this.beepSound.play().catch(() => {});
+            }
         }
     }
 
@@ -385,7 +382,10 @@
         init() {
             const chatWidget = new ChatWidget();
             if (chatWidget.init()) {
-                window.chatWidget = chatWidget;
+                chatWidget.initializeSSE();
+                if (!app.config.CHAT_USE_SSE) {
+                    chatWidget.fetchComments();
+                }
             }
         }
     };
