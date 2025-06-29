@@ -39,7 +39,7 @@ from enum import Enum  # Ensure this is included if not already
 # - ERROR: Shows only errors
 # - CRITICAL: Shows only critical errors
 # Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
-LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
+LOG_LEVEL = "DEBUG"  # Change to "DEBUG" for maximum verbosity
 LOG_FILE = "auto_update.log"  # Single log file that gets appended to
 
 # Configure logging
