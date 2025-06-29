@@ -1,76 +1,73 @@
 /**
- * config.js - Refactored
+ * config.js
  * 
  * Configuration page module for the LinuxReport application, integrated with the global app object.
  * Handles theme/font settings, drag-and-drop URL reordering, and archive management.
  * 
  * @author LinuxReport Team
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 (function(app) {
     'use strict';
 
-    class SettingsManager {
-        static init() {
-            this.initTheme();
-            this.initFont();
-            this.initUnderlines();
-        }
-
-        static initTheme() {
-            const theme = app.utils.CookieManager.get('Theme') || app.config.DEFAULT_THEME;
-            const select = document.querySelector('.config-container #theme-select');
-            if (select) select.value = theme;
-        }
-
-        static initFont() {
-            const font = app.utils.CookieManager.get('FontFamily') || app.config.DEFAULT_FONT;
-            const select = document.querySelector('.config-container #font-select');
-            if (select) select.value = font;
-        }
-
-        static initUnderlines() {
-            const noUnderlines = app.utils.CookieManager.get('NoUnderlines');
-            const checkbox = document.querySelector('.config-container input[name="no_underlines"]');
-            if (checkbox) checkbox.checked = !noUnderlines || noUnderlines === '1';
-        }
-    }
-
-    class DragDropManager {
+    class ConfigManager {
         constructor() {
             this.draggedItem = null;
             this.init();
         }
 
         init() {
-            document.querySelectorAll('.url-entry').forEach(entry => {
-                entry.addEventListener('dragstart', e => this.handleDragStart(e, entry));
-                entry.addEventListener('dragend', e => this.handleDragEnd(e, entry));
-                entry.addEventListener('dragover', e => this.handleDragOver(e, entry));
-                entry.addEventListener('drop', e => this.handleDrop(e, entry));
+            this.initSettings();
+            this.initDragDrop();
+            this.initArchive();
+        }
+
+        initSettings() {
+            const settings = {
+                'theme-select': 'Theme',
+                'font-select': 'FontFamily',
+                'input[name="no_underlines"]': 'NoUnderlines'
+            };
+
+            Object.entries(settings).forEach(([selector, cookieName]) => {
+                const element = document.querySelector(`.config-container ${selector}`);
+                if (!element) return;
+
+                if (element.type === 'checkbox') {
+                    const value = app.utils.CookieManager.get(cookieName);
+                    element.checked = !value || value === '1';
+                } else {
+                    const defaultValue = cookieName === 'Theme' ? app.config.DEFAULT_THEME : 
+                                       cookieName === 'FontFamily' ? app.config.DEFAULT_FONT : '';
+                    element.value = app.utils.CookieManager.get(cookieName) || defaultValue;
+                }
             });
         }
 
-        handleDragStart(e, entry) {
+        initDragDrop() {
+            document.querySelectorAll('.url-entry').forEach(entry => {
+                ['dragstart', 'dragend', 'dragover', 'drop'].forEach(event => {
+                    entry.addEventListener(event, e => this[`handle${event.charAt(0).toUpperCase() + event.slice(1)}`](e, entry));
+                });
+            });
+        }
+
+        handleDragstart(e, entry) {
             this.draggedItem = entry;
             entry.style.opacity = app.config.DRAG_OPACITY;
         }
 
-        handleDragEnd(e, entry) {
+        handleDragend(e, entry) {
             entry.style.opacity = app.config.DRAG_OPACITY_NORMAL;
             this.draggedItem = null;
         }
 
-        handleDragOver(e, entry) {
+        handleDragover(e, entry) {
             e.preventDefault();
             const container = entry.parentNode;
             const afterElement = this.getDragAfterElement(container, e.clientY);
-            if (afterElement == null) {
-                container.appendChild(this.draggedItem);
-            } else {
-                container.insertBefore(this.draggedItem, afterElement);
-            }
+            container.insertBefore(this.draggedItem, afterElement);
         }
 
         handleDrop(e, entry) {
@@ -83,11 +80,7 @@
             return draggableElements.reduce((closest, child) => {
                 const box = child.getBoundingClientRect();
                 const offset = y - box.top - box.height / 2;
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
+                return offset < 0 && offset > closest.offset ? { offset, element: child } : closest;
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
@@ -97,51 +90,45 @@
                 if (priorityInput) priorityInput.value = (index + 1) * app.config.PRIORITY_MULTIPLIER;
             });
         }
-    }
 
-    class ArchiveManager {
-        constructor() {
-            this.container = document.querySelector('.headline-archive-container');
-            this.isAdmin = window.isAdmin || false;
-            if (this.container && this.isAdmin) this.init();
-        }
+        initArchive() {
+            const container = document.querySelector('.headline-archive-container');
+            if (!container || !window.isAdmin) return;
 
-        init() {
-            this.container.addEventListener('click', e => this.handleDelete(e));
-        }
+            container.addEventListener('click', async e => {
+                if (!e.target.classList.contains('delete-headline-btn')) return;
+                
+                const entry = e.target.closest('.headline-entry');
+                if (!entry?.dataset?.url || !entry.dataset.timestamp || !confirm('Delete this headline?')) return;
 
-        async handleDelete(e) {
-            if (!e.target.classList.contains('delete-headline-btn')) return;
-            const entry = e.target.closest('.headline-entry');
-            if (!entry) return;
-
-            const { url, timestamp } = entry.dataset;
-            if (!url || !timestamp || !confirm('Delete this headline?')) return;
-
-            try {
-                const response = await fetch(app.config.DELETE_HEADLINE_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url, timestamp })
-                });
-                const data = await response.json();
-                if (data.success) {
-                    entry.remove();
-                } else {
-                    throw new Error(data.error || 'Unknown error');
+                try {
+                    const response = await fetch(app.config.DELETE_HEADLINE_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            url: entry.dataset.url, 
+                            timestamp: entry.dataset.timestamp 
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                        entry.remove();
+                    } else {
+                        throw new Error(data.error || 'Unknown error');
+                    }
+                } catch (error) {
+                    alert(`Delete failed: ${error.message}`);
                 }
-            } catch (error) {
-                alert(`Delete failed: ${error.message}`);
-            }
+            });
         }
     }
 
     app.modules.config = {
         init() {
-            if (!document.querySelector('.config-container')) return;
-            SettingsManager.init();
-            new DragDropManager();
-            new ArchiveManager();
+            if (document.querySelector('.config-container')) {
+                new ConfigManager();
+            }
         }
     };
 

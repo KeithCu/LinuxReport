@@ -1,25 +1,18 @@
 /**
- * core.js - Refactored
+ * core.js
  * 
  * Core module for the LinuxReport application, integrated with the global app object.
  * Handles auto-refresh, pagination, and view mode management.
  * 
  * @author LinuxReport Team
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 (function(app) {
     'use strict';
 
-    // =============================================================================
-    // MODULE-SPECIFIC STATE
-    // =============================================================================
     let autoRefreshManager;
     let infiniteScrollManager;
-
-    // =============================================================================
-    // AUTO-REFRESH MANAGEMENT
-    // =============================================================================
 
     class AutoRefreshManager {
         constructor() {
@@ -27,26 +20,20 @@
             this.activityTimeout = app.config.ACTIVITY_TIMEOUT;
             this.lastActivity = Date.now();
             this.timer = null;
+            this.init();
         }
 
         init() {
-            this.setupActivityTracking();
-            this.start();
-        }
-
-        setupActivityTracking() {
-            const activityEvents = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
-            activityEvents.forEach(event => {
-                document.addEventListener(event, () => {
-                    this.lastActivity = Date.now();
-                }, { passive: true });
+            ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+                document.addEventListener(event, () => this.lastActivity = Date.now(), { passive: true });
             });
             window.addEventListener('online', () => this.start());
             window.addEventListener('offline', () => this.stop());
+            this.start();
         }
 
         start() {
-            if (this.timer) this.stop();
+            this.stop();
             this.timer = setInterval(() => this.check(), this.interval);
         }
 
@@ -59,20 +46,17 @@
 
         check() {
             if (!navigator.onLine) return;
-            const inactiveTime = Date.now() - this.lastActivity;
-            if (inactiveTime < this.activityTimeout) return;
+            if (Date.now() - this.lastActivity < this.activityTimeout) return;
+            
             const hasUnsavedChanges = document.querySelectorAll('form:invalid').length > 0;
             const hasOpenDialogs = document.querySelectorAll('dialog[open]').length > 0;
+            
             if (!hasUnsavedChanges && !hasOpenDialogs) {
                 app.utils.ScrollManager.savePosition();
                 self.location.reload();
             }
         }
     }
-
-    // =============================================================================
-    // PAGINATION MANAGEMENT
-    // =============================================================================
 
     class PaginationManager {
         static init() {
@@ -83,8 +67,7 @@
 
         constructor(feedControls) {
             this.feedControls = feedControls;
-            this.feedId = feedControls.dataset.feedId;
-            this.feedContainer = document.getElementById(this.feedId);
+            this.feedContainer = document.getElementById(feedControls.dataset.feedId);
             if (!this.feedContainer) return;
 
             this.items = Array.from(this.feedContainer.querySelectorAll('.linkclass'));
@@ -131,10 +114,6 @@
         }
     }
 
-    // =============================================================================
-    // CORE MODULE DEFINITION
-    // =============================================================================
-
     app.modules.core = {
         init() {
             app.utils.ThemeManager.applySettings();
@@ -143,35 +122,30 @@
             this.reinitPagination();
 
             autoRefreshManager = new AutoRefreshManager();
-            autoRefreshManager.init();
 
             if (document.getElementById('infinite-scroll-container')) {
                 infiniteScrollManager = app.modules.infiniteScroll.create();
             }
 
-            const themeSelect = document.getElementById('theme-select');
-            if (themeSelect) {
-                themeSelect.addEventListener('change', (e) => app.setTheme(e.target.value));
-            }
+            this.setupEventListeners();
+        },
 
-            const fontSelect = document.getElementById('font-select');
-            if (fontSelect) {
-                fontSelect.addEventListener('change', (e) => app.setFont(e.target.value));
-            }
+        setupEventListeners() {
+            const eventMap = {
+                'theme-select': (e) => app.setTheme(e.target.value),
+                'font-select': (e) => app.setFont(e.target.value),
+                'config-btn': () => app.redirect(),
+                'view-mode-toggle': () => this.toggleViewMode()
+            };
 
-            const configBtn = document.getElementById('config-btn');
-            if (configBtn) {
-                configBtn.addEventListener('click', () => app.redirect());
-            }
-
-            const viewModeToggle = document.getElementById('view-mode-toggle');
-            if (viewModeToggle) {
-                viewModeToggle.addEventListener('click', () => this.toggleViewMode());
-            }
-            
-            document.addEventListener('viewmodechange', (e) => {
-                this.reinitPagination();
+            Object.entries(eventMap).forEach(([id, handler]) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    element.addEventListener(id.includes('select') ? 'change' : 'click', handler);
+                }
             });
+
+            document.addEventListener('viewmodechange', () => this.reinitPagination());
         },
 
         toggleViewMode() {
@@ -185,30 +159,15 @@
         }
     };
 
-    // =============================================================================
-    // GLOBAL HELPER FUNCTIONS
-    // =============================================================================
-
-    app.redirect = function() {
+    // Global helper functions
+    app.redirect = () => {
         app.utils.ScrollManager.savePosition();
         window.location = "/config";
     };
 
-    app.setTheme = function(theme) {
-        app.utils.ThemeManager.setTheme(theme);
-    };
-
-    app.setFont = function(font) {
-        app.utils.ThemeManager.setFont(font);
-    };
-    
-    app.toggleViewMode = function() {
-        app.modules.core.toggleViewMode();
-    };
-
-    // =============================================================================
-    // INITIALIZATION
-    // =============================================================================
+    app.setTheme = (theme) => app.utils.ThemeManager.setTheme(theme);
+    app.setFont = (font) => app.utils.ThemeManager.setFont(font);
+    app.toggleViewMode = () => app.modules.core.toggleViewMode();
 
     document.addEventListener('DOMContentLoaded', () => {
         app.modules.core.init();
