@@ -92,7 +92,7 @@ def get_admin_stats_html():
     return f'''
     <div style="position: fixed; top: 10px; right: 10px; background: #ccc; color: #333; padding: 5px; 
                 border-radius: 5px; font-size: 10px; z-index: 9999; 
-                border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.1); line-height: 1.2;">
         <strong>Admin Stats (Page Render)</strong><br>
         Uptime: {uptime_str}<br>
         Total Requests: {count}<br>
@@ -101,7 +101,7 @@ def get_admin_stats_html():
         Requests (12h): {requests_12h}<br>
         Min: {min_time:.3f}s<br>
         Max: {max_time:.3f}s<br>
-        Avg: {avg_time:.3f}s<br>
+        Avg: {avg_time:.3f}s
     </div>
     '''
 
