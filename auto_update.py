@@ -12,6 +12,7 @@ import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 import random
+import logging
 
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
@@ -25,6 +26,37 @@ from html_generation import (
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 
 from enum import Enum  # Ensure this is included if not already
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Logging configuration
+# LOG_LEVEL options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# - DEBUG: Most verbose - shows everything including full AI responses, article lists, etc.
+# - INFO: Default level - shows main process steps, counts, success/failure messages
+# - WARNING: Shows warnings and errors only
+# - ERROR: Shows only errors
+# - CRITICAL: Shows only critical errors
+# Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
+LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
+LOG_FILE = "auto_update.log"  # Single log file that gets appended to
+
+# Configure logging
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# Log startup information
+logger.info(f"Starting auto_update.py with LOG_LEVEL={LOG_LEVEL}")
+logger.info(f"Log file: {LOG_FILE}")
 
 # =============================================================================
 # ENUMERATIONS AND CONSTANTS
@@ -328,9 +360,10 @@ def update_model_cache(model):
     """Update the cache with the currently working model if it's different."""
     current_model = g_c.get("working_llm_model")
     if current_model == model:
+        logger.debug(f"Model {model} already cached, no update needed")
         return
     g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
-    print(f"Updated cached working model to: {model}")
+    logger.info(f"Updated cached working model from {current_model} to: {model}")
 
 class ModelSelector:
     """Simple model selection and fallback logic."""
@@ -340,6 +373,7 @@ class ModelSelector:
         self.forced_model = forced_model
         self.cache = g_c
         self._load_failed_models()
+        logger.info(f"ModelSelector initialized: use_random={use_random}, forced_model={forced_model}")
         
     def _load_failed_models(self):
         """Load failed models from cache with timestamp."""
@@ -352,26 +386,31 @@ class ModelSelector:
             if current_time - fail_time < FAILED_MODELS_RETRY_HOURS * 3600
         }
         
+        logger.debug(f"Loaded {len(self.failed_models)} failed models from cache")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f"Failed models: {list(self.failed_models)}")
+        
     def mark_failed(self, model):
         """Mark a model as failed with timestamp."""
         if model not in FREE_MODELS:
-            print(f"Warning: Attempted to mark unknown model as failed: {model}")
+            logger.warning(f"Attempted to mark unknown model as failed: {model}")
             return
             
         failed_models_data = self.cache.get(FAILED_MODELS_CACHE_KEY) or {}
         failed_models_data[model] = time.time()
         self.cache.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
         self.failed_models.add(model)
-        print(f"Marked model as failed: {model}")
+        logger.info(f"Marked model as failed: {model}")
         
     def mark_success(self, model):
         """Mark a model as successful and update cache."""
         if model not in FREE_MODELS:
-            print(f"Warning: Attempted to mark unknown model as successful: {model}")
+            logger.warning(f"Attempted to mark unknown model as successful: {model}")
             return
             
         if model != self.forced_model:  # Don't cache forced models
             self.cache.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+            logger.info(f"Cached working model: {model}")
             
         # Remove from failed models if it was there
         if model in self.failed_models:
@@ -380,7 +419,7 @@ class ModelSelector:
             if model in failed_models_data:
                 del failed_models_data[model]
                 self.cache.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
-            print(f"Removed model from failed list: {model}")
+            logger.info(f"Removed model from failed list: {model}")
             
     def get_next_model(self, current_model=None):
         """Get the next model to try."""
@@ -389,32 +428,43 @@ class ModelSelector:
         
         # 1. Forced model takes precedence
         if self.forced_model:
+            logger.debug(f"Using forced model: {self.forced_model}")
             return self.forced_model
             
         # 2. Try cached model if not using random selection
         if not self.use_random:
             cached_model = self.cache.get("working_llm_model")
             if cached_model and cached_model not in self.failed_models:
+                logger.debug(f"Using cached model: {cached_model}")
                 return cached_model
                 
         # 3. Try random available model
         available_models = [m for m in FREE_MODELS if m not in self.failed_models and m != current_model]
         if available_models:
-            return random.choice(available_models)
+            selected_model = random.choice(available_models)
+            logger.debug(f"Selected random model: {selected_model} from {len(available_models)} available")
+            return selected_model
             
         # 4. Final fallback
-        return FALLBACK_MODEL if FALLBACK_MODEL not in self.failed_models else None
+        if FALLBACK_MODEL not in self.failed_models:
+            logger.debug(f"Using fallback model: {FALLBACK_MODEL}")
+            return FALLBACK_MODEL
+        else:
+            logger.error("No models available - all models have failed")
+            return None
         
     def get_model_status(self):
         """Get current status of all models."""
         self._load_failed_models()  # Refresh status
-        return {
+        status = {
             "forced_model": self.forced_model,
             "use_random": self.use_random,
             "failed_models": list(self.failed_models),
             "cached_model": self.cache.get("working_llm_model"),
             "available_models": [m for m in FREE_MODELS if m not in self.failed_models]
         }
+        logger.debug(f"Model status: {status}")
+        return status
 
 class OpenRouterProvider(LLMProvider):
     """Provider implementation for OpenRouter."""
@@ -423,7 +473,7 @@ class OpenRouterProvider(LLMProvider):
         super().__init__("openrouter")
         self.model_selector = ModelSelector(use_random=USE_RANDOM_MODELS, forced_model=forced_model)
         self._selected_model = self.model_selector.get_next_model()
-        print(f"Selected model: {self._selected_model}")
+        logger.info(f"OpenRouterProvider initialized with selected model: {self._selected_model}")
     
     @property
     def api_key_env_var(self) -> str:
@@ -453,31 +503,35 @@ class OpenRouterProvider(LLMProvider):
         }
         for header, value in headers.items():
             client._client.headers[header] = value
-        print(f"[OpenRouter] Using headers: {headers}")
+        logger.debug(f"OpenRouter headers configured: {headers}")
         
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call models with fallback strategy."""
         current_model = self.primary_model
         max_attempts = 3  # Try up to 3 different models
         
+        logger.info(f"Starting model calls with fallback strategy (max attempts: {max_attempts})")
+        
         for attempt in range(max_attempts):
-            print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Attempt {attempt + 1}/{max_attempts}) ---")
+            logger.info(f"Attempt {attempt + 1}/{max_attempts}: {self.name} / {current_model} / {prompt_mode} {label}")
             
             try:
                 response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
                 if response_text:
                     self.model_selector.mark_success(current_model)
+                    logger.info(f"Successfully got response from {current_model}")
                     return response_text, current_model
             except Exception as e:
-                print(f"Model {current_model} failed: {str(e)}")
+                logger.error(f"Model {current_model} failed: {str(e)}")
                 self.model_selector.mark_failed(current_model)
             
             # Let ModelSelector handle all model selection logic
             current_model = self.model_selector.get_next_model(current_model)
             if not current_model:
-                print("No more models available to try")
+                logger.error("No more models available to try")
                 break
                 
+        logger.error("All model attempts failed")
         return None, None
 
 # Provider registry
@@ -501,7 +555,7 @@ def _try_call_model(client, model, messages, max_tokens):
     max_retries = 1
     for attempt in range(1, max_retries + 1):
         start = timer()
-        print(f"[_try_call_model] Attempt {attempt}/{max_retries} for model: {model}")
+        logger.info(f"Calling model {model} (attempt {attempt}/{max_retries})")
         
         prepared_messages = list(messages) # Make a copy to potentially modify
 
@@ -512,18 +566,23 @@ def _try_call_model(client, model, messages, max_tokens):
            prepared_messages[0].get("role") == "system" and \
            prepared_messages[1].get("role") == "user":
             
-            print(f"Model {model} is in USER_ONLY_INSTRUCTION_MODELS. Combining system and user prompts into a single user prompt.")
+            logger.debug(f"Model {model} requires user-only instructions. Combining system and user prompts.")
             system_content = prepared_messages[0]["content"]
             user_content = prepared_messages[1]["content"]
             
             combined_user_content = f"{system_content}\n\n{user_content}"
             prepared_messages = [{"role": "user", "content": combined_user_content}]
+            logger.debug(f"Combined message length: {len(combined_user_content)} characters")
 
         try:
             if 'mistral' in model.lower():
                 extra_params = MISTRAL_EXTRA_PARAMS
+                logger.debug(f"Using Mistral extra params: {extra_params}")
             else:
                 extra_params = {}
+                
+            logger.debug(f"Making API call to {model} with {len(prepared_messages)} messages, max_tokens={max_tokens}")
+            
             response = client.chat.completions.create(
                 model=model,
                 messages=prepared_messages, # Use potentially modified messages
@@ -535,8 +594,13 @@ def _try_call_model(client, model, messages, max_tokens):
             choice = response.choices[0]
             response_text = choice.message.content
             finish_reason = choice.finish_reason
-            print(f"[_try_call_model] Response in {end - start:.3f}s, finish_reason: {finish_reason}")
-            print(f"[_try_call_model] Model response (Attempt {attempt}):\n{response_text}\n{'-'*40}")
+            response_time = end - start
+            
+            logger.info(f"Model {model} responded in {response_time:.3f}s, finish_reason: {finish_reason}")
+            logger.debug(f"Response length: {len(response_text)} characters")
+            
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"Full response from {model}:\n{response_text}")
             
             # Log the API response only if global logging is enabled
             if GLOBAL_LOGGING_ENABLED:
@@ -546,38 +610,46 @@ def _try_call_model(client, model, messages, max_tokens):
                         "model": model,
                         "response": response_text,
                         "finish_reason": finish_reason,
-                        "response_time": end - start,
+                        "response_time": response_time,
                         "messages": prepared_messages # Log potentially modified messages
                     }
                     with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
                         f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n")
+                    logger.debug(f"Logged API response to {API_RESPONSE_LOG}")
                 except Exception as log_error:
-                    print(f"Warning: Failed to log API response: {str(log_error)}")
+                    logger.warning(f"Failed to log API response: {str(log_error)}")
                     # Continue execution even if logging fails
             
             return response_text
         except Exception as e:
             error_msg = str(e)
             if "JSONDecodeError" in error_msg:
-                print(f"Model {model} returned malformed response: {error_msg}")
+                logger.error(f"Model {model} returned malformed response: {error_msg}")
             else:
-                print(f"Error on attempt {attempt} for model {model}: {error_msg}")
+                logger.error(f"Error on attempt {attempt} for model {model}: {error_msg}")
             # Add failed model to global set
             if attempt < max_retries:
+                logger.debug(f"Waiting 1 second before retry...")
                 time.sleep(1)
+    logger.error(f"Model call failed after {max_retries} attempts for model {model}")
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
 
 
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text with multiple fallback strategies."""
     if not text:
-        print("Warning: Empty text provided")
+        logger.warning("Empty text provided to extract_top_titles_from_ai")
         return []
+    
+    logger.debug(f"Extracting titles from AI response (length: {len(text)})")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(f"Full AI response:\n{text}")
         
     # Try to find the marker by looking for the marker word with any surrounding characters
     marker_index = text.rfind(TITLE_MARKER)
     if marker_index != -1:
         marker_length = len(TITLE_MARKER)
+        logger.debug(f"Found title marker '{TITLE_MARKER}' at position {marker_index}")
     else:
         # Extract only A-Za-z letters from the marker
         letters = ''.join(c for c in TITLE_MARKER if c.isalpha())
@@ -586,9 +658,11 @@ def extract_top_titles_from_ai(text):
             marker_index = text.rfind(letters)
             if marker_index != -1:
                 marker_length = len(letters)
+                logger.debug(f"Found partial marker '{letters}' at position {marker_index}")
         else:
             marker_index = -1
             marker_length = 0
+            logger.debug("No title marker found")
     
     # Get lines to process - either after marker or reversed for bottom-up search
     if marker_index != -1:
@@ -598,23 +672,34 @@ def extract_top_titles_from_ai(text):
         should_reverse = False
         # Only look at first 10 lines after marker to avoid false positives
         lines = lines[:10]
+        logger.debug(f"Processing {len(lines)} lines after marker (forward search)")
     else:
         # For bottom-up search, only look at last 15 lines
         lines = text.splitlines()[-15:]
         should_reverse = True
         lines = list(reversed(lines))
+        logger.debug(f"Processing {len(lines)} lines from end (reverse search)")
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Lines to process:")
+        for i, line in enumerate(lines):
+            logger.debug(f"  Line {i+1}: '{line}'")
     
     # Process the lines
     titles = []
-    for line in lines:
+    for i, line in enumerate(lines):
         line = line.strip()
         if not line:
+            logger.debug(f"  Skipping empty line {i+1}")
             continue
 
         # Clean up formatting first - combine all regex operations into one
         # Remove: asterisks, quotes, dashes, bullets, numbers with periods, extra whitespace
+        original_line = line
         line = re.sub(r'^\*+|\*+$|^["\']|["\']$|^[-–—]+|[-–—]+$|\*\*|^[-–—\s]+|^[#\s]+|^[•\s]+|^\d+\.?\s*', '', line)
         line = line.strip()
+        
+        logger.debug(f"  Line {i+1} cleanup: '{original_line}' -> '{line}'")
             
         # Use different regex patterns based on whether we're going forward or backward
         if should_reverse:
@@ -627,27 +712,39 @@ def extract_top_titles_from_ai(text):
             match = re.match(r"^\d+[\.\)\-\s:,]+(.+)", line)
             if match:
                 title = match.group(1)
+                logger.debug(f"  Line {i+1} matched numbered pattern: '{title}'")
             else:
+                logger.debug(f"  Line {i+1} did not match numbered pattern, skipping")
                 continue  # Skip unnumbered lines in bottom-up search
         else:
             # When going forward after marker, accept any non-empty line as a potential title
             title = line
+            logger.debug(f"  Line {i+1} accepted as potential title: '{title}'")
                 
         # Validate title length and content
         if len(title) >= 10 and len(title) <= 200 and not title.startswith(('http://', 'https://', 'www.')):
             titles.append(title)
+            logger.debug(f"  Line {i+1} validated and added: '{title}'")
             if len(titles) == 3:
+                logger.debug(f"  Reached 3 titles, stopping extraction")
                 break
+        else:
+            logger.debug(f"  Line {i+1} failed validation (length: {len(title)}, starts with URL: {title.startswith(('http://', 'https://', 'www.'))}): '{title}'")
     
     if not titles:
-        print("Warning: No valid titles found in response")
+        logger.warning("No valid titles found in response")
         return []
         
     # Reverse the titles if we were processing in reverse
     if should_reverse:
         titles = list(reversed(titles))
+        logger.debug("Reversed titles order due to reverse processing")
         
-    print(f"Found {len(titles)} valid titles in response")
+    logger.info(f"Successfully extracted {len(titles)} valid titles")
+    if logger.isEnabledFor(logging.DEBUG):
+        for i, title in enumerate(titles, 1):
+            logger.debug(f"  Final title {i}: '{title}'")
+    
     return titles
 
 
@@ -684,65 +781,90 @@ def _prepare_messages(prompt_mode, filtered_articles):
 def _try_fallback_model(provider1, messages, filtered_articles, reason):
     """Try fallback model and return (success, top_articles, used_model)"""
     fallback_model = provider1.fallback_model
+    logger.info(f"Attempting fallback model '{fallback_model}' due to: {reason}")
+    
     if fallback_model not in provider1.model_selector.failed_models:
         try:
             response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback ({reason})")
             if response_text:
+                logger.info("Fallback model returned response, extracting titles")
                 top_titles = extract_top_titles_from_ai(response_text)
                 if top_titles:
-                    print(f"Successfully extracted headlines using fallback model: {fallback_model}")
+                    logger.info(f"Successfully extracted {len(top_titles)} headlines using fallback model: {fallback_model}")
                     # Process articles with new titles
                     top_articles = []
-                    for title in top_titles:
+                    for i, title in enumerate(top_titles, 1):
+                        logger.debug(f"Fallback matching title {i}: {title}")
                         best_match = get_best_matching_article(title, filtered_articles)
                         if (best_match):
                             top_articles.append(best_match)
-                            print(f"Selected article: {best_match['title']} ({best_match['url']})")
+                            logger.info(f"Fallback selected article {i}: {best_match['title']} ({best_match['url']})")
                         else:
-                            print(f"Failed to find match for title: {title}")
+                            logger.warning(f"Fallback failed to find match for title: {title}")
                     return True, top_articles, fallback_model
                 else:
-                    print("Fallback model also failed to extract headlines")
+                    logger.warning("Fallback model also failed to extract headlines")
                     provider1.model_selector.mark_failed(fallback_model)
             return False, [], None
         except Exception as e:
-            print(f"Fallback model failed during {reason}: {e}")
+            logger.error(f"Fallback model failed during {reason}: {e}")
             traceback.print_exc()
             provider1.model_selector.mark_failed(fallback_model)
             return False, [], None
     else:
-        print(f"Fallback model {fallback_model} was already tried and failed")
+        logger.warning(f"Fallback model {fallback_model} was already tried and failed")
         return False, [], None
 
 def ask_ai_top_articles(articles):
     """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
+    logger.info(f"Starting AI article selection with {len(articles)} total articles")
+    
     # --- Deduplication (remains the same) ---
     previous_selections = g_c.get("previously_selected_selections_2")
-    print(f"Retrieved previous_selections from cache: {len(previous_selections) if previous_selections else 0} entries")
+    logger.info(f"Retrieved previous_selections from cache: {len(previous_selections) if previous_selections else 0} entries")
     if previous_selections is None:
         previous_selections = []
-        print("No previous selections found in cache")
+        logger.info("No previous selections found in cache")
 
     previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
     previous_urls = [sel["url"] for sel in previous_selections]
+    
+    logger.debug(f"Previous URLs for filtering: {previous_urls}")
 
     # Log articles being filtered by URL
-    print("\nFiltering articles by URL:")
+    logger.info("Filtering articles by URL to avoid duplicates")
+    original_count = len(articles)
     articles = [article for article in articles if article["url"] not in previous_urls]
-    print(f"\nRemaining articles after URL filtering: {len(articles)}")
+    filtered_count = len(articles)
+    logger.info(f"URL filtering: {original_count} -> {filtered_count} articles (removed {original_count - filtered_count})")
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Articles after URL filtering:")
+        for i, article in enumerate(articles, 1):
+            logger.debug(f"  {i}. {article['title']} ({article['url']})")
     
     # Pass threshold to deduplicate function
+    logger.info("Applying embedding-based deduplication")
     filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
-    print(f"Remaining articles after embedding filtering: {len(filtered_articles)}")
+    logger.info(f"Embedding filtering: {filtered_count} -> {len(filtered_articles)} articles (removed {filtered_count - len(filtered_articles)})")
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Articles after embedding filtering:")
+        for i, article in enumerate(filtered_articles, 1):
+            logger.debug(f"  {i}. {article['title']} ({article['url']})")
 
     if not filtered_articles:
-        print("No new articles available after deduplication.")
+        logger.warning("No new articles available after deduplication.")
         return "No new articles to rank.", [], previous_selections, None
 
     # --- Prepare Messages ---
     messages = _prepare_messages(PROMPT_MODE, filtered_articles)
-    print(f"Constructed Prompt (Mode: {PROMPT_MODE}):")
-    print(messages)
+    logger.info(f"Constructed prompt for {PROMPT_MODE} mode with {len(filtered_articles)} articles")
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Prompt messages:")
+        for i, msg in enumerate(messages):
+            logger.debug(f"  Message {i+1} ({msg['role']}): {msg['content'][:200]}...")
 
     # --- Call Primary LLM using the provider class ---
     provider1 = get_provider(PROVIDER, forced_model=None)
@@ -753,58 +875,92 @@ def ask_ai_top_articles(articles):
     )
     
     if not response_text or response_text.startswith("LLM models are currently unavailable"):
+        logger.error("No response from LLM models")
         return "No response from LLM models.", [], previous_selections, None
 
     # --- Process Response and Update Selections (remains the same) ---
+    logger.info("Extracting top titles from AI response")
     top_titles = extract_top_titles_from_ai(response_text)
+    logger.info(f"Extracted {len(top_titles)} titles from AI response")
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Extracted titles:")
+        for i, title in enumerate(top_titles, 1):
+            logger.debug(f"  {i}. {title}")
     
     # If no headlines extracted, try fallback model
     if not top_titles:
-        print("No headlines extracted from primary model, trying fallback model...")
+        logger.warning("No headlines extracted from primary model, trying fallback model...")
         success, top_articles, used_model = _try_fallback_model(provider1, messages, filtered_articles, "headline retry")
         if success:
             return response_text, top_articles, previous_selections, used_model
         else:
+            logger.error("No headlines could be extracted from AI response")
             return "No headlines could be extracted from AI response.", [], previous_selections, None
     
+    logger.info("Matching extracted titles to articles")
     top_articles = []
-    for title in top_titles:
+    for i, title in enumerate(top_titles, 1):
+        logger.debug(f"Matching title {i}: {title}")
         best_match = get_best_matching_article(title, filtered_articles)
         if (best_match):
             top_articles.append(best_match)
-            print(f"Selected article: {best_match['title']} ({best_match['url']})")
+            logger.info(f"Selected article {i}: {best_match['title']} ({best_match['url']})")
         else:
-            print(f"Failed to find match for title: {title}")
+            logger.warning(f"Failed to find match for title: {title}")
+
+    logger.info(f"Successfully matched {len(top_articles)} articles out of {len(top_titles)} titles")
 
     # If fewer than 3 articles found, try fallback model
     if len(top_articles) < 3:
-        print(f"Only {len(top_articles)} articles found, trying fallback model...")
+        logger.warning(f"Only {len(top_articles)} articles found, trying fallback model...")
         success, top_articles, used_model = _try_fallback_model(provider1, messages, filtered_articles, "article count retry")
         if success:
             return response_text, top_articles, previous_selections, used_model
         else:
+            logger.error("No headlines could be extracted from AI response")
             return "No headlines could be extracted from AI response.", [], previous_selections, None
 
     # Only update model cache if we successfully got 3 articles
     if len(top_articles) >= 3 and used_model:
         update_model_cache(used_model)
 
+    # Check for duplicate URLs in selected articles
+    selected_urls = [art["url"] for art in top_articles if art]
+    unique_urls = set(selected_urls)
+    if len(selected_urls) != len(unique_urls):
+        logger.error(f"DUPLICATE DETECTED: {len(selected_urls)} selected URLs but only {len(unique_urls)} unique URLs")
+        logger.error(f"Selected URLs: {selected_urls}")
+        logger.error(f"Unique URLs: {list(unique_urls)}")
+        # Find the duplicates
+        from collections import Counter
+        url_counts = Counter(selected_urls)
+        duplicates = [url for url, count in url_counts.items() if count > 1]
+        logger.error(f"Duplicate URLs: {duplicates}")
+        
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Full article details for debugging:")
+            for i, article in enumerate(top_articles):
+                logger.debug(f"  Article {i+1}: {article['title']} ({article['url']})")
+    else:
+        logger.info(f"All {len(top_articles)} selected articles have unique URLs")
+
     new_selections = [{"url": art["url"], "title": art["title"]}
                       for art in top_articles if art]
     updated_selections = previous_selections + new_selections
     if len(updated_selections) > MAX_PREVIOUS_HEADLINES:
         updated_selections = updated_selections[-MAX_PREVIOUS_HEADLINES:]
-        print(f"Trimmed selections to {len(updated_selections)} entries")
+        logger.info(f"Trimmed selections to {len(updated_selections)} entries")
 
-    print(f"Updating cache with {len(updated_selections)} selections")
+    logger.info(f"Updating cache with {len(updated_selections)} selections")
     g_c.put("previously_selected_selections_2", updated_selections, timeout=EXPIRE_WEEK)
-    print(f"Cache update status: {g_c.get('previously_selected_selections_2') is not None}")
+    logger.info(f"Cache update status: {g_c.get('previously_selected_selections_2') is not None}")
     return response_text, top_articles, updated_selections, used_model
 
 
 def run_comparison(articles):
     """Runs two LLM calls with different configurations for comparison."""
-    print("\n--- Running Comparison Mode ---")
+    logger.info("--- Running Comparison Mode ---")
 
     # --- Deduplication (same as ask_ai_top_articles) ---
     previous_selections = g_c.get("previously_selected_selections_2") or []
@@ -813,55 +969,75 @@ def run_comparison(articles):
     articles = [article for article in articles if article["url"] not in previous_urls]
     filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
 
+    logger.info(f"Comparison mode: {len(articles)} articles after deduplication")
+
     if not filtered_articles:
-        print("No new articles available after deduplication for comparison.")
+        logger.warning("No new articles available after deduplication for comparison.")
         return
 
     # --- Config 1 ---
     provider = get_provider(PROVIDER, forced_model=None)
     model1, model2 = provider.get_comparison_models()
+    logger.info(f"Comparison model 1: {model1}")
+    logger.info(f"Comparison model 2: {model2}")
+    
     messages1 = _prepare_messages(PROMPT_MODE, filtered_articles)
     response_text1 = provider.call_model(model1, messages1, MAX_TOKENS, 'Comparison 1')
     
     if not response_text1:
-        print(f"Comparison 1 failed for {PROVIDER}")
+        logger.error(f"Comparison 1 failed for {PROVIDER}")
 
     # --- Config 2 ---
     messages2 = _prepare_messages(PROMPT_MODE, filtered_articles)
     response_text2 = provider.call_model(model2, messages2, MAX_TOKENS, 'Comparison 2')
     
     if not response_text2:
-        print(f"Comparison 2 failed for {PROVIDER}")
+        logger.error(f"Comparison 2 failed for {PROVIDER}")
 
-    print("\n--- Comparison Mode Finished ---")
+    logger.info("--- Comparison Mode Finished ---")
 
 
 def append_to_archive(mode, top_articles):
     """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
     archive_file = f"{mode}report_archive.jsonl"
     timestamp = datetime.datetime.now(TZ).isoformat()
+    
+    logger.info(f"Appending {len(top_articles)} articles to archive: {archive_file}")
+    
     # Build entries directly from pre-fetched image URLs
     new_entries = []
-    for article in top_articles[:3]:
-        new_entries.append({
+    for i, article in enumerate(top_articles[:3], 1):
+        entry = {
             "title": article["title"],
             "url": article["url"],
             "timestamp": timestamp,
             "image_url": article.get("image_url"),
             "alt_text": f"headline: {article['title'][:50]}" if article.get("image_url") else None
-        })
+        }
+        new_entries.append(entry)
+        logger.debug(f"Archive entry {i}: {article['title']} ({article['url']})")
+    
     # Read old entries, append new, and trim to limit
     try:
         with open(archive_file, "r", encoding="utf-8") as f:
             old_entries = [json.loads(line) for line in f if line.strip()]
+        logger.debug(f"Read {len(old_entries)} existing entries from archive")
     except FileNotFoundError:
         old_entries = []
+        logger.info(f"Archive file {archive_file} not found, creating new archive")
 
     all_entries = new_entries + old_entries
+    original_count = len(all_entries)
     all_entries = all_entries[:MAX_ARCHIVE_HEADLINES]
+    final_count = len(all_entries)
+    
+    logger.info(f"Archive: {original_count} -> {final_count} entries (trimmed to {MAX_ARCHIVE_HEADLINES} max)")
+    
     with open(archive_file, "w", encoding="utf-8") as f:
         for entry in all_entries:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    
+    logger.info(f"Successfully updated archive file: {archive_file}")
 
 # --- Integration into the main pipeline ---
 def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run parameter
@@ -870,69 +1046,88 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
     REPORT_PROMPT = settings_config.REPORT_PROMPT
     SITE_PATH = settings_config.PATH  # Get the site's path from its config
 
+    logger.info(f"Starting main processing for mode: {mode}")
+    logger.info(f"Site path: {SITE_PATH}")
+    logger.info(f"Report prompt: {REPORT_PROMPT}")
+    logger.info(f"Number of URLs configured: {len(ALL_URLS)}")
+    
+    if dry_run:
+        logger.info("Running in DRY RUN mode - no files will be updated")
+
     html_file = f"{mode}reportabove.html"
 
     try:
         # Pass ALL_URLS and cache to fetch_recent_articles
+        logger.info("Fetching recent articles from configured URLs")
         articles = fetch_recent_articles(ALL_URLS, g_c)
         if not articles:
-            print(f"No articles found for mode: {mode}")
+            logger.error(f"No articles found for mode: {mode}")
             sys.exit(1) # Keep exit for no articles
+
+        logger.info(f"Fetched {len(articles)} articles from {len(ALL_URLS)} URLs")
 
         # --- Handle Run Modes ---
         if RUN_MODE == "compare":
+            logger.info("Running in comparison mode")
             run_comparison(articles)
             # Comparison mode implies dry-run, so we exit here
-            print("Exiting after comparison run.")
+            logger.info("Exiting after comparison run.")
             sys.exit(0)
         elif RUN_MODE == "normal":
+            logger.info("Running in normal mode")
             full_response, top_3_articles_match, updated_selections, used_model = ask_ai_top_articles(articles)
 
             # Check if AI call failed or returned no usable response
             if not top_3_articles_match and not full_response.startswith("No new articles"):
-                print(f"AI processing failed or returned no headlines.")
+                logger.error("AI processing failed or returned no headlines.")
                 # Decide if we should exit or continue without update
                 sys.exit(1) # Exit if AI failed critically
 
             if dry_run:
-                print("\n--- Dry Run Mode: Skipping file generation and archive update. ---")
+                logger.info("--- Dry Run Mode: Skipping file generation and archive update. ---")
                 sys.exit(0) # Exit after dry run
 
             # --- Normal Run: Generate HTML and Archive ---
             if not top_3_articles_match:
-                print("No top articles identified by AI. Skipping update.")
+                logger.warning("No top articles identified by AI. Skipping update.")
                 sys.exit(0) # Exit gracefully if AI didn't pick articles
 
             # Fetch largest images in-line for each headline
-            print("\nFetching images for top articles...")
-            for art in top_3_articles_match:
+            logger.info("Fetching images for top articles...")
+            for i, art in enumerate(top_3_articles_match, 1):
+                logger.debug(f"Fetching image for article {i}: {art['title']}")
                 art['image_url'] = custom_fetch_largest_image(
                     art['url'], underlying_link=art.get('underlying_link'), html_content=art.get('html_content')
                 )
+                if art['image_url']:
+                    logger.debug(f"Found image for article {i}: {art['image_url']}")
+                else:
+                    logger.debug(f"No image found for article {i}")
+                    
             # Render HTML and archive with images
-            print(f"Generating HTML file: {html_file}")
+            logger.info(f"Generating HTML file: {html_file}")
             # Pass headline_template to generate_headlines_html
             generate_headlines_html(top_3_articles_match, html_file, model_name=used_model if SHOW_AI_ATTRIBUTION else None)
                         
-            print(f"Appending to archive for mode: {mode}")
+            logger.info(f"Appending to archive for mode: {mode}")
             append_to_archive(mode, top_3_articles_match)
             # Update selections cache only on successful normal run completion
-            print(f"About to update cache with {len(updated_selections)} selections")
+            logger.info(f"About to update cache with {len(updated_selections)} selections")
             g_c.put("previously_selected_selections_2", updated_selections, timeout=EXPIRE_WEEK)
-            print("Successfully updated headlines and archive.")
+            logger.info("Successfully updated headlines and archive.")
 
         else:
-            print(f"Unknown RUN_MODE: {RUN_MODE}. Exiting.")
+            logger.error(f"Unknown RUN_MODE: {RUN_MODE}. Exiting.")
             sys.exit(1)
 
     except FileNotFoundError as e: # Specific error
-        print(f"Configuration file error for mode {mode}: {e}")
+        logger.error(f"Configuration file error for mode {mode}: {e}")
         sys.exit(1)
     except ImportError as e: # Specific error
-        print(f"Error importing settings for mode {mode}: {e}")
+        logger.error(f"Error importing settings for mode {mode}: {e}")
         sys.exit(1)
     except Exception as e: # Keep general for other unexpected errors during main execution
-        print(f"Error in mode {mode}: {e}")
+        logger.error(f"Error in mode {mode}: {e}")
         traceback.print_exc() # Print traceback for debugging
         sys.exit(1)
 
@@ -948,11 +1143,16 @@ if __name__ == "__main__":
     parser.add_argument('--force-model', type=str, help='Force the use of a specific model (overrides random/cached selection)')
     args = parser.parse_args()
 
+    logger.info("Command line arguments parsed")
+    logger.info(f"Arguments: force={args.force}, forceimage={args.forceimage}, dry_run={args.dry_run}, compare={args.compare}, include_summary={args.include_summary}, prompt_mode={args.prompt_mode}, use_cached_model={args.use_cached_model}, force_model={args.force_model}")
+
     # Set USE_RANDOM_MODELS based on command line argument
     USE_RANDOM_MODELS = not args.use_cached_model
+    logger.info(f"USE_RANDOM_MODELS set to: {USE_RANDOM_MODELS}")
 
     # Revert to CWD-based mode detection
     cwd = os.getcwd()
+    logger.info(f"Current working directory: {cwd}")
     selected_mode_enum = None
     selected_mode_str = None
 
@@ -960,6 +1160,7 @@ if __name__ == "__main__":
     for mode_enum_val in Mode:
         settings_file = f"{mode_enum_val.value}_report_settings.py"
         if os.path.isfile(settings_file):
+            logger.debug(f"Found settings file: {settings_file}")
             # Load the settings file to get its path
             spec = importlib.util.spec_from_file_location("module_name", settings_file)
             module = importlib.util.module_from_spec(spec)
@@ -972,17 +1173,21 @@ if __name__ == "__main__":
                 # Store the loaded module and config
                 loaded_settings_module = module
                 loaded_settings_config = module.CONFIG
+                logger.info(f"Matched mode '{selected_mode_str}' with path {module.CONFIG.PATH}")
                 break
+            else:
+                logger.debug(f"Settings file {settings_file} path mismatch: {module.CONFIG.PATH} != {cwd}")
 
     if selected_mode_enum is None:
-        print(f"Error: Could not determine mode from current directory: {cwd}")
-        print("Expected to find a settings file with a matching PATH in the current directory.")
+        logger.error(f"Could not determine mode from current directory: {cwd}")
+        logger.error("Expected to find a settings file with a matching PATH in the current directory.")
         sys.exit(1)
 
-    print(f"Detected mode '{selected_mode_str}' based on current directory.")
+    logger.info(f"Detected mode '{selected_mode_str}' based on current directory.")
 
     # Handle forceimage case early
     if args.forceimage:
+        logger.info("Running in forceimage mode - only refreshing images")
         refresh_images_only(selected_mode_str, None)
         sys.exit(0)
 
@@ -990,31 +1195,38 @@ if __name__ == "__main__":
     current_hour = datetime.datetime.now(TZ).hour
     should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or args.compare
 
+    logger.info(f"Schedule check: current_hour={current_hour}, scheduled_hours={loaded_settings_config.SCHEDULE}, should_run={should_run}")
+
     if not should_run:
-        print(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
+        logger.info(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
         sys.exit(0)
 
     # Set RUN_MODE to 'compare' if --compare is specified
     if args.compare:
         RUN_MODE = "compare"
+        logger.info("Set RUN_MODE to 'compare'")
 
     # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
     if args.include_summary:
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
+        logger.info("Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM to True")
 
     # Configure primary provider from CLI - only if we're actually going to run
     provider = get_provider(PROVIDER, forced_model=args.force_model)
     MODEL_1 = provider.primary_model
     MODEL_2 = provider.fallback_model
+    logger.info(f"Configured provider: {PROVIDER}, MODEL_1={MODEL_1}, MODEL_2={MODEL_2}")
 
     if args.prompt_mode:
         try:
             prompt_mode_enum = PromptMode(args.prompt_mode.upper())
             PROMPT_MODE = prompt_mode_enum
+            logger.info(f"Set PROMPT_MODE to {PROMPT_MODE}")
         except ValueError:
-            print(f"Invalid prompt mode specified: {args.prompt_mode}. Using 30B mode.")
+            logger.warning(f"Invalid prompt mode specified: {args.prompt_mode}. Using 30B mode.")
             PROMPT_MODE = PromptMode.THIRTY_B
 
+    logger.info("Starting main processing...")
     main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run)
 
 
