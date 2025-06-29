@@ -168,6 +168,11 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text, image_url: imageUrl })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
                 const data = await response.json();
                 
                 if (data.success) {
@@ -231,7 +236,7 @@
 
         createMessageElement(comment) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message${comment.is_admin ? ' admin-message' : ''}`;
+            messageDiv.className = `chat-message${this.state.isAdminMode ? ' admin-message' : ''}`;
             messageDiv.dataset.commentId = comment.id;
             
             const timeStr = new Date(comment.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
