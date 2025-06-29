@@ -439,9 +439,8 @@ def extract_post_data(post, config, url, use_selenium):
     if filter_pattern and filter_pattern not in link:
         return None
     
-    # TODO: Future enhancement - extract actual published timestamps from site-specific selectors
-    # For now, use current time as a reasonable approximation
-    # This ensures proper sorting in infinite scroll while avoiding complex parsing logic
+    # Use current time for new articles - original timestamps are preserved by merge_entries
+    # when articles are re-fetched, maintaining proper chronological ordering
     import time
     published_parsed = time.gmtime()
     published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)

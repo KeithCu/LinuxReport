@@ -82,10 +82,60 @@
         var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
         var theme = match ? match[1] : 'light';
         document.body.classList.add('theme-' + theme);
+        
+        // Initialize delete functionality for old headlines
+        initDeleteHeadlines();
       });
       
       // Pass admin status from Flask-Login to JavaScript
       window.isAdmin = {{ 'true' if is_admin else 'false' }};
+      
+      // Delete headlines functionality
+      function initDeleteHeadlines() {
+        const container = document.querySelector('.headline-archive-container');
+        if (!container || !window.isAdmin) return;
+
+        container.addEventListener('click', async e => {
+          if (!e.target.classList.contains('delete-headline-btn')) return;
+          
+          const entry = e.target.closest('.headline-entry');
+          if (!entry?.dataset?.url || !entry.dataset.timestamp || !confirm('Delete this headline?')) return;
+
+          console.log('Delete request:', {
+            url: entry.dataset.url,
+            timestamp: entry.dataset.timestamp
+          });
+
+          try {
+            const response = await fetch('/api/delete_headline', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ 
+                url: entry.dataset.url, 
+                timestamp: entry.dataset.timestamp 
+              })
+            });
+            
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            
+            const data = await response.json();
+            console.log('Response data:', data);
+            
+            if (data.success) {
+              entry.remove();
+              console.log('Headline deleted successfully');
+            } else {
+              throw new Error(data.error || 'Unknown error');
+            }
+          } catch (error) {
+            console.error('Delete error:', error);
+            alert(`Delete failed: ${error.message}`);
+          }
+        });
+      }
     </script>
 </head>
 <body>

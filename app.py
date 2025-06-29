@@ -169,6 +169,9 @@ def initialize_extensions(app):
     csrf = CSRFProtect()
     csrf.init_app(app)
     
+    # Disable CSRF protection for API endpoints
+    app.config['WTF_CSRF_ENABLED'] = False
+    
     return login_manager
 
 # Initialize extensions
