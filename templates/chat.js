@@ -1,11 +1,11 @@
 /**
- * chat.js - Refactored
+ * chat.js
  * 
  * Chat widget module for the LinuxReport application, integrated with the global app object.
  * Handles real-time messaging, SSE/polling communication, draggable interface, and image uploads.
  * 
  * @author LinuxReport Team
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 (function(app) {
@@ -37,8 +37,9 @@
                 'chat-image-url-input', 'chat-send-btn', 'chat-close-btn',
                 'chat-loading', 'chat-toggle-btn', 'chat-input-area'
             ];
-            const missing = requiredElements.filter(id => !(this.elements[id] = document.getElementById(id)));
-            if (missing.length > 0) return false;
+            
+            requiredElements.forEach(id => this.elements[id] = document.getElementById(id));
+            if (requiredElements.some(id => !this.elements[id])) return false;
 
             this.setupEventListeners();
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
@@ -52,27 +53,36 @@
                     this.beepSound = new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAD//w==');
                 }
             };
-            const once = { once: true };
-            ['click', 'touchstart', 'keydown'].forEach(event => document.addEventListener(event, loadBeep, once));
+            ['click', 'touchstart', 'keydown'].forEach(event => 
+                document.addEventListener(event, loadBeep, { once: true })
+            );
         }
 
         setupEventListeners() {
             this.setupDraggable();
-            this.elements['chat-close-btn'].addEventListener('click', () => this.closeChat());
-            this.elements['chat-toggle-btn'].addEventListener('click', () => this.toggleChat());
-            this.elements['chat-send-btn'].addEventListener('click', () => this.sendComment());
+            this.setupImageUpload();
+            
+            const eventMap = {
+                'chat-close-btn': () => this.closeChat(),
+                'chat-toggle-btn': () => this.toggleChat(),
+                'chat-send-btn': () => this.sendComment()
+            };
+            
+            Object.entries(eventMap).forEach(([id, handler]) => {
+                this.elements[id].addEventListener('click', handler);
+            });
+            
             this.elements['chat-message-input'].addEventListener('keypress', e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     this.sendComment();
                 }
             });
-            this.setupImageUpload();
         }
 
         setupDraggable() {
-            const header = this.elements['chat-header'];
-            const container = this.elements['chat-container'];
+            const { 'chat-header': header, 'chat-container': container } = this.elements;
+            
             header.addEventListener('mousedown', e => {
                 if (e.target === this.elements['chat-close-btn']) return;
                 this.state.isDragging = true;
@@ -81,6 +91,7 @@
                 container.style.cursor = 'grabbing';
                 e.preventDefault();
             });
+            
             document.addEventListener('mousemove', app.utils.throttle(e => {
                 if (!this.state.isDragging) return;
                 const newX = Math.max(0, Math.min(e.clientX - this.state.offsetX, window.innerWidth - container.offsetWidth));
@@ -88,6 +99,7 @@
                 container.style.left = `${newX}px`;
                 container.style.top = `${newY}px`;
             }, app.config.CHAT_DRAG_THROTTLE_DELAY));
+            
             document.addEventListener('mouseup', () => {
                 if (this.state.isDragging) {
                     this.state.isDragging = false;
@@ -117,14 +129,17 @@
                 alert('Invalid file type or size.');
                 return;
             }
+            
             const imageUrlInput = this.elements['chat-image-url-input'];
-            const formData = new FormData();
-            formData.append('image', file);
             try {
                 imageUrlInput.value = 'Uploading...';
                 imageUrlInput.disabled = true;
+                
+                const formData = new FormData();
+                formData.append('image', file);
                 const response = await fetch('/api/upload_image', { method: 'POST', body: formData });
                 const data = await response.json();
+                
                 if (data.success && data.url) {
                     imageUrlInput.value = data.url;
                 } else {
@@ -147,12 +162,14 @@
             try {
                 sendButton.disabled = true;
                 sendButton.textContent = 'Sending...';
+                
                 const response = await fetch('/api/comments', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text, image_url: imageUrl })
                 });
                 const data = await response.json();
+                
                 if (data.success) {
                     this.elements['chat-message-input'].value = '';
                     this.elements['chat-image-url-input'].value = '';
@@ -170,6 +187,7 @@
 
         async fetchComments() {
             if (app.config.CHAT_USE_SSE || this.elements['chat-container'].style.display === 'none') return;
+            
             try {
                 const response = await fetch(`/api/comments?_=${Date.now()}`);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -183,10 +201,14 @@
         }
 
         async renderComments(comments) {
-            const newMessagesExist = comments.length && (!this.state.lastCommentTimestamp || new Date(comments[0].timestamp).getTime() > this.state.lastCommentTimestamp);
-            this.state.lastCommentTimestamp = comments.length ? new Date(comments[0].timestamp).getTime() : this.state.lastCommentTimestamp;
+            const newMessagesExist = comments.length && 
+                (!this.state.lastCommentTimestamp || new Date(comments[0].timestamp).getTime() > this.state.lastCommentTimestamp);
+            
+            this.state.lastCommentTimestamp = comments.length ? 
+                new Date(comments[0].timestamp).getTime() : this.state.lastCommentTimestamp;
 
-            if (newMessagesExist && this.elements['chat-container'].style.display !== 'none' && this.state.beepEnabled && !document.hidden) {
+            if (newMessagesExist && this.elements['chat-container'].style.display !== 'none' && 
+                this.state.beepEnabled && !document.hidden) {
                 this.playBeep();
             }
 
@@ -201,6 +223,7 @@
                 noMessages.textContent = 'No messages yet.';
                 fragment.appendChild(noMessages);
             }
+            
             this.elements['chat-messages'].innerHTML = '';
             this.elements['chat-messages'].appendChild(fragment);
             this.state.lastComments = comments;
@@ -210,11 +233,12 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `chat-message${comment.is_admin ? ' admin-message' : ''}`;
             messageDiv.dataset.commentId = comment.id;
+            
+            const timeStr = new Date(comment.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
             messageDiv.innerHTML = `
-                <span class="timestamp">${new Date(comment.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}</span>
-                <span class="message-text"></span>
+                <span class="timestamp">${timeStr}</span>
+                <span class="message-text">${comment.text}</span>
             `;
-            messageDiv.querySelector('.message-text').textContent = comment.text;
 
             if (comment.image_url) {
                 const link = document.createElement('a');
@@ -239,9 +263,11 @@
         async handleDelete(e) {
             const id = e.target.dataset.commentId;
             if (!id || !confirm('Are you sure?')) return;
+            
             try {
                 const response = await fetch(`/api/comments/${id}`, { method: 'DELETE' });
                 const data = await response.json();
+                
                 if (data.success) {
                     e.target.closest('.chat-message').remove();
                     if (!app.config.CHAT_USE_SSE) await this.fetchComments();
@@ -254,19 +280,30 @@
         }
 
         initializeSSE() {
-            if (!app.config.CHAT_USE_SSE || this.state.eventSource || this.elements['chat-container'].style.display === 'none') return;
+            if (!app.config.CHAT_USE_SSE || this.state.eventSource || 
+                this.elements['chat-container'].style.display === 'none') return;
+            
             let retryCount = 0;
             const connect = () => {
                 this.state.eventSource = new EventSource('/api/comments/stream');
-                this.state.eventSource.onopen = () => { this.elements['chat-loading'].style.display = 'none'; retryCount = 0; };
-                this.state.eventSource.onmessage = async e => { await this.renderComments(JSON.parse(e.data)); };
+                this.state.eventSource.onopen = () => { 
+                    this.elements['chat-loading'].style.display = 'none'; 
+                    retryCount = 0; 
+                };
+                this.state.eventSource.onmessage = async e => { 
+                    await this.renderComments(JSON.parse(e.data)); 
+                };
                 this.state.eventSource.onerror = () => {
                     this.elements['chat-loading'].textContent = 'Connection error. Retrying...';
                     this.elements['chat-loading'].style.display = 'block';
                     if (this.state.eventSource) this.state.eventSource.close();
                     this.state.eventSource = null;
+                    
                     if (retryCount < app.config.CHAT_MAX_RETRIES) {
-                        setTimeout(connect, Math.min(app.config.CHAT_BASE_RETRY_DELAY * (2 ** retryCount), app.config.CHAT_MAX_RETRY_DELAY));
+                        setTimeout(connect, Math.min(
+                            app.config.CHAT_BASE_RETRY_DELAY * (2 ** retryCount), 
+                            app.config.CHAT_MAX_RETRY_DELAY
+                        ));
                         retryCount++;
                     } else {
                         this.elements['chat-loading'].textContent = 'Connection failed. Please refresh.';
@@ -280,16 +317,22 @@
             if (document.hidden) {
                 this.cleanup();
             } else if (this.elements['chat-container'].style.display !== 'none') {
-                if (app.config.CHAT_USE_SSE) this.initializeSSE(); else this.fetchComments();
+                if (app.config.CHAT_USE_SSE) this.initializeSSE(); 
+                else this.fetchComments();
             }
         }
 
         handleResize() {
             const container = this.elements['chat-container'];
             if (container.style.display === 'none') return;
+            
             const rect = container.getBoundingClientRect();
-            if (rect.left > window.innerWidth - rect.width) container.style.left = `${window.innerWidth - rect.width}px`;
-            if (rect.top > window.innerHeight - rect.height) container.style.top = `${window.innerHeight - rect.height}px`;
+            if (rect.left > window.innerWidth - rect.width) {
+                container.style.left = `${window.innerWidth - rect.width}px`;
+            }
+            if (rect.top > window.innerHeight - rect.height) {
+                container.style.top = `${window.innerHeight - rect.height}px`;
+            }
         }
 
         closeChat() {
@@ -298,14 +341,19 @@
         }
 
         toggleChat() {
-            const isHidden = this.elements['chat-container'].style.display === 'none' || this.elements['chat-container'].style.display === '';
+            const isHidden = this.elements['chat-container'].style.display === 'none' || 
+                            this.elements['chat-container'].style.display === '';
+            
             this.elements['chat-container'].style.display = isHidden ? 'flex' : 'none';
+            
             if (isHidden) {
                 if (app.config.CHAT_USE_SSE) {
                     this.initializeSSE();
                 } else {
                     if (this.state.lastComments.length === 0) this.fetchComments();
-                    if (!this.state.pollingTimer) this.state.pollingTimer = setInterval(() => this.fetchComments(), app.config.CHAT_POLLING_INTERVAL);
+                    if (!this.state.pollingTimer) {
+                        this.state.pollingTimer = setInterval(() => this.fetchComments(), app.config.CHAT_POLLING_INTERVAL);
+                    }
                 }
             } else {
                 this.cleanup();
@@ -332,7 +380,7 @@
         init() {
             const chatWidget = new ChatWidget();
             if (chatWidget.init()) {
-                window.chatWidget = chatWidget; // For external access if needed
+                window.chatWidget = chatWidget;
             }
         }
     };

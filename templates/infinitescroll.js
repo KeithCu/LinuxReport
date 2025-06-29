@@ -1,11 +1,11 @@
 /**
- * infinitescroll.js - Refactored
+ * infinitescroll.js
  * 
  * Infinite scroll module for the LinuxReport application, integrated with the global app object.
  * Handles switching between column and infinite scroll views and dispatches view mode change events.
  * 
  * @author LinuxReport Team
- * @version 3.0.0
+ * @version 3.1.0
  */
 
 (function(app) {
@@ -15,14 +15,17 @@
         constructor() {
             this.currentViewMode = 'column';
             this.currentPage = 0;
-            this.rowElement = document.querySelector('.row');
-            this.infiniteContainer = document.getElementById('infinite-scroll-container');
-            this.infiniteContent = document.getElementById('infinite-content');
-            this.loadingIndicator = document.getElementById('loading-indicator');
+            this.elements = {
+                row: document.querySelector('.row'),
+                infiniteContainer: document.getElementById('infinite-scroll-container'),
+                infiniteContent: document.getElementById('infinite-content'),
+                loadingIndicator: document.getElementById('loading-indicator')
+            };
         }
 
         toggleViewMode() {
             this.currentViewMode = this.currentViewMode === 'column' ? 'infinite' : 'column';
+            
             const button = document.getElementById('view-mode-toggle');
             if (button) {
                 button.textContent = this.currentViewMode === 'column' ? 'Infinite View' : 'Column View';
@@ -34,11 +37,13 @@
                 this.switchToColumnView();
             }
 
-            document.dispatchEvent(new CustomEvent('viewmodechange', { detail: { mode: this.currentViewMode } }));
+            document.dispatchEvent(new CustomEvent('viewmodechange', { 
+                detail: { mode: this.currentViewMode } 
+            }));
         }
 
         switchToInfiniteView() {
-            if (this.infiniteContent) this.infiniteContent.innerHTML = '';
+            if (this.elements.infiniteContent) this.elements.infiniteContent.innerHTML = '';
             this.currentPage = 0;
 
             document.querySelectorAll('.linkclass').forEach(item => {
@@ -47,50 +52,45 @@
 
             this.loadInfiniteContent();
 
-            if (this.rowElement) this.rowElement.style.display = 'none';
-            if (this.infiniteContainer) this.infiniteContainer.style.display = 'block';
+            if (this.elements.row) this.elements.row.style.display = 'none';
+            if (this.elements.infiniteContainer) this.elements.infiniteContainer.style.display = 'block';
         }
 
         switchToColumnView() {
-            if (this.rowElement) this.rowElement.style.display = 'flex';
-            if (this.infiniteContainer) this.infiniteContainer.style.display = 'none';
+            if (this.elements.row) this.elements.row.style.display = 'flex';
+            if (this.elements.infiniteContainer) this.elements.infiniteContainer.style.display = 'none';
         }
 
         loadInfiniteContent() {
-            if (!this.infiniteContent) return;
-            if (this.loadingIndicator) this.loadingIndicator.style.display = 'block';
+            if (!this.elements.infiniteContent) return;
+            
+            if (this.elements.loadingIndicator) this.elements.loadingIndicator.style.display = 'block';
 
             const allItems = this.collectAllItems();
             const groupedItems = this.groupItemsBySource(allItems);
-            this.renderGroupedItems(this.infiniteContent, groupedItems);
+            this.renderGroupedItems(this.elements.infiniteContent, groupedItems);
 
-            if (this.loadingIndicator) this.loadingIndicator.style.display = 'none';
+            if (this.elements.loadingIndicator) this.elements.loadingIndicator.style.display = 'none';
         }
 
         collectAllItems() {
             const allItems = [];
-            const columns = document.querySelectorAll('.column');
-            columns.forEach(column => {
-                const feedContainers = column.querySelectorAll('.box');
-                feedContainers.forEach(container => {
-                    const feedId = container.id;
+            document.querySelectorAll('.column').forEach(column => {
+                column.querySelectorAll('.box').forEach(container => {
                     const feedTitle = container.querySelector('a[target="_blank"]');
                     const feedIcon = container.querySelector('img');
                     if (!feedTitle || !feedIcon) return;
 
-                    const feedInfo = this.extractFeedInfo(feedId, feedIcon);
-                    const items = container.querySelectorAll('.linkclass');
-                    items.forEach(item => {
+                    const feedInfo = this.extractFeedInfo(container.id, feedIcon);
+                    container.querySelectorAll('.linkclass').forEach(item => {
                         if (window.getComputedStyle(item).display !== 'none') {
-                            const timestamp = parseInt(item.getAttribute('data-index') || '0');
-                            const published = item.getAttribute('data-published') || '';
                             allItems.push({
                                 title: item.textContent,
                                 link: item.href,
                                 source_name: feedInfo.name,
                                 source_icon: feedInfo.icon,
-                                timestamp: timestamp,
-                                published: published
+                                timestamp: parseInt(item.getAttribute('data-index') || '0'),
+                                published: item.getAttribute('data-published') || ''
                             });
                         }
                     });
@@ -102,30 +102,44 @@
         extractFeedInfo(feedId, feedIcon) {
             const feedUrl = feedId.replace('feed-', '');
             let feedName = '';
+            
             try {
                 const url = new URL(feedUrl);
                 feedName = url.pathname.split('/').filter(Boolean).pop() || url.hostname;
-                feedName = feedName.replace(/\.(com|org|net|io)$/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                feedName = feedName
+                    .replace(/\.(com|org|net|io)$/, '')
+                    .replace(/-/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
             } catch (error) {
                 feedName = feedId.replace('feed-', '');
             }
+            
             return { name: feedName, icon: feedIcon.src };
         }
 
         groupItemsBySource(allItems) {
             allItems.sort((a, b) => b.timestamp - a.timestamp);
+            
             const sourceInfo = new Map();
             allItems.forEach(item => {
                 if (!sourceInfo.has(item.source_name)) {
-                    sourceInfo.set(item.source_name, { name: item.source_name, icon: item.source_icon });
+                    sourceInfo.set(item.source_name, { 
+                        name: item.source_name, 
+                        icon: item.source_icon 
+                    });
                 }
             });
 
             const groupedItems = [];
             let currentGroup = null;
+            
             allItems.forEach(item => {
                 if (!currentGroup || currentGroup.name !== item.source_name) {
-                    currentGroup = { name: item.source_name, icon: sourceInfo.get(item.source_name).icon, items: [] };
+                    currentGroup = { 
+                        name: item.source_name, 
+                        icon: sourceInfo.get(item.source_name).icon, 
+                        items: [] 
+                    };
                     groupedItems.push(currentGroup);
                 }
                 currentGroup.items.push({ 
@@ -135,13 +149,13 @@
                     timestamp: item.timestamp
                 });
             });
+            
             return groupedItems;
         }
 
         renderGroupedItems(container, groupedItems) {
             groupedItems.forEach(group => {
-                const groupElement = this.createSourceGroupElement(group);
-                container.appendChild(groupElement);
+                container.appendChild(this.createSourceGroupElement(group));
             });
         }
 
@@ -154,9 +168,11 @@
                     <h2 style="margin: 0; font-size: 1.4em; color: var(--text);">${group.name}</h2>
                 </div>
             `;
+            
             group.items.forEach(item => {
                 div.appendChild(this.createItemElement(item));
             });
+            
             return div;
         }
 

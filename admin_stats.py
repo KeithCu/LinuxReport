@@ -91,7 +91,7 @@ def get_admin_stats_html():
     
     return f'''
     <div style="position: fixed; top: 10px; right: 10px; background: #ccc; color: #333; padding: 10px; 
-                border-radius: 5px; font-family: monospace; font-size: 12px; z-index: 9999; 
+                border-radius: 5px; font-size: 10px; z-index: 9999; 
                 border: 1px solid #999; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <strong>Admin Stats (Page Render)</strong><br>
         Uptime: {uptime_str}<br>
