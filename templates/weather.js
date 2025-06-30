@@ -89,6 +89,7 @@
                 this.render(data, useMetric);
             } catch (error) {
                 this.showError('Unable to load weather data.');
+                app.utils.handleError('Fetch Weather', error);
             }
         }
 
