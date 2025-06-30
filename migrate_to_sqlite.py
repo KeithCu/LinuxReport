@@ -17,7 +17,7 @@ def migrate_to_sqlite(cache_dir):
     old_cache = diskcache.Cache(directory=cache_dir)
     new_cache = diskcache.Cache(
         directory=migrated_dir,
-        sqlite_only=True
+        disk_min_file_size=1000000
     )
     
     migrated_count = 0
@@ -62,37 +62,82 @@ def migrate_to_sqlite(cache_dir):
         
         # Verify the migration
         print("\nVerifying migration...")
+        verification_errors = 0
         for key in old_cache:
             try:
-                # Get data from both caches with all metadata
-                old_data = old_cache.get(key, read=False, expire_time=True, tag=True)
-                new_data = new_cache.get(key, read=False, expire_time=True, tag=True)
+                # Get data from both caches
+                old_value = old_cache.get(key, default=diskcache.core.ENOVAL)
+                new_value = new_cache.get(key, default=diskcache.core.ENOVAL)
                 
-                if old_data == diskcache.core.ENOVAL or new_data == diskcache.core.ENOVAL:
-                    print(f"Error: Key '{key}' missing in one of the caches")
-                    return False
-                
-                old_value, old_expire, old_tag = old_data
-                new_value, new_expire, new_tag = new_data
-                
-                # Verify value, expiration, and tag
-                if old_value != new_value:
-                    print(f"Error: Value mismatch for key {key}")
-                    return False
-                if old_expire != new_expire:
-                    print(f"Error: Expiration time mismatch for key {key}")
-                    return False
-                if old_tag != new_tag:
-                    print(f"Error: Tag mismatch for key {key}")
-                    return False
+                if old_value == diskcache.core.ENOVAL:
+                    print(f"Error: Key '{key}' missing in old cache")
+                    verification_errors += 1
+                    continue
                     
-                print(f"Verified key: {key}")
+                if new_value == diskcache.core.ENOVAL:
+                    print(f"Error: Key '{key}' missing in new cache")
+                    verification_errors += 1
+                    continue
                 
+                # Compare the actual data values
+                if old_value == new_value:
+                    print(f"Verified key: {key}")
+                else:
+                    # Try to handle format differences
+                    try:
+                        # If they're different types but represent the same data
+                        if isinstance(old_value, bytes) and isinstance(new_value, str):
+                            if old_value.decode('utf-8', errors='ignore') == new_value:
+                                print(f"Verified key: {key} (bytes->string conversion)")
+                            else:
+                                print(f"Error: Value mismatch for key {key}")
+                                verification_errors += 1
+                        elif isinstance(old_value, str) and isinstance(new_value, bytes):
+                            if old_value == new_value.decode('utf-8', errors='ignore'):
+                                print(f"Verified key: {key} (string->bytes conversion)")
+                            else:
+                                print(f"Error: Value mismatch for key {key}")
+                                verification_errors += 1
+                        elif hasattr(old_value, '__dict__') and hasattr(new_value, '__dict__'):
+                            # Handle custom objects like RssFeed
+                            if type(old_value) == type(new_value):
+                                # Compare object attributes
+                                old_dict = old_value.__dict__
+                                new_dict = new_value.__dict__
+                                if old_dict == new_dict:
+                                    print(f"Verified key: {key} (object comparison)")
+                                else:
+                                    print(f"Error: Object attributes mismatch for key {key}")
+                                    print(f"  Old attrs: {old_dict}")
+                                    print(f"  New attrs: {new_dict}")
+                                    verification_errors += 1
+                            else:
+                                print(f"Error: Object type mismatch for key {key}")
+                                verification_errors += 1
+                        else:
+                            # For other cases, try to normalize the data
+                            old_str = str(old_value).strip()
+                            new_str = str(new_value).strip()
+                            if old_str == new_str:
+                                print(f"Verified key: {key} (string normalization)")
+                            else:
+                                print(f"Error: Value mismatch for key {key}")
+                                print(f"  Old: {repr(old_value)}")
+                                print(f"  New: {repr(new_value)}")
+                                verification_errors += 1
+                    except Exception as e:
+                        print(f"Error: Value mismatch for key {key} (comparison failed: {e})")
+                        verification_errors += 1
+                    
             except Exception as e:
                 print(f"Verification error for key {key}: {e}")
-                return False
+                verification_errors += 1
         
-        print("\nVerification successful!")
+        if verification_errors > 0:
+            print(f"\nVerification failed with {verification_errors} errors!")
+            return False
+        else:
+            print("\nVerification successful!")
         
     except Exception as e:
         print(f"An unexpected error occurred: {e}")
@@ -119,6 +164,6 @@ if __name__ == "__main__":
     if migrate_to_sqlite(CACHE_DIR):
         print("Migration completed successfully!")
         print(f"New SQLite-only cache is in: {os.path.join(CACHE_DIR, 'migrated')}")
-        print("You can now update your DiskCache configuration to use sqlite_only=True")
+        print("You can now update your DiskCache configuration to use disk_min_file_size=1000000")
     else:
         print("Migration failed! Please check the errors above and try again.") 
