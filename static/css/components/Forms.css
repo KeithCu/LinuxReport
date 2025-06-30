@@ -1,0 +1,72 @@
+/* =============================================================================
+   FORMS MODULE - Buttons, Inputs, and Form Elements
+   ============================================================================= */
+
+/* Button Base Styles */
+.btn,
+button,
+input[type="button"],
+input[type="submit"] {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-sm);
+  font-weight: bold;
+  transition: all var(--transition-normal);
+  background: var(--btn-bg);
+  border: 2px solid var(--btn-border);
+  color: var(--btn-text);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  font-family: inherit;
+}
+
+.btn:hover,
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover {
+  transform: scale(1.05);
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
+  box-shadow: var(--shadow-lg);
+}
+
+.btn:disabled,
+button:disabled,
+input:disabled {
+  background-color: #e0e0e0;
+  color: #a0a0a0;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Form Input Styles */
+select,
+input[type="text"],
+input[type="password"],
+input[type="number"],
+textarea {
+  padding: var(--spacing-sm);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+}
+
+select:focus,
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--link);
+  box-shadow: 0 0 0 2px rgba(26, 13, 171, 0.2);
+}
+
+/* Focus States for Accessibility */
+.btn:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+a:focus {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+} 

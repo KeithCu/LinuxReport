@@ -1,0 +1,123 @@
+.weather-widget {
+  border: 1px solid var(--btn-border);
+  padding: var(--spacing-xs);
+  margin: calc(var(--spacing-xs) / 2);
+  display: inline-block;
+  font-size: small;
+  position: relative;
+  border-radius: var(--border-radius-sm);
+}
+
+.weather-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.weather-content-inner {
+  text-align: center;
+}
+
+.weather-attribution {
+  position: absolute;
+  bottom: 8px;
+  right: 5px;
+  font-size: 8px;
+  color: var(--link);
+  background-color: transparent;
+  padding: 1px 2px;
+  border-radius: 1px;
+}
+
+.weather-collapsed-label {
+  display: none;
+  vertical-align: middle;
+}
+
+.weather-toggle-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: none;
+  border: none;
+  font-size: 1.2em;
+  cursor: pointer;
+  color: var(--text);
+  padding: 0 var(--spacing-xs);
+  z-index: 1;
+  vertical-align: middle;
+  transition: transform var(--transition-fast);
+}
+
+#weather-widget-container.collapsed #weather-content {
+  display: none;
+}
+
+#weather-toggle-btn {
+  transition: transform var(--transition-fast);
+}
+
+#weather-widget-container.collapsed #weather-toggle-btn {
+  transform: rotate(180deg);
+}
+
+#weather-widget-container.collapsed #weather-collapsed-label {
+  display: inline !important;
+  padding-right: 25px;
+}
+
+.weather-container {
+  max-width: 100%;
+  margin: calc(var(--spacing-sm) / 2) auto;
+  padding: calc(var(--spacing-sm) / 2) calc(var(--spacing-sm) / 2) 20px calc(var(--spacing-sm) / 2);
+  background-color: var(--btn-bg);
+  color: var(--text);
+  border-radius: var(--border-radius-md);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.weather-container h3 {
+  margin: 0 0 calc(var(--spacing-sm) / 2) 0;
+}
+
+.weather-forecast {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+}
+
+.weather-day {
+  flex: 1;
+  min-width: 80px;
+  margin: calc(var(--spacing-xs) / 2);
+  padding: calc(var(--spacing-sm) / 2);
+  background-color: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--border-radius-sm);
+  transition: transform var(--transition-fast);
+}
+
+.weather-day:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.weather-day-name {
+  font-weight: bold;
+  margin-bottom: calc(var(--spacing-xs) / 2);
+}
+
+.weather-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.weather-temp {
+  margin: calc(var(--spacing-xs) / 2) 0;
+}
+
+.weather-precip {
+  font-size: 0.9em;
+  color: var(--link);
+} 

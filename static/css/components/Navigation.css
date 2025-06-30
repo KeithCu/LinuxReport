@@ -1,0 +1,128 @@
+nav {
+  text-align: center;
+  margin: var(--spacing-sm) 0;
+}
+
+.nav-controls {
+  border: 2px solid var(--btn-border);
+  padding: var(--spacing-sm);
+  margin: var(--spacing-sm) auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+  font-size: large;
+  text-align: center;
+  justify-content: center;
+  max-width: fit-content;
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-links-desktop,
+.nav-links-mobile {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.nav-links-desktop {
+  flex-wrap: wrap;
+}
+
+.nav-links-mobile {
+  flex-direction: column;
+}
+
+/* Navigation Links */
+.nav-links-desktop a,
+.nav-links-mobile a {
+  text-decoration: none;
+  transition: all var(--transition-normal);
+  white-space: nowrap;
+  color: var(--nav-link-color, var(--link));
+}
+
+.nav-links-desktop a {
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--border-radius-sm);
+}
+
+.nav-links-mobile a {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid transparent;
+  border-radius: var(--border-radius-sm);
+  margin: 2px 0;
+  display: block;
+  text-align: center;
+}
+
+.nav-links-desktop a:hover,
+.nav-links-mobile a:hover {
+  background-color: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.nav-links-mobile a:active,
+.nav-links-mobile a:focus {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Navigation Link Color Variables */
+.nav-link-linux {
+  --nav-link-color: #f47421;
+}
+
+.nav-link-pv {
+  --nav-link-color: #ffd700;
+}
+
+.nav-link-ai {
+  --nav-link-color: #00d4ff;
+}
+
+.nav-link-techno {
+  --nav-link-color: #7b68ee;
+}
+
+.nav-link-covid {
+  --nav-link-color: #ff6b6b;
+}
+
+.nav-link-truth {
+  --nav-link-color: #32cd32;
+}
+
+.nav-link-space {
+  --nav-link-color: #b22222;
+}
+
+/* Mobile Navigation Border Colors */
+.mobile-view .nav-links-mobile .nav-link-linux {
+  border-color: #f47421 !important;
+}
+
+.mobile-view .nav-links-mobile .nav-link-pv {
+  border-color: #ffd700 !important;
+}
+
+.mobile-view .nav-links-mobile .nav-link-ai {
+  border-color: #00d4ff !important;
+}
+
+.mobile-view .nav-links-mobile .nav-link-techno {
+  border-color: #7b68ee !important;
+}
+
+.mobile-view .nav-links-mobile .nav-link-covid {
+  border-color: #ff6b6b !important;
+}
+
+.mobile-view .nav-links-mobile .nav-link-truth {
+  border-color: #32cd32 !important;
+}
+
+.mobile-view .nav-links-mobile .nav-link-space {
+  border-color: #b22222 !important;
+} 

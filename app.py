@@ -99,6 +99,44 @@ def run_one_time_last_fetch_migration(all_urls):
             g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
             print("Last_fetch migration complete.")
 
+def add_header_to_file(file_path, file_type, source_files):
+    """
+    Add header information to a compiled file.
+    
+    Args:
+        file_path (str): Path to the compiled file
+        file_type (str): Type of file ('JavaScript' or 'CSS')
+        source_files (list): List of source files that were compiled
+    """
+    if os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Generate header information
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        try:
+            file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
+        except Exception:
+            file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
+        
+        # Create header based on file type
+        if file_type == 'JavaScript':
+            header = f'// Compiled: {timestamp}\n'
+            header += f'// Hash: {file_hash}\n'
+            header += f'// Source files: {", ".join(source_files)}\n\n'
+        else:  # CSS
+            header = f'/* Compiled: {timestamp} */\n'
+            header += f'/* Hash: {file_hash} */\n'
+            header += f'/* Source files: {", ".join(source_files)} */\n\n'
+        
+        # Write back with header
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(header + content)
+        
+        print(f"Header information added to {file_type} bundle")
+    else:
+        print(f"Warning: {file_type} bundle was not created after build")
+
 # =============================================================================
 # FLASK APPLICATION INITIALIZATION
 # =============================================================================
@@ -243,9 +281,19 @@ def setup_asset_bundles(app):
         output='linuxreport.js'
     ))
     
-    # Register CSS bundle for cache busting
+    # Register a single CSS bundle including main and component CSS
     css_bundle = assets.register('css_all', Bundle(
-        'linuxreport.css',
+        'css/themes/Themes.css',
+        'css/linuxreport.css',
+        'css/components/Typography.css',
+        'css/components/Forms.css',
+        'css/components/Layout.css',
+        'css/components/WeatherWidget.css',
+        'css/components/Navigation.css',
+        'css/components/ChatWindow.css',
+        'css/components/ConfigPage.css',
+        'css/components/MainContent.css',
+        'css/components/Responsive.css',
         output='linuxreport.css'
     ))
     
@@ -283,32 +331,15 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
             print("JavaScript bundle built successfully")
             
             # Add header information to the freshly compiled JS file
-            if os.path.exists(js_output_path):
-                with open(js_output_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Generate header information
-                timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                try:
-                    file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
-                except Exception:
-                    file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
-                
-                # Create header
-                header = f'// Compiled: {timestamp}\n'
-                header += f'// Hash: {file_hash}\n'
-                header += f'// Source files: {", ".join(JS_MODULES)}\n\n'
-                
-                # Write back with header
-                with open(js_output_path, 'w', encoding='utf-8') as f:
-                    f.write(header + content)
-                
-                print("Header information added to JavaScript bundle")
-            else:
-                print("Warning: JavaScript bundle was not created after build")
+            add_header_to_file(js_output_path, 'JavaScript', JS_MODULES)
             
             css_bundle.build()
-            print("CSS cache busting configured successfully")
+            print("CSS bundle built successfully")
+            
+            # Add header information to the compiled CSS file
+            css_output_path = os.path.join(app.static_folder, 'linuxreport.css')
+            css_source_files = ['Themes.css', 'linuxreport.css', 'Typography.css', 'Forms.css', 'Layout.css', 'WeatherWidget.css', 'Navigation.css', 'ChatWindow.css', 'ConfigPage.css', 'MainContent.css', 'Responsive.css']
+            add_header_to_file(css_output_path, 'CSS', css_source_files)
             
             # Run one-time migration of last_fetch times
             run_one_time_last_fetch_migration(ALL_URLS.keys())
