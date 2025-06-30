@@ -124,24 +124,39 @@
         }
 
         groupItemsBySource(allItems) {
-            const grouped = new Map();
+            allItems.sort((a, b) => b.timestamp - a.timestamp);
+            
+            const sourceInfo = new Map();
             allItems.forEach(item => {
-                if (!grouped.has(item.source_name)) {
-                    grouped.set(item.source_name, {
-                        name: item.source_name,
-                        icon: item.source_icon,
-                        items: []
+                if (!sourceInfo.has(item.source_name)) {
+                    sourceInfo.set(item.source_name, { 
+                        name: item.source_name, 
+                        icon: item.source_icon 
                     });
                 }
-                grouped.get(item.source_name).items.push(item);
             });
 
-            const sortedGroups = Array.from(grouped.values());
-            sortedGroups.forEach(group => {
-                group.items.sort((a, b) => b.timestamp - a.timestamp);
+            const groupedItems = [];
+            let currentGroup = null;
+            
+            allItems.forEach(item => {
+                if (!currentGroup || currentGroup.name !== item.source_name) {
+                    currentGroup = { 
+                        name: item.source_name, 
+                        icon: sourceInfo.get(item.source_name).icon, 
+                        items: [] 
+                    };
+                    groupedItems.push(currentGroup);
+                }
+                currentGroup.items.push({ 
+                    title: item.title, 
+                    link: item.link, 
+                    published: item.published,
+                    timestamp: item.timestamp
+                });
             });
-
-            return sortedGroups.sort((a, b) => b.items[0].timestamp - a.items[0].timestamp);
+            
+            return groupedItems;
         }
 
         renderGroupedItems(container, groupedItems) {
