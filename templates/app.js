@@ -35,7 +35,6 @@
       // Weather settings
       WEATHER_WIDGET_TOGGLE_ENABLED: true,
       WEATHER_DEFAULT_COLLAPSED: false,
-      WEATHER_CACHE_DURATION: 30 * 60 * 1000,
       USE_LINUXREPORT_WEATHER: true,
       WEATHER_BASE_URL: '',
       WEATHER_DEBOUNCE_DELAY: 100,
@@ -125,29 +124,6 @@
       const cookieString = `${name}=${encodeURIComponent(value)}` + 
         Object.entries(opts).map(([k, v]) => `; ${k}${v !== true ? `=${v}` : ''}`).join('');
       document.cookie = cookieString;
-    }
-  };
-
-  // Cache management
-  app.utils.CacheManager = {
-    get(key, duration) {
-      try {
-        const cached = sessionStorage.getItem(key);
-        if (cached) {
-          const { data, timestamp } = JSON.parse(cached);
-          if (Date.now() - timestamp < duration) return data;
-        }
-      } catch (error) {
-        handleError(`reading cached data for key ${key}`, error);
-      }
-      return null;
-    },
-    set(key, data) {
-      try {
-        sessionStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }));
-      } catch (error) {
-        handleError(`caching data for key ${key}`, error);
-      }
     }
   };
 
