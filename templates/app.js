@@ -103,15 +103,20 @@
   // Cookie management
   app.utils.CookieManager = {
     get(name) {
-      const match = document.cookie.match(new RegExp(`(^|;)\s*${name}\s*=\s*([^;]+)`));
-      if (match) {
-        try {
-          return decodeURIComponent(match[2]);
-        } catch (error) {
-          app.utils.handleError('cookie decode', error);
-          return null;
+      // More robust cookie parsing
+      const cookies = document.cookie.split(';');
+      for (let cookie of cookies) {
+        const [cookieName, cookieValue] = cookie.trim().split('=');
+        if (cookieName === name && cookieValue) {
+          try {
+            const value = decodeURIComponent(cookieValue);
+            console.log(`Cookie ${name}:`, value); // Debug log
+            return value;
+          } catch (error) {
+            app.utils.handleError('cookie decode', error);
+            return null;
+          }
         }
-      }
       return null;
     },
     set(name, value, options = {}) {
@@ -164,9 +169,9 @@
   // Theme management
   app.utils.ThemeManager = {
     applySettings() {
-      const theme = app.utils.CookieManager.get('Theme') || app.config.DEFAULT_THEME;
-      document.body.setAttribute('data-theme', theme);
-      const themeSelect = document.getElementById('theme-select');
+        const theme = app.utils.CookieManager.get('Theme') || app.config.DEFAULT_THEME;
+        document.body.setAttribute('data-theme', theme);
+        const themeSelect = document.getElementById('theme-select');
       if (themeSelect) themeSelect.value = theme;
 
       const font = app.utils.CookieManager.get('FontFamily') || app.config.DEFAULT_FONT;
@@ -183,9 +188,9 @@
       document.body.setAttribute('data-font', font);
     },
     setTheme(theme) {
-      app.utils.ScrollManager.savePosition();
-      app.utils.CookieManager.set('Theme', theme);
-      window.location.reload();
+        app.utils.ScrollManager.savePosition();
+        app.utils.CookieManager.set('Theme', theme);
+        window.location.reload();
     },
     setFont(font) {
       app.utils.ScrollManager.savePosition();
