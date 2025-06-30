@@ -74,14 +74,35 @@
         }
 
         collectAllItems() {
-            return Array.from(document.querySelectorAll('.linkclass')).map(item => ({
-                title: item.textContent,
-                link: item.href,
-                source_name: item.closest('.box').querySelector('a[target="_blank"]').textContent.trim(),
-                source_icon: item.closest('.box').querySelector('img').src,
-                timestamp: parseInt(item.getAttribute('data-index') || '0'),
-                published: item.getAttribute('data-published') || ''
-            }));
+            const allItems = [];
+            const columns = document.querySelectorAll('.column');
+            columns.forEach(column => {
+                const feedContainers = column.querySelectorAll('.box');
+                feedContainers.forEach(container => {
+                    const feedId = container.id;
+                    const feedTitle = container.querySelector('a[target="_blank"]');
+                    const feedIcon = container.querySelector('img');
+                    if (!feedTitle || !feedIcon) return;
+
+                    const feedInfo = this.extractFeedInfo(feedId, feedIcon);
+                    const items = container.querySelectorAll('.linkclass');
+                    items.forEach(item => {
+                        if (window.getComputedStyle(item).display !== 'none') {
+                            const timestamp = parseInt(item.getAttribute('data-index') || '0');
+                            const published = item.getAttribute('data-published') || '';
+                            allItems.push({
+                                title: item.textContent,
+                                link: item.href,
+                                source_name: feedInfo.name,
+                                source_icon: feedInfo.icon,
+                                timestamp: timestamp,
+                                published: published
+                            });
+                        }
+                    });
+                });
+            });
+            return allItems;
         }
 
         extractFeedInfo(feedId, feedIcon) {
