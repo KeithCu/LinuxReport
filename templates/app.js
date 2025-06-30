@@ -117,6 +117,7 @@
             return null;
           }
         }
+      }
       return null;
     },
     set(name, value, options = {}) {
