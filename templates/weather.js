@@ -123,7 +123,7 @@
         }
 
         createDayHTML(day, useMetric) {
-            const unit = useMetric ? 'C' : 'F';
+            const unit = 'F';
             return `
                 <div class="weather-day">
                     <div class="weather-day-name">${this.getDayName(day)}</div>
