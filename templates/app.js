@@ -96,19 +96,19 @@
   };
 
   // Error handler
-  const handleError = (operation, error) => {
+  app.utils.handleError = (operation, error) => {
     console.error(`Error in ${operation}:`, error);
   };
 
   // Cookie management
   app.utils.CookieManager = {
     get(name) {
-      const match = document.cookie.match(new RegExp(`(^|;)\\s*${name}\\s*=\\s*([^;]+)`));
+      const match = document.cookie.match(new RegExp(`(^|;)\s*${name}\s*=\s*([^;]+)`));
       if (match) {
         try {
           return decodeURIComponent(match[2]);
         } catch (error) {
-          handleError('cookie decode', error);
+          app.utils.handleError('cookie decode', error);
           return null;
         }
       }
@@ -202,6 +202,54 @@
           app.utils.ScrollManager.restorePosition();
         });
       });
+    }
+  };
+
+  app.utils.DragDropManager = {
+    init(options) {
+      const { containerSelector, itemSelector, onDrop } = options;
+      const container = document.querySelector(containerSelector);
+      if (!container) return;
+
+      let draggedItem = null;
+
+      container.addEventListener('dragstart', e => {
+        if (e.target.matches(itemSelector)) {
+          draggedItem = e.target;
+          draggedItem.style.opacity = app.config.DRAG_OPACITY;
+        }
+      });
+
+      container.addEventListener('dragend', e => {
+        if (draggedItem) {
+          draggedItem.style.opacity = app.config.DRAG_OPACITY_NORMAL;
+          draggedItem = null;
+        }
+      });
+
+      container.addEventListener('dragover', e => {
+        e.preventDefault();
+        const afterElement = this.getDragAfterElement(container, e.clientY, itemSelector);
+        if (draggedItem) {
+          container.insertBefore(draggedItem, afterElement);
+        }
+      });
+
+      container.addEventListener('drop', e => {
+        e.preventDefault();
+        if (onDrop) {
+          onDrop();
+        }
+      });
+    },
+
+    getDragAfterElement(container, y, itemSelector) {
+      const draggableElements = [...container.querySelectorAll(`${itemSelector}:not(.dragging)`)];
+      return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        return offset < 0 && offset > closest.offset ? { offset, element: child } : closest;
+      }, { offset: Number.NEGATIVE_INFINITY }).element;
     }
   };
 

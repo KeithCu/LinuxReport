@@ -148,6 +148,7 @@
                 }
             } catch (error) {
                 alert(`Upload failed: ${error.message}`);
+                app.utils.handleError('Image Upload', error);
                 imageUrlInput.value = '';
             } finally {
                 imageUrlInput.disabled = false;
@@ -185,6 +186,7 @@
                 }
             } catch (error) {
                 alert(`Error sending comment: ${error.message}`);
+                app.utils.handleError('Send Comment', error);
             } finally {
                 sendButton.disabled = false;
                 sendButton.textContent = 'Send';
@@ -283,6 +285,7 @@
                 }
             } catch (error) {
                 alert(`Delete failed: ${error.message}`);
+                app.utils.handleError('Delete Comment', error);
             }
         }
 

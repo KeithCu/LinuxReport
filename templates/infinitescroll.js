@@ -74,29 +74,14 @@
         }
 
         collectAllItems() {
-            const allItems = [];
-            document.querySelectorAll('.column').forEach(column => {
-                column.querySelectorAll('.box').forEach(container => {
-                    const feedTitle = container.querySelector('a[target="_blank"]');
-                    const feedIcon = container.querySelector('img');
-                    if (!feedTitle || !feedIcon) return;
-
-                    const feedInfo = this.extractFeedInfo(container.id, feedIcon);
-                    container.querySelectorAll('.linkclass').forEach(item => {
-                        if (window.getComputedStyle(item).display !== 'none') {
-                            allItems.push({
-                                title: item.textContent,
-                                link: item.href,
-                                source_name: feedInfo.name,
-                                source_icon: feedInfo.icon,
-                                timestamp: parseInt(item.getAttribute('data-index') || '0'),
-                                published: item.getAttribute('data-published') || ''
-                            });
-                        }
-                    });
-                });
-            });
-            return allItems;
+            return Array.from(document.querySelectorAll('.linkclass')).map(item => ({
+                title: item.textContent,
+                link: item.href,
+                source_name: item.closest('.box').querySelector('a[target="_blank"]').textContent.trim(),
+                source_icon: item.closest('.box').querySelector('img').src,
+                timestamp: parseInt(item.getAttribute('data-index') || '0'),
+                published: item.getAttribute('data-published') || ''
+            }));
         }
 
         extractFeedInfo(feedId, feedIcon) {
@@ -118,39 +103,24 @@
         }
 
         groupItemsBySource(allItems) {
-            allItems.sort((a, b) => b.timestamp - a.timestamp);
-            
-            const sourceInfo = new Map();
+            const grouped = new Map();
             allItems.forEach(item => {
-                if (!sourceInfo.has(item.source_name)) {
-                    sourceInfo.set(item.source_name, { 
-                        name: item.source_name, 
-                        icon: item.source_icon 
+                if (!grouped.has(item.source_name)) {
+                    grouped.set(item.source_name, {
+                        name: item.source_name,
+                        icon: item.source_icon,
+                        items: []
                     });
                 }
+                grouped.get(item.source_name).items.push(item);
             });
 
-            const groupedItems = [];
-            let currentGroup = null;
-            
-            allItems.forEach(item => {
-                if (!currentGroup || currentGroup.name !== item.source_name) {
-                    currentGroup = { 
-                        name: item.source_name, 
-                        icon: sourceInfo.get(item.source_name).icon, 
-                        items: [] 
-                    };
-                    groupedItems.push(currentGroup);
-                }
-                currentGroup.items.push({ 
-                    title: item.title, 
-                    link: item.link, 
-                    published: item.published,
-                    timestamp: item.timestamp
-                });
+            const sortedGroups = Array.from(grouped.values());
+            sortedGroups.forEach(group => {
+                group.items.sort((a, b) => b.timestamp - a.timestamp);
             });
-            
-            return groupedItems;
+
+            return sortedGroups.sort((a, b) => b.items[0].timestamp - a.items[0].timestamp);
         }
 
         renderGroupedItems(container, groupedItems) {

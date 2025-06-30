@@ -46,42 +46,11 @@
         }
 
         initDragDrop() {
-            document.querySelectorAll('.url-entry').forEach(entry => {
-                ['dragstart', 'dragend', 'dragover', 'drop'].forEach(event => {
-                    entry.addEventListener(event, e => this[`handle${event.charAt(0).toUpperCase() + event.slice(1)}`](e, entry));
-                });
+            app.utils.DragDropManager.init({
+                containerSelector: '.url-list',
+                itemSelector: '.url-entry',
+                onDrop: () => this.updatePriorities()
             });
-        }
-
-        handleDragstart(e, entry) {
-            this.draggedItem = entry;
-            entry.style.opacity = app.config.DRAG_OPACITY;
-        }
-
-        handleDragend(e, entry) {
-            entry.style.opacity = app.config.DRAG_OPACITY_NORMAL;
-            this.draggedItem = null;
-        }
-
-        handleDragover(e, entry) {
-            e.preventDefault();
-            const container = entry.parentNode;
-            const afterElement = this.getDragAfterElement(container, e.clientY);
-            container.insertBefore(this.draggedItem, afterElement);
-        }
-
-        handleDrop(e, entry) {
-            e.preventDefault();
-            this.updatePriorities();
-        }
-
-        getDragAfterElement(container, y) {
-            const draggableElements = [...container.querySelectorAll('.url-entry:not(.dragging)')];
-            return draggableElements.reduce((closest, child) => {
-                const box = child.getBoundingClientRect();
-                const offset = y - box.top - box.height / 2;
-                return offset < 0 && offset > closest.offset ? { offset, element: child } : closest;
-            }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
         updatePriorities() {
@@ -119,6 +88,7 @@
                     }
                 } catch (error) {
                     alert(`Delete failed: ${error.message}`);
+                    app.utils.handleError('Delete Headline', error);
                 }
             });
         }
