@@ -81,36 +81,8 @@
         }
 
         getUnits() {
-            // Try multiple methods to detect if user is in an imperial region
-            const userLocale = navigator.language || app.config.DEFAULT_LOCALE;
-            
-            // Method 1: Check if locale contains US region
-            if (userLocale.includes('US') || userLocale.includes('en-US')) {
-                return 'imperial';
-            }
-            
-            // Method 2: Try Intl.Locale if available
-            try {
-                const locale = new Intl.Locale(userLocale);
-                if (locale.region && app.config.IMPERIAL_REGIONS.includes(locale.region)) {
-                    return 'imperial';
-                }
-            } catch (error) {
-                // Fallback if Intl.Locale fails
-            }
-            
-            // Method 3: Check timezone for US regions
-            try {
-                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                if (timezone && (timezone.includes('America/') || timezone.includes('US/'))) {
-                    return 'imperial';
-                }
-            } catch (error) {
-                // Fallback if timezone detection fails
-            }
-            
-            // Default to metric for non-US regions
-            return 'metric';
+            // Force imperial units for now while debugging
+            return 'imperial';
         }
 
         async fetch() {
