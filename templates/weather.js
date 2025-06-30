@@ -2,7 +2,7 @@
  * weather.js
  * 
  * Weather widget module for the LinuxReport application, integrated with the global app object.
- * Handles weather data fetching, caching, rendering, and widget toggle functionality.
+ * Handles weather data fetching, rendering, and widget toggle functionality.
  * 
  * @author LinuxReport Team
  * @version 3.1.0
@@ -72,11 +72,6 @@
             if (!container || (widgetWrapper && widgetWrapper.classList.contains('collapsed')) || 
                 getComputedStyle(container).display === 'none') return;
             
-            const cachedData = app.utils.CacheManager.get('weatherData', app.config.WEATHER_CACHE_DURATION);
-            if (cachedData) {
-                this.render(cachedData, this.getUnits());
-                return;
-            }
             this.fetch();
         }
 
@@ -91,7 +86,6 @@
                 const response = await fetch(`${app.config.WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}`);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
-                app.utils.CacheManager.set('weatherData', data);
                 this.render(data, useMetric);
             } catch (error) {
                 this.showError('Unable to load weather data.');
