@@ -88,16 +88,19 @@
                     const items = container.querySelectorAll('.linkclass');
                     items.forEach(item => {
                         if (window.getComputedStyle(item).display !== 'none') {
-                            const timestamp = parseInt(item.getAttribute('data-index') || '0');
-                            const published = item.getAttribute('data-published') || '';
-                            allItems.push({
-                                title: item.textContent,
-                                link: item.href,
-                                source_name: feedInfo.name,
-                                source_icon: feedInfo.icon,
-                                timestamp: timestamp,
-                                published: published
-                            });
+                            const linkElement = item.querySelector('a[target="_blank"]');
+                            if (linkElement) {
+                                const timestamp = parseInt(item.getAttribute('data-index') || '0');
+                                const published = item.getAttribute('data-published') || '';
+                                allItems.push({
+                                    title: linkElement.textContent.trim(),
+                                    link: linkElement.href,
+                                    source_name: feedInfo.name,
+                                    source_icon: feedInfo.icon,
+                                    timestamp: timestamp,
+                                    published: published
+                                });
+                            }
                         }
                     });
                 });

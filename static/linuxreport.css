@@ -792,7 +792,17 @@ textarea {
   border: 1px solid var(--btn-border);
   border-radius: var(--border-radius-sm);
   background-color: var(--bg);
-  color: var(--text);
+  color: var(--text) !important;
+}
+
+/* Ensure select elements always use theme text color */
+select {
+  color: var(--text) !important;
+}
+
+select option {
+  color: var(--text) !important;
+  background-color: var(--bg) !important;
 }
 
 select:focus,
