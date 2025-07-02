@@ -860,37 +860,59 @@ def _prepare_articles_for_ai(articles):
     return filtered_articles, previous_selections
 
 
-def _try_model_selection(provider, messages, filtered_articles, attempt_num):
-    """Try to get articles using a specific model attempt."""
-    logger.info(f"AI selection attempt {attempt_num}/2 (free models)")
+def _try_model_with_articles(provider, messages, filtered_articles, model_type="free", attempt_num=None, model_name=None):
+    """Try to get articles using a specific model. Handles both free models and fallback model."""
     
-    # Get available models
-    available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
-    if not available_models:
-        logger.warning("No more free models available")
-        return None, None, None
+    # Determine model and logging context
+    if model_type == "fallback":
+        used_model = provider.fallback_model
+        log_context = "fallback model"
+        if used_model in provider.model_selector.failed_models:
+            logger.warning(f"Fallback model {used_model} was already marked as failed")
+            return None, None, None
+    else:  # free model
+        if attempt_num == 1:
+            # First attempt: use provider's normal fallback logic
+            logger.info(f"AI selection attempt {attempt_num}/2 (free models)")
+            response_text, used_model = provider.call_with_fallback(messages, PROMPT_MODE, f"Attempt {attempt_num}")
+        else:
+            # Second attempt: force a specific free model
+            logger.info(f"AI selection attempt {attempt_num}/2 (free models)")
+            available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
+            if not available_models:
+                logger.warning("No more free models available")
+                return None, None, None
+            
+            selected_model = available_models[0]
+            logger.info(f"Forcing free model: {selected_model}")
+            try:
+                response_text = provider.call_model(selected_model, messages, MAX_TOKENS, f"Attempt {attempt_num}")
+                used_model = selected_model
+            except Exception as e:
+                logger.error(f"Model {selected_model} failed: {str(e)}")
+                provider.model_selector.mark_failed(selected_model)
+                return None, None, None
+        
+        log_context = f"model {used_model}"
     
-    # For first attempt, use provider's normal fallback logic
-    if attempt_num == 1:
-        response_text, used_model = provider.call_with_fallback(messages, PROMPT_MODE, f"Attempt {attempt_num}")
-    else:
-        # For second attempt, force a specific free model
-        selected_model = available_models[0]
-        logger.info(f"Forcing free model: {selected_model}")
+    # For fallback model, make the actual call
+    if model_type == "fallback":
         try:
-            response_text = provider.call_model(selected_model, messages, MAX_TOKENS, f"Attempt {attempt_num}")
-            used_model = selected_model
+            response_text = provider.call_model(used_model, messages, MAX_TOKENS, "Fallback")
         except Exception as e:
-            logger.error(f"Model {selected_model} failed: {str(e)}")
-            provider.model_selector.mark_failed(selected_model)
+            logger.error(f"Fallback model failed: {e}")
+            provider.model_selector.mark_failed(used_model)
             return None, None, None
     
+    # Check response
     if not response_text:
-        logger.warning(f"Attempt {attempt_num} failed - no response from model {used_model}")
+        logger.warning(f"{log_context} returned no response")
+        if model_type == "fallback":
+            provider.model_selector.mark_failed(used_model)
         return None, None, None
     
-    # Process response
-    logger.info(f"Extracting top titles from AI response (model: {used_model})")
+    # Process response (common logic for both types)
+    logger.info(f"Extracting top titles from AI response ({log_context})")
     top_titles = extract_top_titles_from_ai(response_text)
     logger.info(f"Extracted {len(top_titles)} titles from AI response")
     
@@ -900,10 +922,12 @@ def _try_model_selection(provider, messages, filtered_articles, attempt_num):
             logger.debug(f"  {i}. {title}")
     
     if not top_titles:
-        logger.warning(f"No headlines extracted from model {used_model}")
+        logger.warning(f"No headlines extracted from {log_context}")
+        if model_type == "fallback":
+            provider.model_selector.mark_failed(used_model)
         return None, None, None
     
-    # Match titles to articles
+    # Match titles to articles (common logic for both types)
     logger.info("Matching extracted titles to articles")
     top_articles = []
     for i, title in enumerate(top_titles, 1):
@@ -918,55 +942,6 @@ def _try_model_selection(provider, messages, filtered_articles, attempt_num):
     logger.info(f"Successfully matched {len(top_articles)} articles out of {len(top_titles)} titles")
     
     return response_text, top_articles, used_model
-
-
-def _try_fallback_model(provider, messages, filtered_articles):
-    """Try the fallback model if free models failed."""
-    logger.info("Free models failed, trying fallback model...")
-    fallback_model = provider.fallback_model
-    
-    if fallback_model in provider.model_selector.failed_models:
-        logger.warning(f"Fallback model {fallback_model} was already marked as failed")
-        return None, None, None
-    
-    try:
-        response_text = provider.call_model(fallback_model, messages, MAX_TOKENS, "Fallback")
-        used_model = fallback_model
-        
-        if not response_text:
-            logger.warning("Fallback model returned no response")
-            provider.model_selector.mark_failed(fallback_model)
-            return None, None, None
-        
-        # Process fallback response
-        logger.info(f"Extracting top titles from fallback model response")
-        top_titles = extract_top_titles_from_ai(response_text)
-        logger.info(f"Extracted {len(top_titles)} titles from fallback response")
-        
-        if not top_titles:
-            logger.warning("Fallback model failed to extract headlines")
-            provider.model_selector.mark_failed(fallback_model)
-            return None, None, None
-        
-        # Match extracted titles to articles
-        logger.info("Matching extracted titles to articles (fallback)")
-        top_articles = []
-        for i, title in enumerate(top_titles, 1):
-            logger.debug(f"Matching title {i}: {title}")
-            best_match = get_best_matching_article(title, filtered_articles)
-            if (best_match):
-                top_articles.append(best_match)
-                logger.info(f"Fallback selected article {i}: {best_match['title']} ({best_match['url']})")
-            else:
-                logger.warning(f"Fallback failed to find match for title: {title}")
-
-        logger.info(f"Fallback successfully matched {len(top_articles)} articles out of {len(top_titles)} titles")
-        return response_text, top_articles, used_model
-        
-    except Exception as e:
-        logger.error(f"Fallback model failed: {e}")
-        provider.model_selector.mark_failed(fallback_model)
-        return None, None, None
 
 
 def _update_selections_cache(top_articles, previous_selections, used_model):
@@ -1011,14 +986,14 @@ def ask_ai_top_articles(articles):
     
     # Try 2 free models first
     for attempt in range(1, 3):
-        response_text, top_articles, used_model = _try_model_selection(provider, messages, filtered_articles, attempt)
+        response_text, top_articles, used_model = _try_model_with_articles(provider, messages, filtered_articles, "free", attempt)
         if top_articles and len(top_articles) >= 3:
             logger.info(f"Successfully got {len(top_articles)} articles from model {used_model}")
             break
     
     # If free models didn't work, try fallback
     if not top_articles or len(top_articles) < 3:
-        response_text, top_articles, used_model = _try_fallback_model(provider, messages, filtered_articles)
+        response_text, top_articles, used_model = _try_model_with_articles(provider, messages, filtered_articles, "fallback")
     
     # Check if we succeeded
     if not top_articles or len(top_articles) < 3:
