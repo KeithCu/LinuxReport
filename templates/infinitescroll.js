@@ -174,7 +174,6 @@
             div.innerHTML = `
                 <div style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--btn-border);">
                     <img src="${group.icon}" alt="${group.name}" style="width: 64px; height: 64px; margin-right: 16px; border-radius: 8px; object-fit: contain;">
-                    <h2 style="margin: 0; font-size: 1.4em; color: var(--text);">${group.name}</h2>
                 </div>
             `;
             
