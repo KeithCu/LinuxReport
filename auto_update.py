@@ -944,8 +944,12 @@ def _try_model_with_articles(provider, messages, filtered_articles, model_type="
     return response_text, top_articles, used_model
 
 
-def _update_selections_cache(top_articles, previous_selections, used_model):
+def _update_selections_cache(top_articles, previous_selections, used_model, dry_run=False):
     """Update the selections cache with new articles."""
+    if dry_run:
+        logger.info("DRY RUN: Skipping cache updates")
+        return
+        
     if len(top_articles) >= 3 and used_model:
         update_model_cache(used_model)
 
@@ -961,7 +965,7 @@ def _update_selections_cache(top_articles, previous_selections, used_model):
     logger.info(f"Cache update status: {g_c.get('previously_selected_selections_2') is not None}")
 
 
-def ask_ai_top_articles(articles):
+def ask_ai_top_articles(articles, dry_run=False):
     """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
     logger.info(f"Starting AI article selection with {len(articles)} total articles")
     
@@ -1001,7 +1005,7 @@ def ask_ai_top_articles(articles):
         return "Failed to get 3 articles after trying free models and fallback.", [], None
 
     # Update cache
-    _update_selections_cache(top_articles, previous_selections, used_model)
+    _update_selections_cache(top_articles, previous_selections, used_model, dry_run)
     
     return response_text, top_articles, used_model
 
@@ -1123,7 +1127,7 @@ def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run p
             sys.exit(0)
         elif RUN_MODE == "normal":
             logger.info("Running in normal mode")
-            full_response, top_3_articles_match, used_model = ask_ai_top_articles(articles)
+            full_response, top_3_articles_match, used_model = ask_ai_top_articles(articles, dry_run)
 
             # Check if AI call failed or returned no usable response
             if not top_3_articles_match and not full_response.startswith("No new articles"):
