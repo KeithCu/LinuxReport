@@ -83,7 +83,10 @@
         async fetch() {
             const useMetric = this.getUnits() === 'metric';
             try {
-                const response = await fetch(`${app.config.WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}`);
+                // Add cache busting parameter with current date and hour
+                const now = new Date();
+                const cacheBuster = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`;
+                const response = await fetch(`${app.config.WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_cb=${cacheBuster}`);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 this.render(data, useMetric);
