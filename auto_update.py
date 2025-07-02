@@ -778,42 +778,128 @@ def _prepare_messages(prompt_mode, filtered_articles):
         ]
     return messages
 
-def _try_fallback_model(provider1, messages, filtered_articles, reason):
-    """Try fallback model and return (success, top_articles, used_model)"""
-    fallback_model = provider1.fallback_model
-    logger.info(f"Attempting fallback model '{fallback_model}' due to: {reason}")
+def ask_ai_top_articles(articles, dry_run=False):
+    """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
+    logger.info(f"Starting AI article selection with {len(articles)} total articles")
     
-    if fallback_model not in provider1.model_selector.failed_models:
+    # Prepare articles
+    result = _prepare_articles_for_ai(articles)
+    if result is None:
+        return "No new articles to rank.", [], None
+    filtered_articles, previous_selections = result
+
+    # Prepare messages
+    messages = _prepare_messages(PROMPT_MODE, filtered_articles)
+    logger.info(f"Constructed prompt for {PROMPT_MODE} mode with {len(filtered_articles)} articles")
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Prompt messages:")
+        for i, msg in enumerate(messages):
+            logger.debug(f"  Message {i+1} ({msg['role']}): {msg['content'][:200]}...")
+
+    # Try AI selection with simplified logic
+    provider = get_provider(PROVIDER, forced_model=None)
+    response_text, top_articles, used_model = _try_ai_models(provider, messages, filtered_articles)
+    
+    # Check if we succeeded
+    if not top_articles or len(top_articles) < 3:
+        logger.error("Failed to get 3 articles after trying all available models")
+        return "Failed to get 3 articles after trying all available models.", [], None
+
+    # Update cache
+    _update_selections_cache(top_articles, previous_selections, used_model, dry_run)
+    
+    return response_text, top_articles, used_model
+
+
+def _try_ai_models(provider, messages, filtered_articles):
+    """Simplified model selection logic that tries free models first, then fallback."""
+    logger.info("Starting AI model selection process")
+    
+    # Try free models first (up to 2 attempts)
+    for attempt in range(1, 3):
+        logger.info(f"AI selection attempt {attempt}/2 (free models)")
+        
         try:
-            response_text = provider1.call_model(fallback_model, messages, MAX_TOKENS, f"Fallback ({reason})")
+            if attempt == 1:
+                # First attempt: use provider's normal fallback logic
+                response_text, used_model = provider.call_with_fallback(messages, PROMPT_MODE, f"Attempt {attempt}")
+            else:
+                # Second attempt: force a specific free model
+                available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
+                if not available_models:
+                    logger.warning("No more free models available")
+                    break
+                
+                selected_model = available_models[0]
+                logger.info(f"Forcing free model: {selected_model}")
+                response_text = provider.call_model(selected_model, messages, MAX_TOKENS, f"Attempt {attempt}")
+                used_model = selected_model
+            
+            # Process the response
             if response_text:
-                logger.info("Fallback model returned response, extracting titles")
-                top_titles = extract_top_titles_from_ai(response_text)
-                if top_titles:
-                    logger.info(f"Successfully extracted {len(top_titles)} headlines using fallback model: {fallback_model}")
-                    # Process articles with new titles
-                    top_articles = []
-                    for i, title in enumerate(top_titles, 1):
-                        logger.debug(f"Fallback matching title {i}: {title}")
-                        best_match = get_best_matching_article(title, filtered_articles)
-                        if (best_match):
-                            top_articles.append(best_match)
-                            logger.info(f"Fallback selected article {i}: {best_match['title']} ({best_match['url']})")
-                        else:
-                            logger.warning(f"Fallback failed to find match for title: {title}")
-                    return True, top_articles, fallback_model
-                else:
-                    logger.warning("Fallback model also failed to extract headlines")
-                    provider1.model_selector.mark_failed(fallback_model)
-            return False, [], None
+                top_articles = _process_ai_response(response_text, filtered_articles, f"model {used_model}")
+                if top_articles and len(top_articles) >= 3:
+                    logger.info(f"Successfully got {len(top_articles)} articles from {used_model}")
+                    return response_text, top_articles, used_model
+                    
         except Exception as e:
-            logger.error(f"Fallback model failed during {reason}: {e}")
-            traceback.print_exc()
-            provider1.model_selector.mark_failed(fallback_model)
-            return False, [], None
-    else:
-        logger.warning(f"Fallback model {fallback_model} was already tried and failed")
-        return False, [], None
+            logger.error(f"Model attempt {attempt} failed: {str(e)}")
+            if attempt == 1 and hasattr(provider, 'model_selector') and 'used_model' in locals():
+                # Mark the failed model if we can identify it
+                provider.model_selector.mark_failed(used_model)
+    
+    # Try fallback model if free models failed
+    logger.info("Trying fallback model")
+    fallback_model = provider.fallback_model
+    if fallback_model not in provider.model_selector.failed_models:
+        try:
+            response_text = provider.call_model(fallback_model, messages, MAX_TOKENS, "Fallback")
+            if response_text:
+                top_articles = _process_ai_response(response_text, filtered_articles, "fallback model")
+                if top_articles and len(top_articles) >= 3:
+                    logger.info(f"Successfully got {len(top_articles)} articles from fallback model")
+                    return response_text, top_articles, fallback_model
+        except Exception as e:
+            logger.error(f"Fallback model failed: {e}")
+            provider.model_selector.mark_failed(fallback_model)
+    
+    logger.error("All model attempts failed")
+    return None, [], None
+
+
+def _process_ai_response(response_text, filtered_articles, model_context):
+    """Process AI response and extract matching articles."""
+    logger.info(f"Processing AI response from {model_context}")
+    
+    # Extract titles from response
+    top_titles = extract_top_titles_from_ai(response_text)
+    logger.info(f"Extracted {len(top_titles)} titles from AI response")
+    
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("Extracted titles:")
+        for i, title in enumerate(top_titles, 1):
+            logger.debug(f"  {i}. {title}")
+    
+    if not top_titles:
+        logger.warning(f"No headlines extracted from {model_context}")
+        return []
+    
+    # Match titles to articles
+    logger.info("Matching extracted titles to articles")
+    top_articles = []
+    for i, title in enumerate(top_titles, 1):
+        logger.debug(f"Matching title {i}: {title}")
+        best_match = get_best_matching_article(title, filtered_articles)
+        if best_match:
+            top_articles.append(best_match)
+            logger.info(f"Selected article {i}: {best_match['title']} ({best_match['url']})")
+        else:
+            logger.warning(f"Failed to find match for title: {title}")
+
+    logger.info(f"Successfully matched {len(top_articles)} articles out of {len(top_titles)} titles")
+    return top_articles
+
 
 def _prepare_articles_for_ai(articles):
     """Prepare articles by deduplicating and filtering."""
@@ -860,90 +946,6 @@ def _prepare_articles_for_ai(articles):
     return filtered_articles, previous_selections
 
 
-def _try_model_with_articles(provider, messages, filtered_articles, model_type="free", attempt_num=None, model_name=None):
-    """Try to get articles using a specific model. Handles both free models and fallback model."""
-    
-    # Determine model and logging context
-    if model_type == "fallback":
-        used_model = provider.fallback_model
-        log_context = "fallback model"
-        if used_model in provider.model_selector.failed_models:
-            logger.warning(f"Fallback model {used_model} was already marked as failed")
-            return None, None, None
-    else:  # free model
-        if attempt_num == 1:
-            # First attempt: use provider's normal fallback logic
-            logger.info(f"AI selection attempt {attempt_num}/2 (free models)")
-            response_text, used_model = provider.call_with_fallback(messages, PROMPT_MODE, f"Attempt {attempt_num}")
-        else:
-            # Second attempt: force a specific free model
-            logger.info(f"AI selection attempt {attempt_num}/2 (free models)")
-            available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
-            if not available_models:
-                logger.warning("No more free models available")
-                return None, None, None
-            
-            selected_model = available_models[0]
-            logger.info(f"Forcing free model: {selected_model}")
-            try:
-                response_text = provider.call_model(selected_model, messages, MAX_TOKENS, f"Attempt {attempt_num}")
-                used_model = selected_model
-            except Exception as e:
-                logger.error(f"Model {selected_model} failed: {str(e)}")
-                provider.model_selector.mark_failed(selected_model)
-                return None, None, None
-        
-        log_context = f"model {used_model}"
-    
-    # For fallback model, make the actual call
-    if model_type == "fallback":
-        try:
-            response_text = provider.call_model(used_model, messages, MAX_TOKENS, "Fallback")
-        except Exception as e:
-            logger.error(f"Fallback model failed: {e}")
-            provider.model_selector.mark_failed(used_model)
-            return None, None, None
-    
-    # Check response
-    if not response_text:
-        logger.warning(f"{log_context} returned no response")
-        if model_type == "fallback":
-            provider.model_selector.mark_failed(used_model)
-        return None, None, None
-    
-    # Process response (common logic for both types)
-    logger.info(f"Extracting top titles from AI response ({log_context})")
-    top_titles = extract_top_titles_from_ai(response_text)
-    logger.info(f"Extracted {len(top_titles)} titles from AI response")
-    
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Extracted titles:")
-        for i, title in enumerate(top_titles, 1):
-            logger.debug(f"  {i}. {title}")
-    
-    if not top_titles:
-        logger.warning(f"No headlines extracted from {log_context}")
-        if model_type == "fallback":
-            provider.model_selector.mark_failed(used_model)
-        return None, None, None
-    
-    # Match titles to articles (common logic for both types)
-    logger.info("Matching extracted titles to articles")
-    top_articles = []
-    for i, title in enumerate(top_titles, 1):
-        logger.debug(f"Matching title {i}: {title}")
-        best_match = get_best_matching_article(title, filtered_articles)
-        if (best_match):
-            top_articles.append(best_match)
-            logger.info(f"Selected article {i}: {best_match['title']} ({best_match['url']})")
-        else:
-            logger.warning(f"Failed to find match for title: {title}")
-
-    logger.info(f"Successfully matched {len(top_articles)} articles out of {len(top_titles)} titles")
-    
-    return response_text, top_articles, used_model
-
-
 def _update_selections_cache(top_articles, previous_selections, used_model, dry_run=False):
     """Update the selections cache with new articles."""
     if dry_run:
@@ -963,51 +965,6 @@ def _update_selections_cache(top_articles, previous_selections, used_model, dry_
     logger.info(f"Updating cache with {len(updated_selections)} selections")
     g_c.put("previously_selected_selections_2", updated_selections, timeout=EXPIRE_WEEK)
     logger.info(f"Cache update status: {g_c.get('previously_selected_selections_2') is not None}")
-
-
-def ask_ai_top_articles(articles, dry_run=False):
-    """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
-    logger.info(f"Starting AI article selection with {len(articles)} total articles")
-    
-    # Prepare articles
-    result = _prepare_articles_for_ai(articles)
-    if result is None:
-        return "No new articles to rank.", [], [], None
-    filtered_articles, previous_selections = result
-
-    # Prepare messages
-    messages = _prepare_messages(PROMPT_MODE, filtered_articles)
-    logger.info(f"Constructed prompt for {PROMPT_MODE} mode with {len(filtered_articles)} articles")
-    
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Prompt messages:")
-        for i, msg in enumerate(messages):
-            logger.debug(f"  Message {i+1} ({msg['role']}): {msg['content'][:200]}...")
-
-    # Try AI selection
-    provider = get_provider(PROVIDER, forced_model=None)
-    response_text, top_articles, used_model = None, [], None
-    
-    # Try 2 free models first
-    for attempt in range(1, 3):
-        response_text, top_articles, used_model = _try_model_with_articles(provider, messages, filtered_articles, "free", attempt)
-        if top_articles and len(top_articles) >= 3:
-            logger.info(f"Successfully got {len(top_articles)} articles from model {used_model}")
-            break
-    
-    # If free models didn't work, try fallback
-    if not top_articles or len(top_articles) < 3:
-        response_text, top_articles, used_model = _try_model_with_articles(provider, messages, filtered_articles, "fallback")
-    
-    # Check if we succeeded
-    if not top_articles or len(top_articles) < 3:
-        logger.error("Failed to get 3 articles after trying free models and fallback")
-        return "Failed to get 3 articles after trying free models and fallback.", [], None
-
-    # Update cache
-    _update_selections_cache(top_articles, previous_selections, used_model, dry_run)
-    
-    return response_text, top_articles, used_model
 
 
 def run_comparison(articles):
@@ -1092,93 +1049,96 @@ def append_to_archive(mode, top_articles):
     logger.info(f"Successfully updated archive file: {archive_file}")
 
 # --- Integration into the main pipeline ---
-def main(mode, settings_module, settings_config, dry_run=False): # Add dry_run parameter
+def main(mode, settings_module, settings_config, dry_run=False):
+    """Main processing function with improved error handling and dry run logic."""
     global ALL_URLS, REPORT_PROMPT
     ALL_URLS = settings_config.ALL_URLS
     REPORT_PROMPT = settings_config.REPORT_PROMPT
-    SITE_PATH = settings_config.PATH  # Get the site's path from its config
+    SITE_PATH = settings_config.PATH
 
     logger.info(f"Starting main processing for mode: {mode}")
     logger.info(f"Site path: {SITE_PATH}")
     logger.info(f"Report prompt: {REPORT_PROMPT}")
     logger.info(f"Number of URLs configured: {len(ALL_URLS)}")
-    
-    if dry_run:
-        logger.info("Running in DRY RUN mode - no files will be updated")
+    logger.info(f"Dry run mode: {dry_run}")
 
     html_file = f"{mode}reportabove.html"
 
     try:
-        # Pass ALL_URLS and cache to fetch_recent_articles
+        # Fetch articles
         logger.info("Fetching recent articles from configured URLs")
         articles = fetch_recent_articles(ALL_URLS, g_c)
         if not articles:
             logger.error(f"No articles found for mode: {mode}")
-            sys.exit(1) # Keep exit for no articles
+            return 1
 
         logger.info(f"Fetched {len(articles)} articles from {len(ALL_URLS)} URLs")
 
-        # --- Handle Run Modes ---
+        # Handle different run modes
         if RUN_MODE == "compare":
             logger.info("Running in comparison mode")
             run_comparison(articles)
-            # Comparison mode implies dry-run, so we exit here
-            logger.info("Exiting after comparison run.")
-            sys.exit(0)
+            return 0
         elif RUN_MODE == "normal":
-            logger.info("Running in normal mode")
-            full_response, top_3_articles_match, used_model = ask_ai_top_articles(articles, dry_run)
-
-            # Check if AI call failed or returned no usable response
-            if not top_3_articles_match and not full_response.startswith("No new articles"):
-                logger.error("AI processing failed or returned no headlines.")
-                # Decide if we should exit or continue without update
-                sys.exit(1) # Exit if AI failed critically
-
-            if dry_run:
-                logger.info("--- Dry Run Mode: Skipping file generation and archive update. ---")
-                sys.exit(0) # Exit after dry run
-
-            # --- Normal Run: Generate HTML and Archive ---
-            if not top_3_articles_match:
-                logger.warning("No top articles identified by AI. Skipping update.")
-                sys.exit(0) # Exit gracefully if AI didn't pick articles
-
-            # Fetch largest images in-line for each headline
-            logger.info("Fetching images for top articles...")
-            for i, art in enumerate(top_3_articles_match, 1):
-                logger.debug(f"Fetching image for article {i}: {art['title']}")
-                art['image_url'] = custom_fetch_largest_image(
-                    art['url'], underlying_link=art.get('underlying_link'), html_content=art.get('html_content')
-                )
-                if art['image_url']:
-                    logger.debug(f"Found image for article {i}: {art['image_url']}")
-                else:
-                    logger.debug(f"No image found for article {i}")
-                    
-            # Render HTML and archive with images
-            logger.info(f"Generating HTML file: {html_file}")
-            # Pass headline_template to generate_headlines_html
-            generate_headlines_html(top_3_articles_match, html_file, model_name=used_model if SHOW_AI_ATTRIBUTION else None)
-                        
-            logger.info(f"Appending to archive for mode: {mode}")
-            append_to_archive(mode, top_3_articles_match)
-            # Update selections cache only on successful normal run completion
-
+            return _process_normal_mode(mode, articles, html_file, dry_run)
         else:
-            logger.error(f"Unknown RUN_MODE: {RUN_MODE}. Exiting.")
-            sys.exit(1)
+            logger.error(f"Unknown RUN_MODE: {RUN_MODE}")
+            return 1
 
-    except FileNotFoundError as e: # Specific error
-        logger.error(f"Configuration file error for mode {mode}: {e}")
-        sys.exit(1)
-    except ImportError as e: # Specific error
-        logger.error(f"Error importing settings for mode {mode}: {e}")
-        sys.exit(1)
-    except Exception as e: # Keep general for other unexpected errors during main execution
-        logger.error(f"Error in mode {mode}: {e}")
-        traceback.print_exc() # Print traceback for debugging
-        sys.exit(1)
+    except (FileNotFoundError, ImportError) as e:
+        logger.error(f"Configuration error for mode {mode}: {e}")
+        return 1
+    except Exception as e:
+        logger.error(f"Unexpected error in mode {mode}: {e}")
+        traceback.print_exc()
+        return 1
+
+
+def _process_normal_mode(mode, articles, html_file, dry_run):
+    """Process articles in normal mode with improved error handling."""
+    logger.info("Running in normal mode")
+    
+    # Get AI-selected articles
+    full_response, top_3_articles_match, used_model = ask_ai_top_articles(articles, dry_run)
+
+    # Handle AI processing results
+    if not top_3_articles_match:
+        if full_response.startswith("No new articles"):
+            logger.info("No new articles to process")
+            return 0
+        else:
+            logger.error("AI processing failed or returned no headlines")
+            return 1
+
+    # Handle dry run mode
+    if dry_run:
+        logger.info("--- Dry Run Mode: Skipping file generation and archive update ---")
+        logger.info(f"Would have selected {len(top_3_articles_match)} articles:")
+        for i, article in enumerate(top_3_articles_match, 1):
+            logger.info(f"  {i}. {article['title']} ({article['url']})")
+        return 0
+
+    # Normal processing: fetch images and generate files
+    logger.info("Fetching images for top articles...")
+    for i, art in enumerate(top_3_articles_match, 1):
+        logger.debug(f"Fetching image for article {i}: {art['title']}")
+        art['image_url'] = custom_fetch_largest_image(
+            art['url'], underlying_link=art.get('underlying_link'), html_content=art.get('html_content')
+        )
+        if art['image_url']:
+            logger.debug(f"Found image for article {i}: {art['image_url']}")
+        else:
+            logger.debug(f"No image found for article {i}")
+            
+    # Generate HTML and archive
+    logger.info(f"Generating HTML file: {html_file}")
+    generate_headlines_html(top_3_articles_match, html_file, model_name=used_model if SHOW_AI_ATTRIBUTION else None)
+                
+    logger.info(f"Appending to archive for mode: {mode}")
+    append_to_archive(mode, top_3_articles_match)
+    
+    logger.info("Normal mode processing completed successfully")
+    return 0
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate report with optional force update')
@@ -1276,6 +1236,7 @@ if __name__ == "__main__":
             PROMPT_MODE = PromptMode.THIRTY_B
 
     logger.info("Starting main processing...")
-    main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run)
+    exit_code = main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run)
+    sys.exit(exit_code)
 
 
