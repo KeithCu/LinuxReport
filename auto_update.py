@@ -321,10 +321,11 @@ class LLMProvider(ABC):
         """Configure the client with provider-specific settings."""
         pass  # Default implementation does nothing
     
-    def call_model(self, model: str, messages: List[Dict[str, str]], max_tokens: int, label: str = "") -> str:
+    def call_model(self, model: str, messages: List[Dict[str, str]], max_tokens: int, label: str = "") -> Tuple[str, str]:
         """Call the model with retry logic, timeout, and logging."""
         client = self.get_client(use_cache=False)
-        return _try_call_model(client, model, messages, max_tokens)
+        response_text = _try_call_model(client, model, messages, max_tokens)
+        return response_text, model
     
     def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
         """Call the primary model with fallback to secondary if needed."""
@@ -516,11 +517,11 @@ class OpenRouterProvider(LLMProvider):
             logger.info(f"Attempt {attempt + 1}/{max_attempts}: {self.name} / {current_model} / {prompt_mode} {label}")
             
             try:
-                response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
+                response_text, used_model = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
                 if response_text:
                     self.model_selector.mark_success(current_model)
                     logger.info(f"Successfully got response from {current_model}")
-                    return response_text, current_model
+                    return response_text, used_model
             except Exception as e:
                 logger.error(f"Model {current_model} failed: {str(e)}")
                 self.model_selector.mark_failed(current_model)
@@ -591,6 +592,12 @@ def _try_call_model(client, model, messages, max_tokens):
                 extra_body=extra_params
             )
             end = timer()
+            
+            # Check if response has choices before accessing
+            if not response.choices:
+                logger.error(f"Model {model} returned empty choices")
+                raise RuntimeError(f"Model {model} returned empty choices")
+            
             choice = response.choices[0]
             response_text = choice.message.content
             finish_reason = choice.finish_reason
@@ -858,10 +865,11 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
     try:
         result = call_func()
         
-        # Handle different return types from call_func
+        # Standardize return types - all call_func should return (response_text, used_model)
         if isinstance(result, tuple):
             response_text, used_model = result
         else:
+            # Handle case where call_func returns just response_text
             response_text = result
             used_model = None
         
@@ -1030,7 +1038,7 @@ def _run_comparison_model(provider, model, filtered_articles, label):
     """Helper function to run a single comparison model."""
     try:
         messages = _prepare_messages(PROMPT_MODE, filtered_articles)
-        response_text = provider.call_model(model, messages, MAX_TOKENS, label)
+        response_text, used_model = provider.call_model(model, messages, MAX_TOKENS, label)
         
         if response_text:
             logger.info(f"{label} completed successfully")
