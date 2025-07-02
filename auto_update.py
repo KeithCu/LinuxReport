@@ -820,52 +820,85 @@ def _try_ai_models(provider, messages, filtered_articles):
     for attempt in range(1, 3):
         logger.info(f"AI selection attempt {attempt}/2 (free models)")
         
-        try:
-            if attempt == 1:
-                # First attempt: use provider's normal fallback logic
-                response_text, used_model = provider.call_with_fallback(messages, PROMPT_MODE, f"Attempt {attempt}")
-            else:
-                # Second attempt: force a specific free model
-                available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
-                if not available_models:
-                    logger.warning("No more free models available")
-                    break
-                
-                selected_model = available_models[0]
-                logger.info(f"Forcing free model: {selected_model}")
-                response_text = provider.call_model(selected_model, messages, MAX_TOKENS, f"Attempt {attempt}")
-                used_model = selected_model
+        # Get model and call it
+        if attempt == 1:
+            # First attempt: use provider's normal fallback logic
+            result = _try_model_call(provider, messages, filtered_articles, "provider fallback", 
+                                   lambda: provider.call_with_fallback(messages, PROMPT_MODE, f"Attempt {attempt}"))
+        else:
+            # Second attempt: force a specific free model
+            available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
+            if not available_models:
+                logger.warning("No more free models available")
+                break
             
-            # Process the response
-            if response_text:
-                top_articles = _process_ai_response(response_text, filtered_articles, f"model {used_model}")
-                if top_articles and len(top_articles) >= 3:
-                    logger.info(f"Successfully got {len(top_articles)} articles from {used_model}")
-                    return response_text, top_articles, used_model
-                    
-        except Exception as e:
-            logger.error(f"Model attempt {attempt} failed: {str(e)}")
-            if attempt == 1 and hasattr(provider, 'model_selector') and 'used_model' in locals():
-                # Mark the failed model if we can identify it
-                provider.model_selector.mark_failed(used_model)
+            selected_model = available_models[0]
+            logger.info(f"Forcing free model: {selected_model}")
+            result = _try_model_call(provider, messages, filtered_articles, f"model {selected_model}",
+                                   lambda: provider.call_model(selected_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
+        
+        if result:
+            return result
     
     # Try fallback model if free models failed
     logger.info("Trying fallback model")
     fallback_model = provider.fallback_model
     if fallback_model not in provider.model_selector.failed_models:
-        try:
-            response_text = provider.call_model(fallback_model, messages, MAX_TOKENS, "Fallback")
-            if response_text:
-                top_articles = _process_ai_response(response_text, filtered_articles, "fallback model")
-                if top_articles and len(top_articles) >= 3:
-                    logger.info(f"Successfully got {len(top_articles)} articles from fallback model")
-                    return response_text, top_articles, fallback_model
-        except Exception as e:
-            logger.error(f"Fallback model failed: {e}")
-            provider.model_selector.mark_failed(fallback_model)
+        result = _try_model_call(provider, messages, filtered_articles, "fallback model",
+                               lambda: provider.call_model(fallback_model, messages, MAX_TOKENS, "Fallback"))
+        if result:
+            return result
     
     logger.error("All model attempts failed")
     return None, [], None
+
+
+def _try_model_call(provider, messages, filtered_articles, model_context, call_func):
+    """Helper function to try a model call and process the response."""
+    try:
+        result = call_func()
+        
+        # Handle different return types from call_func
+        if isinstance(result, tuple):
+            response_text, used_model = result
+        else:
+            response_text = result
+            used_model = None
+        
+        if not response_text:
+            logger.warning(f"{model_context} returned no response")
+            return None
+        
+        # Process the response
+        top_articles = _process_ai_response(response_text, filtered_articles, model_context)
+        if top_articles and len(top_articles) >= 3:
+            logger.info(f"Successfully got {len(top_articles)} articles from {model_context}")
+            
+            # Determine the actual model name
+            if used_model:
+                actual_model = used_model
+            elif model_context == "fallback model":
+                actual_model = provider.fallback_model
+            else:
+                # Extract model name from context like "model model_name"
+                actual_model = model_context.replace("model ", "")
+            
+            return response_text, top_articles, actual_model
+        else:
+            logger.warning(f"{model_context} failed to produce enough articles")
+            return None
+            
+    except Exception as e:
+        logger.error(f"{model_context} failed: {str(e)}")
+        # Mark model as failed if we can identify it
+        if hasattr(provider, 'model_selector'):
+            if model_context == "fallback model":
+                provider.model_selector.mark_failed(provider.fallback_model)
+            elif model_context != "provider fallback":
+                # Extract model name from context
+                model_name = model_context.replace("model ", "")
+                provider.model_selector.mark_failed(model_name)
+        return None
 
 
 def _process_ai_response(response_text, filtered_articles, model_context):
@@ -971,39 +1004,45 @@ def run_comparison(articles):
     """Runs two LLM calls with different configurations for comparison."""
     logger.info("--- Running Comparison Mode ---")
 
-    # --- Deduplication (same as ask_ai_top_articles) ---
-    previous_selections = g_c.get("previously_selected_selections_2") or []
-    previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
-    previous_urls = [sel["url"] for sel in previous_selections]
-    articles = [article for article in articles if article["url"] not in previous_urls]
-    filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
-
-    logger.info(f"Comparison mode: {len(articles)} articles after deduplication")
-
-    if not filtered_articles:
+    # Use the same deduplication logic as ask_ai_top_articles
+    result = _prepare_articles_for_ai(articles)
+    if result is None:
         logger.warning("No new articles available after deduplication for comparison.")
         return
+    filtered_articles, _ = result
 
-    # --- Config 1 ---
+    logger.info(f"Comparison mode: {len(filtered_articles)} articles after deduplication")
+
+    # Get comparison models and run them
     provider = get_provider(PROVIDER, forced_model=None)
     model1, model2 = provider.get_comparison_models()
     logger.info(f"Comparison model 1: {model1}")
     logger.info(f"Comparison model 2: {model2}")
     
-    messages1 = _prepare_messages(PROMPT_MODE, filtered_articles)
-    response_text1 = provider.call_model(model1, messages1, MAX_TOKENS, 'Comparison 1')
-    
-    if not response_text1:
-        logger.error(f"Comparison 1 failed for {PROVIDER}")
-
-    # --- Config 2 ---
-    messages2 = _prepare_messages(PROMPT_MODE, filtered_articles)
-    response_text2 = provider.call_model(model2, messages2, MAX_TOKENS, 'Comparison 2')
-    
-    if not response_text2:
-        logger.error(f"Comparison 2 failed for {PROVIDER}")
+    # Run both models
+    _run_comparison_model(provider, model1, filtered_articles, "Comparison 1")
+    _run_comparison_model(provider, model2, filtered_articles, "Comparison 2")
 
     logger.info("--- Comparison Mode Finished ---")
+
+
+def _run_comparison_model(provider, model, filtered_articles, label):
+    """Helper function to run a single comparison model."""
+    try:
+        messages = _prepare_messages(PROMPT_MODE, filtered_articles)
+        response_text = provider.call_model(model, messages, MAX_TOKENS, label)
+        
+        if response_text:
+            logger.info(f"{label} completed successfully")
+            # Optionally process and log the results
+            top_articles = _process_ai_response(response_text, filtered_articles, f"{label} ({model})")
+            if top_articles:
+                logger.info(f"{label} selected {len(top_articles)} articles")
+        else:
+            logger.error(f"{label} failed for {PROVIDER}")
+            
+    except Exception as e:
+        logger.error(f"{label} failed with exception: {e}")
 
 
 def append_to_archive(mode, top_articles):
