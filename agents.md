@@ -24,7 +24,7 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
   - Pillow for image processing and WebP conversion
   - OpenAI and sentence_transformers for LLM integration
   - Diskcache for high-performance SQLite caching
-  - Cacheout for in-memory caching
+  - Cacheout for in-memory TTL caching
 
 ## Project Structure
 
@@ -52,14 +52,11 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 ├── FeedHistory.py            # Feed history tracking and management
 ├── Reddit.py                 # Reddit-specific fetching and processing
 ├── custom_site_handlers.py   # Custom site-specific handlers
-├── image_processing.py       # Image processing and optimization
-├── image_parser.py           # Image parsing and extraction
-├── image_utils.py            # Image utility functions
-├── image_candidate_selector.py # Image selection algorithms
-├── image_html_parser.py      # HTML image parsing utilities
+├── image_processing.py       # Main entry points for image extraction and processing
+├── image_parser.py           # HTML parsing, image candidate extraction and selection
+├── image_utils.py            # Core utility functions, constants, and image dimension logic
 ├── combinefiles.py           # File combination utilities
 ├── convert_png_to_webp.py    # PNG to WebP conversion utilities
-├── png_to_webp_converter.py  # Alternative WebP conversion implementation
 ├── feedfilter.py             # RSS feed filtering and processing
 ├── old_headlines.py          # Legacy headlines processing
 ├── stats.py                  # Statistics and analytics
@@ -155,6 +152,23 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
     - Cloud storage synchronization
     - Distributed lock management
 
+11. **image_parser.py**:
+    - Main entry point for image fetching via `custom_fetch_largest_image`
+    - HTML parsing and image candidate extraction
+    - Image selection and scoring algorithms
+    - Integration with custom site handlers
+
+12. **image_processing.py**:
+    - Selenium-based image extraction for JavaScript-heavy sites
+    - Orchestration of image processing pipeline
+    - Browser automation for complex image extraction scenarios
+
+13. **image_utils.py**:
+    - Core utility functions for image processing
+    - Image dimension extraction and scoring
+    - SVG image handling and srcset parsing
+    - Shared constants and configuration
+
 ## Report Type System
 
 LinuxReport supports multiple report types, each with its own configuration:
@@ -217,13 +231,15 @@ The system includes CDN support for optimal image delivery:
 
 The project includes a comprehensive image processing pipeline:
 
-1. **image_processing.py**: Core image processing and optimization
-2. **image_parser.py**: Image parsing and extraction from HTML
-3. **image_utils.py**: Image utility functions and helpers
-4. **image_candidate_selector.py**: Image selection algorithms
-5. **image_html_parser.py**: HTML image parsing utilities
-6. **convert_png_to_webp.py**: PNG to WebP conversion utilities
-7. **png_to_webp_converter.py**: Alternative WebP conversion implementation
+1. **image_processing.py**: Main entry points for image extraction and processing, including Selenium-based fetching. Orchestrates calls to utility and parsing functions defined in other modules.
+
+2. **image_parser.py**: Handles HTML parsing, image candidate extraction and selection, and custom site-specific logic. Contains the main `custom_fetch_largest_image` function that serves as the primary entry point for image fetching.
+
+3. **image_utils.py**: Contains core utility functions, constants, and image dimension logic. Includes functions for scoring image candidates, parsing srcset attributes, extracting dimensions, and handling SVG images.
+
+4. **convert_png_to_webp.py**: PNG to WebP conversion utilities for image optimization.
+
+The image processing system has been refactored to consolidate functionality into these core modules, with `image_parser.py` serving as the main entry point and `image_utils.py` providing shared utilities and constants.
 
 ## Coding Conventions
 
@@ -257,7 +273,7 @@ The project includes a comprehensive image processing pipeline:
 ## JavaScript Architecture
 
 1. **Modular System**:
-   - Source files in `templates/`: `app.js`, `core.js`, `config.js`, `chat.js`, `weather.js`, `infinitescroll.js`, `image-optimizer-unused.js`
+   - Source files in `templates/`: `app.js`, `core.js`, `config.js`, `chat.js`, `weather.js`, `infinitescroll.js`
    - Automatic bundling into `static/linuxreport.js` via Flask-Assets
    - Development mode: unminified for debugging
    - Production mode: minified with source file headers
@@ -275,6 +291,7 @@ The project includes a comprehensive image processing pipeline:
    - Event delegation for performance
    - Progressive enhancement principles
    - Consistent error handling and logging
+   - CSRF token handling for secure AJAX requests
 
 ## Configuration Management
 
