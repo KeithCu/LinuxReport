@@ -834,7 +834,7 @@ textarea:focus {
   top: 20px;
   right: 20px;
   width: 350px;
-  height: calc(100vh - 40px);
+  height: 400px;
   background-color: var(--bg);
   border: 2px solid var(--btn-border);
   border-radius: var(--border-radius-md);
@@ -843,7 +843,7 @@ textarea:focus {
   flex-direction: column;
   z-index: 1000;
   resize: both;
-  overflow: auto;
+  overflow: hidden;
 }
 
 #chat-header {
@@ -858,11 +858,10 @@ textarea:focus {
 }
 
 #chat-messages {
-  flex-grow: 1;
+  flex: 1;
   overflow-y: auto;
   padding: var(--spacing-sm);
-  display: flex;
-  flex-direction: column-reverse;
+  min-height: 0;
 }
 
 .chat-message {
@@ -899,6 +898,8 @@ textarea:focus {
   display: flex;
   gap: var(--spacing-sm);
   border-top: 1px solid var(--btn-border);
+  flex-shrink: 0;
+  margin-top: auto;
 }
 
 #chat-input-area.dragover {

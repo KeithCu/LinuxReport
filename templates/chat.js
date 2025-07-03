@@ -41,6 +41,7 @@
             requiredElements.forEach(id => this.elements[id] = document.getElementById(id));
             if (requiredElements.some(id => !this.elements[id])) return false;
 
+            this.setupChatLayout();
             this.setupEventListeners();
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
             window.addEventListener('resize', this.handleResize);
@@ -56,6 +57,11 @@
             ['click', 'touchstart', 'keydown'].forEach(event => 
                 document.addEventListener(event, loadBeep, { once: true })
             );
+        }
+
+        setupChatLayout() {
+            // Chat layout is now handled by CSS
+            // This method is kept for potential future layout adjustments
         }
 
         setupEventListeners() {
@@ -211,6 +217,12 @@
             const messagesContainer = this.elements['chat-messages'];
             if (!messagesContainer) return;
 
+            // Hide loading message once we have comments
+            const loadingElement = this.elements['chat-loading'];
+            if (loadingElement && comments.length > 0) {
+                loadingElement.style.display = 'none';
+            }
+
             // Check for new comments
             const newComments = comments.filter(comment => 
                 !this.state.lastComments.some(last => 
@@ -258,10 +270,16 @@
             
             if (this.state.isAdminMode && comment.id) {
                 const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = 'Delete';
+                deleteBtn.textContent = '✕';
                 deleteBtn.style.marginTop = '4px';
-                deleteBtn.style.fontSize = '0.8em';
-                deleteBtn.style.padding = '2px 6px';
+                deleteBtn.style.fontSize = '1.2em';
+                deleteBtn.style.padding = '0';
+                deleteBtn.style.background = 'none';
+                deleteBtn.style.border = 'none';
+                deleteBtn.style.color = 'var(--muted, #888)';
+                deleteBtn.style.cursor = 'pointer';
+                deleteBtn.style.lineHeight = '1';
+                deleteBtn.title = 'Delete';
                 deleteBtn.addEventListener('click', (e) => this.handleDelete(e, comment.id));
                 messageDiv.appendChild(deleteBtn);
             }
@@ -322,9 +340,14 @@
             if (document.hidden) {
                 this.cleanup();
             } else {
-                this.initializeSSE();
-                if (!app.config.CHAT_USE_SSE) {
-                    this.fetchComments();
+                // Only reconnect if chat is currently visible
+                const container = this.elements['chat-container'];
+                const computedStyle = getComputedStyle(container);
+                if (computedStyle.display !== 'none') {
+                    this.initializeSSE();
+                    if (!app.config.CHAT_USE_SSE) {
+                        this.fetchComments();
+                    }
                 }
             }
         }
@@ -350,12 +373,13 @@
 
         toggleChat() {
             const container = this.elements['chat-container'];
-            const isVisible = container.style.display !== 'none';
+            const computedStyle = getComputedStyle(container);
+            const isVisible = computedStyle.display !== 'none';
             
             if (isVisible) {
                 this.closeChat();
             } else {
-                container.style.display = 'block';
+                container.style.display = 'flex';
                 this.initializeSSE();
                 if (!app.config.CHAT_USE_SSE) {
                     this.fetchComments();
@@ -385,10 +409,8 @@
         init() {
             const chatWidget = new ChatWidget();
             if (chatWidget.init()) {
-                chatWidget.initializeSSE();
-                if (!app.config.CHAT_USE_SSE) {
-                    chatWidget.fetchComments();
-                }
+                // Don't initialize SSE or fetch comments until chat is opened
+                // The chat container starts hidden by default
             }
         }
     };
