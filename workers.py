@@ -29,6 +29,7 @@ from timeit import default_timer as timer
 from urllib.parse import urlparse
 from collections import defaultdict
 import pickle
+from abc import ABC, abstractmethod
 
 # Third-party imports
 import feedparser
@@ -62,7 +63,123 @@ if not g_cs.has("REDDIT_USER_AGENT"):
 USER_AGENT_RANDOM = g_cs.get("REDDIT_USER_AGENT")
 
 # Regular expression for extracting links from HTML content
-LINK_REGEX = re.compile(r'href=["\'](.*?)["\']')
+LINK_REGEX = re.compile(r'href=["\\]["\\](.*?)["\\]["\\]')
+
+# =============================================================================
+# FETCHER STRATEGY PATTERN
+# =============================================================================
+
+class FetcherStrategy(ABC):
+    """Abstract base class for a feed fetching strategy."""
+
+    @abstractmethod
+    def fetch(self, url, rss_info):
+        """
+        Fetches and processes a feed.
+
+        Args:
+            url (str): The URL of the feed to fetch.
+            rss_info (RssInfo): The RssInfo object for the feed.
+
+        Returns:
+            list: A list of processed feed entries.
+        """
+        pass
+
+class DefaultFetcher(FetcherStrategy):
+    """The default strategy for fetching standard RSS/Atom feeds."""
+
+    def fetch(self, url, rss_info):
+        res = feedparser.parse(url, agent=USER_AGENT)
+        if not res:
+            return []
+        
+        new_entries = prefilter_news(url, res)
+        new_entries = filter_similar_titles(url, new_entries)
+        return list(itertools.islice(new_entries, MAX_ITEMS))
+
+class LwnFetcher(FetcherStrategy):
+    """Strategy for handling the unique paywall logic of LWN.net feeds."""
+
+    def fetch(self, url, rss_info):
+        pending = g_c.get("lwn_pending") or {}
+        displayed = g_c.get("lwn_displayed") or set()
+        res = feedparser.parse(url, agent=USER_AGENT)
+        now = datetime.now(TZ)
+        ready = []
+        
+        for entry in res.entries:
+            link = entry.link
+            title = entry.get('title', '')
+            pub = datetime.fromtimestamp(mktime(entry.published_parsed), tz=TZ)
+            
+            if title.startswith("[$]"):
+                if link not in pending and link not in displayed:
+                    pending[link] = {'title': title, 'published': pub}
+                    print(f"[LWN] Article locked, saving for future: {title} ({link}) at {pub.isoformat()}")
+            else:
+                if link not in displayed:
+                    ready.append({'link': link, 'title': title, 'html_content': '', 'published': pub, 'published_parsed': entry.published_parsed})
+                    displayed.add(link)
+                    pending.pop(link, None)
+        
+        for link, info in list(pending.items()):
+            if now - info['published'] >= timedelta(days=15):
+                title = info['title']
+                if title.startswith("[$]"):
+                    title = title[3:].strip()
+                
+                import time
+                ready.append({'link': link, 'title': title, 'html_content': '', 'published': now, 'published_parsed': time.gmtime()})
+                displayed.add(link)
+                pending.pop(link)
+                print(f"[LWN] Article now available for free: {info['title']} ({link}) at {now.isoformat()}")
+        
+        ready.sort(key=lambda x: x['published'])
+        g_c.put("lwn_pending", pending)
+        g_c.put("lwn_displayed", displayed)
+        return ready
+
+class RedditFetcher(FetcherStrategy):
+    """Strategy for fetching Reddit feeds, with optional Tor support."""
+
+    def fetch(self, url, rss_info):
+        if USE_TOR:
+            print(f"Using TOR proxy for Reddit URL: {url}")
+            res = fetch_via_tor(url, rss_info.site_url)
+        else:
+            res = feedparser.parse(url, agent=USER_AGENT_RANDOM)
+
+        if not res:
+            return []
+
+        new_entries = prefilter_news(url, res)
+        new_entries = filter_similar_titles(url, new_entries)
+        return list(itertools.islice(new_entries, MAX_ITEMS))
+
+class SeleniumFetcher(FetcherStrategy):
+    """Strategy for feeds that require JavaScript rendering, using Selenium."""
+
+    def fetch(self, url, rss_info):
+        res = fetch_site_posts(rss_info.site_url, USER_AGENT)
+        if not res:
+            return []
+        
+        new_entries = prefilter_news(url, res)
+        new_entries = filter_similar_titles(url, new_entries)
+        return list(itertools.islice(new_entries, MAX_ITEMS))
+
+def get_fetcher(url):
+    """
+    Factory function that returns the appropriate fetcher strategy for a given URL.
+    """
+    if "lwn.net" in url:
+        return LwnFetcher()
+    if "reddit.com" in url:
+        return RedditFetcher()
+    if "fakefeed" in url:
+        return SeleniumFetcher()
+    return DefaultFetcher()
 
 # =============================================================================
 # CORE WORKER FUNCTIONS
@@ -97,79 +214,27 @@ def load_url_worker(url):
             return
 
         start = timer()
-        rssfeed = None
-        res = None  # Ensure res is always defined for error handling
 
-        # =====================================================================
-        # OBJECT STORAGE RETRIEVAL (if enabled)
-        # =====================================================================
-        use_object_store = ENABLE_OBJECT_STORE_FEEDS
-        if use_object_store:
-            # Use smart_fetch to get feed content with metadata
-            content, metadata = smart_fetch(url, cache_expiry=OBJECT_STORE_FEED_TIMEOUT)
+        if ENABLE_OBJECT_STORE_FEEDS:
+            content, _ = smart_fetch(url, cache_expiry=OBJECT_STORE_FEED_TIMEOUT)
             if content:
                 try:
-                    # Parse the pickled RssFeed object from object store
                     rssfeed = pickle.loads(content)
                     if isinstance(rssfeed, RssFeed):
-                        # Store directly in cache since it's already processed
                         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
                         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
                         print(f"Successfully fetched processed feed from object store: {url}")
                         return
-                    else:
-                        print(f"Invalid feed data type from object store for {url}")
-                        return
                 except Exception as e:
                     print(f"Error parsing object store feed for {url}: {e}")
-                    return
-            else:
-                print(f"No content found in object store for {url}")
-                return
 
-        # =====================================================================
-        # STANDARD RSS FEED PARSING
-        # =====================================================================
-        if "lwn.net" in url:
-            new_entries = handle_lwn_feed(url)
-        else:
-            # Standard feed parsing logic
-            if not use_object_store:  # Only use standard parsing if not using object store
-                if USE_TOR and "reddit" in url:
-                    print(f"Using TOR proxy for Reddit URL: {url}")
-                    res = fetch_via_tor(url, rss_info.site_url)
-                elif "fakefeed" in url:
-                    res = fetch_site_posts(rss_info.site_url, USER_AGENT)
-                else:
-                    user_a = USER_AGENT
-                    if "reddit" in url:
-                        user_a = USER_AGENT_RANDOM
-                    res = feedparser.parse(url, agent=user_a)
+        fetcher = get_fetcher(url)
+        new_entries = fetcher.fetch(url, rss_info)
 
-            if res:
-                new_entries = prefilter_news(url, res)
-                new_entries = filter_similar_titles(url, new_entries)
-                # Trim the entries to the limit before comparison to avoid finding 500 new entries
-                new_entries = list(itertools.islice(new_entries, MAX_ITEMS))
-            else:
-                new_entries = []
+        if not new_entries:
+            print(f"No entries found for {url}.")
+            # Continue processing - let the rest of the function handle empty entries
 
-        # =====================================================================
-        # ERROR HANDLING AND LOGGING
-        # =====================================================================
-        # Added detailed logging when no entries are found
-        if len(new_entries) == 0:
-            if res is not None:
-                http_status = res.get("status", "unknown") if hasattr(res, "get") else "unknown"
-                bozo_exception = res.get("bozo_exception", "None") if hasattr(res, "get") else "None"
-            else:
-                http_status = "N/A (LWN feed)"
-                bozo_exception = "N/A (LWN feed)"
-            print(f"No entries found for {url}. HTTP status: {http_status}. Bozo exception: {bozo_exception}")
-
-        # =====================================================================
-        # ENTRY PROCESSING AND ENHANCEMENT
-        # =====================================================================
         for entry in new_entries:
             entry['underlying_url'] = entry.get('origin_link', entry.get('link', ''))
             if 'content' in entry and entry['content']:
@@ -177,41 +242,20 @@ def load_url_worker(url):
             else:
                 entry['html_content'] = entry.get('summary', '')
 
-            # Ensure timestamps are properly set
             if not entry.get('published_parsed'):
-                # Try to parse published time if available
-                if entry.get('published'):
-                    try:
-                        import time
-                        from email.utils import parsedate_to_datetime
-                        parsed_date = parsedate_to_datetime(entry['published'])
-                        entry['published_parsed'] = parsed_date.timetuple()
-                    except Exception as e:
-                        # Fallback to current time if parsing fails
-                        entry['published_parsed'] = time.gmtime()
-                        entry['published'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', entry['published_parsed'])
-                else:
-                    # No published time available, use current time
-                    import time
-                    entry['published_parsed'] = time.gmtime()
-                    entry['published'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', entry['published_parsed'])
+                import time
+                entry['published_parsed'] = time.gmtime()
+                entry['published'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', entry['published_parsed'])
 
-            # Special handling for Reddit feeds - override links to external content
-            if "reddit" in url:
-                if "reddit" not in entry.get('underlying_url'):
+            if "reddit.com" in url:
+                if "reddit.com" not in entry.get('underlying_url', ''):
                     entry['link'] = entry['underlying_url']
                 else:
                     links = LINK_REGEX.findall(entry.get('html_content', ''))
-                    # Filter out reddit links to get external content
-                    links = [lnk for lnk in links if 'reddit' not in lnk]
+                    links = [lnk for lnk in links if 'reddit.com' not in lnk]
                     if links:
-                        # Pick the first match for now
                         entry['link'] = links[0]
 
-        # =====================================================================
-        # CACHE MERGING AND ENTRY LIMITING
-        # =====================================================================
-        # Merge with cached entries (if any) to retain history
         old_feed = g_c.get(url)
         new_count = len(new_entries)
         if old_feed and old_feed.entries:
@@ -220,14 +264,9 @@ def load_url_worker(url):
         else:
             entries = new_entries
 
-        # Trim the limit again after merge
         entries = list(itertools.islice(entries, MAX_ITEMS))
-
         shared.history.update_fetch(url, new_count)
 
-        # =====================================================================
-        # TOP ARTICLES PRESERVATION
-        # =====================================================================
         top_articles = []
         if old_feed and old_feed.entries:
             previous_top_5 = set(e['link'] for e in old_feed.entries[:5])
@@ -237,22 +276,14 @@ def load_url_worker(url):
 
         rssfeed = RssFeed(entries, top_articles=top_articles)
 
-        # =====================================================================
-        # OBJECT STORAGE PUBLISHING
-        # =====================================================================
-        # Publish feed to object store if enabled - publish exactly what we store locally
         if ENABLE_OBJECT_STORE_FEED_PUBLISH:
             try:
-                # Pickle the RssFeed object for storage
                 feed_data = pickle.dumps(rssfeed)
                 publish_bytes(feed_data, url)
                 print(f"Successfully published feed to object store: {url}")
             except Exception as e:
                 print(f"Error publishing feed to object store for {url}: {e}")
 
-        # =====================================================================
-        # CACHE UPDATES AND CLEANUP
-        # =====================================================================
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
 
@@ -261,64 +292,6 @@ def load_url_worker(url):
             
         end = timer()
         print(f"Parsing from: {url}, in {end - start:f}.")
-        # Lock is automatically released by the 'with' statement
-
-# =============================================================================
-# SPECIALIZED FEED HANDLERS
-# =============================================================================
-
-def handle_lwn_feed(url):
-    """
-    Specialized handler for LWN.net feeds.
-    
-    LWN.net has a unique paywall system where articles are initially marked with [$]
-    and become available after 15 days. This function manages the pending and
-    displayed article states to handle this behavior.
-    
-    Args:
-        url (str): The LWN.net RSS feed URL
-        
-    Returns:
-        list: List of ready-to-display article entries
-    """
-    pending = g_c.get("lwn_pending") or {}
-    displayed = g_c.get("lwn_displayed") or set()
-    res = feedparser.parse(url, agent=USER_AGENT)
-    now = datetime.now(TZ)
-    ready = []
-    
-    for entry in res.entries:
-        link = entry.link
-        title = entry.get('title', '')
-        pub = datetime.fromtimestamp(mktime(entry.published_parsed), tz=TZ)
-        
-        if title.startswith("[$]"):
-            if link not in pending and link not in displayed:
-                pending[link] = {'title': title, 'published': pub}
-                print(f"[LWN] Article locked, saving for future: {title} ({link}) at {pub.isoformat()}")
-        else:
-            if link not in displayed:
-                ready.append({'link': link, 'title': title, 'html_content': '', 'published': pub})
-                displayed.add(link)
-                pending.pop(link, None)
-    
-    # Check for articles that have aged out of the paywall (15 days)
-    for link, info in list(pending.items()):
-        if now - info['published'] >= timedelta(days=15):
-            title = info['title']
-            # Remove [$] prefix if present
-            if title.startswith("[$]"):
-                title = title[3:].strip()
-            ready.append({'link': link, 'title': title, 'html_content': '', 'published': now})
-            displayed.add(link)
-            pending.pop(link)
-            print(f"[LWN] Article now available for free: {info['title']} ({link}) at {now.isoformat()}")
-    
-    # Sort by publication/availability date for proper interleaving
-    ready.sort(key=lambda x: x['published'])
-    g_c.put("lwn_pending", pending)
-    g_c.put("lwn_displayed", displayed)
-    return ready
 
 # =============================================================================
 # LOCKING AND THREADING UTILITIES
