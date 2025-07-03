@@ -52,8 +52,7 @@ class CustomRSSForm(FlaskForm):
         'URL',
         validators=[
             validators.Optional(),
-            validators.Length(min=10, max=120, message="URL must be between 10 and 120 characters"),
-            validators.URL(message="Please enter a valid URL")
+            validators.Length(max=120, message="URL must be 120 characters or less"),
         ],
         render_kw={"style": "width: 300px;"}
     )
