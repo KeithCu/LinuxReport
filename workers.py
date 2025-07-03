@@ -130,7 +130,7 @@ class LwnFetcher(FetcherStrategy):
                     title = title[3:].strip()
                 
                 import time
-                ready.append({'link': link, 'title': title, 'html_content': '', 'published': now, 'published_parsed': time.gmtime()})
+                ready.append({'link': link, 'title': title, 'html_content': '', 'published': now})
                 displayed.add(link)
                 pending.pop(link)
                 print(f"[LWN] Article now available for free: {info['title']} ({link}) at {now.isoformat()}")
@@ -175,7 +175,7 @@ def get_fetcher(url):
     """
     if "lwn.net" in url:
         return LwnFetcher()
-    if "reddit.com" in url:
+    if "reddit" in url:
         return RedditFetcher()
     if "fakefeed" in url:
         return SeleniumFetcher()
@@ -247,8 +247,8 @@ def load_url_worker(url):
                 entry['published_parsed'] = time.gmtime()
                 entry['published'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', entry['published_parsed'])
 
-            if "reddit.com" in url:
-                if "reddit.com" not in entry.get('underlying_url', ''):
+            if "reddit" in url:
+                if "reddit" not in entry.get('underlying_url', ''):
                     entry['link'] = entry['underlying_url']
                 else:
                     links = LINK_REGEX.findall(entry.get('html_content', ''))
