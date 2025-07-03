@@ -13,11 +13,19 @@ import os
 import re
 import warnings
 import math
+import logging
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 from sentence_transformers import SentenceTransformer, util
+
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Use the root logger to inherit the same configuration as auto_update.py
+logger = logging.getLogger()
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -42,7 +50,7 @@ embedding_cache = {}  # Cache for storing computed embeddings
 def clamp_similarity(score):
     """Clamp cosine similarity score to [-1, 1] to avoid floating point artifacts."""
     if not isinstance(score, (int, float)) or math.isnan(score):
-        warnings.warn(f"Non-numeric or NaN similarity score: {score}, type: {type(score)}")
+        logger.warning(f"Non-numeric or NaN similarity score: {score}, type: {type(score)}")
         return 0.0
     return max(-1.0, min(1.0, score))
 
@@ -64,11 +72,11 @@ def get_embedding(text):
     
     # Input validation
     if text is None:
-        warnings.warn("get_embedding called with None text")
+        logger.warning("get_embedding called with None text")
         text = ""
     
     if not isinstance(text, str):
-        warnings.warn(f"get_embedding called with non-string text: {type(text)}")
+        logger.warning(f"get_embedding called with non-string text: {type(text)}")
         text = str(text)
     
     # Handle empty/whitespace-only strings gracefully
@@ -78,13 +86,13 @@ def get_embedding(text):
                 embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
                 st_util = util
             except Exception as e:
-                warnings.warn(f"Failed to initialize SentenceTransformer: {e}")
+                logger.warning(f"Failed to initialize SentenceTransformer: {e}")
                 return None
         # Return a zero vector of the same shape as a normal embedding
         try:
             return embedder.encode(" ", convert_to_tensor=True) * 0
         except Exception as e:
-            warnings.warn(f"Failed to create zero embedding: {e}")
+            logger.warning(f"Failed to create zero embedding: {e}")
             return None
     
     # Check cache first
@@ -97,7 +105,7 @@ def get_embedding(text):
             embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
             st_util = util
         except Exception as e:
-            warnings.warn(f"Failed to initialize SentenceTransformer: {e}")
+            logger.warning(f"Failed to initialize SentenceTransformer: {e}")
             return None
     
     # Compute embedding
@@ -106,7 +114,7 @@ def get_embedding(text):
         embedding_cache[text] = embedding
         return embedding
     except Exception as e:
-        warnings.warn(f"Failed to compute embedding for text '{text[:50]}...': {e}")
+        logger.warning(f"Failed to compute embedding for text '{text[:50]}...': {e}")
         return None
 
 # =============================================================================
@@ -131,15 +139,15 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
     """
     # Input validation
     if not isinstance(articles, list):
-        warnings.warn(f"articles must be a list, got {type(articles)}")
+        logger.warning(f"articles must be a list, got {type(articles)}")
         return []
     
     if not isinstance(excluded_embeddings, list):
-        warnings.warn(f"excluded_embeddings must be a list, got {type(excluded_embeddings)}")
+        logger.warning(f"excluded_embeddings must be a list, got {type(excluded_embeddings)}")
         excluded_embeddings = []
     
     if not isinstance(threshold, (int, float)) or threshold < 0 or threshold > 1:
-        warnings.warn(f"threshold must be a number between 0 and 1, got {threshold}")
+        logger.warning(f"threshold must be a number between 0 and 1, got {threshold}")
         threshold = THRESHOLD
     
     unique_articles = []
@@ -150,23 +158,23 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
     filtered_count = 0
     error_count = 0
 
-    print("\nFiltering articles by embedding similarity:")
+    logger.info("Filtering articles by embedding similarity:")
     for i, article in enumerate(articles):
         # Validate article structure
         if not isinstance(article, dict):
-            warnings.warn(f"Article {i} is not a dictionary: {type(article)}")
+            logger.warning(f"Article {i} is not a dictionary: {type(article)}")
             error_count += 1
             continue
         
         if "title" not in article:
-            warnings.warn(f"Article {i} missing 'title' key: {article}")
+            logger.warning(f"Article {i} missing 'title' key: {article}")
             error_count += 1
             continue
         
         title = article["title"]
         # Skip empty/whitespace-only or non-string titles
         if not isinstance(title, str) or not title.strip():
-            warnings.warn(f"Skipping article with invalid or empty title: {title}")
+            logger.warning(f"Skipping article with invalid or empty title: {title}")
             error_count += 1
             continue
         
@@ -175,7 +183,7 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
         # Get embedding with error handling
         current_emb = get_embedding(title)
         if current_emb is None:
-            warnings.warn(f"Failed to get embedding for title: {title}")
+            logger.warning(f"Failed to get embedding for title: {title}")
             error_count += 1
             continue
         
@@ -194,26 +202,26 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
                 unique_articles.append(article)
                 do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
             else:
-                print(f"Filtered by embedding similarity: {title}")
+                logger.debug(f"Filtered by embedding similarity: {title}")
                 filtered_count += 1
                 
         except Exception as e:
-            warnings.warn(f"Error computing similarity for '{title}': {e}")
+            logger.warning(f"Error computing similarity for '{title}': {e}")
             error_count += 1
             continue
 
-    # Print summary statistics
-    print(f"\nDeduplication summary:")
-    print(f"  Processed: {processed_count} articles")
-    print(f"  Filtered: {filtered_count} articles")
-    print(f"  Errors: {error_count} articles")
-    print(f"  Remaining: {len(unique_articles)} articles")
+    # Log summary statistics
+    logger.info(f"Deduplication summary:")
+    logger.info(f"  Processed: {processed_count} articles")
+    logger.info(f"  Filtered: {filtered_count} articles")
+    logger.info(f"  Errors: {error_count} articles")
+    logger.info(f"  Remaining: {len(unique_articles)} articles")
     
     if error_count > 0:
-        warnings.warn(f"Encountered {error_count} errors during deduplication")
+        logger.warning(f"Encountered {error_count} errors during deduplication")
     
     if len(unique_articles) == 0 and len(articles) > 0:
-        warnings.warn("All articles were filtered out - threshold may be too low")
+        logger.warning("All articles were filtered out - threshold may be too low")
 
     return unique_articles
 
@@ -235,21 +243,21 @@ def get_best_matching_article(target_title, articles):
     """
     # Input validation
     if not isinstance(target_title, str):
-        warnings.warn(f"target_title must be a string, got {type(target_title)}")
+        logger.warning(f"target_title must be a string, got {type(target_title)}")
         return None
     
     if not isinstance(articles, list):
-        warnings.warn(f"articles must be a list, got {type(articles)}")
+        logger.warning(f"articles must be a list, got {type(articles)}")
         return None
     
     if not target_title.strip():
-        warnings.warn("target_title is empty or whitespace-only")
+        logger.warning("target_title is empty or whitespace-only")
         return None
     
     # Get target embedding
     target_emb = get_embedding(target_title)
     if target_emb is None:
-        warnings.warn(f"Failed to get embedding for target title: {target_title}")
+        logger.warning(f"Failed to get embedding for target title: {target_title}")
         return None
     
     best_match = None
@@ -259,7 +267,7 @@ def get_best_matching_article(target_title, articles):
     for i, article in enumerate(articles):
         # Validate article structure
         if not isinstance(article, dict) or "title" not in article:
-            warnings.warn(f"Article {i} is invalid: {article}")
+            logger.warning(f"Article {i} is invalid: {article}")
             continue
         
         article_title = article["title"]
@@ -268,7 +276,7 @@ def get_best_matching_article(target_title, articles):
         # Get article embedding
         article_emb = get_embedding(article_title)
         if article_emb is None:
-            warnings.warn(f"Failed to get embedding for article title: {article_title}")
+            logger.warning(f"Failed to get embedding for article title: {article_title}")
             continue
         
         # Compute similarity
@@ -280,15 +288,15 @@ def get_best_matching_article(target_title, articles):
                     return best_match
                 best_score = score
         except Exception as e:
-            warnings.warn(f"Error computing similarity for '{article_title}': {e}")
+            logger.warning(f"Error computing similarity for '{article_title}': {e}")
             continue
     
     if valid_articles == 0:
-        warnings.warn("No valid articles found in the list")
+        logger.warning("No valid articles found in the list")
         return None
     
     if best_score < THRESHOLD:
-        print(f"\nNo match found above threshold {THRESHOLD}. Scores:")
+        logger.debug(f"No match found above threshold {THRESHOLD}. Scores:")
         for article in articles:
             if not isinstance(article, dict) or "title" not in article:
                 continue
@@ -296,9 +304,9 @@ def get_best_matching_article(target_title, articles):
                 article_emb = get_embedding(article["title"])
                 if article_emb is not None:
                     score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
-                    print(f"Score for '{article['title']}': {score}")
+                    logger.debug(f"Score for '{article['title']}': {score}")
             except Exception as e:
-                print(f"Error computing score for '{article['title']}': {e}")
+                logger.debug(f"Error computing score for '{article['title']}': {e}")
             
     return best_match if best_score >= THRESHOLD else None
 
@@ -320,7 +328,7 @@ def extract_articles_from_html(html_file):
         list: List of article dictionaries with 'url' and 'title' keys
     """
     if not os.path.exists(html_file):
-        print(f"No existing HTML file found at {html_file}")
+        logger.info(f"No existing HTML file found at {html_file}")
         return []
         
     # Read the existing file
@@ -360,7 +368,7 @@ def fetch_recent_articles(all_urls, cache):
     for feed_url, _ in all_urls.items():
         feed = cache.get(feed_url)
         if feed is None:
-            print(f"No data found for {feed_url}")
+            logger.info(f"No data found for {feed_url}")
             continue
 
         count = 0
