@@ -31,7 +31,7 @@ from flask_wtf.csrf import CSRFProtect
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from shared import (
-    EXPIRE_WEEK, JS_MODULES, FLASK_DASHBOARD, 
+    EXPIRE_WEEK, FLASK_DASHBOARD, 
     FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, 
     limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS,
     API, set_flask_restful_api
@@ -39,11 +39,18 @@ from shared import (
 from app_config import DEBUG, get_secret_key
 from models import User
 
-# =============================================================================
-# COOKIE VERSIONING
-# =============================================================================
+# Define the order of JavaScript modules for loading
+JS_MODULES = [
+    'app.js',
+    'infinitescroll.js',
+    'core.js',
+    'weather.js',
+    'chat.js',
+    'config.js',
+]
 
 # Mechanism to invalidate old URL cookies if feeds change
+
 URLS_COOKIE_VERSION = "2"
 
 

@@ -235,19 +235,6 @@ if ENABLE_URL_IMAGE_CDN_DELIVERY:
 
 STANDARD_ORDER_STR = str(SITE_URLS)
 
-# =============================================================================
-# JAVASCRIPT MODULE CONFIGURATION
-# =============================================================================
-
-# Define the order of JavaScript modules for loading
-JS_MODULES = [
-    'app.js',
-    'infinitescroll.js',
-    'core.js',
-    'weather.js',
-    'chat.js',
-    'config.js',
-]
 
 # =============================================================================
 # RATE LIMITING CONFIGURATION
