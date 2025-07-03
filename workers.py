@@ -37,7 +37,7 @@ from fake_useragent import UserAgent
 
 # Local application imports
 import shared
-from feedfilter import filter_similar_titles, merge_entries, prefilter_news
+from feedfilter import merge_entries
 from seleniumfetch import fetch_site_posts
 from shared import (
     ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
@@ -94,8 +94,7 @@ class DefaultFetcher(FetcherStrategy):
         if not res:
             return []
         
-        new_entries = prefilter_news(url, res)
-        new_entries = filter_similar_titles(url, new_entries)
+        new_entries = res['entries']
         return list(itertools.islice(new_entries, MAX_ITEMS))
 
 class LwnFetcher(FetcherStrategy):
@@ -153,8 +152,7 @@ class RedditFetcher(FetcherStrategy):
         if not res:
             return []
 
-        new_entries = prefilter_news(url, res)
-        new_entries = filter_similar_titles(url, new_entries)
+        new_entries = res['entries']
         return list(itertools.islice(new_entries, MAX_ITEMS))
 
 class SeleniumFetcher(FetcherStrategy):
@@ -165,8 +163,7 @@ class SeleniumFetcher(FetcherStrategy):
         if not res:
             return []
         
-        new_entries = prefilter_news(url, res)
-        new_entries = filter_similar_titles(url, new_entries)
+        new_entries = res['entries']
         return list(itertools.islice(new_entries, MAX_ITEMS))
 
 def get_fetcher(url):
