@@ -327,32 +327,6 @@ class LLMProvider(ABC):
         response_text = _try_call_model(client, model, messages, max_tokens)
         return response_text, model
     
-    def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
-        """Call the primary model with fallback to secondary if needed."""
-        # Try the selected model first
-        current_model = self.primary_model
-        print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Primary Model) ---")
-        
-        try:
-            response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
-            return response_text, current_model
-        except Exception as e:
-            print(f"Primary model {current_model} failed: {str(e)}")
-            self.model_selector.mark_failed(current_model)
-        
-        # Let ModelSelector handle all model selection logic
-        current_model = self.model_selector.get_next_model(current_model)
-        if current_model:
-            print(f"\n--- LLM Call: {self.name} / {current_model} / {prompt_mode} {label} (Fallback) ---")
-            try:
-                response_text = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
-                return response_text, current_model
-            except Exception as e:
-                print(f"Fallback model {current_model} failed: {str(e)}")
-                self.model_selector.mark_failed(current_model)
-        
-        return None, None
-    
     def __str__(self) -> str:
         return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
 
@@ -505,35 +479,6 @@ class OpenRouterProvider(LLMProvider):
         for header, value in headers.items():
             client._client.headers[header] = value
         logger.debug(f"OpenRouter headers configured: {headers}")
-        
-    def call_with_fallback(self, messages: List[Dict[str, str]], prompt_mode: str, label: str = "") -> Tuple[Optional[str], Optional[str]]:
-        """Call models with fallback strategy."""
-        current_model = self.primary_model
-        max_attempts = 3  # Try up to 3 different models
-        
-        logger.info(f"Starting model calls with fallback strategy (max attempts: {max_attempts})")
-        
-        for attempt in range(max_attempts):
-            logger.info(f"Attempt {attempt + 1}/{max_attempts}: {self.name} / {current_model} / {prompt_mode} {label}")
-            
-            try:
-                response_text, used_model = self.call_model(current_model, messages, MAX_TOKENS, f"{label}")
-                if response_text:
-                    self.model_selector.mark_success(current_model)
-                    logger.info(f"Successfully got response from {current_model}")
-                    return response_text, used_model
-            except Exception as e:
-                logger.error(f"Model {current_model} failed: {str(e)}")
-                self.model_selector.mark_failed(current_model)
-            
-            # Let ModelSelector handle all model selection logic
-            current_model = self.model_selector.get_next_model(current_model)
-            if not current_model:
-                logger.error("No more models available to try")
-                break
-                
-        logger.error("All model attempts failed")
-        return None, None
 
 # Provider registry
 PROVIDERS = {
@@ -829,9 +774,11 @@ def _try_ai_models(provider, messages, filtered_articles):
         
         # Get model and call it
         if attempt == 1:
-            # First attempt: use provider's normal fallback logic
-            result = _try_model_call(provider, messages, filtered_articles, "provider fallback", 
-                                   lambda: provider.call_with_fallback(messages, PROMPT_MODE, f"Attempt {attempt}"))
+            # First attempt: use provider's primary model
+            current_model = provider.primary_model
+            logger.info(f"Using primary model: {current_model}")
+            result = _try_model_call(provider, messages, filtered_articles, f"model {current_model}", 
+                                   lambda: provider.call_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
         else:
             # Second attempt: force a specific free model
             available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
@@ -882,7 +829,7 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
         if top_articles and len(top_articles) >= 3:
             logger.info(f"Successfully got {len(top_articles)} articles from {model_context}")
             
-            # Determine the actual model name
+            # Determine the actual model name and mark success
             if used_model:
                 actual_model = used_model
             elif model_context == "fallback model":
@@ -890,6 +837,10 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
             else:
                 # Extract model name from context like "model model_name"
                 actual_model = model_context.replace("model ", "")
+            
+            # Mark the model as successful
+            if hasattr(provider, 'model_selector'):
+                provider.model_selector.mark_success(actual_model)
             
             return response_text, top_articles, actual_model
         else:
@@ -902,7 +853,7 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
         if hasattr(provider, 'model_selector'):
             if model_context == "fallback model":
                 provider.model_selector.mark_failed(provider.fallback_model)
-            elif model_context != "provider fallback":
+            elif model_context.startswith("model "):
                 # Extract model name from context
                 model_name = model_context.replace("model ", "")
                 provider.model_selector.mark_failed(model_name)
