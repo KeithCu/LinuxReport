@@ -272,40 +272,65 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
     """
     with app.app_context():
         try:
-            # Clear existing compiled JS file to ensure fresh build
             js_output_path = os.path.join(app.static_folder, 'linuxreport.js')
-            if os.path.exists(js_output_path):
-                os.remove(js_output_path)
-                print("Removed existing JavaScript bundle for fresh build")
             
-            # Build asset bundles (this should create a fresh file)
-            js_bundle.build()
-            print("JavaScript bundle built successfully")
-            
-            # Add header information to the freshly compiled JS file
+            # Check if existing file exists and get its hash
+            existing_hash = None
             if os.path.exists(js_output_path):
-                with open(js_output_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Generate header information
-                timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 try:
-                    file_hash = hashlib.md5(content.encode('utf-8')).hexdigest()[:8]
-                except Exception:
-                    file_hash = f'dev{int(datetime.datetime.now().timestamp())}'
+                    with open(js_output_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Extract existing hash from header
+                    for line in content.split('\n')[:5]:
+                        if line.startswith('// Hash: '):
+                            existing_hash = line.split('// Hash: ')[1].strip()
+                            break
+                except Exception as e:
+                    print(f"Warning: Could not read existing JS file: {e}")
+            
+            # Calculate hash of source files to see if they changed
+            source_files = [
+                os.path.join(os.path.dirname(__file__), 'templates', module) 
+                for module in JS_MODULES
+            ]
+            
+            source_content = ""
+            for file_path in source_files:
+                if os.path.exists(file_path):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        source_content += f.read()
+            
+            new_hash = hashlib.md5(source_content.encode('utf-8')).hexdigest()[:8]
+            
+            # Only rebuild if hash changed or file doesn't exist
+            if not existing_hash or existing_hash != new_hash:
+                # Clear existing file and rebuild
+                if os.path.exists(js_output_path):
+                    os.remove(js_output_path)
+                    print("Removed existing JavaScript bundle for fresh build")
                 
-                # Create header
-                header = f'// Compiled: {timestamp}\n'
-                header += f'// Hash: {file_hash}\n'
-                header += f'// Source files: {", ".join(JS_MODULES)}\n\n'
+                js_bundle.build()
+                print("JavaScript bundle built successfully")
                 
-                # Write back with header
-                with open(js_output_path, 'w', encoding='utf-8') as f:
-                    f.write(header + content)
-                
-                print("Header information added to JavaScript bundle")
+                # Add header information
+                if os.path.exists(js_output_path):
+                    with open(js_output_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    header = f'// Compiled: {timestamp}\n'
+                    header += f'// Hash: {new_hash}\n'
+                    header += f'// Source files: {", ".join(JS_MODULES)}\n\n'
+                    
+                    with open(js_output_path, 'w', encoding='utf-8') as f:
+                        f.write(header + content)
+                    
+                    print(f"JavaScript content changed (new hash: {new_hash}), updated with new header")
+                else:
+                    print("Warning: JavaScript bundle was not created after build")
             else:
-                print("Warning: JavaScript bundle was not created after build")
+                print(f"JavaScript content unchanged (hash: {new_hash}), reusing existing file")
             
             css_bundle.build()
             print("CSS cache busting configured successfully")
