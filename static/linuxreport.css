@@ -752,7 +752,7 @@ input[type="button"],
 input[type="submit"],
 select,
 textarea {
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 5px var(--spacing-md);
   border-radius: var(--border-radius-sm);
   font-weight: bold;
   transition: all var(--transition-normal);
