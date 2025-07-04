@@ -496,7 +496,7 @@ def _register_main_routes(flask_app):
         # Track the rate limit event
         ip = get_remote_address()
         endpoint = request.endpoint or request.path
-        track_rate_limit_event(ip, endpoint, "exceeded")
+        track_rate_limit_event(ip, endpoint)
         
         return jsonify({
             "error": "Rate limit exceeded",
