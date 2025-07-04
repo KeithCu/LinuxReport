@@ -10,7 +10,6 @@ configuration page, weather API, authentication, and various utility endpoints.
 # =============================================================================
 import os
 import json
-from timeit import default_timer as timer
 import datetime
 import time
 import gzip
@@ -92,12 +91,13 @@ class RateLimitStatsResource(Resource):
             "by_endpoint": {}
         }
         
-        # Combine data
+        # Combine data - use single time call for current_time
+        current_time = time.time()
         result = {
             "events": events,
             "by_ip": stats.get("by_ip", {}),
             "by_endpoint": stats.get("by_endpoint", {}),
-            "current_time": time.time(),
+            "current_time": current_time,
             "total_events": len(events),
             "unique_ips": len(stats.get("by_ip", {})),
             "unique_endpoints": len(stats.get("by_endpoint", {}))
@@ -251,9 +251,8 @@ def _register_main_routes(flask_app):
         # Check if admin mode is enabled for performance tracking using Flask-Login
         is_admin = current_user.is_authenticated
 
-        # Calculate performance stats for non-admin requests
-        if not is_admin:
-            start_time = timer()
+        # Single kernel time call at start - use time.time() as unified time format
+        start_time = time.time()
         
         # Determine the order of RSS feeds to display.
         page_order = None
@@ -288,11 +287,11 @@ def _register_main_routes(flask_app):
         cache_key = f"page-cache:{page_order_s}{suffix}"
         full_page = g_cm.get(cache_key) if not is_admin else None
         if not DEBUG and not is_admin and full_page is not None:
-            # Track performance stats for cache hit
+            # Track performance stats for cache hit - NO additional kernel calls
             if not is_admin:
                 # For cache hits, use tiny fixed time since they're very fast
-                render_time = 0.0001  # 100 microseconds
-                update_performance_stats(render_time, time.time())
+                render_time = 0.001  # 1 millisecond fixed time for cache hits
+                update_performance_stats(render_time, start_time)
             
             # Handle compressed cache response - check if content is actually compressed (bytes)
             if compression_enabled and isinstance(full_page, bytes):
@@ -334,10 +333,10 @@ def _register_main_routes(flask_app):
 
         # 2. Fetch any needed feeds
         if len(needed_urls) > 0:
-            start = timer()
+            # Use current start_time to avoid additional kernel calls for fetch timing
             fetch_urls_parallel(needed_urls)
-            end = timer()
-            print(f"Fetched {len(needed_urls)} feeds in {end - start} sec.")
+            # We could calculate fetch time using end_time later, but for now just log the count
+            print(f"Fetched {len(needed_urls)} feeds.")
 
         # 3. Render the RSS feeds into the page layout.
         for url in page_order:
@@ -411,14 +410,14 @@ def _register_main_routes(flask_app):
             else:
                 g_cm.set(cache_key, page, ttl=expire)
 
-        # Track performance stats for non-admin mode
+        # Single kernel time call at end and track performance stats
+        end_time = time.time()
         if not is_admin:
-            end_time = timer()
             render_time = end_time - start_time
-            update_performance_stats(render_time, time.time())
+            update_performance_stats(render_time, end_time)
         else:
-            # Add stats display to the page for admin mode
-            stats_html = get_admin_stats_html()
+            # Add stats display to the page for admin mode - pass end_time to avoid additional time call
+            stats_html = get_admin_stats_html(end_time)
             if stats_html:
                 page = page.replace('</body>', f'{stats_html}</body>')
 
@@ -452,9 +451,9 @@ def _register_main_routes(flask_app):
             response.headers['Content-Length'] = str(len(page.encode('utf-8')))
         
         # Add cache control headers for 30 minutes (1800 seconds)
-        # Use the end_time we already calculated for performance stats to avoid another timer() call
+        # Use the end_time we already calculated to avoid additional time calls
         if not is_admin:
-            # Convert timer() time to datetime for the Expires header
+            # Convert time.time() to datetime for the Expires header
             response.headers['Cache-Control'] = 'public, max-age=1800'
             expires_time = datetime.datetime.fromtimestamp(end_time) + datetime.timedelta(hours=0.5)
             response.headers['Expires'] = expires_time.strftime('%a, %d %b %Y %H:%M:%S GMT')

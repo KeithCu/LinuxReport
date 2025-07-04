@@ -11,7 +11,7 @@ def update_performance_stats(render_time, current_time):
     
     Args:
         render_time: Time taken to render the page in seconds
-        current_time: Current time (required)
+        current_time: Current timestamp from the caller (no internal time calls)
     """
     # Skip if Flask-MonitoringDashboard is enabled (it handles this automatically)
     if FLASK_DASHBOARD:
