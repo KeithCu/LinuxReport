@@ -417,7 +417,7 @@ def _register_main_routes(flask_app):
             update_performance_stats(render_time, end_time)
         else:
             # Add stats display to the page for admin mode - pass end_time to avoid additional time call
-            stats_html = get_admin_stats_html(end_time)
+            stats_html = get_admin_stats_html()
             if stats_html:
                 page = page.replace('</body>', f'{stats_html}</body>')
 
