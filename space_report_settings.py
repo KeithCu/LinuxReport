@@ -17,7 +17,7 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://space.com/feeds/all": RssInfo("space.webp", "Space.com", "https://space.com"),
         "https://www.spaceelevatorblog.com/?feed=rss2": RssInfo("spaceelevatorblog.jpg","Space Elevator Blog", "https://www.spaceelevatorblog.com"),
 	},
-	USER_AGENT="Space Report -- https://spacereport.info",
+	USER_AGENT="Space Report -- https://news.spaceelevatorwiki.com",
 	SITE_URLS=[
 		"https://space.com/feeds/all",
 		"https://www.nasa.gov/rss/dyn/breaking_news.rss",
@@ -32,7 +32,7 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://www.planetary.org/rss/articles",
 		"https://www.spaceelevatorblog.com/?feed=rss2",
 	],
-	URL_IMAGES="https://spacereport.info/static/images/",
+	URL_IMAGES="https://news.spaceelevatorwiki.com/static/images/",
 	FAVICON="SpaceReport.ico",
 	LOGO_URL="SpaceReport.webp",
 	WEB_DESCRIPTION="Space exploration news: Cosmic updates in milliseconds",
