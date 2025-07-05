@@ -10,6 +10,7 @@ import time
 import sys
 import urllib.request
 import urllib.error
+import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -118,9 +119,9 @@ def wake_up_site(dir_name, url):
     
     return status_text == "SUCCESS"
 
-def wake_up_all_sites_concurrent():
-    """Wake up all sites concurrently using ThreadPoolExecutor"""
-    print("Step 3: Waking up all sites...")
+def wake_up_sites_round(round_name, round_number):
+    """Wake up all sites concurrently for a specific round"""
+    print(f"Step {round_number}: {round_name}...")
     print("=" * 100)
     print(f"{'Site':<15} | {'Status':<3} | {'Title':<40} | {'Duration'}")
     print("-" * 100)
@@ -149,31 +150,70 @@ def wake_up_all_sites_concurrent():
     print(f"✅ {success_count}/{len(URLS)} sites deployed successfully!")
     print(f"⏱️  Total time: {duration:.2f} seconds")
     print("=" * 100)
+    
+    return success_count, duration
+
+def wake_up_all_sites_concurrent():
+    """Wake up all sites concurrently using ThreadPoolExecutor"""
+    # First round
+    success_count, duration = wake_up_sites_round("Waking up all sites", 3)
+    
+    # Wait 1 second after initial warm-up
+    print("\n⏳ Waiting 1 second before second round...")
+    time.sleep(1)
+    
+    # Second round
+    second_success_count, second_duration = wake_up_sites_round("Second round - waking up all sites again", 4)
+
+def warm_up_sites_only():
+    """Just warm up all sites without chown or restart"""
+    print("🔥 Warming up all sites only...")
+    print("=" * 100)
+    
+    # Single round of warm-up
+    success_count, duration = wake_up_sites_round("Warming up all sites", 1)
+    
+    print(f"🔥 Warm-up complete! {success_count}/{len(URLS)} sites warmed up in {duration:.2f} seconds")
 
 def main():
+    # =============================================================================
+    # ARGUMENT PARSING
+    # =============================================================================
+    
+    parser = argparse.ArgumentParser(description='Deploy and warm up sites')
+    parser.add_argument('--warmup-only', action='store_true', 
+                       help='Only warm up sites without chown or restart')
+    
+    args = parser.parse_args()
+    
     # =============================================================================
     # MAIN EXECUTION
     # =============================================================================
     
-    overall_start = time.time()
-    
-    # Step 1: Change ownership for all directories
-    print("Step 1: Changing ownership for all directories...")
-    for dir_name in URLS.keys():
-        chown_directory(dir_name)
-    
-    # Step 2: Restart web server
-    print("Step 2: Restarting web server...")
-    run_command(f"sudo systemctl restart {WEB_SERVER_SERVICE}")
-    time.sleep(0.25)
-    
-    # Step 3: Wake up all sites concurrently
-    wake_up_all_sites_concurrent()
-    
-    overall_end = time.time()
-    total_duration = overall_end - overall_start
-    
-    print(f"🚀 Deployment complete! Total time: {total_duration:.2f} seconds")
+    if args.warmup_only:
+        # Just warm up sites
+        warm_up_sites_only()
+    else:
+        # Full deployment
+        overall_start = time.time()
+        
+        # Step 1: Change ownership for all directories
+        print("Step 1: Changing ownership for all directories...")
+        for dir_name in URLS.keys():
+            chown_directory(dir_name)
+        
+        # Step 2: Restart web server
+        print("Step 2: Restarting web server...")
+        run_command(f"sudo systemctl restart {WEB_SERVER_SERVICE}")
+        time.sleep(0.25)
+        
+        # Step 3: Wake up all sites concurrently
+        wake_up_all_sites_concurrent()
+        
+        overall_end = time.time()
+        total_duration = overall_end - overall_start
+        
+        print(f"🚀 Deployment complete! Total time: {total_duration:.2f} seconds")
 
 if __name__ == "__main__":
     main() 
