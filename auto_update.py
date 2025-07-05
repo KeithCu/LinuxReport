@@ -331,15 +331,6 @@ class LLMProvider(ABC):
         return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
 
 
-def update_model_cache(model):
-    """Update the cache with the currently working model if it's different."""
-    current_model = g_c.get("working_llm_model")
-    if current_model == model:
-        logger.debug(f"Model {model} already cached, no update needed")
-        return
-    g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
-    logger.info(f"Updated cached working model from {current_model} to: {model}")
-
 class ModelSelector:
     """Simple model selection and fallback logic."""
     
@@ -765,41 +756,29 @@ def ask_ai_top_articles(articles, dry_run=False):
 
 
 def _try_ai_models(provider, messages, filtered_articles):
-    """Simplified model selection logic that tries free models first, then fallback."""
+    """Simplified model selection logic that uses the provider's ModelSelector."""
     logger.info("Starting AI model selection process")
     
-    # Try free models first (up to 2 attempts)
-    for attempt in range(1, 3):
-        logger.info(f"AI selection attempt {attempt}/2 (free models)")
-        
-        # Get model and call it
-        if attempt == 1:
-            # First attempt: use provider's primary model
-            current_model = provider.primary_model
-            logger.info(f"Using primary model: {current_model}")
-            result = _try_model_call(provider, messages, filtered_articles, f"model {current_model}", 
-                                   lambda: provider.call_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
-        else:
-            # Second attempt: force a specific free model
-            available_models = [m for m in FREE_MODELS if m not in provider.model_selector.failed_models]
-            if not available_models:
-                logger.warning("No more free models available")
-                break
-            
-            selected_model = available_models[0]
-            logger.info(f"Forcing free model: {selected_model}")
-            result = _try_model_call(provider, messages, filtered_articles, f"model {selected_model}",
-                                   lambda: provider.call_model(selected_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
-        
-        if result:
-            return result
+    # Use the provider's model selector to get models to try
+    model_selector = provider.model_selector
+    current_model = None
     
-    # Try fallback model if free models failed
-    logger.info("Trying fallback model")
-    fallback_model = provider.fallback_model
-    if fallback_model not in provider.model_selector.failed_models:
-        result = _try_model_call(provider, messages, filtered_articles, "fallback model",
-                               lambda: provider.call_model(fallback_model, messages, MAX_TOKENS, "Fallback"))
+    # Try up to 3 different models (including fallback)
+    for attempt in range(1, 4):
+        logger.info(f"AI selection attempt {attempt}/3")
+        
+        # Get next model to try
+        current_model = model_selector.get_next_model(current_model)
+        if not current_model:
+            logger.error("No more models available to try")
+            break
+            
+        logger.info(f"Trying model: {current_model}")
+        
+        # Try the model
+        result = _try_model_call(provider, messages, filtered_articles, f"model {current_model}", 
+                               lambda: provider.call_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
+        
         if result:
             return result
     
@@ -829,11 +808,9 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
         if top_articles and len(top_articles) >= 3:
             logger.info(f"Successfully got {len(top_articles)} articles from {model_context}")
             
-            # Determine the actual model name and mark success
+            # Determine the actual model name
             if used_model:
                 actual_model = used_model
-            elif model_context == "fallback model":
-                actual_model = provider.fallback_model
             else:
                 # Extract model name from context like "model model_name"
                 actual_model = model_context.replace("model ", "")
@@ -851,9 +828,7 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
         logger.error(f"{model_context} failed: {str(e)}")
         # Mark model as failed if we can identify it
         if hasattr(provider, 'model_selector'):
-            if model_context == "fallback model":
-                provider.model_selector.mark_failed(provider.fallback_model)
-            elif model_context.startswith("model "):
+            if model_context.startswith("model "):
                 # Extract model name from context
                 model_name = model_context.replace("model ", "")
                 provider.model_selector.mark_failed(model_name)
@@ -943,9 +918,6 @@ def _update_selections_cache(top_articles, previous_selections, used_model, dry_
     if dry_run:
         logger.info("DRY RUN: Skipping cache updates")
         return
-        
-    if len(top_articles) >= 3 and used_model:
-        update_model_cache(used_model)
 
     new_selections = [{"url": art["url"], "title": art["title"]}
                       for art in top_articles if art]
