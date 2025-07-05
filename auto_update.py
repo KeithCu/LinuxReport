@@ -179,7 +179,11 @@ USE_RANDOM_MODELS = True  # Set to True to always try random models, False to us
 
 # Models that don't support system instructions properly and need user-only instructions
 USER_ONLY_INSTRUCTION_MODELS = [
+    "google/gemma-2-9b-it:free",  # Google Gemma models don't support system instructions
+    "google/gemma-3-12b-it:free",  # Google Gemma models don't support system instructions
     "google/gemma-3-27b-it:free",
+    "google/gemma-3-4b-it:free",  # Added due to "Developer instruction is not enabled" error
+    "google/gemma-3n-e4b-it:free",  # Google Gemma models don't support system instructions
     "qwen/qwen3-8b:free",  # Added due to issues with system prompts
 ]
 
@@ -791,11 +795,16 @@ def _try_ai_models(provider, messages, filtered_articles):
     for attempt in range(1, 4):
         logger.info(f"AI selection attempt {attempt}/3")
         
-        # Get next model to try
-        current_model = model_selector.get_next_model(current_model)
-        if not current_model:
-            logger.error("No more models available to try")
-            break
+        # On the 3rd attempt, explicitly use the fallback model
+        if attempt == 3:
+            current_model = FALLBACK_MODEL
+            logger.info(f"3rd attempt: explicitly using fallback model: {current_model}")
+        else:
+            # Get next model to try (for attempts 1 and 2)
+            current_model = model_selector.get_next_model(current_model)
+            if not current_model:
+                logger.error("No more models available to try")
+                break
             
         logger.info(f"Trying model: {current_model}")
         
