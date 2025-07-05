@@ -187,9 +187,6 @@ INFINITE_SCROLL_MOBILE = True
 # Debug mode for infinite scroll (enables on desktop)
 INFINITE_SCROLL_DEBUG = True
 
-# Enable compression caching for faster response times (disabled by default)
-ENABLE_COMPRESSION_CACHING = False
-
 # =============================================================================
 # RSS FEED CONFIGURATION
 # =============================================================================

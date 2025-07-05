@@ -12,7 +12,6 @@ import os
 import json
 import datetime
 import time
-import gzip
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -38,8 +37,7 @@ from shared import (
     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML, 
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
-    WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG,
-    ENABLE_COMPRESSION_CACHING, API
+    WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API
 )
 from weather import get_default_weather_html, init_weather_routes
 from workers import fetch_urls_parallel, fetch_urls_thread
@@ -274,15 +272,6 @@ def _register_main_routes(flask_app):
             suffix = ":MOBILE"
             single_column = True
 
-        # Check if client accepts gzip compression and if compression is enabled globally
-        accept_encoding = request.headers.get('Accept-Encoding', '')
-        supports_gzip = 'gzip' in accept_encoding.lower()
-        compression_enabled = supports_gzip and ENABLE_COMPRESSION_CACHING
-        
-        # Add compression suffix to cache key if supported and enabled globally
-        if compression_enabled:
-            suffix += ":COMPRESS"
-
         # Try full page cache using only page order and mobile flag (but not for admin mode)
         cache_key = f"page-cache:{page_order_s}{suffix}"
         full_page = g_cm.get(cache_key) if not is_admin else None
@@ -293,13 +282,7 @@ def _register_main_routes(flask_app):
                 render_time = 0.001  # 1 millisecond fixed time for cache hits
                 update_performance_stats(render_time, start_time)
             
-            # Handle compressed cache response - check if content is actually compressed (bytes)
-            if compression_enabled and isinstance(full_page, bytes):
-                response = make_response(full_page)
-                response.headers['Content-Encoding'] = 'gzip'
-                response.headers['Content-Length'] = str(len(full_page))
-            else:
-                response = make_response(full_page)
+            response = make_response(full_page)
             return response
 
         # Prepare the page layout.
@@ -403,12 +386,7 @@ def _register_main_routes(flask_app):
             if need_fetch:
                 expire = 30
             
-            # Store compressed or uncompressed version based on client support
-            if compression_enabled and not is_admin:  # Don't compress admin responses for debugging
-                compressed_page = gzip.compress(page.encode('utf-8'), compresslevel=6)
-                g_cm.set(cache_key, compressed_page, ttl=expire)
-            else:
-                g_cm.set(cache_key, page, ttl=expire)
+            g_cm.set(cache_key, page, ttl=expire)
 
         # Single kernel time call at end and track performance stats
         end_time = time.time()
@@ -430,25 +408,9 @@ def _register_main_routes(flask_app):
             if not is_web_bot:
                 fetch_urls_thread()
         
-        # Create response (compression already handled in cache storage/retrieval)
-        if compression_enabled and not is_admin:
-            # Get the compressed content from cache (should already be there from earlier storage)
-            compressed_page = g_cm.get(cache_key)
-            if compressed_page is None:
-                # CRASH: This shouldn't happen - we should have stored compressed content earlier
-                raise RuntimeError(f"Compressed content missing from cache! Key: {cache_key}, compression_enabled: {compression_enabled}")
-            
-            # CRASH: Verify it's actually compressed (bytes)
-            if not isinstance(compressed_page, bytes):
-                raise RuntimeError(f"Cache contains uncompressed content for compressed key! Key: {cache_key}, type: {type(compressed_page)}")
-            
-            response = make_response(compressed_page)
-            response.headers['Content-Encoding'] = 'gzip'
-            response.headers['Content-Length'] = str(len(compressed_page))
-        else:
-            # Return uncompressed response
-            response = make_response(page)
-            response.headers['Content-Length'] = str(len(page.encode('utf-8')))
+        # Create response
+        response = make_response(page)
+        response.headers['Content-Length'] = str(len(page.encode('utf-8')))
         
         # Add cache control headers for 30 minutes (1800 seconds)
         # Use the end_time we already calculated to avoid additional time calls
