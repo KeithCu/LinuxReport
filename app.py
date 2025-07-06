@@ -34,7 +34,7 @@ from shared import (
     EXPIRE_WEEK, FLASK_DASHBOARD, 
     FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, 
     limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS,
-    API, set_flask_restful_api
+    set_flask_restful_api
 )
 from app_config import DEBUG, get_secret_key
 from models import User
@@ -182,7 +182,7 @@ def initialize_extensions(app):
     return login_manager
 
 # Initialize extensions
-login_manager = initialize_extensions(g_app)
+g_login_manager = initialize_extensions(g_app)
 
 # =============================================================================
 # MONITORING DASHBOARD CONFIGURATION
@@ -235,8 +235,8 @@ def setup_asset_bundles(app):
         tuple: (js_bundle, css_bundle) - Configured asset bundles
     """
     # Initialize Flask-Assets
-    assets = Environment(app)
-    assets.url = app.static_url_path
+    g_assets = Environment(app)
+    g_assets.url = app.static_url_path
     
     # Create JS bundle from individual modules
     js_files = [
@@ -245,24 +245,24 @@ def setup_asset_bundles(app):
     ]
     
     # Register JavaScript bundle
-    js_bundle = assets.register('js_all', Bundle(
+    g_js_bundle = g_assets.register('js_all', Bundle(
         *js_files,
         output='linuxreport.js'
     ))
     
     # Register CSS bundle for cache busting
-    css_bundle = assets.register('css_all', Bundle(
+    g_css_bundle = g_assets.register('css_all', Bundle(
         'linuxreport.css',
         output='linuxreport.css'
     ))
     
     # Make assets available to templates
-    app.jinja_env.globals['assets'] = assets
+    app.jinja_env.globals['assets'] = g_assets
     
-    return assets, js_bundle, css_bundle
+    return g_assets, g_js_bundle, g_css_bundle
 
 # Set up asset bundles
-assets, js_bundle, css_bundle = setup_asset_bundles(g_app)
+g_assets, g_js_bundle, g_css_bundle = setup_asset_bundles(g_app)
 
 # =============================================================================
 # APPLICATION STARTUP TASKS
@@ -349,7 +349,7 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
             print(f"Warning: Failed to complete startup tasks: {e}")
 
 # Perform startup tasks
-perform_startup_tasks(g_app, js_bundle, css_bundle)
+perform_startup_tasks(g_app, g_js_bundle, g_css_bundle)
 
 # =============================================================================
 # ROUTE REGISTRATION
