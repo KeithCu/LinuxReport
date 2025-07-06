@@ -35,7 +35,7 @@ CONFIG: SiteConfig = SiteConfig(
 	],
 	URL_IMAGES="https://aireport.keithcu.com/static/images/",
 	FAVICON="covidreport192.ico",
-	LOGO_URL="aireportfancy.webp",
+	LOGO_URL="aireportfancy2.webp",
 	WEB_DESCRIPTION="Latest AI news: breakthroughs, trends, and tech for enthusiasts. Hourly updates, no fluff.",
 	WEB_TITLE="AI Report | Latest AI News",
 	REPORT_PROMPT="AI and robotics for both programmers / researchers and less technical people curious about the biggest news in AI / robots. Nothing about AI security.",
