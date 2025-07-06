@@ -1181,7 +1181,6 @@ if __name__ == "__main__":
     for mode_enum_val in Mode:
         settings_file = f"{mode_enum_val.value}_report_settings.py"
         if os.path.isfile(settings_file):
-            logger.debug(f"Found settings file: {settings_file}")
             # Load the settings file to get its path
             spec = importlib.util.spec_from_file_location("module_name", settings_file)
             module = importlib.util.module_from_spec(spec)
@@ -1197,7 +1196,7 @@ if __name__ == "__main__":
                 logger.info(f"Matched mode '{selected_mode_str}' with path {module.CONFIG.PATH}")
                 break
             else:
-                logger.debug(f"Settings file {settings_file} path mismatch: {module.CONFIG.PATH} != {cwd}")
+                pass
 
     if selected_mode_enum is None:
         logger.error(f"Could not determine mode from current directory: {cwd}")
