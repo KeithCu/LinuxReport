@@ -191,14 +191,14 @@
             itemElement.style.borderBottom = '1px solid var(--btn-border)';
             
             const titleElement = document.createElement('div');
+            titleElement.style.textAlign = 'left';
             titleElement.innerHTML = `<a href="${item.link}" target="_blank" style="color: var(--link); text-decoration: none; font-size: 1.1em;">${item.title}</a>`;
             
-            // Commented out published date display - uncomment to show timestamps
-            /*
             const timeElement = document.createElement('div');
             timeElement.style.fontSize = '0.8em';
             timeElement.style.color = 'var(--text-secondary)';
             timeElement.style.marginTop = '4px';
+            timeElement.style.textAlign = 'right';
             
             if (item.published) {
                 // Try to parse and format the published time
@@ -216,10 +216,8 @@
                 timeElement.textContent = `Timestamp: ${item.timestamp}`;
             }
             
-            itemElement.appendChild(timeElement);
-            */
-            
             itemElement.appendChild(titleElement);
+            itemElement.appendChild(timeElement);
             return itemElement;
         }
     }
