@@ -172,7 +172,7 @@ FREE_MODELS = [
 ]
 
 # Fallback model to use if all free models fail
-FALLBACK_MODEL = "mistralai/mistral-small-3.1-24b-instruct"
+FALLBACK_MODEL = "mistralai/mistral-small-3.2-24b-instruct"
 
 # Model selection behavior
 USE_RANDOM_MODELS = True  # Set to True to always try random models, False to use cached working model
