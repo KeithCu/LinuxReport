@@ -52,6 +52,11 @@ logging.basicConfig(
     ]
 )
 
+# Suppress HTTP client debug messages
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("openai").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 # Log startup information
@@ -147,7 +152,6 @@ FREE_MODELS = [
     "moonshotai/kimi-vl-a3b-thinking:free",
     "moonshotai/moonlight-16b-a3b-instruct:free",
     "nousresearch/deephermes-3-llama-3-8b-preview:free",
-    "nousresearch/deephermes-3-mistral-24b-preview:free",
     "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
     "nvidia/llama-3.3-nemotron-super-49b-v1:free",
    # "open-r1/olympiccoder-32b:free", Generates too many tokens
@@ -613,8 +617,6 @@ def extract_top_titles_from_ai(text):
         return []
     
     logger.debug(f"Extracting titles from AI response (length: {len(text)})")
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(f"Full AI response:\n{text}")
         
     # Try to find the marker by looking for the marker word with any surrounding characters
     marker_index = text.rfind(TITLE_MARKER)
@@ -692,15 +694,12 @@ def extract_top_titles_from_ai(text):
             title = line
             logger.debug(f"  Line {i+1} accepted as potential title: '{title}'")
                 
-        # Validate title length and content
-        if len(title) >= 10 and len(title) <= 200 and not title.startswith(('http://', 'https://', 'www.')):
-            titles.append(title)
-            logger.debug(f"  Line {i+1} validated and added: '{title}'")
-            if len(titles) == 3:
-                logger.debug(f"  Reached 3 titles, stopping extraction")
-                break
-        else:
-            logger.debug(f"  Line {i+1} failed validation (length: {len(title)}, starts with URL: {title.startswith(('http://', 'https://', 'www.'))}): '{title}'")
+        # Add the title (no length validation needed since it was done before sending to AI)
+        titles.append(title)
+        logger.debug(f"  Line {i+1} added: '{title}'")
+        if len(titles) == 3:
+            logger.debug(f"  Reached 3 titles, stopping extraction")
+            break
     
     if not titles:
         logger.warning("No valid titles found in response")
@@ -934,13 +933,23 @@ def _prepare_articles_for_ai(articles):
     filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
     logger.info(f"Embedding filtering: {filtered_count} -> {len(filtered_articles)} articles (removed {filtered_count - len(filtered_articles)})")
     
+    # Filter by title length (10-200 characters) to prevent AI from selecting headlines that will be rejected later
+    logger.info("Filtering articles by title length (10-200 characters)")
+    length_filtered_count = len(filtered_articles)
+    filtered_articles = [
+        article for article in filtered_articles 
+        if len(article['title']) >= 10 and len(article['title']) <= 200 and not article['title'].startswith(('http://', 'https://', 'www.'))
+    ]
+    final_count = len(filtered_articles)
+    logger.info(f"Title length filtering: {length_filtered_count} -> {final_count} articles (removed {length_filtered_count - final_count})")
+    
     if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Articles after embedding filtering:")
+        logger.debug("Articles after title length filtering:")
         for i, article in enumerate(filtered_articles, 1):
             logger.debug(f"  {i}. {article['title']} ({article['url']})")
 
     if not filtered_articles:
-        logger.warning("No new articles available after deduplication.")
+        logger.warning("No new articles available after all filtering.")
         return None, previous_selections
 
     return filtered_articles, previous_selections
