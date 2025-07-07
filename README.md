@@ -3,7 +3,7 @@
 <div align="center">
   <img src="https://linuxreportstatic.us-ord-1.linodeobjects.com/linuxreportfancy.webp" alt="LinuxReport logo" width="200" style="margin: 10px;">
   <img src="https://linuxreportstatic.us-ord-1.linodeobjects.com/covidreportfancy.webp" alt="CovidReport logo" width="200" style="margin: 10px;">
-  <img src="https://linuxreportstatic.us-ord-1.linodeobjects.com/aireportfancy.webp" alt="AIReport logo" width="200" style="margin: 10px;">
+  <img src="https://linuxreportstatic.us-ord-1.linodeobjects.com/aireportfancy2.webp" alt="AIReport logo" width="200" style="margin: 10px;">
 </div>
 
 ---
