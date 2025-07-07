@@ -272,18 +272,17 @@ def _register_main_routes(flask_app):
             suffix = ":MOBILE"
             single_column = True
 
-        # Try full page cache using only page order and mobile flag (but not for admin mode)
-        cache_key = f"page-cache:{page_order_s}{suffix}"
-        full_page = g_cm.get(cache_key) if not is_admin else None
-        if not DEBUG and not is_admin and full_page is not None:
+        # Try full response cache using only page order and mobile flag (but not for admin mode)
+        cache_key = f"response-cache:{page_order_s}{suffix}"
+        cached_response = g_cm.get(cache_key) if not is_admin else None
+        if not DEBUG and not is_admin and cached_response is not None:
             # Track performance stats for cache hit - NO additional kernel calls
             if not is_admin:
                 # For cache hits, use tiny fixed time since they're very fast
                 render_time = 0.001  # 1 millisecond fixed time for cache hits
                 update_performance_stats(render_time, start_time)
             
-            response = make_response(full_page)
-            return response
+            return cached_response
 
         # Prepare the page layout.
         if single_column:
@@ -380,14 +379,6 @@ def _register_main_routes(flask_app):
                                INFINITE_SCROLL_MOBILE=INFINITE_SCROLL_MOBILE,
                                INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG)
 
-        # Store full page cache (but not for admin mode)
-        if not is_admin and page_order_s == STANDARD_ORDER_STR:
-            expire = EXPIRE_MINUTES
-            if need_fetch:
-                expire = 30
-            
-            g_cm.set(cache_key, page, ttl=expire)
-
         # Single kernel time call at end and track performance stats
         end_time = time.time()
         if not is_admin:
@@ -412,13 +403,22 @@ def _register_main_routes(flask_app):
         response = make_response(page)
         response.headers['Content-Length'] = str(len(page.encode('utf-8')))
         
-        # Add cache control headers for 30 minutes (1800 seconds)
+        # Add cache control headers for 15 minutes (900 seconds)
         # Use the end_time we already calculated to avoid additional time calls
         if not is_admin:
             # Convert time.time() to datetime for the Expires header
-            response.headers['Cache-Control'] = 'public, max-age=1800'
-            expires_time = datetime.datetime.fromtimestamp(end_time) + datetime.timedelta(hours=0.5)
+            response.headers['Cache-Control'] = 'public, max-age=900'
+            expires_time = datetime.datetime.fromtimestamp(end_time) + datetime.timedelta(minutes=15)
             response.headers['Expires'] = expires_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
+        
+        # Store full response cache (but not for admin mode) - after response is fully configured
+        if not is_admin and page_order_s == STANDARD_ORDER_STR:
+            expire = EXPIRE_MINUTES
+            if need_fetch:
+                expire = 30
+            
+            g_cm.set(cache_key, response, ttl=expire)
+        
         return response
 
     @flask_app.route('/sitemap.xml')
