@@ -379,6 +379,15 @@ def _register_main_routes(flask_app):
                                INFINITE_SCROLL_MOBILE=INFINITE_SCROLL_MOBILE,
                                INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG)
 
+        # Trigger background fetching if needed
+        if need_fetch and ENABLE_BACKGROUND_REFRESH:
+            # Check if the request is from a web bot
+            user_agent = request.headers.get('User-Agent', '')
+            is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+            
+            if not is_web_bot:
+                fetch_urls_thread()
+
         # Single kernel time call at end and track performance stats
         end_time = time.time()
         if not is_admin:
@@ -389,15 +398,6 @@ def _register_main_routes(flask_app):
             stats_html = get_admin_stats_html()
             if stats_html:
                 page = page.replace('</body>', f'{stats_html}</body>')
-
-        # Trigger background fetching if needed
-        if need_fetch and ENABLE_BACKGROUND_REFRESH:
-            # Check if the request is from a web bot
-            user_agent = request.headers.get('User-Agent', '')
-            is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
-            
-            if not is_web_bot:
-                fetch_urls_thread()
         
         # Create response
         response = make_response(page)
@@ -406,12 +406,11 @@ def _register_main_routes(flask_app):
         # Add cache control headers for 15 minutes (900 seconds)
         # Use the end_time we already calculated to avoid additional time calls
         if not is_admin:
-            # Convert time.time() to datetime for the Expires header
             response.headers['Cache-Control'] = 'public, max-age=900'
             expires_time = datetime.datetime.fromtimestamp(end_time) + datetime.timedelta(minutes=15)
             response.headers['Expires'] = expires_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
         
-        # Store full response cache (but not for admin mode) - after response is fully configured
+        # Store full response cache (but not for admin mode)
         if not is_admin and page_order_s == STANDARD_ORDER_STR:
             expire = EXPIRE_MINUTES
             if need_fetch:
