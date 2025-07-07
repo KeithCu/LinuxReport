@@ -406,9 +406,8 @@ def _register_main_routes(flask_app):
         # Add cache control headers for 15 minutes (900 seconds)
         # Use the end_time we already calculated to avoid additional time calls
         if not is_admin:
+            # Use max-age for relative caching (more reliable than Expires)
             response.headers['Cache-Control'] = 'public, max-age=900'
-            expires_time = datetime.datetime.fromtimestamp(end_time) + datetime.timedelta(minutes=15)
-            response.headers['Expires'] = expires_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
         
         # Store full response cache (but not for admin mode)
         if not is_admin and page_order_s == STANDARD_ORDER_STR:
