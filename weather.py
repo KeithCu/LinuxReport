@@ -45,6 +45,11 @@ from app_config import DEBUG, get_weather_api_key
 WEATHER_BUCKET_SIZE_MILES = 10  # Default bucket diameter in miles (good balance for weather data)
 _WEATHER_BUCKET_SIZE_DEG = WEATHER_BUCKET_SIZE_MILES / 69.0  # Convert miles to degrees (~1° ≈ 69 miles)
 
+# Dynamic bucket size management
+BUCKET_SIZE_KEY = "weather:bucket_size_miles"
+MAX_BUCKET_SIZE_MILES = 160  # Maximum bucket size (about 2.3 degrees)
+BUCKET_SIZE_MULTIPLIER = 2.0  # Factor to multiply bucket size by when rate limited
+
 # Cache timeout configuration
 if DEBUG:
     WEATHER_CACHE_TIMEOUT = 300
@@ -95,17 +100,63 @@ WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 # UTILITY FUNCTIONS
 # =============================================================================
 
-def _bucket_coord(val, bucket_size_deg=_WEATHER_BUCKET_SIZE_DEG):
+def get_current_bucket_size_miles():
+    """
+    Get the current bucket size in miles from cache, or return default if not set.
+    
+    Returns:
+        float: Current bucket size in miles
+    """
+    cached_size = g_cs.get(BUCKET_SIZE_KEY)
+    if cached_size is not None:
+        return float(cached_size)
+    return WEATHER_BUCKET_SIZE_MILES
+
+def get_current_bucket_size_degrees():
+    """
+    Get the current bucket size in degrees.
+    
+    Returns:
+        float: Current bucket size in degrees
+    """
+    miles = get_current_bucket_size_miles()
+    return miles / 69.0
+
+def increase_bucket_size():
+    """
+    Increase the bucket size by the multiplier factor, up to the maximum.
+    Uses locking to prevent race conditions.
+    
+    Returns:
+        tuple: (old_size, new_size) in miles
+    """
+    lock_key = "weather:bucket_size_adjustment"
+    with get_lock(lock_key):
+        current_size = get_current_bucket_size_miles()
+        new_size = min(current_size * BUCKET_SIZE_MULTIPLIER, MAX_BUCKET_SIZE_MILES)
+        
+        if new_size > current_size:
+            # Store the new bucket size with a long timeout (24 hours)
+            g_cs.put(BUCKET_SIZE_KEY, new_size, timeout=86400)
+            print(f"Weather bucket size increased from {current_size:.1f} to {new_size:.1f} miles due to rate limiting")
+            return current_size, new_size
+        else:
+            print(f"Weather bucket size already at maximum ({current_size:.1f} miles)")
+            return current_size, current_size
+
+def _bucket_coord(val, bucket_size_deg=None):
     """
     Buckets a coordinate into intervals of bucket_size_deg degrees.
     
     Args:
         val (float): Coordinate value to bucket
-        bucket_size_deg (float): Size of each bucket in degrees
+        bucket_size_deg (float, optional): Size of each bucket in degrees. If None, uses current dynamic size.
         
     Returns:
         float: Bucketed coordinate value
     """
+    if bucket_size_deg is None:
+        bucket_size_deg = get_current_bucket_size_degrees()
     return math.floor(float(val) / bucket_size_deg) * bucket_size_deg
 
 def _bucket_key(lat, lon):
@@ -150,7 +201,7 @@ def rate_limit_check():
     Enforces RATE_LIMIT_COUNT calls per RATE_LIMIT_WINDOW seconds.
     
     This function implements a sliding window rate limiter for weather API calls.
-    If the rate limit is exceeded, it sleeps until the oldest request expires.
+    If the rate limit is exceeded, it increases the bucket size and sleeps until the oldest request expires.
     """
     now = datetime.now(TZ).timestamp()
     timestamps = g_cs.get(RL_KEY) or []
@@ -161,13 +212,16 @@ def rate_limit_check():
     timestamps_in_window = timestamps[start_index:]
 
     if len(timestamps_in_window) >= RATE_LIMIT_COUNT:
+        # Increase bucket size to reduce API calls
+        old_size, new_size = increase_bucket_size()
+        
         # Calculate wait time based on the oldest timestamp in the current window
         # This ensures we wait until the oldest request expires from the window
         oldest_in_window = timestamps_in_window[0]
         wait_time = (oldest_in_window + RATE_LIMIT_WINDOW) - now
         if wait_time > 0:
             time.sleep(wait_time)
-            print(f"Weather API rate limit exceeded. Sleeping for {wait_time:.2f} seconds. Consider increasing WEATHER_BUCKET_SIZE_MILES.")
+            print(f"Weather API rate limit exceeded. Sleeping for {wait_time:.2f} seconds. Bucket size increased from {old_size:.1f} to {new_size:.1f} miles.")
             now = datetime.now(TZ).timestamp()
 
     timestamps_in_window.append(now)
@@ -560,6 +614,40 @@ def test_weather_api_with_ips():
             fetch_time_from_data = f"{fetch_time_from_data:.2f}s"
         print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
 
+def test_dynamic_bucket_size():
+    """
+    Test the dynamic bucket size functionality.
+    
+    This function demonstrates how the bucket size changes when rate limits are hit.
+    """
+    print("Testing dynamic bucket size functionality...")
+    
+    # Show initial bucket size
+    info = get_bucket_size_info()
+    print(f"Initial bucket size: {info['current_miles']:.1f} miles ({info['current_degrees']:.4f} degrees)")
+    
+    # Simulate rate limit hits by calling increase_bucket_size multiple times
+    for i in range(5):
+        old_size, new_size = increase_bucket_size()
+        if old_size == new_size:
+            print(f"Bucket size already at maximum ({new_size:.1f} miles)")
+            break
+        print(f"Rate limit hit #{i+1}: Increased bucket size from {old_size:.1f} to {new_size:.1f} miles")
+    
+    # Show final bucket size info
+    final_info = get_bucket_size_info()
+    print(f"Final bucket size: {final_info['current_miles']:.1f} miles ({final_info['current_degrees']:.4f} degrees)")
+    print(f"Is at maximum: {final_info['is_max']}")
+    
+    # Reset to default
+    old_size, new_size = reset_bucket_size()
+    print(f"Reset bucket size from {old_size:.1f} to {new_size:.1f} miles")
+    
+    # Show final state
+    reset_info = get_bucket_size_info()
+    print(f"After reset: {reset_info['current_miles']:.1f} miles ({reset_info['current_degrees']:.4f} degrees)")
+    print(f"Is at default: {reset_info['is_default']}")
+
 # =============================================================================
 # FLASK ROUTES INITIALIZATION
 # =============================================================================
@@ -702,13 +790,105 @@ def init_weather_routes(app):
             
             return response
 
-    # Register the resource with Flask-RESTful
+    class WeatherBucketSizeResource(Resource):
+        """
+        Weather Bucket Size Management Resource
+        
+        Provides endpoints to view and manage the dynamic bucket size configuration.
+        
+        ---
+        responses:
+          200:
+            description: Bucket size information retrieved successfully
+            schema:
+              type: object
+              properties:
+                current_miles:
+                  type: number
+                  description: Current bucket size in miles
+                current_degrees:
+                  type: number
+                  description: Current bucket size in degrees
+                default_miles:
+                  type: number
+                  description: Default bucket size in miles
+                max_miles:
+                  type: number
+                  description: Maximum bucket size in miles
+                multiplier:
+                  type: number
+                  description: Multiplier factor for size increases
+                is_default:
+                  type: boolean
+                  description: Whether current size equals default
+                is_max:
+                  type: boolean
+                  description: Whether current size equals maximum
+        """
+        @limiter.limit(dynamic_rate_limit)
+        def get(self):
+            """Handle GET requests for bucket size information."""
+            return get_bucket_size_info(), 200
+        
+        def post(self):
+            """Handle POST requests to reset bucket size to default."""
+            old_size, new_size = reset_bucket_size()
+            return {
+                'message': f'Bucket size reset from {old_size:.1f} to {new_size:.1f} miles',
+                'old_size': old_size,
+                'new_size': new_size
+            }, 200
+
+    # Register the resources with Flask-RESTful
     API.add_resource(WeatherResource, '/api/weather')
+    API.add_resource(WeatherBucketSizeResource, '/api/weather/bucket-size')
+
+def reset_bucket_size():
+    """
+    Reset the bucket size back to the default value.
+    Uses locking to prevent race conditions.
+    
+    Returns:
+        tuple: (old_size, new_size) in miles
+    """
+    lock_key = "weather:bucket_size_adjustment"
+    with get_lock(lock_key):
+        current_size = get_current_bucket_size_miles()
+        if current_size != WEATHER_BUCKET_SIZE_MILES:
+            # Remove the cached bucket size to revert to default
+            g_cs.delete(BUCKET_SIZE_KEY)
+            print(f"Weather bucket size reset from {current_size:.1f} to {WEATHER_BUCKET_SIZE_MILES:.1f} miles")
+            return current_size, WEATHER_BUCKET_SIZE_MILES
+        else:
+            print(f"Weather bucket size already at default ({WEATHER_BUCKET_SIZE_MILES:.1f} miles)")
+            return current_size, current_size
+
+def get_bucket_size_info():
+    """
+    Get information about the current bucket size configuration.
+    
+    Returns:
+        dict: Information about bucket size configuration
+    """
+    current_size = get_current_bucket_size_miles()
+    current_degrees = get_current_bucket_size_degrees()
+    return {
+        'current_miles': current_size,
+        'current_degrees': current_degrees,
+        'default_miles': WEATHER_BUCKET_SIZE_MILES,
+        'max_miles': MAX_BUCKET_SIZE_MILES,
+        'multiplier': BUCKET_SIZE_MULTIPLIER,
+        'is_default': current_size == WEATHER_BUCKET_SIZE_MILES,
+        'is_max': current_size >= MAX_BUCKET_SIZE_MILES
+    }
 
 # =============================================================================
 # MAIN EXECUTION
 # =============================================================================
 
 if __name__ == "__main__":
-    print("Running weather API tests with test IP addresses...")
+    print("Running weather API tests...")
+    print("1. Testing with IP addresses...")
     test_weather_api_with_ips()
+    print("\n2. Testing dynamic bucket size functionality...")
+    test_dynamic_bucket_size()
