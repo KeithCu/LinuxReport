@@ -14,6 +14,14 @@ from typing import Dict, List, Optional, Tuple
 import random
 import logging
 
+# Visualization imports
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from matplotlib.colors import LinearSegmentedColormap
+import numpy as np
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+
 from image_parser import custom_fetch_largest_image
 from article_deduplication import (
     fetch_recent_articles, get_embedding, deduplicate_articles_with_exclusions,
@@ -252,7 +260,7 @@ FAILED_MODELS_CACHE_KEY = "failed_llm_models"
 FAILED_MODELS_RETRY_HOURS = 24  # Retry failed models after 24 hours
 
 # Run mode configuration
-RUN_MODE = "normal"  # options: "normal", "compare"
+RUN_MODE = "normal"  # options: "normal", "compare", "visualize"
 
 # Provider configuration
 PROVIDER = "openrouter"
@@ -1018,6 +1026,201 @@ def _run_comparison_model(provider, model, filtered_articles, label):
         logger.error(f"{label} failed with exception: {e}")
 
 
+def create_embedding_visualization(mode=None, output_file="embedding_visualization.png"):
+    """
+    Create a visualization of the 200 previous selected titles using their embeddings.
+    
+    Args:
+        mode (str): The mode name for cache key (optional, uses local cache.db)
+        output_file (str): Output filename for the visualization
+    """
+    logger.info(f"Creating embedding visualization using local cache.db")
+    
+    # Get previous selections from the global cache (which uses local cache.db)
+    previous_selections = g_c.get("previously_selected_selections_2")
+    
+    if not previous_selections:
+        logger.warning("No previous selections found in local cache.db")
+        return False
+    
+    logger.info(f"Found {len(previous_selections)} previous selections")
+    
+    # Limit to 200 most recent selections
+    if len(previous_selections) > 200:
+        previous_selections = previous_selections[-200:]
+        logger.info(f"Limited to 200 most recent selections")
+    
+    # Extract titles and compute embeddings
+    titles = [sel["title"] for sel in previous_selections]
+    logger.info(f"Extracted {len(titles)} titles for embedding computation")
+    
+    # Set matplotlib to use a non-interactive backend to avoid font loading issues
+    import matplotlib
+    matplotlib.use('Agg')  # Use non-interactive backend
+    logger.info("Set matplotlib backend to Agg")
+    
+    # Re-import matplotlib.pyplot after setting backend
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
+    from matplotlib.colors import LinearSegmentedColormap
+    import numpy as np
+    from sklearn.decomposition import PCA
+    from sklearn.manifold import TSNE
+    
+    logger.info("Computing embeddings for titles...")
+    
+    # Limit to 200 most recent selections
+    if len(previous_selections) > 200:
+        previous_selections = previous_selections[-200:]
+        logger.info(f"Limited to 200 most recent selections")
+    
+    # Extract titles and compute embeddings
+    titles = [sel["title"] for sel in previous_selections]
+    logger.info("Computing embeddings for titles...")
+    
+    embeddings = []
+    valid_titles = []
+    failed_titles = []
+    
+    logger.info(f"Starting embedding computation for {len(titles)} titles...")
+    for i, title in enumerate(titles):
+        if i % 10 == 0:  # Log progress every 10 titles
+            logger.info(f"Processing title {i+1}/{len(titles)}")
+        embedding = get_embedding(title)
+        if embedding is not None:
+            embeddings.append(embedding.cpu().numpy())
+            valid_titles.append(title)
+        else:
+            failed_titles.append(title)
+            logger.warning(f"Failed to get embedding for title {i}: {title[:50]}...")
+    
+    logger.info(f"Embedding computation completed")
+    
+    if len(embeddings) < 2:
+        logger.error("Need at least 2 valid embeddings for visualization")
+        return False
+    
+    logger.info(f"Successfully computed {len(embeddings)} embeddings out of {len(titles)} titles")
+    if failed_titles:
+        logger.info(f"Failed to get embeddings for {len(failed_titles)} titles")
+    
+    # Convert to numpy array
+    embeddings_array = np.array(embeddings)
+    logger.info(f"Embedding shape: {embeddings_array.shape}")
+    
+    logger.info("Creating matplotlib figure...")
+    # Create visualization
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
+    logger.info("Matplotlib figure created successfully")
+    
+    # Method 1: PCA to 2D
+    logger.info("Computing PCA reduction...")
+    pca = PCA(n_components=2)
+    embeddings_2d_pca = pca.fit_transform(embeddings_array)
+    logger.info("PCA reduction completed")
+    
+    # Method 2: t-SNE to 2D
+    logger.info("Computing t-SNE reduction...")
+    tsne = TSNE(n_components=2, random_state=42, perplexity=min(30, len(embeddings)-1))
+    embeddings_2d_tsne = tsne.fit_transform(embeddings_array)
+    logger.info("t-SNE reduction completed")
+    
+    # Use a neutral color scheme based on position in the dataset
+    colors = plt.cm.plasma(np.linspace(0, 1, len(embeddings)))
+    
+    # Plot PCA
+    scatter1 = ax1.scatter(embeddings_2d_pca[:, 0], embeddings_2d_pca[:, 1], 
+                           c=colors, alpha=0.7, s=50)
+    ax1.set_title(f'PCA Visualization of {len(embeddings)} Headlines\n(Explained variance: {pca.explained_variance_ratio_.sum():.2%})', 
+                  fontsize=14, fontweight='bold')
+    ax1.set_xlabel('Principal Component 1')
+    ax1.set_ylabel('Principal Component 2')
+    ax1.grid(True, alpha=0.3)
+    
+    # Plot t-SNE
+    scatter2 = ax2.scatter(embeddings_2d_tsne[:, 0], embeddings_2d_tsne[:, 1], 
+                           c=colors, alpha=0.7, s=50)
+    ax2.set_title(f't-SNE Visualization of {len(embeddings)} Headlines', 
+                  fontsize=14, fontweight='bold')
+    ax2.set_xlabel('t-SNE Component 1')
+    ax2.set_ylabel('t-SNE Component 2')
+    ax2.grid(True, alpha=0.3)
+    
+    # Add colorbar
+    cbar = plt.colorbar(scatter1, ax=[ax1, ax2], shrink=0.8)
+    cbar.set_label('Dataset Position', rotation=270, labelpad=20)
+    
+    # Add some statistics
+    mode_display = mode if mode else "All modes (local cache)"
+    stats_text = f"""
+Statistics:
+• Total headlines: {len(embeddings)}
+• Original dimensions: {embeddings_array.shape[1]}
+• PCA explained variance: {pca.explained_variance_ratio_.sum():.2%}
+• Dataset size: {len(previous_selections)} selections
+• Source: {mode_display}
+    """
+    
+    plt.figtext(0.02, 0.02, stats_text, fontsize=10, 
+                bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
+    
+    # Add title
+    title_mode = mode.upper() if mode else "ALL MODES"
+    plt.suptitle(f'Headline Embedding Visualization - {title_mode}', 
+                 fontsize=16, fontweight='bold', y=0.95)
+    
+    # Adjust layout and save
+    plt.tight_layout()
+    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    logger.info(f"Visualization saved to: {output_file}")
+    
+    # Also create a 3D version if we have enough data
+    if len(embeddings) >= 10:
+        logger.info("Creating 3D visualization...")
+        fig_3d = plt.figure(figsize=(15, 10))
+        ax_3d = fig_3d.add_subplot(111, projection='3d')
+        
+        # Use PCA for 3D
+        pca_3d = PCA(n_components=3)
+        embeddings_3d = pca_3d.fit_transform(embeddings_array)
+        
+        scatter_3d = ax_3d.scatter(embeddings_3d[:, 0], embeddings_3d[:, 1], embeddings_3d[:, 2],
+                                   c=colors, alpha=0.7, s=50)
+        ax_3d.set_title(f'3D PCA Visualization of {len(embeddings)} Headlines\n(Explained variance: {pca_3d.explained_variance_ratio_.sum():.2%})',
+                        fontsize=14, fontweight='bold')
+        ax_3d.set_xlabel('Principal Component 1')
+        ax_3d.set_ylabel('Principal Component 2')
+        ax_3d.set_zlabel('Principal Component 3')
+        
+        # Add colorbar
+        cbar_3d = plt.colorbar(scatter_3d, ax=ax_3d, shrink=0.8)
+        cbar_3d.set_label('Dataset Position', rotation=270, labelpad=20)
+        
+        # Save 3D version
+        output_file_3d = output_file.replace('.png', '_3d.png')
+        plt.savefig(output_file_3d, dpi=300, bbox_inches='tight')
+        logger.info(f"3D visualization saved to: {output_file_3d}")
+        plt.close(fig_3d)
+    
+    plt.close(fig)
+    return True
+
+
+def run_visualization_mode(mode=None):
+    """Run the visualization mode to create embedding plots."""
+    logger.info("--- Running Visualization Mode ---")
+    
+    # Create visualization (mode is optional now)
+    success = create_embedding_visualization(mode)
+    
+    if success:
+        logger.info("Visualization mode completed successfully")
+        return 0
+    else:
+        logger.error("Visualization mode failed")
+        return 1
+
+
 def append_to_archive(mode, top_articles):
     """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
     archive_file = f"{mode}report_archive.jsonl"
@@ -1064,6 +1267,13 @@ def append_to_archive(mode, top_articles):
 def main(mode, settings_module, settings_config, dry_run=False):
     """Main processing function with improved error handling and dry run logic."""
     global ALL_URLS, REPORT_PROMPT
+    
+    # Handle visualization mode specially
+    if RUN_MODE == "visualize":
+        logger.info("Running in visualization mode")
+        return run_visualization_mode()  # No mode required, uses local cache.db
+    
+    # For other modes, set up the configuration
     ALL_URLS = settings_config.ALL_URLS
     REPORT_PROMPT = settings_config.REPORT_PROMPT
     SITE_PATH = settings_config.PATH
@@ -1158,6 +1368,7 @@ if __name__ == "__main__":
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
     parser.add_argument('--compare', action='store_true', help='Run in comparison mode')
+    parser.add_argument('--visualize', action='store_true', help='Run in visualization mode to create embedding plots')
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
     parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
@@ -1165,7 +1376,15 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logger.info("Command line arguments parsed")
-    logger.info(f"Arguments: force={args.force}, forceimage={args.forceimage}, dry_run={args.dry_run}, compare={args.compare}, include_summary={args.include_summary}, prompt_mode={args.prompt_mode}, use_cached_model={args.use_cached_model}, force_model={args.force_model}")
+    logger.info(f"Arguments: force={args.force}, forceimage={args.forceimage}, dry_run={args.dry_run}, compare={args.compare}, visualize={args.visualize}, include_summary={args.include_summary}, prompt_mode={args.prompt_mode}, use_cached_model={args.use_cached_model}, force_model={args.force_model}")
+
+    # Handle visualization mode immediately, before any mode detection
+    if args.visualize:
+        RUN_MODE = "visualize"
+        logger.info("Set RUN_MODE to 'visualize'")
+        logger.info("Starting main processing for visualization mode...")
+        exit_code = main(None, None, None, dry_run=args.dry_run)
+        sys.exit(exit_code)
 
     # Set USE_RANDOM_MODELS based on command line argument
     USE_RANDOM_MODELS = not args.use_cached_model
@@ -1225,7 +1444,7 @@ if __name__ == "__main__":
     if args.compare:
         RUN_MODE = "compare"
         logger.info("Set RUN_MODE to 'compare'")
-
+    
     # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
     if args.include_summary:
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
