@@ -97,25 +97,38 @@ def get_cached_page(page_name, render_function, file_path=None):
     """
     now = time.time()
     cache_entry = _page_cache.get(page_name)
-    mtime = None
-    if file_path:
-        try:
-            mtime = os.path.getmtime(file_path)
-        except OSError:
-            mtime = None
 
     if cache_entry:
         last_check = cache_entry.get('last_checked', 0)
-        cached_mtime = cache_entry.get('file_mtime')
-        # Only stat file every _FILE_CHECK_INTERVAL_SECONDS
+        # Only check mtime every _FILE_CHECK_INTERVAL_SECONDS
         if now - last_check < _FILE_CHECK_INTERVAL_SECONDS:
             # Don't check mtime until interval has elapsed
             return cache_entry['html']
+        
+        # Time to check if file changed
+        if file_path:
+            try:
+                mtime = os.path.getmtime(file_path)
+            except OSError:
+                mtime = None
+        else:
+            mtime = None
+            
+        cached_mtime = cache_entry.get('file_mtime')
         if mtime == cached_mtime:
             # File unchanged, only update 'last_checked'
             cache_entry['last_checked'] = now
             return cache_entry['html']
         # File changed! Will fall through and re-render.
+    else:
+        # No cache, get mtime for initial cache
+        if file_path:
+            try:
+                mtime = os.path.getmtime(file_path)
+            except OSError:
+                mtime = None
+        else:
+            mtime = None
 
     # No cache, or file changed, or missing
     html = render_function()
