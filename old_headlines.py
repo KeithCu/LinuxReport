@@ -1,10 +1,11 @@
 import os
 import json
 import datetime
-from flask import render_template, request, jsonify
+from flask import render_template, request
 from flask_login import current_user, login_required
 from flask_restful import Resource
 from shared import MODE_MAP, MODE, PATH, FAVICON, LOGO_URL, WEB_DESCRIPTION, API
+from caching import get_cached_page
 
 
 class DeleteHeadlineResource(Resource):
@@ -59,58 +60,62 @@ def init_old_headlines_routes(app):
     def old_headlines():
         mode_str = MODE_MAP.get(MODE)
         archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
-        headlines = []
-        try:
-            with open(archive_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line)
-                        # Convert timestamp to datetime object for grouping
-                        if 'timestamp' in entry:
-                            entry['date'] = datetime.datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00')).date()
-                        headlines.append(entry)
-                    except json.JSONDecodeError:
-                        continue
-        except FileNotFoundError:
-            pass
-        except IOError as e:
-            print(f"Error reading archive file {archive_file}: {e}")
 
-        # Sort headlines by timestamp
-        headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-        
-        # Skip the first 3 headlines (most recent)
-        if len(headlines) > 3:
-            headlines = headlines[3:]
-        else:
+        def render_old_headlines_page():
             headlines = []
+            try:
+                with open(archive_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            entry = json.loads(line)
+                            # Convert timestamp to datetime object for grouping
+                            if 'timestamp' in entry:
+                                entry['date'] = datetime.datetime.fromisoformat(entry['timestamp'].replace('Z', '+00:00')).date()
+                            headlines.append(entry)
+                        except json.JSONDecodeError:
+                            continue
+            except FileNotFoundError:
+                pass
+            except IOError as e:
+                print(f"Error reading archive file {archive_file}: {e}")
 
-        # Group headlines by date
-        grouped_headlines = {}
-        for headline in headlines:
-            date = headline.get('date')
-            if date:
-                date_str = date.strftime('%B %d, %Y')  # Format: January 1, 2024
-                if date_str not in grouped_headlines:
-                    grouped_headlines[date_str] = []
-                grouped_headlines[date_str].append(headline)
+            # Sort headlines by timestamp
+            headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+            
+            # Skip the first 3 headlines (most recent)
+            if len(headlines) > 3:
+                headlines = headlines[3:]
+            else:
+                headlines = []
 
-        # Convert to list of tuples (date, headlines) and sort by date
-        grouped_headlines_list = [(date, headlines) for date, headlines in grouped_headlines.items()]
-        grouped_headlines_list.sort(key=lambda x: datetime.datetime.strptime(x[0], '%B %d, %Y'), reverse=True)
+            # Group headlines by date
+            grouped_headlines = {}
+            for headline in headlines:
+                date = headline.get('date')
+                if date:
+                    date_str = date.strftime('%B %d, %Y')  # Format: January 1, 2024
+                    if date_str not in grouped_headlines:
+                        grouped_headlines[date_str] = []
+                    grouped_headlines[date_str].append(headline)
 
-        # Use Flask-Login for admin authentication
-        is_admin = current_user.is_authenticated
-        return render_template(
-            'old_headlines.html',
-            grouped_headlines=grouped_headlines_list,
-            mode=mode_str,
-            title=f"Old Headlines - {mode_str.title()}Report",
-            favicon=FAVICON,
-            logo_url=LOGO_URL,
-            description=WEB_DESCRIPTION,
-            is_admin=is_admin
-        )
+            # Convert to list of tuples (date, headlines) and sort by date
+            grouped_headlines_list = [(date, headlines) for date, headlines in grouped_headlines.items()]
+            grouped_headlines_list.sort(key=lambda x: datetime.datetime.strptime(x[0], '%B %d, %Y'), reverse=True)
+
+            # Use Flask-Login for admin authentication
+            is_admin = current_user.is_authenticated
+            return render_template(
+                'old_headlines.html',
+                grouped_headlines=grouped_headlines_list,
+                mode=mode_str,
+                title=f"Old Headlines - {mode_str.title()}Report",
+                favicon=FAVICON,
+                logo_url=LOGO_URL,
+                description=WEB_DESCRIPTION,
+                is_admin=is_admin
+            )
+
+        return get_cached_page('old_headlines', render_old_headlines_page, archive_file)
     
     # Register Flask-RESTful resource
     API.add_resource(DeleteHeadlineResource, '/api/delete_headline')

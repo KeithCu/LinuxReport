@@ -78,6 +78,53 @@ def get_cached_file_content(file_path, encoding='utf-8'):
     _file_cache[file_path] = {'mtime': mtime, 'content': content, 'last_check_time': now}
     return content
 
+
+_page_cache = {}
+
+
+def get_cached_page(page_name, render_function, file_path=None):
+    """
+    Cache a rendered page, only updating if the underlying file changes.
+    Only check the file's mtime every _FILE_CHECK_INTERVAL_SECONDS to avoid excess stat ops.
+
+    Args:
+        page_name (str): Unique cache name
+        render_function (callable): Function that returns the rendered HTML
+        file_path (str, optional): Path to a file to track for changes
+
+    Returns:
+        str: Cached HTML or newly rendered if file changed
+    """
+    now = time.time()
+    cache_entry = _page_cache.get(page_name)
+    mtime = None
+    if file_path:
+        try:
+            mtime = os.path.getmtime(file_path)
+        except OSError:
+            mtime = None
+
+    if cache_entry:
+        last_check = cache_entry.get('last_checked', 0)
+        cached_mtime = cache_entry.get('file_mtime')
+        # Only stat file every _FILE_CHECK_INTERVAL_SECONDS
+        if now - last_check < _FILE_CHECK_INTERVAL_SECONDS:
+            # Don't check mtime until interval has elapsed
+            return cache_entry['html']
+        if mtime == cached_mtime:
+            # File unchanged, only update 'last_checked'
+            cache_entry['last_checked'] = now
+            return cache_entry['html']
+        # File changed! Will fall through and re-render.
+
+    # No cache, or file changed, or missing
+    html = render_function()
+    _page_cache[page_name] = {
+        'html': html,
+        'file_mtime': mtime,
+        'last_checked': now
+    }
+    return html
 # =============================================================================
 # CACHE MANAGEMENT FUNCTIONS
 # =============================================================================
