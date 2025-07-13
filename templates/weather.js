@@ -182,6 +182,15 @@
             forecast.innerHTML = data.daily.map(day => this.createDayHTML(day, useMetric)).join('');
             this.hideElement(loading);
             this.showElement(forecast);
+            
+            // Force horizontal layout with inline styles
+            if (forecast) {
+                forecast.style.display = 'flex';
+                forecast.style.flexDirection = 'row';
+                forecast.style.flexWrap = 'nowrap';
+                forecast.style.width = 'max-content';
+                console.log('[Weather] Applied inline styles for horizontal layout');
+            }
         }
 
         createDayHTML(day, useMetric) {

@@ -434,25 +434,54 @@ img {
   padding-right: 25px;
 }
 
+#weather-widget-container {
+  display: block;
+  text-align: center;
+  margin: calc(var(--spacing-sm) / 2) auto;
+  width: fit-content;
+  min-width: 600px;
+  max-width: 90%;
+}
+
 .weather-container {
-  width: 100%;
+  width: fit-content;
   overflow-x: auto;
-  /* Optional: set a max-width if you want to limit it */
+  min-width: 600px;
+  display: block;
+  margin: 0 auto;
+  padding: 10px 20px 30px 20px; /* Extra bottom padding for OpenWeather attribution */
 }
 
 .weather-forecast {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  width: max-content; /* Ensures children don't wrap and container can scroll */
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  width: max-content;
+  min-width: 600px;
+  min-height: 100px;
+}
+
+/* Force horizontal layout with higher specificity */
+#weather-container .weather-forecast,
+.weather-container .weather-forecast {
+  display: grid !important;
+  grid-template-columns: repeat(5, 1fr) !important;
 }
 
 .weather-day {
-  flex: 0 0 auto; /* Prevents stretching/shrinking */
-  min-width: 120px; /* Adjust as needed for your design */
-  margin-right: 8px; /* Space between days */
-  /* Remove or override any width: 100% or similar */
-  width: auto !important;
+  min-width: 120px;
+  max-width: 150px;
+  margin: calc(var(--spacing-xs) / 2);
+  width: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--spacing-sm) / 2);
+  background-color: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--border-radius-sm);
+  transition: transform var(--transition-fast);
 }
 
 .weather-day:hover {
@@ -497,13 +526,6 @@ header {
 header small {
   display: block;
   margin: var(--spacing-sm) 0;
-}
-
-#weather-widget-container {
-  display: inline-block;
-  text-align: center;
-  margin: calc(var(--spacing-sm) / 2) auto;
-  width: auto;
 }
 
 /* =============================================================================
