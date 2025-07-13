@@ -283,6 +283,22 @@ def _process_openweather_response(weather_data, fetch_time):
     # Determine city name for logging
     city_name = weather_data.get("city", {}).get("name", "Unknown location")
     print(f"[DEBUG] Raw city name from API: {repr(city_name)}")
+    
+    # Fix Unicode encoding issue - the city name might be coming as bytes or with encoding issues
+    if isinstance(city_name, str):
+        try:
+            # If it looks like it has escaped bytes, try to decode it
+            if '\\x' in repr(city_name):
+                # Convert the string representation back to bytes and decode
+                city_name = city_name.encode('latin-1').decode('utf-8')
+            else:
+                # Ensure it's properly decoded
+                city_name = city_name.encode('utf-8').decode('utf-8')
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            # If all else fails, use the original
+            pass
+    
+    print(f"[DEBUG] Processed city name: {repr(city_name)}")
     # print(f"[DEBUG] Raw API response city data: {weather_data.get('city', {})}")
 
     daily_data = defaultdict(list)
