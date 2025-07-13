@@ -435,41 +435,24 @@ img {
 }
 
 .weather-container {
-  max-width: 100%;
-  min-width: 600px; /* Ensure enough width for 5 days */
-  margin: calc(var(--spacing-sm) / 2) auto;
-  padding: calc(var(--spacing-sm) / 2) calc(var(--spacing-sm) / 2) 20px calc(var(--spacing-sm) / 2);
-  background-color: var(--btn-bg);
-  color: var(--text);
-  border-radius: var(--border-radius-md);
-  text-align: center;
-  box-shadow: var(--shadow-sm);
-}
-
-.weather-container h3 {
-  margin: 0 0 calc(var(--spacing-sm) / 2) 0;
+  width: 100%;
+  overflow-x: auto;
+  /* Optional: set a max-width if you want to limit it */
 }
 
 .weather-forecast {
   display: flex;
+  flex-direction: row;
   flex-wrap: nowrap;
-  justify-content: space-between;
-  gap: var(--spacing-xs);
-  overflow-x: auto;
-  min-width: 100%;
-  width: 100%;
+  width: max-content; /* Ensures children don't wrap and container can scroll */
 }
 
 .weather-day {
-  flex: 0 0 auto;
-  min-width: 80px;
-  max-width: 120px;
-  margin: calc(var(--spacing-xs) / 2);
-  padding: calc(var(--spacing-sm) / 2);
-  background-color: var(--btn-bg);
-  border: 1px solid var(--btn-border);
-  border-radius: var(--border-radius-sm);
-  transition: transform var(--transition-fast);
+  flex: 0 0 auto; /* Prevents stretching/shrinking */
+  min-width: 120px; /* Adjust as needed for your design */
+  margin-right: 8px; /* Space between days */
+  /* Remove or override any width: 100% or similar */
+  width: auto !important;
 }
 
 .weather-day:hover {
