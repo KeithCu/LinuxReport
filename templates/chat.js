@@ -150,7 +150,7 @@
                 return;
             }
             
-            const imageUrlInput = this.elements['chat-image-url-input'];
+            const imageUrlInput = this.elements.get('chat-image-url-input');
             try {
                 imageUrlInput.value = 'Uploading...';
                 imageUrlInput.disabled = true;
@@ -355,12 +355,14 @@
                 this.cleanup();
             } else {
                 // Only reconnect if chat is currently visible
-                const container = this.elements['chat-container'];
-                const computedStyle = getComputedStyle(container);
-                if (computedStyle.display !== 'none') {
-                    this.initializeSSE();
-                    if (!app.config.CHAT_USE_SSE) {
-                        this.fetchComments();
+                const container = this.elements.get('chat-container');
+                if (container) {
+                    const computedStyle = getComputedStyle(container);
+                    if (computedStyle.display !== 'none') {
+                        this.initializeSSE();
+                        if (!app.config.CHAT_USE_SSE) {
+                            this.fetchComments();
+                        }
                     }
                 }
             }

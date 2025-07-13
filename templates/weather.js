@@ -171,6 +171,38 @@
             return date.toDateString() === today.toDateString() ? 'Today' : 
                    date.toLocaleDateString(navigator.language || app.config.DEFAULT_LOCALE, { weekday: 'short' });
         }
+
+        setCollapsed(isCollapsed, saveCookie = false) {
+            const widgetWrapper = this.elements.get('weather-widget-container');
+            const toggleBtn = this.elements.get('weather-toggle-btn');
+            
+            if (widgetWrapper) {
+                widgetWrapper.classList.toggle('collapsed', isCollapsed);
+            }
+            
+            if (toggleBtn) {
+                toggleBtn.innerHTML = isCollapsed ? '&#9650;' : '&#9660;';
+            }
+            
+            if (saveCookie) {
+                app.utils.CookieManager.set('weatherCollapsed', isCollapsed ? 'true' : 'false');
+            }
+        }
+
+        showElement(element, content = null) {
+            if (element) {
+                if (content !== null) {
+                    element.textContent = content;
+                }
+                element.style.display = 'block';
+            }
+        }
+
+        hideElement(element) {
+            if (element) {
+                element.style.display = 'none';
+            }
+        }
     }
 
     app.modules.weather = {
