@@ -436,6 +436,7 @@ img {
 
 .weather-container {
   max-width: 100%;
+  min-width: 600px; /* Ensure enough width for 5 days */
   margin: calc(var(--spacing-sm) / 2) auto;
   padding: calc(var(--spacing-sm) / 2) calc(var(--spacing-sm) / 2) 20px calc(var(--spacing-sm) / 2);
   background-color: var(--btn-bg);
@@ -455,6 +456,8 @@ img {
   justify-content: space-between;
   gap: var(--spacing-xs);
   overflow-x: auto;
+  min-width: 100%;
+  width: 100%;
 }
 
 .weather-day {
