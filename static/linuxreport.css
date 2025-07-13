@@ -451,14 +451,16 @@ img {
 
 .weather-forecast {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: space-between;
   gap: var(--spacing-xs);
+  overflow-x: auto;
 }
 
 .weather-day {
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 80px;
+  max-width: 120px;
   margin: calc(var(--spacing-xs) / 2);
   padding: calc(var(--spacing-sm) / 2);
   background-color: var(--btn-bg);
