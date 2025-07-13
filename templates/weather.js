@@ -106,49 +106,66 @@
             return 'imperial';
         }
 
-        async fetch() {
+        async fetch(retryCount = 0) {
             const useMetric = this.getUnits() === 'metric';
-            try {
-                // console.log('[Weather] Starting fetch...');
-                const startTime = performance.now();
-                
-                // Get user's geolocation first
-                // console.log('[Weather] Getting location...');
-                const location = await app.utils.GeolocationManager.getLocation();
-                // console.log('[Weather] Location obtained:', location);
-                
-                // Build URL with location parameters
-                const params = new URLSearchParams({
-                    units: useMetric ? 'metric' : 'imperial'
-                });
-                
-                // Add location parameters if geolocation was successful
-                if (location.lat !== null && location.lon !== null) {
-                    params.append('lat', location.lat);
-                    params.append('lon', location.lon);
+            const maxRetries = 20; // Much higher retry limit
+            
+            const attemptFetch = async () => {
+                try {
+                    // console.log('[Weather] Starting fetch...');
+                    const startTime = performance.now();
+                    
+                    // Get user's geolocation first
+                    // console.log('[Weather] Getting location...');
+                    const location = await app.utils.GeolocationManager.getLocation();
+                    console.log('[Weather] Location obtained:', location);
+                    
+                    // Build URL with location parameters
+                    const params = new URLSearchParams({
+                        units: useMetric ? 'metric' : 'imperial'
+                    });
+                    
+                    // Add location parameters if geolocation was successful
+                    if (location.lat !== null && location.lon !== null) {
+                        params.append('lat', location.lat);
+                        params.append('lon', location.lon);
+                        console.log('[Weather] Sending coordinates to server:', location.lat, location.lon);
+                    } else {
+                        console.log('[Weather] No coordinates available, will use IP fallback');
+                    }
+                    
+                    // Add cache busting parameter with current date and hour
+                    const now = new Date();
+                    const cacheBuster = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`;
+                    params.append('_cb', cacheBuster);
+                    
+                    const url = `${app.config.WEATHER_BASE_URL}/api/weather?${params.toString()}`;
+                    // console.log('[Weather] Making request to:', url);
+                    // console.log('[Weather] Time spent on geolocation:', performance.now() - startTime, 'ms');
+                    
+                    const response = await fetch(url);
+                    // console.log('[Weather] Response received after:', performance.now() - startTime, 'ms');
+                    
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const data = await response.json();
+                    // console.log('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
+                    
+                    this.render(data, useMetric);
+                } catch (error) {
+                    // If we have coordinates but the request failed, keep retrying until we succeed
+                    if (retryCount < maxRetries) {
+                        retryCount++;
+                        console.log(`[Weather] Request failed, retrying in 250ms (attempt ${retryCount}/${maxRetries})...`);
+                        setTimeout(() => this.fetch(retryCount), 250); // Non-blocking retry
+                        return;
+                    }
+                    
+                    this.showError('Unable to load weather data.');
+                    app.utils.handleError('Fetch Weather', error);
                 }
-                // If geolocation failed, don't pass any coordinates - backend will handle fallback
-                
-                // Add cache busting parameter with current date and hour
-                const now = new Date();
-                const cacheBuster = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`;
-                params.append('_cb', cacheBuster);
-                
-                const url = `${app.config.WEATHER_BASE_URL}/api/weather?${params.toString()}`;
-                // console.log('[Weather] Making request to:', url);
-                // console.log('[Weather] Time spent on geolocation:', performance.now() - startTime, 'ms');
-                
-                const response = await fetch(url);
-                // console.log('[Weather] Response received after:', performance.now() - startTime, 'ms');
-                
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const data = await response.json();
-                // console.log('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
-                this.render(data, useMetric);
-            } catch (error) {
-                this.showError('Unable to load weather data.');
-                app.utils.handleError('Fetch Weather', error);
-            }
+            };
+            
+            return attemptFetch();
         }
 
         showError(message) {

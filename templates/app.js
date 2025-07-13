@@ -127,20 +127,20 @@
         }
 
                 const options = {
-                    enableHighAccuracy: false, // Changed to false for faster response
-                    timeout: 5000, // Reduced timeout to 5 seconds
-                    maximumAge: 60000 // Reduced to 1 minute for fresher data
+                    enableHighAccuracy: false, // Keep false for faster response
+                    timeout: 15000, // Increased timeout to 15 seconds for localhost
+                    maximumAge: 3600000 // 1 hour - data within last hour is good enough
                 };
 
                 // console.log('Requesting geolocation with options:', options);
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const { latitude, longitude } = position.coords;
-                        // console.log(`Geolocation successful: ${latitude}, ${longitude}`);
+                        console.log(`Geolocation successful: ${latitude}, ${longitude}`);
                         resolve({ lat: latitude, lon: longitude });
                     },
                     (error) => {
-                        // console.log('Geolocation failed:', error.message);
+                        console.log('Geolocation failed:', error.message, 'Code:', error.code);
                         // Return null coordinates to indicate geolocation failure
                         // The backend will handle the fallback based on DISABLE_IP_GEOLOCATION setting
                         resolve({ lat: null, lon: null });
