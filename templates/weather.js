@@ -115,24 +115,41 @@
                     // console.log('[Weather] Starting fetch...');
                     const startTime = performance.now();
                     
-                    // Get user's geolocation first
+                    // Get user's geolocation first - keep retrying until we get valid coordinates
                     // console.log('[Weather] Getting location...');
-                    const location = await app.utils.GeolocationManager.getLocation();
-                    console.log('[Weather] Location obtained:', location);
+                    let location;
+                    let geolocationAttempts = 0;
+                    
+                    while (true) { // Keep trying indefinitely until we get valid coordinates
+                        try {
+                            location = await app.utils.GeolocationManager.getLocation();
+                            console.log('[Weather] Location obtained:', location);
+                            
+                            // If we got valid coordinates, break out of the retry loop
+                            if (location.lat !== null && location.lon !== null) {
+                                console.log('[Weather] Valid coordinates obtained, proceeding with weather request');
+                                break;
+                            } else {
+                                geolocationAttempts++;
+                                console.log(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts})`);
+                                await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                            }
+                        } catch (geolocationError) {
+                            geolocationAttempts++;
+                            console.log(`[Weather] Geolocation attempt failed (attempt ${geolocationAttempts}):`, geolocationError.message);
+                            await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                        }
+                    }
                     
                     // Build URL with location parameters
                     const params = new URLSearchParams({
                         units: useMetric ? 'metric' : 'imperial'
                     });
                     
-                    // Add location parameters if geolocation was successful
-                    if (location.lat !== null && location.lon !== null) {
-                        params.append('lat', location.lat);
-                        params.append('lon', location.lon);
-                        console.log('[Weather] Sending coordinates to server:', location.lat, location.lon);
-                    } else {
-                        console.log('[Weather] No coordinates available, will use IP fallback');
-                    }
+                    // Add location parameters (we know they're valid now)
+                    params.append('lat', location.lat);
+                    params.append('lon', location.lon);
+                    console.log('[Weather] Sending coordinates to server:', location.lat, location.lon);
                     
                     // Add cache busting parameter with current date and hour
                     const now = new Date();
@@ -152,7 +169,7 @@
                     
                     this.render(data, useMetric);
                 } catch (error) {
-                    // If we have coordinates but the request failed, keep retrying until we succeed
+                    // If the weather request failed, keep retrying until we succeed
                     if (retryCount < maxRetries) {
                         retryCount++;
                         console.log(`[Weather] Request failed, retrying in 250ms (attempt ${retryCount}/${maxRetries})...`);

@@ -95,23 +95,8 @@
      * @returns {Promise<{lat: number, lon: number}>}
      */
     async getLocation() {
-      // Return cached location if available
-      if (this.locationData) {
-        return this.locationData;
-      }
-
-      // Return existing promise if a request is already in progress
-      if (this.locationPromise) {
-        return this.locationPromise;
-      }
-
-      this.locationPromise = this._requestLocation();
-      try {
-        this.locationData = await this.locationPromise;
-        return this.locationData;
-      } finally {
-        this.locationPromise = null;
-      }
+      // Always request fresh location from browser - no caching
+      return this._requestLocation();
     },
 
     /**
@@ -128,7 +113,7 @@
 
                 const options = {
                     enableHighAccuracy: false, // Keep false for faster response
-                    timeout: 15000, // Increased timeout to 15 seconds for localhost
+                    timeout: 15000, // Increased timeout to 15 seconds
                     maximumAge: 3600000 // 1 hour - data within last hour is good enough
                 };
 
@@ -142,7 +127,6 @@
                     (error) => {
                         console.log('Geolocation failed:', error.message, 'Code:', error.code);
                         // Return null coordinates to indicate geolocation failure
-                        // The backend will handle the fallback based on DISABLE_IP_GEOLOCATION setting
                         resolve({ lat: null, lon: null });
                     },
                     options
@@ -151,11 +135,10 @@
         },
 
     /**
-     * Clear cached location data
+     * Clear cached location data (kept for compatibility, but no longer needed)
      */
     clearLocation() {
-      this.locationData = null;
-      this.locationPromise = null;
+      // No longer caching, so this is a no-op
     }
   };
 
