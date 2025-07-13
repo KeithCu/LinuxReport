@@ -66,7 +66,11 @@
         }
 
         disableToggle() {
-            const { widgetWrapper, content, toggleBtn, collapsedLabel } = this.elements;
+            const widgetWrapper = this.elements.get('weather-widget-container');
+            const content = this.elements.get('weather-content');
+            const toggleBtn = this.elements.get('weather-toggle-btn');
+            const collapsedLabel = this.elements.get('weather-collapsed-label');
+            
             if (widgetWrapper) widgetWrapper.classList.remove('collapsed');
             if (content) content.style.display = '';
             if (toggleBtn) toggleBtn.style.display = 'none';
@@ -148,13 +152,22 @@
         }
 
         showError(message) {
-            this.showElement(this.elements.get('error'), message);
-            this.hideElement(this.elements.get('loading'));
+            const error = this.elements.get('weather-error');
+            const loading = this.elements.get('weather-loading');
+            
+            console.log('[Weather] ShowError - error:', !!error, 'loading:', !!loading);
+            
+            this.showElement(error, message);
+            this.hideElement(loading);
         }
 
         render(data, useMetric) {
             const forecast = this.elements.get('weather-forecast');
             const header = this.elements.get('header');
+            const loading = this.elements.get('weather-loading');
+            
+            console.log('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
+            
             if (!forecast || !header) return;
 
             if (data.city_name) {
@@ -167,7 +180,7 @@
             }
 
             forecast.innerHTML = data.daily.map(day => this.createDayHTML(day, useMetric)).join('');
-            this.hideElement(this.elements.get('loading'));
+            this.hideElement(loading);
             this.showElement(forecast);
         }
 
