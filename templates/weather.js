@@ -13,7 +13,9 @@
 
     class WeatherWidget {
         constructor() {
+            // console.log('[Weather] Creating WeatherWidget instance...');
             this.elements = this.getElements();
+            // console.log('[Weather] Elements found:', this.elements.size);
             this.debouncedLoad = app.utils.debounce(() => this.load(), app.config.WEATHER_DEBOUNCE_DELAY);
             this.init();
         }
@@ -31,13 +33,16 @@
         }
 
         init() {
+            // console.log('[Weather] Initializing weather widget...');
             this.initToggle();
+            // console.log('[Weather] Toggle initialized, calling debouncedLoad...');
             this.debouncedLoad();
             
             const toggleBtn = this.elements.get('weather-toggle-btn');
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', () => this.debouncedLoad());
             }
+            // console.log('[Weather] Initialization complete');
         }
 
         initToggle() {
@@ -69,10 +74,26 @@
         }
 
         load() {
-            const { container, widgetWrapper } = this.elements;
-            if (!container || (widgetWrapper && widgetWrapper.classList.contains('collapsed')) || 
-                getComputedStyle(container).display === 'none') return;
+            // console.log('[Weather] load() called');
+            const container = this.elements.get('weather-container');
+            const widgetWrapper = this.elements.get('weather-widget-container');
             
+            if (!container) {
+                // console.log('[Weather] No container found, returning');
+                return;
+            }
+            
+            if (widgetWrapper && widgetWrapper.classList.contains('collapsed')) {
+                // console.log('[Weather] Widget is collapsed, returning');
+                return;
+            }
+            
+            if (getComputedStyle(container).display === 'none') {
+                // console.log('[Weather] Container is hidden, returning');
+                return;
+            }
+            
+            // console.log('[Weather] Calling fetch()...');
             this.fetch();
         }
 
@@ -84,13 +105,13 @@
         async fetch() {
             const useMetric = this.getUnits() === 'metric';
             try {
-                console.log('[Weather] Starting fetch...');
+                // console.log('[Weather] Starting fetch...');
                 const startTime = performance.now();
                 
                 // Get user's geolocation first
-                console.log('[Weather] Getting location...');
+                // console.log('[Weather] Getting location...');
                 const location = await app.utils.GeolocationManager.getLocation();
-                console.log('[Weather] Location obtained:', location);
+                // console.log('[Weather] Location obtained:', location);
                 
                 // Build URL with location parameters
                 const params = new URLSearchParams({
@@ -110,15 +131,15 @@
                 params.append('_cb', cacheBuster);
                 
                 const url = `${app.config.WEATHER_BASE_URL}/api/weather?${params.toString()}`;
-                console.log('[Weather] Making request to:', url);
-                console.log('[Weather] Time before fetch:', performance.now() - startTime, 'ms');
+                // console.log('[Weather] Making request to:', url);
+                // console.log('[Weather] Time spent on geolocation:', performance.now() - startTime, 'ms');
                 
                 const response = await fetch(url);
-                console.log('[Weather] Response received after:', performance.now() - startTime, 'ms');
+                // console.log('[Weather] Response received after:', performance.now() - startTime, 'ms');
                 
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
-                console.log('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
+                // console.log('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
                 this.render(data, useMetric);
             } catch (error) {
                 this.showError('Unable to load weather data.');
@@ -207,11 +228,18 @@
 
     app.modules.weather = {
         init() {
-            new WeatherWidget();
+            // console.log('[Weather] Initializing weather widget...');
+            try {
+                new WeatherWidget();
+                // console.log('[Weather] Weather widget initialized successfully');
+            } catch (error) {
+                console.error('[Weather] Failed to initialize weather widget:', error);
+            }
         }
     };
 
     document.addEventListener('DOMContentLoaded', () => {
+        // console.log('[Weather] DOM loaded, initializing weather...');
         app.modules.weather.init();
     });
 

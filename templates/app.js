@@ -118,36 +118,37 @@
      * Request location from browser geolocation API
      * @returns {Promise<{lat: number, lon: null}>} - Returns null for lon when geolocation fails
      */
-    _requestLocation() {
-      return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-          console.log('Geolocation not supported, using IP-based location');
-          resolve({ lat: null, lon: null });
-          return;
+            _requestLocation() {
+            return new Promise((resolve) => {
+                        if (!navigator.geolocation) {
+            // console.log('Geolocation not supported, using IP-based location');
+            resolve({ lat: null, lon: null });
+            return;
         }
 
-        const options = {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 300000 // 5 minutes
-        };
+                const options = {
+                    enableHighAccuracy: false, // Changed to false for faster response
+                    timeout: 5000, // Reduced timeout to 5 seconds
+                    maximumAge: 60000 // Reduced to 1 minute for fresher data
+                };
 
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const { latitude, longitude } = position.coords;
-            console.log(`Geolocation successful: ${latitude}, ${longitude}`);
-            resolve({ lat: latitude, lon: longitude });
-          },
-          (error) => {
-            console.log('Geolocation failed:', error.message);
-            // Return null coordinates to indicate geolocation failure
-            // The backend will handle the fallback based on DISABLE_IP_GEOLOCATION setting
-            resolve({ lat: null, lon: null });
-          },
-          options
-        );
-      });
-    },
+                // console.log('Requesting geolocation with options:', options);
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const { latitude, longitude } = position.coords;
+                        // console.log(`Geolocation successful: ${latitude}, ${longitude}`);
+                        resolve({ lat: latitude, lon: longitude });
+                    },
+                    (error) => {
+                        // console.log('Geolocation failed:', error.message);
+                        // Return null coordinates to indicate geolocation failure
+                        // The backend will handle the fallback based on DISABLE_IP_GEOLOCATION setting
+                        resolve({ lat: null, lon: null });
+                    },
+                    options
+                );
+            });
+        },
 
     /**
      * Clear cached location data
