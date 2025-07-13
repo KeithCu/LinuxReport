@@ -282,6 +282,7 @@ def _process_openweather_response(weather_data, fetch_time):
     """
     # Determine city name for logging
     city_name = weather_data.get("city", {}).get("name", "Unknown location")
+    print(f"[DEBUG] Raw city name from API: {repr(city_name)}")
     # print(f"[DEBUG] Raw API response city data: {weather_data.get('city', {})}")
 
     daily_data = defaultdict(list)
@@ -343,6 +344,19 @@ def _log_weather_result(processed_data, city_name, service_name, api_time, units
         # Get the temp (already potentially converted)
         current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
         log_unit = 'C' if units == 'metric' else 'F'
+        
+        # Ensure proper Unicode handling for city name
+        try:
+            # Try to decode if it's bytes, otherwise use as-is
+            if isinstance(city_name, bytes):
+                city_name = city_name.decode('utf-8')
+            elif isinstance(city_name, str):
+                # Ensure it's properly encoded
+                city_name = city_name.encode('utf-8').decode('utf-8')
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            # Fallback to safe string representation
+            city_name = repr(city_name)
+        
         print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}{log_unit}, API time: {api_time:.2f}s")
     except (IndexError, KeyError, TypeError):
         # Indicate error or missing data
@@ -380,6 +394,9 @@ def _fetch_from_openweather_api(lat, lon, fetch_time):
     response = requests.get(url, timeout=10)
     api_time = datetime.now(TZ).timestamp() - start_time
     response.raise_for_status()
+    
+    # Ensure proper encoding for JSON parsing
+    response.encoding = 'utf-8'
     weather_data = response.json()
     # print(f"[DEBUG] Full API response: {json.dumps(weather_data, indent=2)}")
     
