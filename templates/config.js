@@ -24,25 +24,24 @@
         }
 
         initSettings() {
-            const settings = {
-                'theme-select': 'Theme',
-                'font-select': 'FontFamily',
-                'input[name="no_underlines"]': 'NoUnderlines'
+            const settingsConfig = {
+                'theme-select': { cookie: 'Theme', default: app.config.DEFAULT_THEME },
+                'font-select': { cookie: 'FontFamily', default: app.config.DEFAULT_FONT },
+                'input[name="no_underlines"]': { cookie: 'NoUnderlines', type: 'checkbox', default: '1' }
             };
 
-            Object.entries(settings).forEach(([selector, cookieName]) => {
+            for (const [selector, config] of Object.entries(settingsConfig)) {
                 const element = document.querySelector(`.config-container ${selector}`);
-                if (!element) return;
+                if (!element) continue;
 
-                if (element.type === 'checkbox') {
-                    const value = app.utils.CookieManager.get(cookieName);
-                    element.checked = !value || value === '1';
+                const cookieValue = app.utils.CookieManager.get(config.cookie);
+                
+                if (config.type === 'checkbox') {
+                    element.checked = cookieValue === null || cookieValue === config.default;
                 } else {
-                    const defaultValue = cookieName === 'Theme' ? app.config.DEFAULT_THEME : 
-                                       cookieName === 'FontFamily' ? app.config.DEFAULT_FONT : '';
-                    element.value = app.utils.CookieManager.get(cookieName) || defaultValue;
+                    element.value = cookieValue || config.default;
                 }
-            });
+            }
         }
 
         initDragDrop() {
@@ -64,27 +63,32 @@
             const container = document.querySelector('.headline-archive-container');
             if (!container || !window.isAdmin) return;
 
-            container.addEventListener('click', async e => {
-                if (!e.target.classList.contains('delete-headline-btn')) return;
-                
-                const entry = e.target.closest('.headline-entry');
-                if (!entry?.dataset?.url || !entry.dataset.timestamp || !confirm('Delete this headline?')) return;
+            container.addEventListener('click', async (e) => {
+                const deleteBtn = e.target.closest('.delete-headline-btn');
+                if (!deleteBtn) return;
+
+                const entry = deleteBtn.closest('.headline-entry');
+                const { url, timestamp } = entry.dataset;
+
+                if (!url || !timestamp || !confirm(`Delete headline: ${url}?`)) return;
 
                 try {
                     const response = await fetch(app.config.DELETE_HEADLINE_ENDPOINT, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            url: entry.dataset.url, 
-                            timestamp: entry.dataset.timestamp 
-                        })
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.csrf_token },
+                        body: JSON.stringify({ url, timestamp })
                     });
-                    
+
+                    if (!response.ok) {
+                        const errorData = await response.json().catch(() => ({ error: 'Invalid JSON response' }));
+                        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                    }
+
                     const data = await response.json();
                     if (data.success) {
                         entry.remove();
                     } else {
-                        throw new Error(data.error || 'Unknown error');
+                        throw new Error(data.error || 'Unknown deletion error');
                     }
                 } catch (error) {
                     alert(`Delete failed: ${error.message}`);

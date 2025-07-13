@@ -19,24 +19,24 @@
         }
 
         getElements() {
-            return {
-                container: document.getElementById('weather-container'),
-                widgetWrapper: document.getElementById('weather-widget-container'),
-                content: document.getElementById('weather-content'),
-                toggleBtn: document.getElementById('weather-toggle-btn'),
-                collapsedLabel: document.getElementById('weather-collapsed-label'),
-                forecast: document.getElementById('weather-forecast'),
-                loading: document.getElementById('weather-loading'),
-                error: document.getElementById('weather-error'),
-                header: document.querySelector('#weather-container h3')
-            };
+            const elements = new Map();
+            const ids = [
+                'weather-container', 'weather-widget-container', 'weather-content', 
+                'weather-toggle-btn', 'weather-collapsed-label', 'weather-forecast', 
+                'weather-loading', 'weather-error'
+            ];
+            ids.forEach(id => elements.set(id, document.getElementById(id)));
+            elements.set('header', document.querySelector('#weather-container h3'));
+            return elements;
         }
 
         init() {
             this.initToggle();
             this.debouncedLoad();
-            if (this.elements.toggleBtn) {
-                this.elements.toggleBtn.addEventListener('click', () => this.debouncedLoad());
+            
+            const toggleBtn = this.elements.get('weather-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => this.debouncedLoad());
             }
         }
 
@@ -45,17 +45,18 @@
                 this.disableToggle();
                 return;
             }
-            if (!this.elements.widgetWrapper || !this.elements.content || !this.elements.toggleBtn) return;
-            
-            const isCollapsed = app.utils.CookieManager.get('weatherCollapsed') === 'true' || app.config.WEATHER_DEFAULT_COLLAPSED;
-            this.elements.widgetWrapper.classList.toggle('collapsed', isCollapsed);
-            this.elements.toggleBtn.innerHTML = isCollapsed ? '&#9650;' : '&#9660;';
-            
-            this.elements.toggleBtn.addEventListener('click', (e) => {
+
+            const widgetWrapper = this.elements.get('weather-widget-container');
+            const toggleBtn = this.elements.get('weather-toggle-btn');
+            if (!widgetWrapper || !toggleBtn) return;
+
+            const isCollapsed = (app.utils.CookieManager.get('weatherCollapsed') ?? String(app.config.WEATHER_DEFAULT_COLLAPSED)) === 'true';
+            this.setCollapsed(isCollapsed);
+
+            toggleBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const isCurrentlyCollapsed = this.elements.widgetWrapper.classList.toggle('collapsed');
-                this.elements.toggleBtn.innerHTML = isCurrentlyCollapsed ? '&#9650;' : '&#9660;';
-                app.utils.CookieManager.set('weatherCollapsed', isCurrentlyCollapsed ? 'true' : 'false');
+                const isCurrentlyCollapsed = widgetWrapper.classList.toggle('collapsed');
+                this.setCollapsed(isCurrentlyCollapsed, true);
             });
         }
 
@@ -83,8 +84,13 @@
         async fetch() {
             const useMetric = this.getUnits() === 'metric';
             try {
+                console.log('[Weather] Starting fetch...');
+                const startTime = performance.now();
+                
                 // Get user's geolocation first
+                console.log('[Weather] Getting location...');
                 const location = await app.utils.GeolocationManager.getLocation();
+                console.log('[Weather] Location obtained:', location);
                 
                 // Build URL with location parameters
                 const params = new URLSearchParams({
@@ -103,9 +109,16 @@
                 const cacheBuster = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`;
                 params.append('_cb', cacheBuster);
                 
-                const response = await fetch(`${app.config.WEATHER_BASE_URL}/api/weather?${params.toString()}`);
+                const url = `${app.config.WEATHER_BASE_URL}/api/weather?${params.toString()}`;
+                console.log('[Weather] Making request to:', url);
+                console.log('[Weather] Time before fetch:', performance.now() - startTime, 'ms');
+                
+                const response = await fetch(url);
+                console.log('[Weather] Response received after:', performance.now() - startTime, 'ms');
+                
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
+                console.log('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
                 this.render(data, useMetric);
             } catch (error) {
                 this.showError('Unable to load weather data.');
@@ -114,27 +127,27 @@
         }
 
         showError(message) {
-            const { loading, error } = this.elements;
-            if (loading) loading.style.display = 'none';
-            if (error) {
-                error.style.display = 'block';
-                error.textContent = message;
-            }
+            this.showElement(this.elements.get('error'), message);
+            this.hideElement(this.elements.get('loading'));
         }
 
         render(data, useMetric) {
-            const { forecast, loading, error, header } = this.elements;
-            if (!forecast || !loading || !error) return;
-            
-            if (header && data.city_name) header.textContent = `5-Day Weather (${data.city_name})`;
+            const forecast = this.elements.get('weather-forecast');
+            const header = this.elements.get('header');
+            if (!forecast || !header) return;
+
+            if (data.city_name) {
+                header.textContent = `5-Day Weather (${data.city_name})`;
+            }
+
             if (!data.daily?.length) {
                 this.showError('No weather data available.');
                 return;
             }
-            
+
             forecast.innerHTML = data.daily.map(day => this.createDayHTML(day, useMetric)).join('');
-            loading.style.display = 'none';
-            forecast.style.display = 'flex';
+            this.hideElement(this.elements.get('loading'));
+            this.showElement(forecast);
         }
 
         createDayHTML(day, useMetric) {

@@ -13,35 +13,35 @@
 
     class ChatWidget {
         constructor() {
-            this.elements = {};
+            // Consolidated state and element management
+            this.elements = new Map();
             this.state = {
                 isAdminMode: window.isAdmin || false,
                 isDragging: false,
-                offsetX: 0,
-                offsetY: 0,
                 lastComments: [],
                 lastCommentTimestamp: null,
-                eventSource: null,
-                pollingTimer: null,
                 beepEnabled: true
             };
             this.beepSound = null;
             this.initBeepSound();
+            // Bind key methods
             this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
             this.handleResize = app.utils.debounce(this.handleResize.bind(this), app.config.CHAT_RESIZE_DEBOUNCE_DELAY);
+            this.handleDrag = this.handleDrag.bind(this);
         }
 
         init() {
-            const requiredElements = [
+            const ids = [
                 'chat-container', 'chat-header', 'chat-messages', 'chat-message-input',
                 'chat-image-url-input', 'chat-send-btn', 'chat-close-btn',
                 'chat-loading', 'chat-toggle-btn', 'chat-input-area'
             ];
+            for (const id of ids) {
+                const el = document.getElementById(id);
+                if (!el) return false; // Early exit if an element is missing
+                this.elements.set(id, el);
+            }
             
-            requiredElements.forEach(id => this.elements[id] = document.getElementById(id));
-            if (requiredElements.some(id => !this.elements[id])) return false;
-
-            this.setupChatLayout();
             this.setupEventListeners();
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
             window.addEventListener('resize', this.handleResize);
@@ -65,69 +65,82 @@
         }
 
         setupEventListeners() {
-            this.setupDraggable();
-            this.setupImageUpload();
-            
-            // Simplified event handling
-            const events = {
-                'chat-close-btn': () => this.closeChat(),
-                'chat-toggle-btn': () => this.toggleChat(),
-                'chat-send-btn': () => this.sendComment()
-            };
-            
-            Object.entries(events).forEach(([id, handler]) => {
-                this.elements[id].addEventListener('click', handler);
-            });
-            
-            this.elements['chat-message-input'].addEventListener('keypress', e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.sendComment();
+            // Declarative event handling
+            const eventMap = {
+                'chat-close-btn': { event: 'click', handler: () => this.closeChat() },
+                'chat-toggle-btn': { event: 'click', handler: () => this.toggleChat() },
+                'chat-send-btn': { event: 'click', handler: () => this.sendComment() },
+                'chat-message-input': { event: 'keypress', handler: e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendComment();
+                    }
+                }},
+                'chat-header': { event: 'mousedown', handler: e => this.startDrag(e) },
+                'chat-input-area': {
+                    event: ['dragover', 'dragleave', 'drop'],
+                    handler: e => {
+                        e.preventDefault();
+                        const inputArea = this.elements.get('chat-input-area');
+                        switch(e.type) {
+                            case 'dragover': inputArea.classList.add('dragover'); break;
+                            case 'dragleave': inputArea.classList.remove('dragover'); break;
+                            case 'drop': 
+                                inputArea.classList.remove('dragover');
+                                const file = e.dataTransfer.files[0];
+                                if (file) this.uploadImage(file);
+                                break;
+                        }
+                    }
                 }
-            });
+            };
+
+            for (const [id, { event, handler }] of Object.entries(eventMap)) {
+                const el = this.elements.get(id);
+                if (!el) continue;
+                
+                if (Array.isArray(event)) {
+                    event.forEach(e => el.addEventListener(e, handler));
+                } else {
+                    el.addEventListener(event, handler);
+                }
+            }
+            
+            document.addEventListener('mouseup', () => this.stopDrag());
         }
 
-        setupDraggable() {
-            const { 'chat-header': header, 'chat-container': container } = this.elements;
+        startDrag(e) {
+            if (e.target.closest('#chat-close-btn')) return;
+            const container = this.elements.get('chat-container');
             
-            header.addEventListener('mousedown', e => {
-                if (e.target === this.elements['chat-close-btn']) return;
-                this.state.isDragging = true;
-                this.state.offsetX = e.clientX - container.offsetLeft;
-                this.state.offsetY = e.clientY - container.offsetTop;
-                container.style.cursor = 'grabbing';
-                e.preventDefault();
-            });
-            
-            document.addEventListener('mousemove', app.utils.throttle(e => {
-                if (!this.state.isDragging) return;
-                const newX = Math.max(0, Math.min(e.clientX - this.state.offsetX, window.innerWidth - container.offsetWidth));
-                const newY = Math.max(0, Math.min(e.clientY - this.state.offsetY, window.innerHeight - container.offsetHeight));
+            this.state.isDragging = true;
+            this.state.offsetX = e.clientX - container.offsetLeft;
+            this.state.offsetY = e.clientY - container.offsetTop;
+            container.style.cursor = 'grabbing';
+            e.preventDefault();
+
+            document.addEventListener('mousemove', this.handleDrag);
+        }
+        
+        stopDrag() {
+            if (!this.state.isDragging) return;
+            this.state.isDragging = false;
+            this.elements.get('chat-container').style.cursor = 'default';
+            document.removeEventListener('mousemove', this.handleDrag);
+        }
+
+        handleDrag(e) {
+            if (!this.state.isDragging) return;
+            requestAnimationFrame(() => {
+                const container = this.elements.get('chat-container');
+                let newX = e.clientX - this.state.offsetX;
+                let newY = e.clientY - this.state.offsetY;
+
+                newX = Math.max(0, Math.min(newX, window.innerWidth - container.offsetWidth));
+                newY = Math.max(0, Math.min(newY, window.innerHeight - container.offsetHeight));
+
                 container.style.left = `${newX}px`;
                 container.style.top = `${newY}px`;
-            }, app.config.CHAT_DRAG_THROTTLE_DELAY));
-            
-            document.addEventListener('mouseup', () => {
-                if (this.state.isDragging) {
-                    this.state.isDragging = false;
-                    container.style.cursor = 'default';
-                }
-            });
-        }
-
-        setupImageUpload() {
-            const inputArea = this.elements['chat-input-area'];
-            ['dragover', 'dragleave', 'drop'].forEach(event => {
-                inputArea.addEventListener(event, e => {
-                    e.preventDefault();
-                    if (event === 'drop') {
-                        inputArea.classList.remove('dragover');
-                        const file = e.dataTransfer.files[0];
-                        if (file) this.uploadImage(file);
-                    } else {
-                        inputArea.classList.toggle('dragover', event === 'dragover');
-                    }
-                });
             });
         }
 
@@ -162,40 +175,41 @@
         }
 
         async sendComment() {
-            const text = this.elements['chat-message-input'].value.trim();
-            const imageUrl = this.elements['chat-image-url-input'].value.trim();
-            if (!text && !imageUrl) return;
+            const messageInput = this.elements.get('chat-message-input');
+            const imageUrlInput = this.elements.get('chat-image-url-input');
+            const sendBtn = this.elements.get('chat-send-btn');
 
-            const sendButton = this.elements['chat-send-btn'];
+            const text = messageInput.value.trim();
+            const imageUrl = imageUrlInput.value.trim();
+            if (!text && !imageUrl) return;
+            
+            this.toggleSendButton(true, 'Sending...');
+
             try {
-                sendButton.disabled = true;
-                sendButton.textContent = 'Sending...';
-                
                 const response = await fetch('/api/comments', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json', 
+                        'X-CSRF-TOKEN': window.csrf_token 
+                    },
                     body: JSON.stringify({ text, image_url: imageUrl })
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
                 const data = await response.json();
-                
                 if (data.success) {
-                    this.elements['chat-message-input'].value = '';
-                    this.elements['chat-image-url-input'].value = '';
+                    messageInput.value = '';
+                    imageUrlInput.value = '';
                     if (!app.config.CHAT_USE_SSE) await this.fetchComments();
                 } else {
                     throw new Error(data.error || 'Unknown error');
                 }
             } catch (error) {
-                alert(`Error sending comment: ${error.message}`);
+                alert(`Error: ${error.message}`);
                 app.utils.handleError('Send Comment', error);
             } finally {
-                sendButton.disabled = false;
-                sendButton.textContent = 'Send';
+                this.toggleSendButton(false, 'Send');
             }
         }
 
@@ -367,23 +381,19 @@
         }
 
         closeChat() {
-            this.elements['chat-container'].style.display = 'none';
+            this.elements.get('chat-container').style.display = 'none';
             this.cleanup();
         }
 
         toggleChat() {
-            const container = this.elements['chat-container'];
-            const computedStyle = getComputedStyle(container);
-            const isVisible = computedStyle.display !== 'none';
-            
+            const container = this.elements.get('chat-container');
+            const isVisible = container.style.display !== 'none';
+
             if (isVisible) {
                 this.closeChat();
             } else {
                 container.style.display = 'flex';
-                this.initializeSSE();
-                if (!app.config.CHAT_USE_SSE) {
-                    this.fetchComments();
-                }
+                this.startChatSession();
             }
         }
 

@@ -177,11 +177,15 @@
   // Cookie management
   app.utils.CookieManager = {
     get(name) {
-      // More robust cookie parsing
       const cookies = document.cookie.split(';');
       for (let cookie of cookies) {
-        const [cookieName, cookieValue] = cookie.trim().split('=');
-        if (cookieName === name && cookieValue) {
+        const trimmedCookie = cookie.trim();
+        const separatorIndex = trimmedCookie.indexOf('=');
+        if (separatorIndex === -1) continue;
+
+        const cookieName = trimmedCookie.substring(0, separatorIndex);
+        if (cookieName === name) {
+          const cookieValue = trimmedCookie.substring(separatorIndex + 1);
           try {
             const value = decodeURIComponent(cookieValue);
             console.log(`Cookie ${name}:`, value); // Debug log
@@ -216,7 +220,7 @@
           timestamp: Date.now()
         }));
       } catch (error) {
-        handleError('saving scroll position', error);
+        app.utils.handleError('saving scroll position', error);
       }
     },
     restorePosition() {
@@ -235,7 +239,7 @@
           localStorage.removeItem('scrollPosition');
         });
       } catch (error) {
-        handleError('restoring scroll position', error);
+        app.utils.handleError('restoring scroll position', error);
         localStorage.removeItem('scrollPosition');
       }
     }
@@ -271,17 +275,13 @@
       app.utils.ScrollManager.savePosition();
       app.utils.CookieManager.set('FontFamily', font);
       this.applyFont(font);
-      
+
       const fontSelect = document.getElementById('font-select');
       if (fontSelect) fontSelect.value = font;
-      
-      requestAnimationFrame(() => {
-        document.body.style.display = 'none';
-        requestAnimationFrame(() => {
-          document.body.style.display = '';
-          app.utils.ScrollManager.restorePosition();
-        });
-      });
+
+      // The original implementation caused a jarring flicker to force a reflow.
+      // We can simply restore the scroll position, which already uses requestAnimationFrame.
+      app.utils.ScrollManager.restorePosition();
     }
   };
 
@@ -325,11 +325,19 @@
 
     getDragAfterElement(container, y, itemSelector) {
       const draggableElements = [...container.querySelectorAll(`${itemSelector}:not(.dragging)`)];
-      return draggableElements.reduce((closest, child) => {
+      let closestElement = null;
+      let closestOffset = Number.NEGATIVE_INFINITY;
+
+      for (const child of draggableElements) {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
-        return offset < 0 && offset > closest.offset ? { offset, element: child } : closest;
-      }, { offset: Number.NEGATIVE_INFINITY }).element;
+
+        if (offset < 0 && offset > closestOffset) {
+          closestOffset = offset;
+          closestElement = child;
+        }
+      }
+      return closestElement;
     }
   };
 

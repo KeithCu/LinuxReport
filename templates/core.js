@@ -45,13 +45,11 @@
         }
 
         check() {
-            if (!navigator.onLine) return;
-            if (Date.now() - this.lastActivity < this.activityTimeout) return;
+            const isInactive = Date.now() - this.lastActivity >= this.activityTimeout;
+            const hasUnsavedChanges = document.querySelector('form:invalid');
+            const hasOpenDialogs = document.querySelector('dialog[open]');
             
-            const hasUnsavedChanges = document.querySelectorAll('form:invalid').length > 0;
-            const hasOpenDialogs = document.querySelectorAll('dialog[open]').length > 0;
-            
-            if (!hasUnsavedChanges && !hasOpenDialogs) {
+            if (navigator.onLine && isInactive && !hasUnsavedChanges && !hasOpenDialogs) {
                 app.utils.ScrollManager.savePosition();
                 self.location.reload();
             }
@@ -100,17 +98,16 @@
         }
 
         update() {
-            requestAnimationFrame(() => {
-                const startIdx = this.currentPage * app.config.ITEMS_PER_PAGE;
-                const endIdx = startIdx + app.config.ITEMS_PER_PAGE;
-                
-                this.items.forEach((item, i) => {
-                    item.style.display = (i >= startIdx && i < endIdx) ? 'block' : 'none';
-                });
+            const startIdx = this.currentPage * app.config.ITEMS_PER_PAGE;
+            const endIdx = startIdx + app.config.ITEMS_PER_PAGE;
 
-                if (this.prevBtn) this.prevBtn.disabled = this.currentPage === 0;
-                if (this.nextBtn) this.nextBtn.disabled = this.currentPage >= this.totalPages - 1;
+            this.items.forEach((item, i) => {
+                const isVisible = i >= startIdx && i < endIdx;
+                item.style.display = isVisible ? 'block' : 'none';
             });
+
+            if (this.prevBtn) this.prevBtn.disabled = this.currentPage === 0;
+            if (this.nextBtn) this.nextBtn.disabled = this.currentPage >= this.totalPages - 1;
         }
     }
 
@@ -131,20 +128,20 @@
         },
 
         setupEventListeners() {
-            const eventMap = {
-                'theme-select': (e) => app.setTheme(e.target.value),
-                'font-select': (e) => app.setFont(e.target.value),
-                'config-btn': () => app.redirect(),
-                'view-mode-toggle': () => this.toggleViewMode()
+            const handlers = {
+                'theme-select': { event: 'change', handler: (e) => app.setTheme(e.target.value) },
+                'font-select': { event: 'change', handler: (e) => app.setFont(e.target.value) },
+                'config-btn': { event: 'click', handler: () => app.redirect() },
+                'view-mode-toggle': { event: 'click', handler: () => this.toggleViewMode() }
             };
 
-            Object.entries(eventMap).forEach(([id, handler]) => {
+            for (const [id, { event, handler }] of Object.entries(handlers)) {
                 const element = document.getElementById(id);
                 if (element) {
-                    element.addEventListener(id.includes('select') ? 'change' : 'click', handler);
+                    element.addEventListener(event, handler);
                 }
-            });
-
+            }
+            
             document.addEventListener('viewmodechange', () => this.reinitPagination());
         },
 

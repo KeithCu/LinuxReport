@@ -182,6 +182,29 @@ LinuxReport supports multiple report types, each with its own configuration:
   - `WEB_TITLE`, `WEB_DESCRIPTION`: SEO and display information
   - `REPORT_PROMPT`: LLM prompt for generating headlines
 
+## Weather System
+
+The project includes a comprehensive weather system with caching and geolocation support.
+
+### Geolocation Logic
+
+The weather system implements intelligent geolocation handling:
+
+1. **Browser Geolocation**: Primary method using `navigator.geolocation.getCurrentPosition()`
+2. **Fallback Strategy**: Controlled by `DISABLE_IP_GEOLOCATION` flag in `shared.py`:
+   - **Enabled (`True`)**: Always show Detroit weather when geolocation fails
+   - **Disabled (`False`)**: Use IP-based geolocation when geolocation fails
+3. **Caching**: Location data is cached to avoid repeated permission requests
+4. **Error Handling**: Graceful degradation with appropriate fallbacks
+
+### Weather API Endpoints
+
+- **`/api/weather`**: Main weather API endpoint
+  - Accepts `lat` and `lon` parameters for precise location
+  - Falls back to IP-based location or Detroit based on configuration
+  - Supports both imperial and metric units
+  - Includes comprehensive caching with 4-hour expiration
+
 ## Database and Caching System
 
 LinuxReport uses a sophisticated multi-layer caching system (see `Caching.md` for full details):
@@ -285,6 +308,15 @@ The image processing system has been refactored to consolidate functionality int
    - Auto-refresh with configurable intervals
    - CSRF token handling for secure AJAX requests
    - Image optimization utilities (currently unused)
+   - **Geolocation support**: Browser-based geolocation with fallback to IP-based location or default coordinates
+
+3. **Geolocation System**:
+   - `app.utils.GeolocationManager`: Global geolocation utility in `app.js`
+   - Browser geolocation API integration with high accuracy settings
+   - Backend-controlled fallback logic based on `DISABLE_IP_GEOLOCATION` flag:
+     - **When `DISABLE_IP_GEOLOCATION = True`**: Always show Detroit weather when geolocation fails
+     - **When `DISABLE_IP_GEOLOCATION = False`**: Use IP-based location when geolocation fails
+   - Caching of location data to avoid repeated permission requests
 
 3. **Integration Patterns**:
    - Jinja2 templating for dynamic JavaScript content

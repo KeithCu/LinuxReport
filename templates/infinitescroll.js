@@ -74,151 +74,111 @@
         }
 
         collectAllItems() {
-            const allItems = [];
-            const columns = document.querySelectorAll('.column');
-            columns.forEach(column => {
-                const feedContainers = column.querySelectorAll('.box');
-                feedContainers.forEach(container => {
-                    const feedId = container.id;
-                    const feedTitle = container.querySelector('a[target="_blank"]');
-                    const feedIcon = container.querySelector('img');
-                    if (!feedTitle || !feedIcon) return;
+            return Array.from(document.querySelectorAll('.column .box')).flatMap(container => {
+                const feedId = container.id;
+                const feedIcon = container.querySelector('img');
+                if (!feedIcon) return [];
 
-                    const feedInfo = this.extractFeedInfo(feedId, feedIcon);
-                    const items = container.querySelectorAll('.linkclass');
-                    items.forEach(item => {
-                        if (window.getComputedStyle(item).display !== 'none') {
-                            const linkElement = item.querySelector('a[target="_blank"]');
-                            if (linkElement) {
-                                const timestamp = parseInt(item.getAttribute('data-index') || '0');
-                                const published = item.getAttribute('data-published') || '';
-                                allItems.push({
-                                    title: linkElement.textContent.trim(),
-                                    link: linkElement.href,
-                                    source_name: feedInfo.name,
-                                    source_icon: feedInfo.icon,
-                                    timestamp: timestamp,
-                                    published: published
-                                });
-                            }
-                        }
-                    });
-                });
+                const feedInfo = this.extractFeedInfo(feedId, feedIcon);
+                
+                return Array.from(container.querySelectorAll('.linkclass')).map(item => {
+                    const linkElement = item.querySelector('a[target="_blank"]');
+                    if (!linkElement) return null;
+
+                    return {
+                        title: linkElement.textContent.trim(),
+                        link: linkElement.href,
+                        source_name: feedInfo.name,
+                        source_icon: feedInfo.icon,
+                        timestamp: parseInt(item.dataset.index || '0', 10),
+                        published: item.dataset.published || ''
+                    };
+                }).filter(Boolean);
             });
-            return allItems;
         }
 
         extractFeedInfo(feedId, feedIcon) {
-            const feedUrl = feedId.replace('feed-', '');
-            let feedName = '';
+            const feedUrl = feedId.replace(/^feed-/, '');
+            let feedName;
             
             try {
                 const url = new URL(feedUrl);
-                feedName = url.pathname.split('/').filter(Boolean).pop() || url.hostname;
-                feedName = feedName
-                    .replace(/\.(com|org|net|io)$/, '')
-                    .replace(/-/g, ' ')
-                    .replace(/\b\w/g, l => l.toUpperCase());
+                const pathParts = url.pathname.split('/').filter(Boolean);
+                const baseName = pathParts.pop() || url.hostname;
+                feedName = baseName.replace(/\.(com|org|net|io)$/, '').replace(/[\-_]/g, ' ');
+                feedName = feedName.replace(/\b\w/g, l => l.toUpperCase());
             } catch (error) {
-                feedName = feedId.replace('feed-', '');
+                feedName = feedId.replace(/^feed-/, '').replace(/[\-_]/g, ' ');
             }
-            
+
             return { name: feedName, icon: feedIcon.src };
         }
 
         groupItemsBySource(allItems) {
             allItems.sort((a, b) => b.timestamp - a.timestamp);
-            
-            const sourceInfo = new Map();
-            allItems.forEach(item => {
-                if (!sourceInfo.has(item.source_name)) {
-                    sourceInfo.set(item.source_name, { 
-                        name: item.source_name, 
-                        icon: item.source_icon 
-                    });
-                }
-            });
 
-            const groupedItems = [];
-            let currentGroup = null;
-            
-            allItems.forEach(item => {
-                if (!currentGroup || currentGroup.name !== item.source_name) {
-                    currentGroup = { 
-                        name: item.source_name, 
-                        icon: sourceInfo.get(item.source_name).icon, 
-                        items: [] 
+            const groupedMap = allItems.reduce((acc, item) => {
+                let group = acc.get(item.source_name);
+                if (!group) {
+                    group = {
+                        name: item.source_name,
+                        icon: item.source_icon,
+                        items: []
                     };
-                    groupedItems.push(currentGroup);
+                    acc.set(item.source_name, group);
                 }
-                currentGroup.items.push({ 
-                    title: item.title, 
-                    link: item.link, 
-                    published: item.published,
-                    timestamp: item.timestamp
-                });
-            });
+                group.items.push(item);
+                return acc;
+            }, new Map());
             
-            return groupedItems;
+            return Array.from(groupedMap.values());
         }
 
         renderGroupedItems(container, groupedItems) {
+            const fragment = document.createDocumentFragment();
             groupedItems.forEach(group => {
-                container.appendChild(this.createSourceGroupElement(group));
+                fragment.appendChild(this.createSourceGroupElement(group));
             });
+            container.appendChild(fragment);
         }
 
         createSourceGroupElement(group) {
-            const div = document.createElement('div');
-            div.className = 'source-group';
-            div.innerHTML = `
-                <div style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--btn-border);">
-                    <img src="${group.icon}" alt="${group.name}" style="width: 64px; height: 64px; margin-right: 16px; border-radius: 8px; object-fit: contain;">
+            const groupEl = document.createElement('div');
+            groupEl.className = 'source-group';
+            
+            // Note: Inline styles should be moved to a stylesheet for maintainability.
+            groupEl.innerHTML = `
+                <div class="source-header" style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--btn-border);">
+                    <img src="${group.icon}" alt="${group.name}" class="source-icon" style="width: 64px; height: 64px; margin-right: 16px; border-radius: 8px; object-fit: contain;">
+                    <h3 class="source-name">${group.name}</h3>
                 </div>
+                ${group.items.map(item => this.createItemHTML(item)).join('')}
             `;
-            
-            group.items.forEach(item => {
-                div.appendChild(this.createItemElement(item));
-            });
-            
-            return div;
+            return groupEl;
         }
 
-        createItemElement(item) {
-            const itemElement = document.createElement('div');
-            itemElement.style.margin = '10px 0';
-            itemElement.style.padding = '8px 0';
-            itemElement.style.borderBottom = '1px solid var(--btn-border)';
-            
-            const titleElement = document.createElement('div');
-            titleElement.style.textAlign = 'left';
-            titleElement.innerHTML = `<a href="${item.link}" target="_blank" style="color: var(--link); text-decoration: none; font-size: 1.1em;">${item.title}</a>`;
-            
-            const timeElement = document.createElement('div');
-            timeElement.style.fontSize = '0.8em';
-            timeElement.style.color = 'var(--text-secondary)';
-            timeElement.style.marginTop = '4px';
-            timeElement.style.textAlign = 'right';
-            
+        createItemHTML(item) {
+            let timeString = `Timestamp: ${item.timestamp}`;
             if (item.published) {
-                // Try to parse and format the published time
                 try {
                     const date = new Date(item.published);
-                    if (!isNaN(date.getTime())) {
-                        timeElement.textContent = `Published: ${date.toLocaleString()}`;
-                    } else {
-                        timeElement.textContent = `Published: ${item.published}`;
-                    }
+                    timeString = `Published: ${isNaN(date.getTime()) ? item.published : date.toLocaleString()}`;
                 } catch (e) {
-                    timeElement.textContent = `Published: ${item.published}`;
+                    timeString = `Published: ${item.published}`;
                 }
-            } else {
-                timeElement.textContent = `Timestamp: ${item.timestamp}`;
             }
             
-            itemElement.appendChild(titleElement);
-            itemElement.appendChild(timeElement);
-            return itemElement;
+            // Note: Inline styles should be moved to a stylesheet for maintainability.
+            return `
+                <div class="infinite-item" style="margin: 10px 0; padding: 8px 0; border-bottom: 1px solid var(--btn-border);">
+                    <div class="item-title" style="text-align: left;">
+                        <a href="${item.link}" target="_blank" style="color: var(--link); text-decoration: none; font-size: 1.1em;">${item.title}</a>
+                    </div>
+                    <div class="item-time" style="font-size: 0.8em; color: var(--text-secondary); margin-top: 4px; text-align: right;">
+                        ${timeString}
+                    </div>
+                </div>
+            `;
         }
     }
 
