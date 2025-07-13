@@ -449,7 +449,11 @@ img {
   min-width: 600px;
   display: block;
   margin: 0 auto;
-  padding: 10px 20px 30px 20px; /* Extra bottom padding for OpenWeather attribution */
+  padding: 5px 20px 20px 20px; /* Reduced top padding */
+}
+
+.weather-container h3 {
+  margin: 0 0 10px 0; /* Reduce margin on the header */
 }
 
 .weather-forecast {
@@ -458,7 +462,7 @@ img {
   gap: 8px;
   width: max-content;
   min-width: 600px;
-  min-height: 100px;
+  /* Remove min-height to let content determine height */
 }
 
 /* Force horizontal layout with higher specificity */

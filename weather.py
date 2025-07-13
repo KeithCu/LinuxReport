@@ -576,7 +576,7 @@ def get_default_weather_html():
     return '''
     <div id="weather-container" class="weather-container">
         <h3>5-Day Weather</h3>
-        <div id="weather-loading">Loading weather data...</div>
+        <div id="weather-loading">Finding location...</div>
         <div id="weather-error" style="display: none; color: red;">Could not load weather data.</div>
         <div id="weather-forecast" style="display: none;"></div>
     </div>
