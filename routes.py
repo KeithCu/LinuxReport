@@ -128,28 +128,28 @@ def init_app(flask_app):
     # Configure CORS and security headers only if enabled
     if ENABLE_CORS:
         # Configure CORS to allow requests from specified domains
-        CORS(flask_app, resources={
-            r"/api/weather": {  # Only allow CORS for weather API
-                "origins": ALLOWED_REQUESTER_DOMAINS,
-                "methods": ["GET", "OPTIONS"],
-                "allow_headers": ["Content-Type"],
-                "expose_headers": ["Content-Type"],
-                "supports_credentials": True,
-                "max_age": 3600  # Cache preflight requests for 1 hour
-            }
-        })
+        # CORS(flask_app, resources={
+        #     r"/api/weather": {  # Only allow CORS for weather API
+        #         "origins": ALLOWED_REQUESTER_DOMAINS,
+        #         "methods": ["GET", "OPTIONS"],
+        #         "allow_headers": ["Content-Type"],
+        #         "expose_headers": ["Content-Type"],
+        #         "supports_credentials": True,
+        #         "max_age": 3600  # Cache preflight requests for 1 hour
+        #     }
+        # })
         
         # Add security headers to all responses
         @flask_app.after_request
         def add_security_headers(response):
             # Add CORS headers only for weather API
-            if request.path == '/api/weather':
-                origin = request.headers.get('Origin')
-                if origin in ALLOWED_REQUESTER_DOMAINS:
-                    response.headers['Access-Control-Allow-Origin'] = origin
-                    response.headers['Access-Control-Allow-Credentials'] = 'true'
-                    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
-                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+            # if request.path == '/api/weather':
+            #     origin = request.headers.get('Origin')
+            #     if origin in ALLOWED_REQUESTER_DOMAINS:
+            #         response.headers['Access-Control-Allow-Origin'] = origin
+            #         response.headers['Access-Control-Allow-Credentials'] = 'true'
+            #         response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+            #         response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
             
             # Add other security headers
             response.headers['X-Content-Type-Options'] = 'nosniff'
