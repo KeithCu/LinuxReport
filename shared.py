@@ -188,6 +188,15 @@ INFINITE_SCROLL_MOBILE = True
 INFINITE_SCROLL_DEBUG = True
 
 # =============================================================================
+# GEOLOCATION SETTINGS
+# =============================================================================
+
+# Disable IP-based geolocation when user provides browser geolocation
+# When True, the system will use default coordinates (Detroit) instead of IP-based location
+# when browser geolocation is not available or denied
+DISABLE_IP_GEOLOCATION = True
+
+# =============================================================================
 # RSS FEED CONFIGURATION
 # =============================================================================
 

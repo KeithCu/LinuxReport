@@ -33,7 +33,7 @@ from flask_restful import Resource, reqparse
 from shared import (
     limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT, 
     TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS,
-    API
+    API, DISABLE_IP_GEOLOCATION
 )
 from app_config import DEBUG, get_weather_api_key
 
@@ -399,19 +399,32 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     Args:
         lat (float, optional): Latitude coordinate
         lon (float, optional): Longitude coordinate
-        ip (str, optional): IP address for geolocation
+        ip (str, optional): IP address for geolocation (only used if DISABLE_IP_GEOLOCATION is False)
         units (str): Temperature units ('imperial' or 'metric')
         
     Returns:
         tuple: (data, status_code) where data includes 'fetch_time' when the data was fetched from the API
     """
-    # If IP is provided, use it to get lat/lon
-    if ip and (not lat or not lon):
-        lat, lon = get_location_from_ip(ip)
-        if not lat or not lon:
+    # If coordinates are provided, use them directly
+    if lat is not None and lon is not None:
+        try:
+            lat = float(lat)
+            lon = float(lon)
+        except (ValueError, TypeError):
             lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
-    if not lat or not lon:
-        lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+    else:
+        # No coordinates provided - handle fallback based on DISABLE_IP_GEOLOCATION setting
+        if DISABLE_IP_GEOLOCATION:
+            # When IP geolocation is disabled, always use Detroit coordinates
+            lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+        else:
+            # When IP geolocation is enabled, try IP-based location with Detroit fallback
+            if ip:
+                lat, lon = get_location_from_ip(ip)
+                if not lat or not lon:
+                    lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+            else:
+                lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
     # Convert coordinates to float if they're strings
     try:
@@ -672,9 +685,26 @@ def init_weather_routes(app):
             if is_web_bot or 'news.thedetroitilove.com' in referrer:
                 lat = DEFAULT_WEATHER_LAT
                 lon = DEFAULT_WEATHER_LON
+                ip = None  # Don't use IP for geolocation
             else:
+                # Get coordinates from request parameters
                 lat = args['lat']
                 lon = args['lon']
+                
+                # If no coordinates provided (geolocation failed), handle IP usage based on setting
+                if lat is None and lon is None:
+                    if DISABLE_IP_GEOLOCATION:
+                        # Use Detroit coordinates when IP geolocation is disabled
+                        lat = DEFAULT_WEATHER_LAT
+                        lon = DEFAULT_WEATHER_LON
+                        ip = None  # Don't use IP for geolocation
+                    else:
+                        # Use IP-based location when enabled
+                        # ip is already set to request.remote_addr
+                        pass
+                else:
+                    # Coordinates provided (geolocation successful), don't use IP
+                    ip = None
             
             weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
             

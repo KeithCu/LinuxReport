@@ -83,10 +83,27 @@
         async fetch() {
             const useMetric = this.getUnits() === 'metric';
             try {
+                // Get user's geolocation first
+                const location = await app.utils.GeolocationManager.getLocation();
+                
+                // Build URL with location parameters
+                const params = new URLSearchParams({
+                    units: useMetric ? 'metric' : 'imperial'
+                });
+                
+                // Add location parameters if geolocation was successful
+                if (location.lat !== null && location.lon !== null) {
+                    params.append('lat', location.lat);
+                    params.append('lon', location.lon);
+                }
+                // If geolocation failed, don't pass any coordinates - backend will handle fallback
+                
                 // Add cache busting parameter with current date and hour
                 const now = new Date();
                 const cacheBuster = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`;
-                const response = await fetch(`${app.config.WEATHER_BASE_URL}/api/weather?units=${useMetric ? 'metric' : 'imperial'}&_cb=${cacheBuster}`);
+                params.append('_cb', cacheBuster);
+                
+                const response = await fetch(`${app.config.WEATHER_BASE_URL}/api/weather?${params.toString()}`);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const data = await response.json();
                 this.render(data, useMetric);

@@ -84,6 +84,80 @@
     };
   };
 
+  // Geolocation utilities
+  app.utils.GeolocationManager = {
+    // Global variable to store location data
+    locationData: null,
+    locationPromise: null,
+
+    /**
+     * Get user's geolocation with fallback based on DISABLE_IP_GEOLOCATION setting
+     * @returns {Promise<{lat: number, lon: number}>}
+     */
+    async getLocation() {
+      // Return cached location if available
+      if (this.locationData) {
+        return this.locationData;
+      }
+
+      // Return existing promise if a request is already in progress
+      if (this.locationPromise) {
+        return this.locationPromise;
+      }
+
+      this.locationPromise = this._requestLocation();
+      try {
+        this.locationData = await this.locationPromise;
+        return this.locationData;
+      } finally {
+        this.locationPromise = null;
+      }
+    },
+
+    /**
+     * Request location from browser geolocation API
+     * @returns {Promise<{lat: number, lon: null}>} - Returns null for lon when geolocation fails
+     */
+    _requestLocation() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          console.log('Geolocation not supported, using IP-based location');
+          resolve({ lat: null, lon: null });
+          return;
+        }
+
+        const options = {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 300000 // 5 minutes
+        };
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log(`Geolocation successful: ${latitude}, ${longitude}`);
+            resolve({ lat: latitude, lon: longitude });
+          },
+          (error) => {
+            console.log('Geolocation failed:', error.message);
+            // Return null coordinates to indicate geolocation failure
+            // The backend will handle the fallback based on DISABLE_IP_GEOLOCATION setting
+            resolve({ lat: null, lon: null });
+          },
+          options
+        );
+      });
+    },
+
+    /**
+     * Clear cached location data
+     */
+    clearLocation() {
+      this.locationData = null;
+      this.locationPromise = null;
+    }
+  };
+
   app.utils.throttle = (func, limit) => {
     let inThrottle;
     return (...args) => {
