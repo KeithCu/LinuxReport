@@ -486,6 +486,7 @@ img {
   border: 1px solid var(--btn-border);
   border-radius: var(--border-radius-sm);
   transition: transform var(--transition-fast);
+  flex: 1; /* Make each day expand to fill available space */
 }
 
 .weather-day:hover {
@@ -1159,6 +1160,7 @@ a:focus {
     width: 100%;
     padding: calc(var(--spacing-xs) / 2);
     margin: 2px;
+    flex: 1; /* Ensure each day expands to fill available space */
   }
   
   .weather-day-name {
