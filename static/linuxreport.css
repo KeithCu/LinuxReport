@@ -1135,3 +1135,46 @@ a:focus {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Mobile-specific weather widget adjustments */
+@media (max-width: 768px) {
+  .weather-container {
+    min-width: auto;
+    width: 100%;
+    max-width: 100vw;
+    padding: 5px 10px 20px 10px;
+    overflow-x: auto;
+  }
+  
+  .weather-forecast {
+    min-width: auto;
+    width: 100%;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+  
+  .weather-day {
+    min-width: auto;
+    max-width: none;
+    width: 100%;
+    padding: calc(var(--spacing-xs) / 2);
+    margin: 2px;
+  }
+  
+  .weather-day-name {
+    font-size: 0.8em;
+  }
+  
+  .weather-icon {
+    width: 30px;
+    height: 30px;
+  }
+  
+  .weather-temp {
+    font-size: 0.8em;
+  }
+  
+  .weather-precip {
+    font-size: 0.7em;
+  }
+}
