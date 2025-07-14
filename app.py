@@ -152,7 +152,7 @@ def initialize_extensions(app):
     Mobility(app)
     
     # Initialize Flask-Compress for response compression
-    Compress(app)
+    #Compress(app)
     
     # Initialize Flask-Login
     login_manager = LoginManager()
