@@ -434,59 +434,39 @@ img {
   padding-right: 25px;
 }
 
-#weather-widget-container {
-  display: block;
-  text-align: center;
-  margin: calc(var(--spacing-sm) / 2) auto;
-  width: fit-content;
-  min-width: 600px;
-  max-width: 90%;
-}
-
 .weather-container {
-  width: fit-content;
-  overflow-x: auto;
-  min-width: 600px;
-  display: block;
-  margin: 0 auto;
-  padding: 5px 20px 20px 20px; /* Reduced top padding */
+  max-width: 100%;
+  margin: calc(var(--spacing-sm) / 2) auto;
+  padding: calc(var(--spacing-sm) / 2) calc(var(--spacing-sm) / 2) 20px calc(var(--spacing-sm) / 2);
+  background-color: var(--btn-bg);
+  color: var(--text);
+  border-radius: var(--border-radius-md);
+  text-align: center;
+  box-shadow: var(--shadow-sm);
 }
 
 .weather-container h3 {
-  margin: 0 0 10px 0; /* Reduce margin on the header */
+  margin: 0 0 calc(var(--spacing-sm) / 2) 0;
 }
 
 .weather-forecast {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  width: max-content;
-  min-width: 600px;
-  /* Remove min-height to let content determine height */
-}
-
-/* Force horizontal layout with higher specificity */
-#weather-container .weather-forecast,
-.weather-container .weather-forecast {
-  display: grid !important;
-  grid-template-columns: repeat(5, 1fr) !important;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  overflow-x: auto;
 }
 
 .weather-day {
-  min-width: 120px;
-  max-width: 150px;
+  flex: 0 0 auto;
+  min-width: 80px;
+  max-width: 120px;
   margin: calc(var(--spacing-xs) / 2);
-  width: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
   padding: calc(var(--spacing-sm) / 2);
   background-color: var(--btn-bg);
   border: 1px solid var(--btn-border);
   border-radius: var(--border-radius-sm);
   transition: transform var(--transition-fast);
-  flex: 1; /* Make each day expand to fill available space */
 }
 
 .weather-day:hover {
@@ -531,6 +511,13 @@ header {
 header small {
   display: block;
   margin: var(--spacing-sm) 0;
+}
+
+#weather-widget-container {
+  display: inline-block;
+  text-align: center;
+  margin: calc(var(--spacing-sm) / 2) auto;
+  width: auto;
 }
 
 /* =============================================================================
@@ -1134,49 +1121,5 @@ a:focus {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-}
-
-/* Mobile-specific weather widget adjustments */
-@media (max-width: 768px) {
-  .weather-container {
-    min-width: auto;
-    width: 100%;
-    max-width: 100vw;
-    padding: 5px 10px 20px 10px;
-    overflow-x: auto;
-  }
-  
-  .weather-forecast {
-    min-width: auto;
-    width: 100%;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 4px;
-  }
-  
-  .weather-day {
-    min-width: auto;
-    max-width: none;
-    width: 100%;
-    padding: calc(var(--spacing-xs) / 2);
-    margin: 2px;
-    flex: 1; /* Ensure each day expands to fill available space */
-  }
-  
-  .weather-day-name {
-    font-size: 0.8em;
-  }
-  
-  .weather-icon {
-    width: 30px;
-    height: 30px;
-  }
-  
-  .weather-temp {
-    font-size: 0.8em;
-  }
-  
-  .weather-precip {
-    font-size: 0.7em;
   }
 }
