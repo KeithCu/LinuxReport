@@ -43,10 +43,20 @@
                 toggleBtn.addEventListener('click', () => this.debouncedLoad());
             }
 
-            // Make widget visible after initial state is set
+            // Apply collapsed state first, then make visible to prevent flash
             const container = this.elements.get('weather-container');
-            if (container) {
-                container.classList.add('loaded'); // Make it visible using CSS class
+            const widgetWrapper = this.elements.get('weather-widget-container');
+            if (container && widgetWrapper && app.config.WEATHER_WIDGET_TOGGLE_ENABLED) {
+                const isCollapsed = (app.utils.CookieManager.get('weatherCollapsed') ?? String(app.config.WEATHER_DEFAULT_COLLAPSED)) === 'true';
+                if (isCollapsed) {
+                    widgetWrapper.classList.add('collapsed');
+                    // Keep container hidden when collapsed
+                    container.style.display = 'none';
+                } else {
+                    // Show the container and start loading if not collapsed
+                    container.style.display = 'block';
+                    container.style.visibility = 'visible';
+                }
             }
             // console.log('[Weather] Initialization complete');
         }
@@ -205,6 +215,7 @@
             const forecast = this.elements.get('weather-forecast');
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
+            const container = this.elements.get('weather-container');
             
             console.log('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
             
@@ -222,6 +233,13 @@
             forecast.innerHTML = data.daily.map(day => this.createDayHTML(day, useMetric)).join('');
             this.hideElement(loading);
             this.showElement(forecast);
+            
+            // The weather container should already be visible if we're rendering data
+            // Only ensure it's visible if it was hidden for some reason
+            if (container && container.style.display === 'none') {
+                container.style.display = 'block';
+                container.style.visibility = 'visible';
+            }
             
             // Force horizontal layout with inline styles
             if (forecast) {
@@ -258,9 +276,20 @@
         setCollapsed(isCollapsed, saveCookie = false) {
             const widgetWrapper = this.elements.get('weather-widget-container');
             const toggleBtn = this.elements.get('weather-toggle-btn');
+            const container = this.elements.get('weather-container');
             
             if (widgetWrapper) {
                 widgetWrapper.classList.toggle('collapsed', isCollapsed);
+            }
+            
+            if (container) {
+                // Hide/show the weather content based on collapsed state
+                if (isCollapsed) {
+                    container.style.display = 'none';
+                } else {
+                    container.style.display = 'block';
+                    container.style.visibility = 'visible';
+                }
             }
             
             if (toggleBtn) {

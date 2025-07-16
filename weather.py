@@ -239,12 +239,12 @@ def get_bucketed_weather_cache(lat, lon, units='imperial'):
     now = datetime.now(TZ).timestamp()
     
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
-        # print(f"[DEBUG] Cache hit for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
+        print(f"[DEBUG] Cache HIT for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
         data = entry['data']
         if units == 'metric':
             data = convert_weather_to_metric(data)
         return data
-    # print(f"[DEBUG] Cache miss for key {key}")
+    print(f"[DEBUG] Cache MISS for key {key}, lat={lat}, lon={lon}")
     return None
 
 def convert_weather_to_metric(data):
@@ -574,7 +574,7 @@ def get_default_weather_html():
         str: HTML string for default weather container
     """
     return '''
-    <div id="weather-container" class="weather-container">
+    <div id="weather-container" class="weather-container" style="display: none;">
         <h3>5-Day Weather</h3>
         <div id="weather-loading">Finding location...</div>
         <div id="weather-error" style="display: none; color: red;">Could not load weather data.</div>
@@ -719,6 +719,7 @@ def init_weather_routes(app):
                 lat = DEFAULT_WEATHER_LAT
                 lon = DEFAULT_WEATHER_LON
                 ip = None  # Don't use IP for geolocation
+                print(f"[DEBUG] Using Detroit coordinates for bot/referrer: lat={lat}, lon={lon}")
             else:
                 # Get coordinates from request parameters
                 lat = args['lat']
@@ -731,15 +732,22 @@ def init_weather_routes(app):
                         lat = DEFAULT_WEATHER_LAT
                         lon = DEFAULT_WEATHER_LON
                         ip = None  # Don't use IP for geolocation
+                        print(f"[DEBUG] Using Detroit coordinates (IP geolocation disabled): lat={lat}, lon={lon}")
                     else:
                         # Use IP-based location when enabled
                         # ip is already set to request.remote_addr
+                        print(f"[DEBUG] Using IP-based location: ip={ip}")
                         pass
                 else:
                     # Coordinates provided (geolocation successful), don't use IP
                     ip = None
+                    print(f"[DEBUG] Using provided coordinates: lat={lat}, lon={lon}")
             
             weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
+            
+            # Log the result for debugging
+            if weather_data and 'city_name' in weather_data:
+                print(f"[DEBUG] Weather API result: city={weather_data['city_name']}, status={status_code}")
             
             # Flask-RESTful handles JSON serialization automatically
             # Just return the data and status code

@@ -428,6 +428,10 @@ img {
   display: none;
 }
 
+#weather-widget-container.collapsed .weather-attribution {
+  display: none;
+}
+
 #weather-toggle-btn {
   transition: transform var(--transition-fast);
 }
@@ -439,6 +443,12 @@ img {
 #weather-widget-container.collapsed #weather-collapsed-label {
   display: inline !important;
   padding-right: 25px;
+}
+
+#weather-widget-container.collapsed {
+  padding: 2px var(--spacing-xs);
+  min-height: auto;
+  height: auto;
 }
 
 .weather-container {
