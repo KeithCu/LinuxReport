@@ -42,6 +42,12 @@
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', () => this.debouncedLoad());
             }
+
+            // Make widget visible after initial state is set
+            const container = this.elements.get('weather-container');
+            if (container) {
+                container.classList.add('loaded'); // Make it visible using CSS class
+            }
             // console.log('[Weather] Initialization complete');
         }
 

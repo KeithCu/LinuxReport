@@ -417,6 +417,13 @@ img {
   transition: transform var(--transition-fast);
 }
 
+#weather-container {
+  visibility: hidden;
+}
+
+#weather-container.loaded {
+  visibility: visible;
+}
 #weather-widget-container.collapsed #weather-content {
   display: none;
 }
