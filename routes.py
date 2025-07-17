@@ -54,6 +54,40 @@ from config import init_config_routes
 # Global setting for background refreshes
 ENABLE_BACKGROUND_REFRESH = True
 
+# Pre-computed security headers for performance
+def _build_security_headers():
+    """Pre-compute security headers at app startup to avoid string operations per request."""
+    # Build CSP domains string once
+    csp_domains = " ".join(ALLOWED_DOMAINS)
+    
+    # Build CSP header with conditional CDN
+    img_src = "'self' data:"
+    default_src = "'self'"
+    if ENABLE_URL_IMAGE_CDN_DELIVERY:
+        img_src += f" {CDN_IMAGE_URL}"
+        default_src += f" {CDN_IMAGE_URL}"
+    
+    csp_policy = (
+        f"default-src {default_src}; "
+        f"connect-src 'self' {csp_domains}; "
+        f"img-src {img_src} *; "
+        f"script-src 'self' 'unsafe-inline'; "
+        f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        f"font-src 'self' https://fonts.gstatic.com; "
+        f"frame-ancestors 'none';"
+    )
+    
+    return {
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'X-XSS-Protection': '1; mode=block',
+        'Content-Security-Policy': csp_policy,
+        'Access-Control-Expose-Headers': 'X-Client-IP'
+    }
+
+# Pre-compute headers at module load
+SECURITY_HEADERS = _build_security_headers()
+
 # =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
@@ -141,31 +175,14 @@ def init_app(flask_app):
             }
         })
         
-        # Add security headers to all responses
+        # Add security headers to HTML responses only
         @flask_app.after_request
         def add_security_headers(response):
-            # Add other security headers
-            response.headers['X-Content-Type-Options'] = 'nosniff'
-            response.headers['X-Frame-Options'] = 'DENY'
-            response.headers['X-XSS-Protection'] = '1; mode=block'
-            
-            # Add CSP header that allows connections to this domain and CDN if enabled
-            img_src = "'self' data:"
-            default_src = "'self'"
-            if ENABLE_URL_IMAGE_CDN_DELIVERY:
-                img_src += f" {CDN_IMAGE_URL}"
-                default_src += f" {CDN_IMAGE_URL}"
-            
-            csp_domains = " ".join(ALLOWED_DOMAINS)
-            response.headers['Content-Security-Policy'] = (
-                f"default-src {default_src}; "
-                f"connect-src 'self' {csp_domains}; "  # Allow connections to all allowed domains
-                f"img-src {img_src} *; "  # Allow images from any domain
-                f"script-src 'self' 'unsafe-inline'; "
-                f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "  # Allow Google Fonts stylesheets
-                f"font-src 'self' https://fonts.gstatic.com; "  # Allow Google Fonts files
-                f"frame-ancestors 'none';"
-            )
+            # Only add security headers to HTML responses
+            if response.content_type and 'text/html' in response.content_type:
+                # Apply pre-computed security headers
+                for header, value in SECURITY_HEADERS.items():
+                    response.headers[header] = value
             
             return response
 

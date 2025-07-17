@@ -8,17 +8,12 @@ for file content with automatic invalidation.
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
-from functools import lru_cache
-import hashlib
 import os
-import datetime
 import time
 
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from shared import PATH, EXPIRE_HOUR, g_cm, clear_page_caches
-from app_config import DEBUG
 
 # =============================================================================
 # GLOBAL VARIABLES AND CONSTANTS
