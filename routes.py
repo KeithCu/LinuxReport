@@ -12,6 +12,7 @@ import os
 import json
 import datetime
 import time
+from functools import lru_cache
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -135,7 +136,7 @@ def init_app(flask_app):
                 "origins": "*",  # Allow all origins
                 "methods": ["GET", "OPTIONS"],
                 "allow_headers": ["Content-Type"],
-                "expose_headers": ["Content-Type"],
+                "expose_headers": ["Content-Type", "X-Client-IP"],
                 "supports_credentials": False,  # Must be False when origins is "*"
                 "max_age": 3600  # Cache preflight requests for 1 hour
             }
@@ -148,6 +149,9 @@ def init_app(flask_app):
             response.headers['X-Content-Type-Options'] = 'nosniff'
             response.headers['X-Frame-Options'] = 'DENY'
             response.headers['X-XSS-Protection'] = '1; mode=block'
+            
+            # Expose X-Client-IP header for JavaScript access
+            response.headers['Access-Control-Expose-Headers'] = 'X-Client-IP'
             
             # Add CSP header that allows connections to this domain and CDN if enabled
             img_src = "'self' data:"
@@ -229,6 +233,12 @@ def _register_main_routes(flask_app):
         flask_app (Flask): The Flask application instance
     """
     
+    @flask_app.route('/storage.html')
+    @lru_cache(maxsize=1)  # Cache the rendered template since it's static
+    def storage():
+        """Serve the shared location storage iframe."""
+        return render_template('storage.html')
+    
     @flask_app.route('/')
     @limiter.limit(dynamic_rate_limit)
     def index():
@@ -275,6 +285,8 @@ def _register_main_routes(flask_app):
                 render_time = 0.001  # 1 millisecond fixed time for cache hits
                 update_performance_stats(render_time, start_time)
             
+            # Add client IP to cached response headers
+            cached_response.headers['X-Client-IP'] = request.remote_addr
             return cached_response
 
         # Prepare the page layout.
@@ -409,6 +421,9 @@ def _register_main_routes(flask_app):
                 expire = 30
             
             g_cm.set(cache_key, response, ttl=expire)
+        
+        # Add client IP to response headers
+        response.headers['X-Client-IP'] = request.remote_addr
         
         return response
 

@@ -86,59 +86,246 @@
 
   // Geolocation utilities
   app.utils.GeolocationManager = {
-    // Global variable to store location data
-    locationData: null,
-    locationPromise: null,
+    iframe: null,
+    iframeReady: false,
+    pendingRequests: [],
 
     /**
-     * Get user's geolocation with fallback based on DISABLE_IP_GEOLOCATION setting
+     * Initialize the shared storage iframe
+     */
+    init() {
+      // Create hidden iframe for cross-domain storage
+      this.iframe = document.createElement('iframe');
+      this.iframe.style.display = 'none';
+      this.iframe.src = 'https://linuxreport.net/storage.html';
+      
+      // Wait for iframe to load
+      this.iframe.onload = () => {
+        this.iframeReady = true;
+        console.log('Shared location storage iframe loaded');
+        // Process any pending requests
+        this.pendingRequests.forEach(resolve => resolve());
+        this.pendingRequests = [];
+      };
+      
+      document.body.appendChild(this.iframe);
+    },
+
+    /**
+     * Get user's geolocation with cross-domain caching
      * @returns {Promise<{lat: number, lon: number}>}
      */
     async getLocation() {
-      // Always request fresh location from browser - no caching
-      return this._requestLocation();
+      // Wait for iframe to be ready
+      if (!this.iframeReady) {
+        await new Promise(resolve => this.pendingRequests.push(resolve));
+      }
+      
+      // Try to get from shared storage first
+      const sharedLocation = await this.getFromSharedStorage();
+      if (sharedLocation) {
+        console.log('Using shared location from iframe');
+        return sharedLocation;
+      }
+      
+      // Fall back to local storage
+      const cached = localStorage.getItem('weatherLocation');
+      if (cached) {
+        const data = JSON.parse(cached);
+        const currentIP = await this.getCurrentIP();
+        
+        if (data.ip && currentIP && data.ip !== currentIP) {
+          console.log('IP changed, invalidating cached location');
+          localStorage.removeItem('weatherLocation');
+        } else if (Date.now() - data.timestamp < 3600000) {
+          console.log('Using local cached location');
+          return { lat: data.lat, lon: data.lon };
+        }
+      }
+      
+      // Get fresh location
+      const location = await this._requestLocation();
+      if (location.lat !== null && location.lon !== null) {
+        // Store in both places
+        localStorage.setItem('weatherLocation', JSON.stringify({
+          lat: location.lat,
+          lon: location.lon,
+          ip: await this.getCurrentIP(),
+          timestamp: Date.now()
+        }));
+        
+        // Also store in shared storage
+        await this.storeInSharedStorage(location);
+      }
+      return location;
+    },
+
+    /**
+     * Get location from shared storage via iframe
+     * @returns {Promise<{lat: number, lon: number} | null>}
+     */
+    async getFromSharedStorage() {
+      return new Promise((resolve) => {
+        const messageHandler = (event) => {
+          if (event.origin !== 'https://linuxreport.net') return;
+          
+          if (event.data.type === 'LOCATION_DATA') {
+            window.removeEventListener('message', messageHandler);
+            resolve(event.data.location);
+          }
+        };
+        
+        window.addEventListener('message', messageHandler);
+        
+        // Request location from iframe
+        this.iframe.contentWindow.postMessage({
+          type: 'GET_LOCATION'
+        }, 'https://linuxreport.net');
+        
+        // Timeout after 2 seconds
+        setTimeout(() => {
+          window.removeEventListener('message', messageHandler);
+          resolve(null);
+        }, 2000);
+      });
+    },
+
+    /**
+     * Store location in shared storage via iframe
+     * @param {Object} location - Location object with lat and lon
+     * @returns {Promise<boolean>}
+     */
+    async storeInSharedStorage(location) {
+      return new Promise(async (resolve) => {
+        const messageHandler = (event) => {
+          if (event.origin !== 'https://linuxreport.net') return;
+          
+          if (event.data.type === 'LOCATION_STORED') {
+            window.removeEventListener('message', messageHandler);
+            resolve(true);
+          }
+        };
+        
+        window.addEventListener('message', messageHandler);
+        
+        // Get current IP and store location in iframe
+        const currentIP = await this.getCurrentIP();
+        this.iframe.contentWindow.postMessage({
+          type: 'STORE_LOCATION',
+          data: {
+            lat: location.lat,
+            lon: location.lon,
+            ip: currentIP
+          }
+        }, 'https://linuxreport.net');
+        
+        // Timeout after 2 seconds
+        setTimeout(() => {
+          window.removeEventListener('message', messageHandler);
+          resolve(false);
+        }, 2000);
+      });
+    },
+
+    /**
+     * Get current IP address for cache invalidation
+     * @returns {Promise<string | null>}
+     */
+    async getCurrentIP() {
+      try {
+        // Get IP from server-injected variable (most efficient)
+        if (window.CLIENT_IP && window.CLIENT_IP !== '' && this.isValidIP(window.CLIENT_IP)) {
+          console.log(`IP detected via server injection: ${window.CLIENT_IP}`);
+          return window.CLIENT_IP;
+        }
+        
+        // Fallback: try to get from response headers (requires additional request)
+        const response = await fetch(window.location.href, {
+          method: 'HEAD',
+          cache: 'no-cache'
+        });
+        
+        if (response.ok) {
+          const ip = response.headers.get('X-Client-IP');
+          
+          if (ip && this.isValidIP(ip)) {
+            console.log(`IP detected via response headers: ${ip}`);
+            return ip;
+          } else {
+            console.error('IP detection failed: X-Client-IP header missing or invalid');
+          }
+        } else {
+          console.error('IP detection failed: HEAD request failed');
+        }
+        
+        return null;
+      } catch (error) {
+        console.error('IP detection failed:', error.message);
+        return null;
+      }
+    },
+
+    /**
+     * Validate IP address (IPv4 or IPv6)
+     * @param {string} ip - IP address to validate
+     * @returns {boolean}
+     */
+    isValidIP(ip) {
+      // Validate IPv4
+      const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+      
+      // Validate IPv6
+      const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$|^(?:[0-9a-fA-F]{1,4}:){1,7}:$|^:(?::[0-9a-fA-F]{1,4}){1,7}$|^::(?:[0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4}$|^[0-9a-fA-F]{1,4}::(?:[0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4}$|^::(?:[0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4}$|^[0-9a-fA-F]{1,4}::(?:[0-9a-fA-F]{1,4}:){0,3}[0-9a-fA-F]{1,4}$|^[0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}:(?:[0-9a-fA-F]{1,4}:){0,2}[0-9a-fA-F]{1,4}$|^[0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}:[0-9a-fA-F]{1,4}:(?:[0-9a-fA-F]{1,4}:)?[0-9a-fA-F]{1,4}$/;
+      
+      return ipv4Regex.test(ip) || ipv6Regex.test(ip);
     },
 
     /**
      * Request location from browser geolocation API
      * @returns {Promise<{lat: number, lon: null}>} - Returns null for lon when geolocation fails
      */
-            _requestLocation() {
-            return new Promise((resolve) => {
-                        if (!navigator.geolocation) {
-            // console.log('Geolocation not supported, using IP-based location');
-            resolve({ lat: null, lon: null });
-            return;
+    _requestLocation() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          console.log('Geolocation not supported, using IP-based location');
+          resolve({ lat: null, lon: null });
+          return;
         }
 
-                const options = {
-                    enableHighAccuracy: false, // Keep false for faster response
-                    timeout: 15000, // Increased timeout to 15 seconds
-                    maximumAge: 3600000 // 1 hour - data within last hour is good enough
-                };
+        const options = {
+          enableHighAccuracy: false, // Keep false for faster response
+          timeout: 10000, // Reduced timeout to 10 seconds
+          maximumAge: 3600000 // 1 hour - data within last hour is good enough
+        };
 
-                // console.log('Requesting geolocation with options:', options);
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        console.log(`Geolocation successful: ${latitude}, ${longitude}`);
-                        resolve({ lat: latitude, lon: longitude });
-                    },
-                    (error) => {
-                        console.log('Geolocation failed:', error.message, 'Code:', error.code);
-                        // Return null coordinates to indicate geolocation failure
-                        resolve({ lat: null, lon: null });
-                    },
-                    options
-                );
-            });
-        },
+        console.log('Requesting fresh geolocation with options:', options);
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            console.log(`Geolocation successful: ${latitude}, ${longitude}`);
+            resolve({ lat: latitude, lon: longitude });
+          },
+          (error) => {
+            console.log('Geolocation failed:', error.message, 'Code:', error.code);
+            // Return null coordinates to indicate geolocation failure
+            resolve({ lat: null, lon: null });
+          },
+          options
+        );
+      });
+    },
 
     /**
-     * Clear cached location data (kept for compatibility, but no longer needed)
+     * Clear cached location data
      */
     clearLocation() {
-      // No longer caching, so this is a no-op
+      localStorage.removeItem('weatherLocation');
+      // Also clear shared storage
+      if (this.iframe && this.iframeReady) {
+        this.iframe.contentWindow.postMessage({
+          type: 'CLEAR_LOCATION'
+        }, 'https://linuxreport.net');
+      }
     }
   };
 
@@ -330,5 +517,20 @@
   // =============================================================================
 
   window.app = app;
+
+  // =============================================================================
+  // INITIALIZATION
+  // =============================================================================
+
+  // Initialize shared location storage when DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    // Initialize the shared storage iframe
+    app.utils.GeolocationManager.init();
+    
+    // Preload location in background
+    app.utils.GeolocationManager.getLocation().catch(() => {
+      // Silently fail - user will be prompted when weather loads
+    });
+  });
 
 })();

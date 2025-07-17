@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Location Storage</title>
+</head>
+<body>
+    <script>
+        // Store location data in this iframe's localStorage
+        let locationData = null;
+        
+        // Listen for messages from parent windows
+        window.addEventListener('message', async (event) => {
+            // Only accept messages from your domains
+            const allowedOrigins = [
+                'https://linuxreport.net',
+                'https://covidreport.org', 
+                'https://pvreport.org',
+                'https://aireport.keithcu.com',
+                'https://news.spaceelevatorwiki.com',
+                'https://trumpreport.info',
+                'https://news.thedetroitilove.com',
+                'http://localhost:5000', // For development
+                'http://127.0.0.1:5000'  // For development
+            ];
+            
+            if (!allowedOrigins.includes(event.origin)) {
+                console.log('Rejected message from unauthorized origin:', event.origin);
+                return;
+            }
+            
+            const { type, data } = event.data;
+            
+            switch (type) {
+                case 'GET_LOCATION':
+                    // Return cached location if available and valid
+                    const cached = localStorage.getItem('sharedLocation');
+                    if (cached) {
+                        const location = JSON.parse(cached);
+                        const currentTime = Date.now();
+                        
+                        // Check if cache is still valid (1 hour)
+                        if (currentTime - location.timestamp < 3600000) {
+                            console.log('Returning cached location from shared storage');
+                            event.source.postMessage({
+                                type: 'LOCATION_DATA',
+                                location: { lat: location.lat, lon: location.lon }
+                            }, event.origin);
+                            return;
+                        } else {
+                            // Cache expired, remove it
+                            console.log('Cached location expired, removing');
+                            localStorage.removeItem('sharedLocation');
+                        }
+                    }
+                    
+                    // No valid cached data
+                    console.log('No valid cached location available');
+                    event.source.postMessage({
+                        type: 'LOCATION_DATA',
+                        location: null
+                    }, event.origin);
+                    break;
+                    
+                case 'STORE_LOCATION':
+                    // Store the location data
+                    console.log('Storing location in shared storage:', data);
+                    localStorage.setItem('sharedLocation', JSON.stringify({
+                        lat: data.lat,
+                        lon: data.lon,
+                        ip: data.ip,
+                        timestamp: Date.now()
+                    }));
+                    
+                    event.source.postMessage({
+                        type: 'LOCATION_STORED',
+                        success: true
+                    }, event.origin);
+                    break;
+                    
+                case 'CLEAR_LOCATION':
+                    // Clear cached location (useful for testing)
+                    console.log('Clearing shared location cache');
+                    localStorage.removeItem('sharedLocation');
+                    
+                    event.source.postMessage({
+                        type: 'LOCATION_CLEARED',
+                        success: true
+                    }, event.origin);
+                    break;
+                    
+                default:
+                    console.log('Unknown message type:', type);
+            }
+        });
+        
+        // Log that storage iframe is ready
+        console.log('Location storage iframe loaded and ready');
+    </script>
+</body>
+</html> 
