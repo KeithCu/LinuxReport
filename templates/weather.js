@@ -122,6 +122,25 @@
             return 'imperial';
         }
 
+        getCachedLocation() {
+            // Check if we have location data from response headers
+            const latHeader = document.querySelector('meta[name="weather-lat"]');
+            const lonHeader = document.querySelector('meta[name="weather-lon"]');
+            
+            if (latHeader && lonHeader) {
+                const lat = parseFloat(latHeader.getAttribute('content'));
+                const lon = parseFloat(lonHeader.getAttribute('content'));
+                
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    console.log('[Weather] Found cached location in meta tags:', lat, lon);
+                    return { lat, lon };
+                }
+            }
+            
+            console.log('[Weather] No cached location found in meta tags');
+            return null;
+        }
+
         async fetch(retryCount = 0) {
             const useMetric = this.getUnits() === 'metric';
             const maxRetries = 20; // Much higher retry limit
@@ -131,30 +150,36 @@
                     // console.log('[Weather] Starting fetch...');
                     const startTime = performance.now();
                     
-                    // Get user's geolocation first - keep retrying until we get valid coordinates
-                    // console.log('[Weather] Getting location...');
-                    let location;
-                    let geolocationAttempts = 0;
+                    // Check for cached location in response headers first
+                    let location = this.getCachedLocation();
                     
-                    while (true) { // Keep trying indefinitely until we get valid coordinates
-                        try {
-                            location = await app.utils.GeolocationManager.getLocation();
-                            console.log('[Weather] Location obtained:', location);
-                            
-                            // If we got valid coordinates, break out of the retry loop
-                            if (location.lat !== null && location.lon !== null) {
-                                console.log('[Weather] Valid coordinates obtained, proceeding with weather request');
-                                break;
-                            } else {
+                    if (!location || location.lat === null || location.lon === null) {
+                        // No cached location, get user's geolocation - keep retrying until we get valid coordinates
+                        // console.log('[Weather] Getting location...');
+                        let geolocationAttempts = 0;
+                        
+                        while (true) { // Keep trying indefinitely until we get valid coordinates
+                            try {
+                                location = await app.utils.GeolocationManager.getLocation();
+                                console.log('[Weather] Location obtained:', location);
+                                
+                                // If we got valid coordinates, break out of the retry loop
+                                if (location.lat !== null && location.lon !== null) {
+                                    console.log('[Weather] Valid coordinates obtained, proceeding with weather request');
+                                    break;
+                                } else {
+                                    geolocationAttempts++;
+                                    console.log(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts})`);
+                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                }
+                            } catch (geolocationError) {
                                 geolocationAttempts++;
-                                console.log(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts})`);
+                                console.log(`[Weather] Geolocation attempt failed (attempt ${geolocationAttempts}):`, geolocationError.message);
                                 await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
                             }
-                        } catch (geolocationError) {
-                            geolocationAttempts++;
-                            console.log(`[Weather] Geolocation attempt failed (attempt ${geolocationAttempts}):`, geolocationError.message);
-                            await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
                         }
+                    } else {
+                        console.log('[Weather] Using cached location from headers:', location);
                     }
                     
                     // Build URL with location parameters

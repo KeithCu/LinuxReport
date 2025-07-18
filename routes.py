@@ -39,7 +39,7 @@ from shared import (
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
     WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API
 )
-from weather import get_default_weather_html, init_weather_routes
+from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content
 from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event
@@ -292,7 +292,20 @@ def _register_main_routes(flask_app):
                 render_time = 0.001  # 1 millisecond fixed time for cache hits
                 update_performance_stats(render_time, start_time)
             
-            return cached_response
+            # For cached responses, make a copy and add user-specific location headers
+            from copy import deepcopy
+            response = deepcopy(cached_response)
+            
+            # Get cached location for this IP to pass to client
+            client_ip = request.remote_addr
+            cached_lat, cached_lon = get_cached_geolocation(client_ip)
+            
+            # Add location headers if we have cached coordinates
+            if cached_lat is not None and cached_lon is not None:
+                response.headers['X-Weather-Lat'] = str(cached_lat)
+                response.headers['X-Weather-Lon'] = str(cached_lon)
+            
+            return response
 
         # Prepare the page layout.
         if single_column:
@@ -379,6 +392,10 @@ def _register_main_routes(flask_app):
 
         weather_html = get_default_weather_html()
 
+        # Get cached location for this IP for template rendering
+        client_ip = request.remote_addr
+        template_lat, template_lon = get_cached_geolocation(client_ip)
+        
         # Render the final page.
         page = render_template('page.html', columns=result,
                                logo_url=LOGO_URL, title=WEB_TITLE,
@@ -387,7 +404,8 @@ def _register_main_routes(flask_app):
                                above_html=Markup(above_html),
                                weather_html=Markup(weather_html),
                                INFINITE_SCROLL_MOBILE=INFINITE_SCROLL_MOBILE,
-                               INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG)
+                               INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG,
+                               weather_lat=template_lat, weather_lon=template_lon)
 
         # Trigger background fetching if needed
         if need_fetch and ENABLE_BACKGROUND_REFRESH:
@@ -413,18 +431,28 @@ def _register_main_routes(flask_app):
         response = make_response(page)
         response.headers['Content-Length'] = str(len(page.encode('utf-8')))
         
+        # Add user-specific location headers for uncached responses
+        client_ip = request.remote_addr
+        cached_lat, cached_lon = get_cached_geolocation(client_ip)
+        
+        # Add location headers if we have cached coordinates
+        if cached_lat is not None and cached_lon is not None:
+            response.headers['X-Weather-Lat'] = str(cached_lat)
+            response.headers['X-Weather-Lon'] = str(cached_lon)
+        
         # Add cache control headers for 15 minutes (900 seconds)
         # Use the end_time we already calculated to avoid additional time calls
         if not is_admin:
             # Use max-age for relative caching (more reliable than Expires)
             response.headers['Cache-Control'] = 'public, max-age=900'
         
-        # Store full response cache (but not for admin mode)
+        # Store full response cache (but not for admin mode) - cache the response with standard headers
         if not is_admin and page_order_s == STANDARD_ORDER_STR:
             expire = EXPIRE_MINUTES
             if need_fetch:
                 expire = 30
             
+            # Cache the response with standard headers (no user-specific headers)
             g_cm.set(cache_key, response, ttl=expire)
         
         return response

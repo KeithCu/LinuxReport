@@ -6,6 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="{{description}}">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    {% if weather_lat is not none and weather_lon is not none %}
+    <meta name="weather-lat" content="{{weather_lat}}">
+    <meta name="weather-lon" content="{{weather_lon}}">
+    {% endif %}
     <title>{{title}}</title>
     <!-- Preload critical fonts -->
     <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" as="style">

@@ -92,6 +92,52 @@ _geoip_reader = None
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
 # =============================================================================
+# GEOLOCATION CACHING
+# =============================================================================
+
+def save_geolocation_cache(ip, lat, lon, source='ip'):
+    """
+    Save geolocation data to shared cache.
+    
+    Args:
+        ip (str): IP address
+        lat (float): Latitude coordinate
+        lon (float): Longitude coordinate
+        source (str): Source of location data ('ip', 'browser', etc.)
+    """
+    cache_key = f"geolocation:{ip}"
+    cache_data = {
+        'lat': lat,
+        'lon': lon,
+        'source': source,
+        'timestamp': datetime.now(TZ).timestamp()
+    }
+    # Cache for 30 days (location doesn't change often)
+    g_cs.put(cache_key, cache_data, timeout=30 * 24 * 3600)
+
+def get_cached_geolocation(ip):
+    """
+    Get cached geolocation data for an IP address.
+    
+    Args:
+        ip (str): IP address
+        
+    Returns:
+        tuple: (lat, lon) coordinates or (None, None) if not cached
+    """
+    cache_key = f"geolocation:{ip}"
+    cached_data = g_cs.get(cache_key)
+    
+    if cached_data:
+        return cached_data.get('lat'), cached_data.get('lon')
+    
+    return None, None
+
+
+
+
+
+# =============================================================================
 # UTILITY FUNCTIONS
 # =============================================================================
 
@@ -438,26 +484,37 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     Returns:
         tuple: (data, status_code) where data includes 'fetch_time' when the data was fetched from the API
     """
-    # If coordinates are provided, use them directly
+    # If coordinates are provided, use them directly and cache them
     if lat is not None and lon is not None:
         try:
             lat = float(lat)
             lon = float(lon)
+            # Cache the provided coordinates for this IP
+            if ip:
+                save_geolocation_cache(ip, lat, lon, 'client')
         except (ValueError, TypeError):
             lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
     else:
-        # No coordinates provided - handle fallback based on DISABLE_IP_GEOLOCATION setting
-        if DISABLE_IP_GEOLOCATION:
-            # When IP geolocation is disabled, always use Detroit coordinates
-            lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
-        else:
-            # When IP geolocation is enabled, try IP-based location with Detroit fallback
-            if ip:
-                lat, lon = get_location_from_ip(ip)
-                if not lat or not lon:
+        # No coordinates provided - try cached location first, then fallback
+        if ip:
+            lat, lon = get_cached_geolocation(ip)
+            if lat is None or lon is None:
+                # No cached location, handle fallback based on DISABLE_IP_GEOLOCATION setting
+                if DISABLE_IP_GEOLOCATION:
+                    # When IP geolocation is disabled, always use Detroit coordinates
                     lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+                else:
+                    # When IP geolocation is enabled, try IP-based location with Detroit fallback
+                    lat, lon = get_location_from_ip(ip)
+                    if not lat or not lon:
+                        lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+                    # Cache the IP-based location
+                    save_geolocation_cache(ip, lat, lon, 'ip')
             else:
-                lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+                # Use cached location
+                pass
+        else:
+            lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
     # Convert coordinates to float if they're strings
     try:
@@ -743,7 +800,7 @@ def init_weather_routes(app):
                     ip = None
                     print(f"[DEBUG] Using provided coordinates: lat={lat}, lon={lon}")
             
-            weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
+            weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=request.remote_addr, units=units)
             
             # Log the result for debugging
             if weather_data and 'city_name' in weather_data:
