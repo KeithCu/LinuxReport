@@ -153,32 +153,55 @@
                     // Check for cached location in response headers first
                     let location = this.getCachedLocation();
                     
-                    if (!location || location.lat === null || location.lon === null) {
-                        // No cached location, get user's geolocation - keep retrying until we get valid coordinates
-                        // console.log('[Weather] Getting location...');
-                        let geolocationAttempts = 0;
-                        
-                        while (true) { // Keep trying indefinitely until we get valid coordinates
-                            try {
-                                location = await app.utils.GeolocationManager.getLocation();
-                                console.log('[Weather] Location obtained:', location);
-                                
-                                // If we got valid coordinates, break out of the retry loop
-                                if (location.lat !== null && location.lon !== null) {
-                                    console.log('[Weather] Valid coordinates obtained, proceeding with weather request');
-                                    break;
-                                } else {
-                                    geolocationAttempts++;
-                                    console.log(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts})`);
-                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                                }
-                            } catch (geolocationError) {
-                                geolocationAttempts++;
-                                console.log(`[Weather] Geolocation attempt failed (attempt ${geolocationAttempts}):`, geolocationError.message);
-                                await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                            }
-                        }
-                    } else {
+                                         if (!location || location.lat === null || location.lon === null) {
+                         // No cached location, get user's geolocation
+                         console.log('[Weather] Getting location...');
+                         let geolocationAttempts = 0;
+                         const maxGeolocationAttempts = 60; // Allow up to 60 attempts (15 seconds with 250ms delays)
+                         let userDeniedPermission = false;
+                         
+                         while (geolocationAttempts < maxGeolocationAttempts && !userDeniedPermission) {
+                             try {
+                                 location = await app.utils.GeolocationManager.getLocation();
+                                 console.log('[Weather] Location obtained:', location);
+                                 
+                                 // If we got valid coordinates, break out of the retry loop
+                                 if (location.lat !== null && location.lon !== null) {
+                                     console.log('[Weather] Valid coordinates obtained, proceeding with weather request');
+                                     break;
+                                 } else {
+                                     geolocationAttempts++;
+                                     console.log(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts}/${maxGeolocationAttempts})`);
+                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                 }
+                             } catch (geolocationError) {
+                                 geolocationAttempts++;
+                                 
+                                 // Check if user explicitly denied permission
+                                 if (geolocationError.code === 1) { // PERMISSION_DENIED
+                                     console.log('[Weather] User denied geolocation permission, using default location');
+                                     userDeniedPermission = true;
+                                     location = { lat: 42.3314, lon: -83.0458, source: 'default' }; // Detroit coordinates
+                                     break;
+                                 } else if (geolocationError.code === 2) { // POSITION_UNAVAILABLE
+                                     console.log(`[Weather] Position unavailable (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                 } else if (geolocationError.code === 3) { // TIMEOUT
+                                     console.log(`[Weather] Geolocation timeout (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                 } else {
+                                     console.log(`[Weather] Geolocation error (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                 }
+                             }
+                         }
+                         
+                         // If we exhausted attempts without getting location, use default
+                         if (geolocationAttempts >= maxGeolocationAttempts && !userDeniedPermission) {
+                             console.log('[Weather] Geolocation timed out after max attempts, using default location (Detroit)');
+                             location = { lat: 42.3314, lon: -83.0458, source: 'default' }; // Detroit coordinates
+                         }
+                     } else {
                         console.log('[Weather] Using cached location from headers:', location);
                     }
                     
