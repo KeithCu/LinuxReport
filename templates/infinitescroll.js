@@ -126,11 +126,28 @@
             return { name: feedName, icon: feedIcon.src };
         }
 
+        /**
+         * Groups items by source while maintaining chronological order.
+         * 
+         * IMPORTANT: This creates a true chronological timeline where articles are grouped
+         * by source only when they appear consecutively in time. This is NOT a simple
+         * grouping of all items from each source together.
+         * 
+         * Example timeline:
+         * - Source A (3 articles: timestamps 100, 101, 102) - grouped because consecutive
+         * - Source B (2 articles: timestamps 103, 104) - grouped because consecutive  
+         * - Source C (1 article: timestamp 105) - single article group
+         * - Source A (2 articles: timestamps 106, 107) - new group because not consecutive
+         * 
+         * This creates a natural flow where users see articles in chronological order
+         * with source headers appearing only when the source changes in the timeline.
+         * 
+         */
         groupItemsBySource(allItems) {
             // First sort ALL items by timestamp (newest first)
             allItems.sort((a, b) => b.timestamp - a.timestamp);
 
-            // Group consecutive items by source
+            // Group consecutive items by source - when source changes, start new group
             const groups = [];
             let currentGroup = null;
             
