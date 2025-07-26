@@ -176,7 +176,6 @@
 
     // Global helper functions
     app.redirect = () => {
-        app.utils.ScrollManager.savePosition();
         window.location = "/config";
     };
 
