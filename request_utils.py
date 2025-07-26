@@ -147,9 +147,9 @@ def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
     try:
         # Convert to UTC and return ISO format for frontend timezone conversion
         utc_time = last_fetch.astimezone(datetime.timezone.utc).isoformat()
-        # Ensure it ends with 'Z' for UTC (JavaScript expects this)
-        if not utc_time.endswith('Z'):
-            utc_time += 'Z'
+        # The isoformat() method already produces the correct format for UTC
+        # It will be something like "2025-07-25T19:20:06.860595+00:00"
+        # JavaScript can parse this format correctly
         print(f"format_last_updated: converted {last_fetch} to {utc_time}")
         return utc_time
     except Exception as e:
