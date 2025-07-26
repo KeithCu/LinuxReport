@@ -127,23 +127,36 @@
         }
 
         groupItemsBySource(allItems) {
+            // First sort ALL items by timestamp (newest first)
             allItems.sort((a, b) => b.timestamp - a.timestamp);
 
-            const groupedMap = allItems.reduce((acc, item) => {
-                let group = acc.get(item.source_name);
-                if (!group) {
-                    group = {
+            // Group consecutive items by source
+            const groups = [];
+            let currentGroup = null;
+            
+            allItems.forEach(item => {
+                // If this is the first item or the source changed, start a new group
+                if (!currentGroup || currentGroup.name !== item.source_name) {
+                    if (currentGroup) {
+                        groups.push(currentGroup);
+                    }
+                    currentGroup = {
                         name: item.source_name,
                         icon: item.source_icon,
                         items: []
                     };
-                    acc.set(item.source_name, group);
                 }
-                group.items.push(item);
-                return acc;
-            }, new Map());
+                
+                // Add item to current group
+                currentGroup.items.push(item);
+            });
             
-            return Array.from(groupedMap.values());
+            // Don't forget the last group
+            if (currentGroup) {
+                groups.push(currentGroup);
+            }
+            
+            return groups;
         }
 
         renderGroupedItems(container, groupedItems) {
