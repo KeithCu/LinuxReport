@@ -132,14 +132,26 @@ def get_ip_prefix(ip_str):
 
 def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
     """
-    Format the last fetch time as 'HH:MM AM/PM' for display.
+    Format the last fetch time as UTC ISO format for frontend timezone conversion.
     
     Args:
         last_fetch (Optional[datetime.datetime]): Timestamp to format
         
     Returns:
-        str: Formatted time string or "Unknown" if no timestamp
+        str: UTC ISO formatted timestamp or "Unknown" if no timestamp
     """
     if not last_fetch:
+        print(f"format_last_updated: last_fetch is None or falsy")
         return "Unknown"
-    return last_fetch.strftime("%I:%M %p")
+    
+    try:
+        # Convert to UTC and return ISO format for frontend timezone conversion
+        utc_time = last_fetch.astimezone(datetime.timezone.utc).isoformat()
+        # Ensure it ends with 'Z' for UTC (JavaScript expects this)
+        if not utc_time.endswith('Z'):
+            utc_time += 'Z'
+        print(f"format_last_updated: converted {last_fetch} to {utc_time}")
+        return utc_time
+    except Exception as e:
+        print(f"format_last_updated: error converting {last_fetch}: {e}")
+        return "Unknown"

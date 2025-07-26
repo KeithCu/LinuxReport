@@ -276,13 +276,18 @@
      * @returns {string} Formatted time in local timezone with timezone name
      */
     formatLocalTime(utcTime) {
-      if (!utcTime || utcTime === 'Unknown') {
+      if (!utcTime || utcTime === 'Unknown' || utcTime === '') {
         return 'Unknown';
       }
       
+      console.log('Attempting to parse time:', utcTime, 'Type:', typeof utcTime);
+      
       try {
         const date = new Date(utcTime);
+        console.log('Parsed date:', date, 'Valid:', !isNaN(date.getTime()));
+        
         if (isNaN(date.getTime())) {
+          console.warn('Invalid time format:', utcTime);
           return 'Invalid time';
         }
         
@@ -296,9 +301,11 @@
         // Get timezone abbreviation
         const timezoneAbbr = this.getTimezoneAbbreviation();
         
-        return `${timeString} ${timezoneAbbr}`;
+        const result = `${timeString} ${timezoneAbbr}`;
+        console.log('Final result:', result);
+        return result;
       } catch (error) {
-        console.error('Error formatting time:', error);
+        console.error('Error formatting time:', error, 'Input:', utcTime);
         return 'Error';
       }
     },
@@ -327,8 +334,11 @@
     init() {
       document.querySelectorAll('.last-updated-time').forEach(element => {
         const utcTime = element.getAttribute('data-utc-time');
+        console.log('Processing time element:', element, 'UTC time:', utcTime);
         if (utcTime) {
           element.textContent = this.formatLocalTime(utcTime);
+        } else {
+          element.textContent = 'Unknown';
         }
       });
     },
