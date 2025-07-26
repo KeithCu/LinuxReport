@@ -251,9 +251,15 @@
       document.body.setAttribute('data-font', font);
     },
     setTheme(theme) {
-        app.utils.ScrollManager.savePosition();
+        // Apply theme immediately using CSS variables
+        document.body.setAttribute('data-theme', theme);
         app.utils.CookieManager.set('Theme', theme);
-        window.location.reload();
+        
+        // Update theme select dropdown if it exists
+        const themeSelect = document.getElementById('theme-select');
+        if (themeSelect) themeSelect.value = theme;
+        
+        // No page reload needed - theme changes instantly!
     },
     setFont(font) {
       app.utils.ScrollManager.savePosition();
