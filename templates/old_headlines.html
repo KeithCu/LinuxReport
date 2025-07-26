@@ -85,6 +85,11 @@
         
         // Initialize delete functionality for old headlines
         initDeleteHeadlines();
+        
+        // Initialize timezone conversion for old headlines timestamps
+        if (window.app && window.app.utils && window.app.utils.TimezoneManager) {
+          window.app.utils.TimezoneManager.init();
+        }
       });
       
       // Pass admin status from Flask-Login to JavaScript
@@ -157,7 +162,7 @@
 <img loading="lazy" src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
                         {% endif %}
                         <div class="headline-timestamp">
-                            {{ h.timestamp[:19].replace('T', ' ') if h.timestamp }}
+                            <span class="last-updated-time" data-utc-time="{{ h.timestamp }}"></span>
                         </div>
                     </div>
                 {% endfor %}

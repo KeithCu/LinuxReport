@@ -150,7 +150,7 @@ def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
         # The isoformat() method already produces the correct format for UTC
         # It will be something like "2025-07-25T19:20:06.860595+00:00"
         # JavaScript can parse this format correctly
-        print(f"format_last_updated: converted {last_fetch} to {utc_time}")
+        #print(f"format_last_updated: converted {last_fetch} to {utc_time}")
         return utc_time
     except Exception as e:
         print(f"format_last_updated: error converting {last_fetch}: {e}")

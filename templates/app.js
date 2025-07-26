@@ -297,17 +297,58 @@
           return 'Invalid time';
         }
         
-        // Format as 12-hour time with AM/PM and timezone
-        const timeString = date.toLocaleTimeString('en-US', {
+        // Check if the date is today
+        const today = new Date();
+        const isToday = date.toDateString() === today.toDateString();
+        
+        // Get user's locale for formatting
+        const userLocale = navigator.language || 'en-US';
+        
+        // Format time according to user's locale preferences
+        const timeString = date.toLocaleTimeString(userLocale, {
           hour: 'numeric',
           minute: '2-digit',
-          hour12: true
+          hour12: userLocale.includes('en') || userLocale.includes('US') || userLocale.includes('CA')
         });
         
         // Get timezone abbreviation
         const timezoneAbbr = this.getTimezoneAbbreviation();
         
-        const result = `${timeString} ${timezoneAbbr}`;
+        let result = `${timeString} ${timezoneAbbr}`;
+        
+        // If not today, add the date in user's preferred format
+        if (!isToday) {
+          const dateString = date.toLocaleDateString(userLocale, {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+          
+          // Use appropriate connector based on locale
+          let connector = ' at ';
+          if (userLocale.startsWith('de')) {
+            connector = ' um ';
+          } else if (userLocale.startsWith('fr')) {
+            connector = ' à ';
+          } else if (userLocale.startsWith('es')) {
+            connector = ' a las ';
+          } else if (userLocale.startsWith('it')) {
+            connector = ' alle ';
+          } else if (userLocale.startsWith('pt')) {
+            connector = ' às ';
+          } else if (userLocale.startsWith('ru')) {
+            connector = ' в ';
+          } else if (userLocale.startsWith('ja')) {
+            connector = ' ';
+          } else if (userLocale.startsWith('zh')) {
+            connector = ' ';
+          } else if (userLocale.startsWith('ko')) {
+            connector = ' ';
+          }
+          
+          result = `${dateString}${connector}${result}`;
+        }
+        
         console.log('Final result:', result);
         return result;
       } catch (error) {

@@ -202,8 +202,13 @@
             let timeString = `Timestamp: ${item.timestamp}`;
             if (item.published) {
                 try {
-                    const date = new Date(item.published);
-                    timeString = `Published: ${isNaN(date.getTime()) ? item.published : date.toLocaleString()}`;
+                    // Use the timezone manager to format the time in local timezone
+                    if (app.utils.TimezoneManager) {
+                        timeString = `Published: ${app.utils.TimezoneManager.formatLocalTime(item.published)}`;
+                    } else {
+                        const date = new Date(item.published);
+                        timeString = `Published: ${isNaN(date.getTime()) ? item.published : date.toLocaleString()}`;
+                    }
                 } catch (e) {
                     timeString = `Published: ${item.published}`;
                 }
