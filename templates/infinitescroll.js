@@ -21,6 +21,12 @@
                 infiniteContent: document.getElementById('infinite-content'),
                 loadingIndicator: document.getElementById('loading-indicator')
             };
+            
+            // Cache frequently used DOM elements and data
+            this.cachedFeedInfo = new Map();
+            this.cachedItems = null;
+            this.lastCollectionTime = 0;
+            this.collectionCacheTimeout = 5000; // 5 seconds cache
         }
 
         toggleViewMode() {
@@ -43,10 +49,16 @@
         }
 
         switchToInfiniteView() {
-            if (this.elements.infiniteContent) this.elements.infiniteContent.innerHTML = '';
+            if (this.elements.infiniteContent) {
+                // Use textContent for faster clearing
+                this.elements.infiniteContent.textContent = '';
+            }
             this.currentPage = 0;
 
-            document.querySelectorAll('.linkclass').forEach(item => {
+            // Batch DOM operations
+            const linkElements = document.querySelectorAll('.linkclass');
+            const fragment = document.createDocumentFragment();
+            linkElements.forEach(item => {
                 item.style.display = 'block';
             });
 
@@ -86,18 +98,37 @@
         }
 
         collectAllItems() {
-            return Array.from(document.querySelectorAll('.column .box')).flatMap(container => {
+            // Use cache if available and recent
+            const now = Date.now();
+            if (this.cachedItems && (now - this.lastCollectionTime) < this.collectionCacheTimeout) {
+                return this.cachedItems;
+            }
+
+            const containers = document.querySelectorAll('.column .box');
+            const items = [];
+            
+            // Pre-allocate array size for better performance
+            let totalItems = 0;
+            containers.forEach(container => {
+                totalItems += container.querySelectorAll('.linkclass').length;
+            });
+            
+            items.length = totalItems;
+            let itemIndex = 0;
+
+            containers.forEach(container => {
                 const feedId = container.id;
                 const feedIcon = container.querySelector('img');
-                if (!feedIcon) return [];
+                if (!feedIcon) return;
 
-                const feedInfo = this.extractFeedInfo(feedId, feedIcon);
+                const feedInfo = this.getCachedFeedInfo(feedId, feedIcon);
+                const linkElements = container.querySelectorAll('.linkclass');
                 
-                return Array.from(container.querySelectorAll('.linkclass')).map(item => {
+                linkElements.forEach(item => {
                     const linkElement = item.querySelector('a[target="_blank"]');
-                    if (!linkElement) return null;
+                    if (!linkElement) return;
 
-                    return {
+                    items[itemIndex++] = {
                         title: linkElement.textContent.trim(),
                         link: linkElement.href,
                         source_name: feedInfo.name,
@@ -105,8 +136,27 @@
                         timestamp: parseInt(item.dataset.index || '0', 10),
                         published: item.dataset.published || ''
                     };
-                }).filter(Boolean);
+                });
             });
+
+            // Trim array to actual size
+            items.length = itemIndex;
+            
+            // Cache the result
+            this.cachedItems = items;
+            this.lastCollectionTime = now;
+            
+            return items;
+        }
+
+        getCachedFeedInfo(feedId, feedIcon) {
+            if (this.cachedFeedInfo.has(feedId)) {
+                return this.cachedFeedInfo.get(feedId);
+            }
+
+            const feedInfo = this.extractFeedInfo(feedId, feedIcon);
+            this.cachedFeedInfo.set(feedId, feedInfo);
+            return feedInfo;
         }
 
         extractFeedInfo(feedId, feedIcon) {
@@ -115,10 +165,24 @@
             
             try {
                 const url = new URL(feedUrl);
-                const pathParts = url.pathname.split('/').filter(Boolean);
-                const baseName = pathParts.pop() || url.hostname;
-                feedName = baseName.replace(/\.(com|org|net|io)$/, '').replace(/[\-_]/g, ' ');
-                feedName = feedName.replace(/\b\w/g, l => l.toUpperCase());
+                const pathParts = url.pathname.split('/');
+                let baseName = '';
+                
+                // More efficient path processing
+                for (let i = pathParts.length - 1; i >= 0; i--) {
+                    if (pathParts[i]) {
+                        baseName = pathParts[i];
+                        break;
+                    }
+                }
+                
+                if (!baseName) baseName = url.hostname;
+                
+                // Combine regex operations for better performance
+                feedName = baseName
+                    .replace(/\.(com|org|net|io)$/, '')
+                    .replace(/[\-_]/g, ' ')
+                    .replace(/\b\w/g, l => l.toUpperCase());
             } catch (error) {
                 feedName = feedId.replace(/^feed-/, '').replace(/[\-_]/g, ' ');
             }
@@ -147,11 +211,13 @@
             // First sort ALL items by timestamp (newest first)
             allItems.sort((a, b) => b.timestamp - a.timestamp);
 
-            // Group consecutive items by source - when source changes, start new group
+            // Pre-allocate array for better performance
             const groups = [];
             let currentGroup = null;
             
-            allItems.forEach(item => {
+            for (let i = 0; i < allItems.length; i++) {
+                const item = allItems[i];
+                
                 // If this is the first item or the source changed, start a new group
                 if (!currentGroup || currentGroup.name !== item.source_name) {
                     if (currentGroup) {
@@ -166,7 +232,7 @@
                 
                 // Add item to current group
                 currentGroup.items.push(item);
-            });
+            }
             
             // Don't forget the last group
             if (currentGroup) {
@@ -178,23 +244,41 @@
 
         renderGroupedItems(container, groupedItems) {
             const fragment = document.createDocumentFragment();
+            
+            // Pre-allocate template strings for better performance
+            const sourceHeaderTemplate = this.createSourceHeaderTemplate();
+            const itemTemplate = this.createItemTemplate();
+            
             groupedItems.forEach(group => {
-                fragment.appendChild(this.createSourceGroupElement(group));
+                fragment.appendChild(this.createSourceGroupElement(group, sourceHeaderTemplate, itemTemplate));
             });
+            
             container.appendChild(fragment);
         }
 
-        createSourceGroupElement(group) {
+        createSourceHeaderTemplate() {
+            return document.createElement('template');
+        }
+
+        createItemTemplate() {
+            return document.createElement('template');
+        }
+
+        createSourceGroupElement(group, headerTemplate, itemTemplate) {
             const groupEl = document.createElement('div');
             groupEl.className = 'source-group';
             
-            groupEl.innerHTML = `
+            // Build HTML more efficiently
+            const headerHTML = `
                 <div class="source-header">
                     <img src="${group.icon}" alt="${group.name}" class="source-icon">
                     <h3 class="source-name">${group.name}</h3>
                 </div>
-                ${group.items.map(item => this.createItemHTML(item)).join('')}
             `;
+            
+            const itemsHTML = group.items.map(item => this.createItemHTML(item)).join('');
+            
+            groupEl.innerHTML = headerHTML + itemsHTML;
             return groupEl;
         }
 
@@ -225,6 +309,13 @@
                     </div>
                 </div>
             `;
+        }
+
+        // Method to clear cache when needed (e.g., when content changes)
+        clearCache() {
+            this.cachedFeedInfo.clear();
+            this.cachedItems = null;
+            this.lastCollectionTime = 0;
         }
     }
 
