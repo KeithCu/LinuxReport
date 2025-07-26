@@ -207,7 +207,8 @@
                         timeString = `Published: ${app.utils.TimezoneManager.formatLocalTime(item.published)}`;
                     } else {
                         const date = new Date(item.published);
-                        timeString = `Published: ${isNaN(date.getTime()) ? item.published : date.toLocaleString()}`;
+                        const userLocale = navigator.language || 'en-US';
+                        timeString = `Published: ${isNaN(date.getTime()) ? item.published : date.toLocaleString(userLocale)}`;
                     }
                 } catch (e) {
                     timeString = `Published: ${item.published}`;
