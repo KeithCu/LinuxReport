@@ -23,7 +23,7 @@
                 beepEnabled: true
             };
             this.beepSound = null;
-            this.initBeepSound();
+            // Beep sound will be initialized in init() method to avoid CSP issues
             // Bind key methods
             this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
             this.handleResize = app.utils.debounce(this.handleResize.bind(this), app.config.CHAT_RESIZE_DEBOUNCE_DELAY);
@@ -45,13 +45,36 @@
             this.setupEventListeners();
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
             window.addEventListener('resize', this.handleResize);
+            
+            // Initialize beep sound after everything else is set up
+            // This way CSP errors won't prevent chat from working
+            try {
+                this.initBeepSound();
+            } catch (error) {
+                console.warn('[Chat] Beep sound initialization failed, but chat will continue to work:', error.message);
+            }
+            
             return true;
         }
 
         initBeepSound() {
             const loadBeep = () => {
                 if (!this.beepSound) {
-                    this.beepSound = new Audio('data:audio/wav;base64,UklGRlIAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQQAAAAAAAD//w==');
+                    try {
+                        // Try to load beep sound file, but make it completely optional
+                        this.beepSound = new Audio('/static/beep.wav');
+                        // Test if the audio loads successfully
+                        this.beepSound.addEventListener('canplaythrough', () => {
+                            console.log('[Chat] Beep sound loaded successfully');
+                        });
+                        this.beepSound.addEventListener('error', () => {
+                            console.log('[Chat] Beep sound file not found, continuing without beep');
+                            this.beepSound = null;
+                        });
+                    } catch (error) {
+                        console.log('[Chat] Beep sound disabled, continuing without beep');
+                        this.beepSound = null;
+                    }
                 }
             };
             ['click', 'touchstart', 'keydown'].forEach(event => 
@@ -69,7 +92,11 @@
             const eventMap = {
                 'chat-close-btn': { event: 'click', handler: () => this.closeChat() },
                 'chat-toggle-btn': { event: 'click', handler: () => this.toggleChat() },
-                'chat-send-btn': { event: 'click', handler: () => this.sendComment() },
+                'chat-send-btn': { event: 'click', handler: (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.sendComment();
+                }},
                 'chat-message-input': { event: 'keypress', handler: e => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -78,7 +105,7 @@
                 }},
                 'chat-header': { event: 'mousedown', handler: e => this.startDrag(e) },
                 'chat-input-area': {
-                    event: ['dragover', 'dragleave', 'drop'],
+                    event: ['dragover', 'dragleave', 'drop', 'submit'],
                     handler: e => {
                         e.preventDefault();
                         const inputArea = this.elements.get('chat-input-area');
@@ -89,6 +116,9 @@
                                 inputArea.classList.remove('dragover');
                                 const file = e.dataTransfer.files[0];
                                 if (file) this.uploadImage(file);
+                                break;
+                            case 'submit':
+                                this.sendComment();
                                 break;
                         }
                     }
@@ -116,6 +146,13 @@
             this.state.isDragging = true;
             this.state.offsetX = e.clientX - container.offsetLeft;
             this.state.offsetY = e.clientY - container.offsetTop;
+            
+            // TUTORIAL: Inline style for cursor change during drag
+            // This cannot be moved to CSS because:
+            // 1. The cursor state is dynamic and changes based on user interaction
+            // 2. CSS cannot respond to JavaScript state changes (isDragging)
+            // 3. The cursor needs to change immediately when drag starts/stops
+            // Alternative: Could use CSS classes with :active pseudo-selector, but that's less reliable
             container.style.cursor = 'grabbing';
             e.preventDefault();
 
@@ -125,6 +162,12 @@
         stopDrag() {
             if (!this.state.isDragging) return;
             this.state.isDragging = false;
+            
+            // TUTORIAL: Inline style for cursor reset after drag
+            // This cannot be moved to CSS because:
+            // 1. The cursor needs to be reset when drag ends, not on mouse release
+            // 2. CSS :active pseudo-selector only works while mouse is pressed
+            // 3. The cursor state depends on JavaScript drag state, not CSS state
             this.elements.get('chat-container').style.cursor = 'default';
             document.removeEventListener('mousemove', this.handleDrag);
         }
@@ -139,6 +182,13 @@
                 newX = Math.max(0, Math.min(newX, window.innerWidth - container.offsetWidth));
                 newY = Math.max(0, Math.min(newY, window.innerHeight - container.offsetHeight));
 
+                // TUTORIAL: Inline styles for dynamic positioning during drag
+                // These cannot be moved to CSS because:
+                // 1. The position values are calculated dynamically based on mouse movement
+                // 2. CSS cannot access JavaScript variables or perform calculations
+                // 3. The position needs to update in real-time as the user drags
+                // 4. The values depend on window size, container size, and mouse position
+                // Alternative: Could use CSS transforms, but would still need JS for calculations
                 container.style.left = `${newX}px`;
                 container.style.top = `${newY}px`;
             });
@@ -181,6 +231,7 @@
 
             const text = messageInput.value.trim();
             const imageUrl = imageUrlInput.value.trim();
+            
             if (!text && !imageUrl) return;
             
             this.toggleSendButton(true, 'Sending...');
@@ -201,7 +252,9 @@
                 if (data.success) {
                     messageInput.value = '';
                     imageUrlInput.value = '';
-                    if (!app.config.CHAT_USE_SSE) await this.fetchComments();
+                    if (!app.config.CHAT_USE_SSE) {
+                        await this.fetchComments();
+                    }
                 } else {
                     throw new Error(data.error || 'Unknown error');
                 }
@@ -214,12 +267,17 @@
         }
 
         async fetchComments() {
-            if (app.config.CHAT_USE_SSE || this.elements['chat-container'].style.display === 'none') return;
+            const chatContainer = this.elements.get('chat-container');
+            const isHidden = chatContainer.style.display === 'none' || window.getComputedStyle(chatContainer).display === 'none';
+            if (app.config.CHAT_USE_SSE || !chatContainer || isHidden) {
+                return;
+            }
             
             try {
                 const response = await fetch(`/api/comments?_=${Date.now()}`);
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                await this.renderComments(await response.json());
+                const comments = await response.json();
+                await this.renderComments(comments);
             } catch (error) {
                 console.error('Error fetching comments:', error);
             }
@@ -228,13 +286,13 @@
         async renderComments(comments) {
             if (!comments || !Array.isArray(comments)) return;
             
-            const messagesContainer = this.elements['chat-messages'];
+            const messagesContainer = this.elements.get('chat-messages');
             if (!messagesContainer) return;
 
             // Hide loading message once we have comments
-            const loadingElement = this.elements['chat-loading'];
+            const loadingElement = this.elements.get('chat-loading');
             if (loadingElement && comments.length > 0) {
-                loadingElement.style.display = 'none';
+                loadingElement.classList.add('hide');
             }
 
             // Check for new comments
@@ -261,12 +319,7 @@
 
         createMessageElement(comment) {
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'chat-message';
-            messageDiv.style.margin = '8px 0';
-            messageDiv.style.padding = '8px';
-            messageDiv.style.borderRadius = '8px';
-            messageDiv.style.backgroundColor = comment.is_own ? 'var(--accent)' : 'var(--bg-secondary)';
-            messageDiv.style.color = comment.is_own ? 'white' : 'var(--text)';
+            messageDiv.className = `chat-message ${comment.is_own ? 'chat-message-own' : 'chat-message-other'}`;
             
             const textDiv = document.createElement('div');
             textDiv.textContent = comment.text;
@@ -275,24 +328,13 @@
             if (comment.image_url) {
                 const img = document.createElement('img');
                 img.src = comment.image_url;
-                img.style.maxWidth = '200px';
-                img.style.maxHeight = '200px';
-                img.style.marginTop = '8px';
-                img.style.borderRadius = '4px';
                 messageDiv.appendChild(img);
             }
             
             if (this.state.isAdminMode && comment.id) {
                 const deleteBtn = document.createElement('button');
                 deleteBtn.textContent = '✕';
-                deleteBtn.style.marginTop = '4px';
-                deleteBtn.style.fontSize = '1.2em';
-                deleteBtn.style.padding = '0';
-                deleteBtn.style.background = 'none';
-                deleteBtn.style.border = 'none';
-                deleteBtn.style.color = 'var(--muted, #888)';
-                deleteBtn.style.cursor = 'pointer';
-                deleteBtn.style.lineHeight = '1';
+                deleteBtn.className = 'chat-delete-btn';
                 deleteBtn.title = 'Delete';
                 deleteBtn.addEventListener('click', (e) => this.handleDelete(e, comment.id));
                 messageDiv.appendChild(deleteBtn);
@@ -356,24 +398,29 @@
             } else {
                 // Only reconnect if chat is currently visible
                 const container = this.elements.get('chat-container');
-                if (container) {
-                    const computedStyle = getComputedStyle(container);
-                    if (computedStyle.display !== 'none') {
-                        this.initializeSSE();
-                        if (!app.config.CHAT_USE_SSE) {
-                            this.fetchComments();
-                        }
+                if (container && !container.classList.contains('hide')) {
+                    this.initializeSSE();
+                    if (!app.config.CHAT_USE_SSE) {
+                        this.fetchComments();
                     }
                 }
             }
         }
 
         handleResize() {
-            const container = this.elements['chat-container'];
+            const container = this.elements.get('chat-container');
             if (!container) return;
             
             // Ensure chat stays within viewport bounds
             const rect = container.getBoundingClientRect();
+            
+            // TUTORIAL: Inline styles for viewport boundary correction
+            // These cannot be moved to CSS because:
+            // 1. The position values are calculated based on viewport size and element size
+            // 2. CSS cannot access window.innerWidth or getBoundingClientRect()
+            // 3. The correction only happens when the element goes outside viewport bounds
+            // 4. The values are dynamic and depend on current window size
+            // Alternative: Could use CSS position: fixed with max-width/max-height, but less precise
             if (rect.right > window.innerWidth) {
                 container.style.left = `${window.innerWidth - rect.width}px`;
             }
@@ -383,13 +430,25 @@
         }
 
         closeChat() {
-            this.elements.get('chat-container').style.display = 'none';
+            const container = this.elements.get('chat-container');
+            container.style.display = 'none';
             this.cleanup();
+        }
+
+        startChatSession() {
+            // Initialize chat session
+            this.initializeSSE();
+            if (!app.config.CHAT_USE_SSE) {
+                this.fetchComments();
+            }
         }
 
         toggleChat() {
             const container = this.elements.get('chat-container');
-            const isVisible = container.style.display !== 'none';
+            // Check both inline style and computed style to handle CSS vs inline conflicts
+            const inlineDisplay = container.style.display;
+            const computedDisplay = window.getComputedStyle(container).display;
+            const isVisible = inlineDisplay !== 'none' && computedDisplay !== 'none';
 
             if (isVisible) {
                 this.closeChat();
@@ -410,10 +469,22 @@
             }
         }
 
+        toggleSendButton(disabled, text) {
+            const sendBtn = this.elements.get('chat-send-btn');
+            if (sendBtn) {
+                sendBtn.disabled = disabled;
+                sendBtn.textContent = text;
+            }
+        }
+
         playBeep() {
             if (this.beepSound && this.state.beepEnabled) {
-                this.beepSound.play().catch(() => {});
+                this.beepSound.play().catch((error) => {
+                    // Silently ignore beep sound errors - it's optional
+                    console.log('[Chat] Beep sound not available');
+                });
             }
+            // If no beep sound, just continue silently - it's optional
         }
     }
 

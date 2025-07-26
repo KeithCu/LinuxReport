@@ -372,13 +372,14 @@
       container.addEventListener('dragstart', e => {
         if (e.target.matches(itemSelector)) {
           draggedItem = e.target;
-          draggedItem.style.opacity = app.config.DRAG_OPACITY;
+          draggedItem.classList.add('dragging');
         }
       });
 
       container.addEventListener('dragend', e => {
         if (draggedItem) {
-          draggedItem.style.opacity = app.config.DRAG_OPACITY_NORMAL;
+          draggedItem.classList.remove('dragging');
+          draggedItem.classList.add('dragging-normal');
           draggedItem = null;
         }
       });

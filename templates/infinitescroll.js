@@ -52,13 +52,25 @@
 
             this.loadInfiniteContent();
 
-            if (this.elements.row) this.elements.row.style.display = 'none';
-            if (this.elements.infiniteContainer) this.elements.infiniteContainer.style.display = 'block';
+            if (this.elements.row) {
+                this.elements.row.classList.remove('show-flex');
+                this.elements.row.classList.add('hide');
+            }
+            if (this.elements.infiniteContainer) {
+                this.elements.infiniteContainer.classList.remove('hide');
+                this.elements.infiniteContainer.classList.add('show');
+            }
         }
 
         switchToColumnView() {
-            if (this.elements.row) this.elements.row.style.display = 'flex';
-            if (this.elements.infiniteContainer) this.elements.infiniteContainer.style.display = 'none';
+            if (this.elements.row) {
+                this.elements.row.classList.remove('hide');
+                this.elements.row.classList.add('show-flex');
+            }
+            if (this.elements.infiniteContainer) {
+                this.elements.infiniteContainer.classList.remove('show');
+                this.elements.infiniteContainer.classList.add('hide');
+            }
         }
 
         loadInfiniteContent() {
@@ -146,10 +158,9 @@
             const groupEl = document.createElement('div');
             groupEl.className = 'source-group';
             
-            // Note: Inline styles should be moved to a stylesheet for maintainability.
             groupEl.innerHTML = `
-                <div class="source-header" style="display: flex; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid var(--btn-border);">
-                    <img src="${group.icon}" alt="${group.name}" class="source-icon" style="width: 64px; height: 64px; margin-right: 16px; border-radius: 8px; object-fit: contain;">
+                <div class="source-header">
+                    <img src="${group.icon}" alt="${group.name}" class="source-icon">
                     <h3 class="source-name">${group.name}</h3>
                 </div>
                 ${group.items.map(item => this.createItemHTML(item)).join('')}
@@ -168,13 +179,12 @@
                 }
             }
             
-            // Note: Inline styles should be moved to a stylesheet for maintainability.
             return `
-                <div class="infinite-item" style="margin: 10px 0; padding: 8px 0; border-bottom: 1px solid var(--btn-border);">
-                    <div class="item-title" style="text-align: left;">
-                        <a href="${item.link}" target="_blank" style="color: var(--link); text-decoration: none; font-size: 1.1em;">${item.title}</a>
+                <div class="infinite-item">
+                    <div class="item-title">
+                        <a href="${item.link}" target="_blank">${item.title}</a>
                     </div>
-                    <div class="item-time" style="font-size: 0.8em; color: var(--text-secondary); margin-top: 4px; text-align: right;">
+                    <div class="item-time">
                         ${timeString}
                     </div>
                 </div>

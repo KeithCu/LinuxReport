@@ -58,7 +58,9 @@
 
     class PaginationManager {
         static init() {
-            document.querySelectorAll('.pagination-controls').forEach(feedControls => {
+            const paginationControls = document.querySelectorAll('.pagination-controls');
+            
+            paginationControls.forEach(feedControls => {
                 new PaginationManager(feedControls);
             });
         }
@@ -79,8 +81,12 @@
         }
 
         setupEventListeners() {
-            if (this.prevBtn) this.prevBtn.addEventListener('click', () => this.previousPage());
-            if (this.nextBtn) this.nextBtn.addEventListener('click', () => this.nextPage());
+            if (this.prevBtn) {
+                this.prevBtn.addEventListener('click', () => this.previousPage());
+            }
+            if (this.nextBtn) {
+                this.nextBtn.addEventListener('click', () => this.nextPage());
+            }
         }
 
         previousPage() {
@@ -103,7 +109,13 @@
 
             this.items.forEach((item, i) => {
                 const isVisible = i >= startIdx && i < endIdx;
-                item.style.display = isVisible ? 'block' : 'none';
+                if (isVisible) {
+                    item.classList.remove('hide');
+                    item.classList.add('show');
+                } else {
+                    item.classList.remove('show');
+                    item.classList.add('hide');
+                }
             });
 
             if (this.prevBtn) this.prevBtn.disabled = this.currentPage === 0;

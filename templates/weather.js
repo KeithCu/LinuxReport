@@ -51,9 +51,22 @@
                 if (isCollapsed) {
                     widgetWrapper.classList.add('collapsed');
                     // Keep container hidden when collapsed
+                    // TUTORIAL: Inline style for initial collapsed state
+                    // This cannot be moved to CSS because:
+                    // 1. The collapsed state is determined by JavaScript (cookie check)
+                    // 2. CSS cannot read cookies or JavaScript variables
+                    // 3. The initial state needs to be set before CSS classes are applied
+                    // 4. This ensures the container is hidden immediately on page load
+                    // Alternative: Could use CSS :not(.collapsed) selectors, but less reliable for initial state
                     container.style.display = 'none';
                 } else {
                     // Show the container and start loading if not collapsed
+                    // TUTORIAL: Inline styles for initial visible state
+                    // These cannot be moved to CSS because:
+                    // 1. The visibility state depends on JavaScript cookie check
+                    // 2. CSS cannot conditionally apply styles based on JavaScript state
+                    // 3. The container needs to be visible immediately for proper layout
+                    // 4. This ensures smooth initial rendering without flash of hidden content
                     container.style.display = 'block';
                     container.style.visibility = 'visible';
                 }
@@ -88,7 +101,7 @@
             const collapsedLabel = this.elements.get('weather-collapsed-label');
             
             if (widgetWrapper) widgetWrapper.classList.remove('collapsed');
-            if (content) content.style.display = '';
+            if (content) content.style.display = 'block';
             if (toggleBtn) toggleBtn.style.display = 'none';
             if (collapsedLabel) collapsedLabel.style.display = 'none';
         }
@@ -271,6 +284,8 @@
             const container = this.elements.get('weather-container');
             
             console.log('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
+            console.log('[Weather] Forecast element:', forecast);
+            console.log('[Weather] Forecast element ID:', forecast?.id);
             
             if (!forecast || !header) return;
 
@@ -294,13 +309,12 @@
                 container.style.visibility = 'visible';
             }
             
-            // Force horizontal layout with inline styles
+            // Apply horizontal layout using CSS class
             if (forecast) {
-                forecast.style.display = 'flex';
-                forecast.style.flexDirection = 'row';
-                forecast.style.flexWrap = 'nowrap';
-                forecast.style.width = 'max-content';
-                console.log('[Weather] Applied inline styles for horizontal layout');
+                forecast.classList.add('weather-forecast-horizontal');
+                console.log('[Weather] Applied CSS class for horizontal layout');
+                console.log('[Weather] Forecast element classes:', forecast.className);
+                console.log('[Weather] Forecast computed style:', getComputedStyle(forecast).display);
             }
         }
 

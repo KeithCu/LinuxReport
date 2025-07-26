@@ -18,6 +18,9 @@
   --btn-hover-bg: #C0C0C0;
   --btn-hover-text: #FFFFFF;
   
+  /* Secondary text color */
+  --text-secondary: #666666;
+  
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -51,6 +54,7 @@
   --btn-text: #3b5971;
   --btn-hover-bg: #0078D7;
   --btn-hover-text: #ffffff;
+  --text-secondary: #666666;
 }
 
 [data-theme="paper"] {
@@ -62,6 +66,7 @@
   --btn-text: #333333;
   --btn-hover-bg: #e6e6e6;
   --btn-hover-text: #333333;
+  --text-secondary: #666666;
 }
 
 [data-theme="silver"] {
@@ -73,6 +78,7 @@
   --btn-text: #000000;
   --btn-hover-bg: #C0C0C0;
   --btn-hover-text: #FFFFFF;
+  --text-secondary: #666666;
 }
 
 [data-theme="retro"] {
@@ -84,6 +90,7 @@
   --btn-text: #90ee90;
   --btn-hover-bg: #ff69b4;
   --btn-hover-text: #000000;
+  --text-secondary: #90ee90;
 }
 
 [data-theme="dark"] {
@@ -95,6 +102,7 @@
   --btn-text: #d4d4d4;
   --btn-hover-bg: #505050;
   --btn-hover-text: #ffffff;
+  --text-secondary: #a0a0a0;
 }
 
 [data-theme="monokai"] {
@@ -106,6 +114,7 @@
   --btn-text: #e2e8f0;
   --btn-hover-bg: #f92672;
   --btn-hover-text: #272822;
+  --text-secondary: #a0a0a0;
 }
 
 [data-theme="futuristic"] {
@@ -117,6 +126,7 @@
   --btn-text: #7fbfbf;
   --btn-hover-bg: #0f0;
   --btn-hover-text: #000;
+  --text-secondary: #5f9f9f;
 }
 
 [data-theme="cyberpunk"] {
@@ -128,6 +138,7 @@
   --btn-text: #c080c0;
   --btn-hover-bg: #00ffff;
   --btn-hover-text: #1e001f;
+  --text-secondary: #a060a0;
 }
 
 [data-theme="midnight"] {
@@ -139,6 +150,7 @@
   --btn-text: #cbd5e1;
   --btn-hover-bg: #4f46e5;
   --btn-hover-text: #ffffff;
+  --text-secondary: #94a3b8;
 }
 
 [data-theme="ocean"] {
@@ -150,6 +162,7 @@
   --btn-text: #cbd5e1;
   --btn-hover-bg: #1d4ed8;
   --btn-hover-text: #ffffff;
+  --text-secondary: #94a3b8;
 }
 
 [data-theme="nord"] {
@@ -161,6 +174,7 @@
   --btn-text: #d8dee9;
   --btn-hover-bg: #5e81ac;
   --btn-hover-text: #2e3440;
+  --text-secondary: #a0a0a0;
 }
 
 [data-theme="forest"] {
@@ -172,6 +186,7 @@
   --btn-text: #E0EBD8;
   --btn-hover-bg: #A3B18A;
   --btn-hover-text: #2E4A2E;
+  --text-secondary: #B8C5A8;
 }
 
 [data-theme="steampunk"] {
@@ -183,6 +198,7 @@
   --btn-text: #d5c1a1;
   --btn-hover-bg: #a67c52;
   --btn-hover-text: #2b1b0e;
+  --text-secondary: #b8a890;
 }
 
 [data-theme="autumn"] {
@@ -194,6 +210,7 @@
   --btn-text: #f5deb3;
   --btn-hover-bg: #cd853f;
   --btn-hover-text: #2c1810;
+  --text-secondary: #deb887;
 }
 
 [data-theme="sepia"] {
@@ -205,6 +222,7 @@
   --btn-text: #FFF8E7;
   --btn-hover-bg: #8B4513;
   --btn-hover-text: #FFF8E7;
+  --text-secondary: #D2B48C;
 }
 
 [data-theme="solarized"] {
@@ -216,6 +234,7 @@
   --btn-text: #586e75;
   --btn-hover-bg: #b58900;
   --btn-hover-text: #fdf6e3;
+  --text-secondary: #839496;
 }
 
 [data-theme="pastelle"] {
@@ -227,6 +246,7 @@
   --btn-text: #4B3621;
   --btn-hover-bg: #FFA07A;
   --btn-hover-text: #FFFFFF;
+  --text-secondary: #8B7355;
 }
 
 [data-theme="neon"] {
@@ -238,6 +258,7 @@
   --btn-text: #90ee90;
   --btn-hover-bg: #ff69b4;
   --btn-hover-text: #000000;
+  --text-secondary: #70ce70;
 }
 
 [data-theme="terminal"] {
@@ -249,6 +270,7 @@
   --btn-text: #90ee90;
   --btn-hover-bg: #003300;
   --btn-hover-text: #90ee90;
+  --text-secondary: #70ce70;
 }
 
 /* =============================================================================
@@ -342,6 +364,7 @@ code {
   margin-bottom: var(--spacing-sm);
   font-size: large;
   line-height: 1.2;
+  display: block;
 }
 
 .linkclass a,
@@ -1043,7 +1066,127 @@ textarea:focus {
 }
 
 /* =============================================================================
-   16. RESPONSIVE DESIGN
+   16. JAVASCRIPT-GENERATED ELEMENTS
+   ============================================================================= */
+
+/* Chat message styles */
+.chat-message {
+  margin: 8px 0;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.chat-message-own {
+  background-color: var(--accent);
+  color: white;
+}
+
+.chat-message-other {
+  background-color: var(--bg-secondary);
+  color: var(--text);
+}
+
+.chat-message img {
+  max-width: 200px;
+  max-height: 200px;
+  margin-top: 8px;
+  border-radius: 4px;
+}
+
+.chat-delete-btn {
+  margin-top: 4px;
+  font-size: 1.2em;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--muted, #888);
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* Weather forecast horizontal layout */
+.weather-forecast-horizontal {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  width: max-content !important;
+}
+
+/* Infinite scroll elements */
+.source-group {
+  /* Container for source groups */
+}
+
+.source-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--btn-border);
+}
+
+.source-icon {
+  width: 64px;
+  height: 64px;
+  margin-right: 16px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.infinite-item {
+  margin: 10px 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--btn-border);
+}
+
+.item-title {
+  text-align: left;
+}
+
+.item-title a {
+  color: var(--link);
+  text-decoration: none;
+  font-size: 1.1em;
+}
+
+.item-time {
+  font-size: 0.8em;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  text-align: right;
+}
+
+/* Drag and drop styles */
+.dragging {
+  opacity: 0.9;
+}
+
+.dragging-normal {
+  opacity: 1;
+}
+
+/* Utility classes for show/hide */
+.show {
+  display: block !important;
+}
+
+.hide {
+  display: none !important;
+}
+
+.show-flex {
+  display: flex;
+}
+
+.show-visible {
+  display: block;
+  visibility: visible;
+}
+
+
+
+/* =============================================================================
+   17. RESPONSIVE DESIGN
    ============================================================================= */
 
 @media (max-width: 768px) {
@@ -1107,7 +1250,7 @@ textarea:focus {
 }
 
 /* =============================================================================
-   17. ACCESSIBILITY & FOCUS STATES
+   18. ACCESSIBILITY & FOCUS STATES
    ============================================================================= */
 
 /* Focus indicators for better accessibility */
