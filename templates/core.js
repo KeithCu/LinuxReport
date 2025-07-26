@@ -118,8 +118,11 @@
                 }
             });
 
-            if (this.prevBtn) this.prevBtn.disabled = this.currentPage === 0;
-            if (this.nextBtn) this.nextBtn.disabled = this.currentPage >= this.totalPages - 1;
+            const isFirstPage = this.currentPage === 0;
+            const isLastPage = this.currentPage >= this.totalPages - 1;
+            
+            if (this.prevBtn) this.prevBtn.disabled = isFirstPage;
+            if (this.nextBtn) this.nextBtn.disabled = isLastPage;
         }
     }
 

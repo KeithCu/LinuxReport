@@ -336,8 +336,11 @@
         getDayName(day) {
             const date = new Date(day.dt * 1000);
             const today = new Date();
-            return date.toDateString() === today.toDateString() ? 'Today' : 
-                   date.toLocaleDateString(navigator.language || app.config.DEFAULT_LOCALE, { weekday: 'short' });
+            const isToday = date.toDateString() === today.toDateString();
+            const userLocale = navigator.language || app.config.DEFAULT_LOCALE;
+            
+            return isToday ? 'Today' : 
+                   date.toLocaleDateString(userLocale, { weekday: 'short' });
         }
 
         setCollapsed(isCollapsed, saveCookie = false) {

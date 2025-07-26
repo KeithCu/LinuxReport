@@ -55,9 +55,7 @@
             }
             this.currentPage = 0;
 
-            // Batch DOM operations
             const linkElements = document.querySelectorAll('.linkclass');
-            const fragment = document.createDocumentFragment();
             linkElements.forEach(item => {
                 item.style.display = 'block';
             });
@@ -215,7 +213,9 @@
             const groups = [];
             let currentGroup = null;
             
-            for (let i = 0; i < allItems.length; i++) {
+            const itemsLength = allItems.length;
+            
+            for (let i = 0; i < itemsLength; i++) {
                 const item = allItems[i];
                 
                 // If this is the first item or the source changed, start a new group

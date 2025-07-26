@@ -53,7 +53,8 @@
         }
 
         updatePriorities() {
-            document.querySelectorAll('.url-entry').forEach((entry, index) => {
+            const urlEntries = document.querySelectorAll('.url-entry');
+            urlEntries.forEach((entry, index) => {
                 const priorityInput = entry.querySelector('input[type="number"]');
                 if (priorityInput) priorityInput.value = (index + 1) * app.config.PRIORITY_MULTIPLIER;
             });

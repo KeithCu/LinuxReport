@@ -162,8 +162,10 @@
   app.utils.CookieManager = {
     get(name) {
       const cookies = document.cookie.split(';');
-      for (let cookie of cookies) {
-        const trimmedCookie = cookie.trim();
+      const cookiesLength = cookies.length;
+      
+      for (let i = 0; i < cookiesLength; i++) {
+        const trimmedCookie = cookies[i].trim();
         const separatorIndex = trimmedCookie.indexOf('=');
         if (separatorIndex === -1) continue;
 
@@ -379,7 +381,9 @@
      * Initialize timezone conversion for all last-updated elements
      */
     init() {
-      document.querySelectorAll('.last-updated-time').forEach(element => {
+      // Cache the querySelectorAll result to avoid repeated DOM queries
+      const timeElements = document.querySelectorAll('.last-updated-time');
+      timeElements.forEach(element => {
         const utcTime = element.getAttribute('data-utc-time');
         console.log('Processing time element:', element, 'UTC time:', utcTime);
         if (utcTime) {
