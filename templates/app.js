@@ -293,9 +293,8 @@
           hour12: true
         });
         
-        // Get timezone name
-        const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const timezoneAbbr = this.getTimezoneAbbreviation(timezoneName);
+        // Get timezone abbreviation
+        const timezoneAbbr = this.getTimezoneAbbreviation();
         
         return `${timeString} ${timezoneAbbr}`;
       } catch (error) {
@@ -305,11 +304,10 @@
     },
 
     /**
-     * Get timezone abbreviation from timezone name
-     * @param {string} timezoneName - Full timezone name
+     * Get timezone abbreviation
      * @returns {string} Timezone abbreviation
      */
-    getTimezoneAbbreviation(timezoneName) {
+    getTimezoneAbbreviation() {
       try {
         const date = new Date();
         const options = { timeZoneName: 'short' };
@@ -317,24 +315,9 @@
         
         // Extract timezone abbreviation from the formatted string
         const match = timeZoneString.match(/\s([A-Z]{3,4})$/);
-        if (match) {
-          return match[1];
-        }
-        
-        // Fallback: try to get timezone offset
-        const offset = date.getTimezoneOffset();
-        const hours = Math.abs(Math.floor(offset / 60));
-        const minutes = Math.abs(offset % 60);
-        const sign = offset <= 0 ? '+' : '-';
-        
-        if (minutes === 0) {
-          return `GMT${sign}${hours.toString().padStart(2, '0')}`;
-        } else {
-          return `GMT${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-        }
+        return match ? match[1] : 'Local';
       } catch (error) {
-        // Final fallback: simplified timezone name
-        return timezoneName.split('/').pop().replace(/_/g, ' ');
+        return 'Local';
       }
     },
 
