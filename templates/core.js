@@ -124,6 +124,9 @@
                 infiniteScrollManager = app.modules.infiniteScroll.create();
             }
 
+            // Initialize timezone conversion for last-updated times
+            app.utils.TimezoneManager.init();
+
             this.setupEventListeners();
         },
 

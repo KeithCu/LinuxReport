@@ -1,7 +1,8 @@
 <div class="box" id="feed-{{ feed_id }}">
 <center><a target="_blank" href="{{ link }}"><img loading="lazy" src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height:100px;"/></a></center>
   <center>
-    <small>Last updated: {{ last_fetch }}</small>
+    <small>Last updated (your time): <span class="last-updated-time" data-utc-time="{{ last_fetch }}">Loading...</span></small>
+    <!-- Time is automatically converted from server timezone to your browser's local timezone -->
   </center>
   <div class="pagination-controls" data-feed-id="feed-{{ feed_id }}">
     <button class="prev-btn" disabled>&lt;</button>

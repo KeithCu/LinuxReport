@@ -269,6 +269,99 @@
     }
   };
 
+  app.utils.TimezoneManager = {
+    /**
+     * Convert UTC ISO timestamp to local timezone display format
+     * @param {string} utcTime - UTC ISO timestamp string
+     * @returns {string} Formatted time in local timezone with timezone name
+     */
+    formatLocalTime(utcTime) {
+      if (!utcTime || utcTime === 'Unknown') {
+        return 'Unknown';
+      }
+      
+      try {
+        const date = new Date(utcTime);
+        if (isNaN(date.getTime())) {
+          return 'Invalid time';
+        }
+        
+        // Format as 12-hour time with AM/PM and timezone
+        const timeString = date.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        
+        // Get timezone name
+        const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const timezoneAbbr = this.getTimezoneAbbreviation(timezoneName);
+        
+        return `${timeString} ${timezoneAbbr}`;
+      } catch (error) {
+        console.error('Error formatting time:', error);
+        return 'Error';
+      }
+    },
+
+    /**
+     * Get timezone abbreviation from timezone name
+     * @param {string} timezoneName - Full timezone name
+     * @returns {string} Timezone abbreviation
+     */
+    getTimezoneAbbreviation(timezoneName) {
+      try {
+        const date = new Date();
+        const options = { timeZoneName: 'short' };
+        const timeZoneString = date.toLocaleString('en-US', options);
+        
+        // Extract timezone abbreviation from the formatted string
+        const match = timeZoneString.match(/\s([A-Z]{3,4})$/);
+        if (match) {
+          return match[1];
+        }
+        
+        // Fallback: try to get timezone offset
+        const offset = date.getTimezoneOffset();
+        const hours = Math.abs(Math.floor(offset / 60));
+        const minutes = Math.abs(offset % 60);
+        const sign = offset <= 0 ? '+' : '-';
+        
+        if (minutes === 0) {
+          return `GMT${sign}${hours.toString().padStart(2, '0')}`;
+        } else {
+          return `GMT${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+      } catch (error) {
+        // Final fallback: simplified timezone name
+        return timezoneName.split('/').pop().replace(/_/g, ' ');
+      }
+    },
+
+    /**
+     * Initialize timezone conversion for all last-updated elements
+     */
+    init() {
+      document.querySelectorAll('.last-updated-time').forEach(element => {
+        const utcTime = element.getAttribute('data-utc-time');
+        if (utcTime) {
+          element.textContent = this.formatLocalTime(utcTime);
+        }
+      });
+    },
+
+    /**
+     * Convert timezone for a specific element (for dynamic content)
+     * @param {Element} element - The element containing the time
+     */
+    convertElement(element) {
+      const utcTime = element.getAttribute('data-utc-time');
+      if (utcTime) {
+        element.textContent = this.formatLocalTime(utcTime);
+      }
+    }
+  };
+
   app.utils.DragDropManager = {
     init(options) {
       const { containerSelector, itemSelector, onDrop } = options;
