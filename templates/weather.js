@@ -179,9 +179,10 @@
                                  
                                  // Check if user explicitly denied permission
                                  if (geolocationError.code === 1) { // PERMISSION_DENIED
-                                     console.log('[Weather] User denied geolocation permission, using default location');
+                                     console.log('[Weather] User denied geolocation permission, letting server use fallback');
                                      userDeniedPermission = true;
-                                     location = { lat: 42.3314, lon: -83.0458, source: 'default' }; // Detroit coordinates
+                                     // Don't send any coordinates - let the server use its own fallback logic
+                                     location = { lat: null, lon: null, source: 'denied_permission' };
                                      break;
                                  } else if (geolocationError.code === 2) { // POSITION_UNAVAILABLE
                                      console.log(`[Weather] Position unavailable (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
@@ -205,15 +206,19 @@
                         console.log('[Weather] Using cached location from headers:', location);
                     }
                     
-                    // Build URL with location parameters
-                    const params = new URLSearchParams({
-                        units: useMetric ? 'metric' : 'imperial'
-                    });
-                    
-                    // Add location parameters (we know they're valid now)
-                    params.append('lat', location.lat);
-                    params.append('lon', location.lon);
-                    console.log('[Weather] Sending coordinates to server:', location.lat, location.lon);
+                                         // Build URL with location parameters
+                     const params = new URLSearchParams({
+                         units: useMetric ? 'metric' : 'imperial'
+                     });
+                     
+                     // Add location parameters only if we have valid coordinates and user didn't deny permission
+                     if (location.lat !== null && location.lon !== null && location.source !== 'denied_permission') {
+                         params.append('lat', location.lat);
+                         params.append('lon', location.lon);
+                         console.log('[Weather] Sending coordinates to server:', location.lat, location.lon);
+                     } else {
+                         console.log('[Weather] No coordinates to send, server will use fallback location');
+                     }
                     
                     // Add cache busting parameter with current date and hour
                     const now = new Date();
