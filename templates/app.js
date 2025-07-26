@@ -104,7 +104,7 @@
      * @returns {Promise<{lat: number, lon: null}>} - Returns null for lon when geolocation fails
      */
             _requestLocation() {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                         if (!navigator.geolocation) {
             // console.log('Geolocation not supported, using IP-based location');
             resolve({ lat: null, lon: null });
@@ -126,8 +126,8 @@
                     },
                     (error) => {
                         console.log('Geolocation failed:', error.message, 'Code:', error.code);
-                        // Return null coordinates to indicate geolocation failure
-                        resolve({ lat: null, lon: null });
+                        // Reject with the error so the caller can check the error code
+                        reject(error);
                     },
                     options
                 );
