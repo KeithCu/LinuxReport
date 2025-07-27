@@ -91,6 +91,8 @@ _geoip_reader = None
 
 WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 
+
+
 # =============================================================================
 # GEOLOCATION CACHING
 # =============================================================================
@@ -484,37 +486,39 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     Returns:
         tuple: (data, status_code) where data includes 'fetch_time' when the data was fetched from the API
     """
-    # If coordinates are provided, use them directly and cache them
+    # If coordinates are provided, use them directly and cache them (unless client geolocation is disabled)
     if lat is not None and lon is not None:
         try:
             lat = float(lat)
             lon = float(lon)
-            # Cache the provided coordinates for this IP
-            if ip:
+            # Only cache the provided coordinates if client geolocation is enabled
+            if ip and not DISABLE_CLIENT_GEOLOCATION:
                 save_geolocation_cache(ip, lat, lon, 'client')
         except (ValueError, TypeError):
             lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
     else:
-        # No coordinates provided - try cached location first, then fallback
+        # No coordinates provided - handle based on IP availability and settings
         if ip:
-            lat, lon = get_cached_geolocation(ip)
-            if lat is None or lon is None:
-                # No cached location, handle fallback based on DISABLE_IP_GEOLOCATION setting
-                if DISABLE_IP_GEOLOCATION:
-                    # When IP geolocation is disabled, always use Detroit coordinates
-                    lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
-                else:
-                    # When IP geolocation is enabled, try IP-based location with Detroit fallback
-                    lat, lon = get_location_from_ip(ip)
-                    if not lat or not lon:
-                        lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
-                    # Cache the IP-based location
-                    save_geolocation_cache(ip, lat, lon, 'ip')
+            if DISABLE_CLIENT_GEOLOCATION:
+                # Skip cache when client geolocation disabled
+                print(f"[DEBUG] Client geolocation disabled - skipping cached location check for IP: {ip}")
+                lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON if DISABLE_IP_GEOLOCATION else get_location_from_ip(ip)
             else:
-                # Use cached location
-                pass
+                # Try cache first, then fallback
+                lat, lon = get_cached_geolocation(ip)
+                if lat is None or lon is None:
+                    lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON if DISABLE_IP_GEOLOCATION else get_location_from_ip(ip)
+                    if not DISABLE_CLIENT_GEOLOCATION:
+                        save_geolocation_cache(ip, lat, lon, 'ip')
+            
+            # Common fallback for both paths
+            if not lat or not lon:
+                lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
         else:
+            # No IP available, use Detroit coordinates
             lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
+            if DISABLE_CLIENT_GEOLOCATION:
+                print(f"[DEBUG] Client geolocation disabled - using Detroit coordinates")
 
     # Convert coordinates to float if they're strings
     try:
@@ -810,7 +814,7 @@ def init_weather_routes(app):
                     ip = None
                     print(f"[DEBUG] Using provided coordinates: lat={lat}, lon={lon}")
             
-            weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=request.remote_addr, units=units)
+            weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
             
             # Log the result for debugging
             if weather_data and 'city_name' in weather_data:

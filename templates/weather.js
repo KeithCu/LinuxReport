@@ -168,14 +168,16 @@
                     app.utils.logger.debug('[Weather] Starting fetch...');
                     const startTime = performance.now();
                     
-                    // Check for cached location in response headers first
-                    let location = this.getCachedLocation();
-                    
-                    // Check if client geolocation is disabled
+                    // Check if client geolocation is disabled first
+                    let location;
                     if (app.config.DISABLE_CLIENT_GEOLOCATION) {
-                        app.utils.logger.debug('[Weather] Client geolocation disabled, not attempting browser geolocation');
+                        app.utils.logger.debug('[Weather] Client geolocation disabled, skipping cached location check and browser geolocation');
                         location = { lat: null, lon: null, source: 'client_disabled' };
-                    } else if (!location || location.lat === null || location.lon === null) {
+                    } else {
+                        // Only check for cached location if client geolocation is enabled
+                        location = this.getCachedLocation();
+                        
+                        if (!location || location.lat === null || location.lon === null) {
                         // No cached location, get user's geolocation
                         app.utils.logger.debug('[Weather] Getting location...');
                         let geolocationAttempts = 0;
@@ -226,6 +228,7 @@
                         }
                     } else {
                         app.utils.logger.debug('[Weather] Using cached location from headers:', location);
+                    }
                     }
                     
                                          // Build URL with location parameters
