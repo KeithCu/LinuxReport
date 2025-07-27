@@ -22,7 +22,8 @@ def update_performance_stats(render_time, current_time):
         "times": [],
         "count": 0,
         "hourly_requests": {},  # Track requests per hour
-        "first_request_time": current_time
+        "first_request_time": current_time,
+        "last_cleanup_hour": None  # Track when we last cleaned up
     }
     
     # Use hour since epoch for consistent tracking
@@ -35,9 +36,26 @@ def update_performance_stats(render_time, current_time):
     # Update hourly request count
     stats["hourly_requests"][current_hour] += 1
     
-    # Clean up old hourly data (keep last 24 hours)
-    old_hour = current_hour - 24
-    stats["hourly_requests"] = {h: count for h, count in stats["hourly_requests"].items() if h > old_hour}
+    # Only clean up old hourly data when we've moved to a new hour
+    # This reduces cleanup from every request to once per hour
+    last_cleanup_hour = stats.get("last_cleanup_hour")
+    if last_cleanup_hour != current_hour:
+        old_hour = current_hour - 24
+        hourly_requests = stats["hourly_requests"]
+        
+        # Only clean up if we have old data to remove
+        if hourly_requests:
+            # Find keys to remove (more efficient than dict comprehension)
+            keys_to_remove = []
+            for hour in hourly_requests:
+                if hour <= old_hour:
+                    keys_to_remove.append(hour)
+            
+            # Remove old entries in-place (faster than creating new dict)
+            for key in keys_to_remove:
+                del hourly_requests[key]
+        
+        stats["last_cleanup_hour"] = current_hour
     
     stats["count"] += 1
     
