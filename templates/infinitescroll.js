@@ -19,7 +19,8 @@
                 row: document.querySelector('.row'),
                 infiniteContainer: document.getElementById('infinite-scroll-container'),
                 infiniteContent: document.getElementById('infinite-content'),
-                loadingIndicator: document.getElementById('loading-indicator')
+                loadingIndicator: document.getElementById('loading-indicator'),
+                viewModeToggle: document.getElementById('view-mode-toggle')
             };
             
             // Cache frequently used DOM elements and data
@@ -32,9 +33,8 @@
         toggleViewMode() {
             this.currentViewMode = this.currentViewMode === 'column' ? 'infinite' : 'column';
             
-            const button = document.getElementById('view-mode-toggle');
-            if (button) {
-                button.textContent = this.currentViewMode === 'column' ? 'Infinite View' : 'Column View';
+            if (this.elements.viewModeToggle) {
+                this.elements.viewModeToggle.textContent = this.currentViewMode === 'column' ? 'Infinite View' : 'Column View';
             }
 
             if (this.currentViewMode === 'infinite') {

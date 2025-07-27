@@ -14,7 +14,22 @@
     class ConfigManager {
         constructor() {
             this.draggedItem = null;
+            this.elements = null;
             this.init();
+        }
+
+        getElements() {
+            if (!this.elements) {
+                this.elements = {
+                    themeSelect: document.querySelector('.config-container #theme-select'),
+                    fontSelect: document.querySelector('.config-container #font-select'),
+                    noUnderlinesInput: document.querySelector('.config-container input[name="no_underlines"]'),
+                    urlEntries: document.querySelectorAll('.url-entry'),
+                    headlineArchiveContainer: document.querySelector('.headline-archive-container'),
+                    configContainer: document.querySelector('.config-container')
+                };
+            }
+            return this.elements;
         }
 
         init() {
@@ -24,24 +39,25 @@
         }
 
         initSettings() {
-            const settingsConfig = {
-                'theme-select': { cookie: 'Theme', default: app.config.DEFAULT_THEME },
-                'font-select': { cookie: 'FontFamily', default: app.config.DEFAULT_FONT },
-                'input[name="no_underlines"]': { cookie: 'NoUnderlines', type: 'checkbox', default: '1' }
-            };
+            const { themeSelect, fontSelect, noUnderlinesInput } = this.getElements();
+            
+            const settingsConfig = [
+                { element: themeSelect, cookie: 'Theme', default: app.config.DEFAULT_THEME },
+                { element: fontSelect, cookie: 'FontFamily', default: app.config.DEFAULT_FONT },
+                { element: noUnderlinesInput, cookie: 'NoUnderlines', type: 'checkbox', default: '1' }
+            ];
 
-            for (const [selector, config] of Object.entries(settingsConfig)) {
-                const element = document.querySelector(`.config-container ${selector}`);
-                if (!element) continue;
+            settingsConfig.forEach(({ element, cookie, type, default: defaultValue }) => {
+                if (!element) return;
 
-                const cookieValue = app.utils.CookieManager.get(config.cookie);
+                const cookieValue = app.utils.CookieManager.get(cookie);
                 
-                if (config.type === 'checkbox') {
-                    element.checked = cookieValue === null || cookieValue === config.default;
+                if (type === 'checkbox') {
+                    element.checked = cookieValue === null || cookieValue === defaultValue;
                 } else {
-                    element.value = cookieValue || config.default;
+                    element.value = cookieValue || defaultValue;
                 }
-            }
+            });
         }
 
         initDragDrop() {
@@ -53,7 +69,7 @@
         }
 
         updatePriorities() {
-            const urlEntries = document.querySelectorAll('.url-entry');
+            const { urlEntries } = this.getElements();
             urlEntries.forEach((entry, index) => {
                 const priorityInput = entry.querySelector('input[type="number"]');
                 if (priorityInput) priorityInput.value = (index + 1) * app.config.PRIORITY_MULTIPLIER;
@@ -61,10 +77,10 @@
         }
 
         initArchive() {
-            const container = document.querySelector('.headline-archive-container');
-            if (!container || !window.isAdmin) return;
+            const { headlineArchiveContainer } = this.getElements();
+            if (!headlineArchiveContainer || !window.isAdmin) return;
 
-            container.addEventListener('click', async (e) => {
+            headlineArchiveContainer.addEventListener('click', async (e) => {
                 const deleteBtn = e.target.closest('.delete-headline-btn');
                 if (!deleteBtn) return;
 
@@ -101,7 +117,8 @@
 
     app.modules.config = {
         init() {
-            if (document.querySelector('.config-container')) {
+            const configContainer = document.querySelector('.config-container');
+            if (configContainer) {
                 new ConfigManager();
             }
         }

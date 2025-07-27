@@ -29,6 +29,11 @@
             ];
             ids.forEach(id => elements.set(id, document.getElementById(id)));
             elements.set('header', document.querySelector('#weather-container h3'));
+            
+            // Cache meta elements for location data
+            elements.set('latMeta', document.querySelector('meta[name="weather-lat"]'));
+            elements.set('lonMeta', document.querySelector('meta[name="weather-lon"]'));
+            
             return elements;
         }
 
@@ -137,8 +142,8 @@
 
         getCachedLocation() {
             // Check if we have location data from response headers
-            const latHeader = document.querySelector('meta[name="weather-lat"]');
-            const lonHeader = document.querySelector('meta[name="weather-lon"]');
+            const latHeader = this.elements.get('latMeta');
+            const lonHeader = this.elements.get('lonMeta');
             
             if (latHeader && lonHeader) {
                 const lat = parseFloat(latHeader.getAttribute('content'));

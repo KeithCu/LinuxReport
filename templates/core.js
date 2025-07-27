@@ -127,6 +127,22 @@
     }
 
     app.modules.core = {
+        // Cache frequently accessed DOM elements
+        elements: null,
+        
+        getElements() {
+            if (!this.elements) {
+                this.elements = {
+                    themeSelect: document.getElementById('theme-select'),
+                    fontSelect: document.getElementById('font-select'),
+                    configBtn: document.getElementById('config-btn'),
+                    viewModeToggle: document.getElementById('view-mode-toggle'),
+                    infiniteScrollContainer: document.getElementById('infinite-scroll-container')
+                };
+            }
+            return this.elements;
+        },
+        
         init() {
             app.utils.ThemeManager.applySettings();
             app.utils.ScrollManager.restorePosition();
@@ -135,7 +151,8 @@
 
             autoRefreshManager = new AutoRefreshManager();
 
-            if (document.getElementById('infinite-scroll-container')) {
+            const { infiniteScrollContainer } = this.getElements();
+            if (infiniteScrollContainer) {
                 infiniteScrollManager = app.modules.infiniteScroll.create();
             }
 
@@ -146,19 +163,20 @@
         },
 
         setupEventListeners() {
-            const handlers = {
-                'theme-select': { event: 'change', handler: (e) => app.setTheme(e.target.value) },
-                'font-select': { event: 'change', handler: (e) => app.setFont(e.target.value) },
-                'config-btn': { event: 'click', handler: () => app.redirect() },
-                'view-mode-toggle': { event: 'click', handler: () => this.toggleViewMode() }
-            };
+            const { themeSelect, fontSelect, configBtn, viewModeToggle } = this.getElements();
+            
+            const handlers = [
+                { element: themeSelect, event: 'change', handler: (e) => app.setTheme(e.target.value) },
+                { element: fontSelect, event: 'change', handler: (e) => app.setFont(e.target.value) },
+                { element: configBtn, event: 'click', handler: () => app.redirect() },
+                { element: viewModeToggle, event: 'click', handler: () => this.toggleViewMode() }
+            ];
 
-            for (const [id, { event, handler }] of Object.entries(handlers)) {
-                const element = document.getElementById(id);
+            handlers.forEach(({ element, event, handler }) => {
                 if (element) {
                     element.addEventListener(event, handler);
                 }
-            }
+            });
             
             document.addEventListener('viewmodechange', () => this.reinitPagination());
         },
