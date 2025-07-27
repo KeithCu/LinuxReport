@@ -171,56 +171,60 @@
                     // Check for cached location in response headers first
                     let location = this.getCachedLocation();
                     
-                                         if (!location || location.lat === null || location.lon === null) {
-                         // No cached location, get user's geolocation
-                         app.utils.logger.debug('[Weather] Getting location...');
-                         let geolocationAttempts = 0;
-                         const maxGeolocationAttempts = 60; // Allow up to 60 attempts (15 seconds with 250ms delays)
-                         let userDeniedPermission = false;
-                         
-                         while (geolocationAttempts < maxGeolocationAttempts && !userDeniedPermission) {
-                             try {
-                                 location = await app.utils.GeolocationManager.getLocation();
-                                 app.utils.logger.debug('[Weather] Location obtained:', location);
-                                 
-                                 // If we got valid coordinates, break out of the retry loop
-                                 if (location.lat !== null && location.lon !== null) {
-                                     app.utils.logger.debug('[Weather] Valid coordinates obtained, proceeding with weather request');
-                                     break;
-                                 } else {
-                                     geolocationAttempts++;
-                                     app.utils.logger.debug(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts}/${maxGeolocationAttempts})`);
-                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                                 }
-                             } catch (geolocationError) {
-                                 geolocationAttempts++;
-                                 
-                                 // Check if user explicitly denied permission
-                                 if (geolocationError.code === 1) { // PERMISSION_DENIED
-                                     app.utils.logger.debug('[Weather] User denied geolocation permission, letting server use fallback');
-                                     userDeniedPermission = true;
-                                     // Don't send any coordinates - let the server use its own fallback logic
-                                     location = { lat: null, lon: null, source: 'denied_permission' };
-                                     break;
-                                 } else if (geolocationError.code === 2) { // POSITION_UNAVAILABLE
-                                     app.utils.logger.debug(`[Weather] Position unavailable (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
-                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                                 } else if (geolocationError.code === 3) { // TIMEOUT
-                                     app.utils.logger.debug(`[Weather] Geolocation timeout (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
-                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                                 } else {
-                                     app.utils.logger.debug(`[Weather] Geolocation error (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
-                                     await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                                 }
-                             }
-                         }
-                         
-                         // If we exhausted attempts without getting location, use default
-                         if (geolocationAttempts >= maxGeolocationAttempts && !userDeniedPermission) {
-                             app.utils.logger.debug('[Weather] Geolocation timed out after max attempts, using default location (Detroit)');
-                             location = { lat: 42.3314, lon: -83.0458, source: 'default' }; // Detroit coordinates
-                         }
-                     } else {
+                    // Check if client geolocation is disabled
+                    if (app.config.DISABLE_CLIENT_GEOLOCATION) {
+                        app.utils.logger.debug('[Weather] Client geolocation disabled, not attempting browser geolocation');
+                        location = { lat: null, lon: null, source: 'client_disabled' };
+                    } else if (!location || location.lat === null || location.lon === null) {
+                        // No cached location, get user's geolocation
+                        app.utils.logger.debug('[Weather] Getting location...');
+                        let geolocationAttempts = 0;
+                        const maxGeolocationAttempts = 60; // Allow up to 60 attempts (15 seconds with 250ms delays)
+                        let userDeniedPermission = false;
+                        
+                        while (geolocationAttempts < maxGeolocationAttempts && !userDeniedPermission) {
+                            try {
+                                location = await app.utils.GeolocationManager.getLocation();
+                                app.utils.logger.debug('[Weather] Location obtained:', location);
+                                
+                                // If we got valid coordinates, break out of the retry loop
+                                if (location.lat !== null && location.lon !== null) {
+                                    app.utils.logger.debug('[Weather] Valid coordinates obtained, proceeding with weather request');
+                                    break;
+                                } else {
+                                    geolocationAttempts++;
+                                    app.utils.logger.debug(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts}/${maxGeolocationAttempts})`);
+                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                }
+                            } catch (geolocationError) {
+                                geolocationAttempts++;
+                                
+                                // Check if user explicitly denied permission
+                                if (geolocationError.code === 1) { // PERMISSION_DENIED
+                                    app.utils.logger.debug('[Weather] User denied geolocation permission, letting server use fallback');
+                                    userDeniedPermission = true;
+                                    // Don't send any coordinates - let the server use its own fallback logic
+                                    location = { lat: null, lon: null, source: 'denied_permission' };
+                                    break;
+                                } else if (geolocationError.code === 2) { // POSITION_UNAVAILABLE
+                                    app.utils.logger.debug(`[Weather] Position unavailable (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                } else if (geolocationError.code === 3) { // TIMEOUT
+                                    app.utils.logger.debug(`[Weather] Geolocation timeout (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                } else {
+                                    app.utils.logger.debug(`[Weather] Geolocation error (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                }
+                            }
+                        }
+                        
+                        // If we exhausted attempts without getting location, use default
+                        if (geolocationAttempts >= maxGeolocationAttempts && !userDeniedPermission) {
+                            app.utils.logger.debug('[Weather] Geolocation timed out after max attempts, using default location (Detroit)');
+                            location = { lat: 42.3314, lon: -83.0458, source: 'default' }; // Detroit coordinates
+                        }
+                    } else {
                         app.utils.logger.debug('[Weather] Using cached location from headers:', location);
                     }
                     
@@ -230,7 +234,10 @@
                      });
                      
                      // Add location parameters only if we have valid coordinates and user didn't deny permission
-                     if (location.lat !== null && location.lon !== null && location.source !== 'denied_permission') {
+                     // and client geolocation is not disabled
+                     if (location.lat !== null && location.lon !== null && 
+                         location.source !== 'denied_permission' && 
+                         location.source !== 'client_disabled') {
                          params.append('lat', location.lat);
                          params.append('lon', location.lon);
                          app.utils.logger.debug('[Weather] Sending coordinates to server:', location.lat, location.lon);

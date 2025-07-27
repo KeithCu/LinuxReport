@@ -194,7 +194,12 @@ INFINITE_SCROLL_DEBUG = True
 # Disable IP-based geolocation when user provides browser geolocation
 # When True, the system will use default coordinates (Detroit) instead of IP-based location
 # when browser geolocation is not available or denied
-DISABLE_IP_GEOLOCATION = True
+DISABLE_IP_GEOLOCATION = False
+
+# Client geolocation configuration
+# When True: Client geolocation is disabled, server uses IP-based location or defaults
+# When False: Client geolocation is enabled, server respects client-provided coordinates
+DISABLE_CLIENT_GEOLOCATION = True
 
 # =============================================================================
 # RSS FEED CONFIGURATION

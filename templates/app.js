@@ -46,6 +46,11 @@
       COOKIE_SAME_SITE: 'Lax',
       IMPERIAL_REGIONS: ['US', 'BS', 'BZ', 'KY', 'PW'],
       DEFAULT_LOCALE: 'en-US',
+      
+      // Client geolocation configuration
+      // When True: Client geolocation is disabled, server uses IP-based location or defaults
+      // When False: Client geolocation is enabled, server respects client-provided coordinates
+      DISABLE_CLIENT_GEOLOCATION: true,
 
       // Chat settings
       CHAT_USE_SSE: false,

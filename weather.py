@@ -33,7 +33,7 @@ from flask_restful import Resource, reqparse
 from shared import (
     limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT, 
     TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS,
-    API, DISABLE_IP_GEOLOCATION
+    API, DISABLE_IP_GEOLOCATION, DISABLE_CLIENT_GEOLOCATION
 )
 from app_config import DEBUG, get_weather_api_key
 
@@ -782,7 +782,13 @@ def init_weather_routes(app):
                 lat = args['lat']
                 lon = args['lon']
                 
-                # If no coordinates provided (geolocation failed), handle IP usage based on setting
+                # If client geolocation is disabled, ignore any provided coordinates
+                if DISABLE_CLIENT_GEOLOCATION:
+                    lat = None
+                    lon = None
+                    print(f"[DEBUG] Client geolocation disabled, ignoring provided coordinates")
+                
+                # If no coordinates provided (geolocation failed or disabled), handle IP usage based on setting
                 if lat is None and lon is None:
                     if DISABLE_IP_GEOLOCATION:
                         # Use Detroit coordinates when IP geolocation is disabled
@@ -790,6 +796,10 @@ def init_weather_routes(app):
                         lon = DEFAULT_WEATHER_LON
                         ip = None  # Don't use IP for geolocation
                         print(f"[DEBUG] Using Detroit coordinates (IP geolocation disabled): lat={lat}, lon={lon}")
+                        
+                        # Log warning if both client and IP geolocation are disabled
+                        if DISABLE_CLIENT_GEOLOCATION:
+                            print(f"[WARNING] Both client geolocation and IP geolocation are disabled - using Detroit fallback")
                     else:
                         # Use IP-based location when enabled
                         # ip is already set to request.remote_addr
