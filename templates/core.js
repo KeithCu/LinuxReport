@@ -11,8 +11,8 @@
 (function(app) {
     'use strict';
 
-    let autoRefreshManager;
-    let infiniteScrollManager;
+    let autoRefreshManager = null;
+    let infiniteScrollManager = null;
 
     class AutoRefreshManager {
         constructor() {
