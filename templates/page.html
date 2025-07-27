@@ -151,9 +151,10 @@
     <script type="text/javascript" src="{{ ASSET_URL }}"></script>
     {% endassets %}
     
-    <!-- Pass admin status from Flask-Login to JavaScript -->
+    <!-- Pass Flask variables to JavaScript -->
     <script>
       window.isAdmin = {{ 'true' if current_user.is_authenticated else 'false' }};
+      window.flaskDebug = {{ 'true' if config.DEBUG else 'false' }};
     </script>
   </body>
 </html>

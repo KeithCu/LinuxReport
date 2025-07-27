@@ -32,6 +32,10 @@
         'font-lato', 'font-raleway', 'font-sans-serif'
       ],
 
+      // Debug settings
+      DEBUG_MODE: false, // Set to true during development to enable debug logging
+      LOG_LEVEL: 'ERROR', // Options: 'ERROR', 'WARN', 'INFO', 'DEBUG'
+
       // Weather settings
       WEATHER_WIDGET_TOGGLE_ENABLED: true,
       WEATHER_DEFAULT_COLLAPSED: false,
@@ -72,9 +76,60 @@
 
   app.config.WEATHER_BASE_URL = app.config.USE_LINUXREPORT_WEATHER ? 'https://linuxreport.net' : '';
 
+  // Auto-set log level to DEBUG when Flask debug mode is enabled
+  if (typeof window !== 'undefined' && window.flaskDebug) {
+    app.config.LOG_LEVEL = 'DEBUG';
+    app.config.DEBUG_MODE = true;
+  }
+
   // =============================================================================
   // SHARED UTILITIES
   // =============================================================================
+
+  // Professional logging utility
+  app.utils.logger = {
+    /**
+     * Debug logging - shown when DEBUG_MODE is true or LOG_LEVEL is 'DEBUG'
+     * @param {string} message - Log message
+     * @param {...any} args - Additional arguments to log
+     */
+    debug: (message, ...args) => {
+      if (app.config.DEBUG_MODE || app.config.LOG_LEVEL === 'DEBUG') {
+        console.log(`[DEBUG] ${message}`, ...args);
+      }
+    },
+
+    /**
+     * Info logging - shown when DEBUG_MODE is true or LOG_LEVEL is 'INFO' or 'DEBUG'
+     * @param {string} message - Log message
+     * @param {...any} args - Additional arguments to log
+     */
+    info: (message, ...args) => {
+      if (app.config.DEBUG_MODE || ['INFO', 'DEBUG'].includes(app.config.LOG_LEVEL)) {
+        console.log(`[INFO] ${message}`, ...args);
+      }
+    },
+
+    /**
+     * Warning logging - shown when LOG_LEVEL is 'WARN', 'INFO', or 'DEBUG'
+     * @param {string} message - Log message
+     * @param {...any} args - Additional arguments to log
+     */
+    warn: (message, ...args) => {
+      if (['WARN', 'INFO', 'DEBUG'].includes(app.config.LOG_LEVEL)) {
+        console.warn(`[WARN] ${message}`, ...args);
+      }
+    },
+
+    /**
+     * Error logging - always shown regardless of LOG_LEVEL
+     * @param {string} message - Log message
+     * @param {...any} args - Additional arguments to log
+     */
+    error: (message, ...args) => {
+      console.error(`[ERROR] ${message}`, ...args);
+    }
+  };
 
   app.utils.debounce = (func, wait) => {
     let timeout;
@@ -106,7 +161,7 @@
             _requestLocation() {
             return new Promise((resolve, reject) => {
                         if (!navigator.geolocation) {
-            // console.log('Geolocation not supported, using IP-based location');
+            app.utils.logger.debug('Geolocation not supported, using IP-based location');
             resolve({ lat: null, lon: null });
             return;
         }
@@ -117,15 +172,15 @@
                     maximumAge: 3600000 // 1 hour - data within last hour is good enough
                 };
 
-                // console.log('Requesting geolocation with options:', options);
+                app.utils.logger.debug('Requesting geolocation with options:', options);
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const { latitude, longitude } = position.coords;
-                        console.log(`Geolocation successful: ${latitude}, ${longitude}`);
+                        app.utils.logger.info(`Geolocation successful: ${latitude}, ${longitude}`);
                         resolve({ lat: latitude, lon: longitude });
                     },
                     (error) => {
-                        console.log('Geolocation failed:', error.message, 'Code:', error.code);
+                        app.utils.logger.warn('Geolocation failed:', error.message, 'Code:', error.code);
                         // Reject with the error so the caller can check the error code
                         reject(error);
                     },
@@ -155,7 +210,7 @@
 
   // Error handler
   app.utils.handleError = (operation, error) => {
-    console.error(`Error in ${operation}:`, error);
+    app.utils.logger.error(`Error in ${operation}:`, error);
   };
 
   // Cookie management
@@ -174,7 +229,7 @@
           const cookieValue = trimmedCookie.substring(separatorIndex + 1);
           try {
             const value = decodeURIComponent(cookieValue);
-            console.log(`Cookie ${name}:`, value); // Debug log
+            app.utils.logger.debug(`Cookie ${name}:`, value);
             return value;
           } catch (error) {
             app.utils.handleError('cookie decode', error);
@@ -288,14 +343,14 @@
         return 'Unknown';
       }
       
-      console.log('Attempting to parse time:', utcTime, 'Type:', typeof utcTime);
+      app.utils.logger.debug('Attempting to parse time:', utcTime, 'Type:', typeof utcTime);
       
       try {
         const date = new Date(utcTime);
-        console.log('Parsed date:', date, 'Valid:', !isNaN(date.getTime()));
+        app.utils.logger.debug('Parsed date:', date, 'Valid:', !isNaN(date.getTime()));
         
         if (isNaN(date.getTime())) {
-          console.warn('Invalid time format:', utcTime);
+          app.utils.logger.warn('Invalid time format:', utcTime);
           return 'Invalid time';
         }
         
@@ -351,10 +406,10 @@
           result = `${dateString}${connector}${result}`;
         }
         
-        console.log('Final result:', result);
+        app.utils.logger.debug('Final result:', result);
         return result;
       } catch (error) {
-        console.error('Error formatting time:', error, 'Input:', utcTime);
+        app.utils.logger.error('Error formatting time:', error, 'Input:', utcTime);
         return 'Error';
       }
     },
@@ -385,7 +440,7 @@
       const timeElements = document.querySelectorAll('.last-updated-time');
       timeElements.forEach(element => {
         const utcTime = element.getAttribute('data-utc-time');
-        console.log('Processing time element:', element, 'UTC time:', utcTime);
+        app.utils.logger.debug('Processing time element:', element, 'UTC time:', utcTime);
         if (utcTime) {
           element.textContent = this.formatLocalTime(utcTime);
         } else {

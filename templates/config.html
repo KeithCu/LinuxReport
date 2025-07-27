@@ -99,5 +99,11 @@
 {% assets "js_all" %}
 <script type="text/javascript" src="{{ ASSET_URL }}"></script>
 {% endassets %}
+
+<!-- Pass Flask variables to JavaScript -->
+<script>
+  window.isAdmin = {{ 'true' if is_admin else 'false' }};
+  window.flaskDebug = {{ 'true' if config.DEBUG else 'false' }};
+</script>
 </body>
 </html>

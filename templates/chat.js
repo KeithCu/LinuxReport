@@ -65,14 +65,14 @@
                         this.beepSound = new Audio('/static/beep.wav');
                         // Test if the audio loads successfully
                         this.beepSound.addEventListener('canplaythrough', () => {
-                            console.log('[Chat] Beep sound loaded successfully');
+                            app.utils.logger.debug('[Chat] Beep sound loaded successfully');
                         });
                         this.beepSound.addEventListener('error', () => {
-                            console.log('[Chat] Beep sound file not found, continuing without beep');
+                            app.utils.logger.debug('[Chat] Beep sound file not found, continuing without beep');
                             this.beepSound = null;
                         });
                     } catch (error) {
-                        console.log('[Chat] Beep sound disabled, continuing without beep');
+                        app.utils.logger.debug('[Chat] Beep sound disabled, continuing without beep');
                         this.beepSound = null;
                     }
                 }
@@ -481,7 +481,7 @@
             if (this.beepSound && this.state.beepEnabled) {
                 this.beepSound.play().catch((error) => {
                     // Silently ignore beep sound errors - it's optional
-                    console.log('[Chat] Beep sound not available');
+                    app.utils.logger.debug('[Chat] Beep sound not available');
                 });
             }
             // If no beep sound, just continue silently - it's optional

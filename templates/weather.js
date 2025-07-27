@@ -13,9 +13,9 @@
 
     class WeatherWidget {
         constructor() {
-            // console.log('[Weather] Creating WeatherWidget instance...');
+            app.utils.logger.debug('[Weather] Creating WeatherWidget instance...');
             this.elements = this.getElements();
-            // console.log('[Weather] Elements found:', this.elements.size);
+            app.utils.logger.debug('[Weather] Elements found:', this.elements.size);
             this.debouncedLoad = app.utils.debounce(() => this.load(), app.config.WEATHER_DEBOUNCE_DELAY);
             this.init();
         }
@@ -38,9 +38,9 @@
         }
 
         init() {
-            // console.log('[Weather] Initializing weather widget...');
+            app.utils.logger.debug('[Weather] Initializing weather widget...');
             this.initToggle();
-            // console.log('[Weather] Toggle initialized, calling debouncedLoad...');
+            app.utils.logger.debug('[Weather] Toggle initialized, calling debouncedLoad...');
             this.debouncedLoad();
             
             const toggleBtn = this.elements.get('weather-toggle-btn');
@@ -76,7 +76,7 @@
                     container.style.visibility = 'visible';
                 }
             }
-            // console.log('[Weather] Initialization complete');
+            app.utils.logger.debug('[Weather] Initialization complete');
         }
 
         initToggle() {
@@ -112,26 +112,26 @@
         }
 
         load() {
-            // console.log('[Weather] load() called');
+            app.utils.logger.debug('[Weather] load() called');
             const container = this.elements.get('weather-container');
             const widgetWrapper = this.elements.get('weather-widget-container');
             
             if (!container) {
-                // console.log('[Weather] No container found, returning');
+                app.utils.logger.debug('[Weather] No container found, returning');
                 return;
             }
             
             if (widgetWrapper && widgetWrapper.classList.contains('collapsed')) {
-                // console.log('[Weather] Widget is collapsed, returning');
+                app.utils.logger.debug('[Weather] Widget is collapsed, returning');
                 return;
             }
             
             if (getComputedStyle(container).display === 'none') {
-                // console.log('[Weather] Container is hidden, returning');
+                app.utils.logger.debug('[Weather] Container is hidden, returning');
                 return;
             }
             
-            // console.log('[Weather] Calling fetch()...');
+            app.utils.logger.debug('[Weather] Calling fetch()...');
             this.fetch();
         }
 
@@ -150,12 +150,12 @@
                 const lon = parseFloat(lonHeader.getAttribute('content'));
                 
                 if (!isNaN(lat) && !isNaN(lon)) {
-                    console.log('[Weather] Found cached location in meta tags:', lat, lon);
+                    app.utils.logger.debug('[Weather] Found cached location in meta tags:', lat, lon);
                     return { lat, lon };
                 }
             }
             
-            console.log('[Weather] No cached location found in meta tags');
+            app.utils.logger.debug('[Weather] No cached location found in meta tags');
             return null;
         }
 
@@ -165,7 +165,7 @@
             
             const attemptFetch = async () => {
                 try {
-                    // console.log('[Weather] Starting fetch...');
+                    app.utils.logger.debug('[Weather] Starting fetch...');
                     const startTime = performance.now();
                     
                     // Check for cached location in response headers first
@@ -173,7 +173,7 @@
                     
                                          if (!location || location.lat === null || location.lon === null) {
                          // No cached location, get user's geolocation
-                         console.log('[Weather] Getting location...');
+                         app.utils.logger.debug('[Weather] Getting location...');
                          let geolocationAttempts = 0;
                          const maxGeolocationAttempts = 60; // Allow up to 60 attempts (15 seconds with 250ms delays)
                          let userDeniedPermission = false;
@@ -181,15 +181,15 @@
                          while (geolocationAttempts < maxGeolocationAttempts && !userDeniedPermission) {
                              try {
                                  location = await app.utils.GeolocationManager.getLocation();
-                                 console.log('[Weather] Location obtained:', location);
+                                 app.utils.logger.debug('[Weather] Location obtained:', location);
                                  
                                  // If we got valid coordinates, break out of the retry loop
                                  if (location.lat !== null && location.lon !== null) {
-                                     console.log('[Weather] Valid coordinates obtained, proceeding with weather request');
+                                     app.utils.logger.debug('[Weather] Valid coordinates obtained, proceeding with weather request');
                                      break;
                                  } else {
                                      geolocationAttempts++;
-                                     console.log(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts}/${maxGeolocationAttempts})`);
+                                     app.utils.logger.debug(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts}/${maxGeolocationAttempts})`);
                                      await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
                                  }
                              } catch (geolocationError) {
@@ -197,19 +197,19 @@
                                  
                                  // Check if user explicitly denied permission
                                  if (geolocationError.code === 1) { // PERMISSION_DENIED
-                                     console.log('[Weather] User denied geolocation permission, letting server use fallback');
+                                     app.utils.logger.debug('[Weather] User denied geolocation permission, letting server use fallback');
                                      userDeniedPermission = true;
                                      // Don't send any coordinates - let the server use its own fallback logic
                                      location = { lat: null, lon: null, source: 'denied_permission' };
                                      break;
                                  } else if (geolocationError.code === 2) { // POSITION_UNAVAILABLE
-                                     console.log(`[Weather] Position unavailable (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                     app.utils.logger.debug(`[Weather] Position unavailable (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
                                      await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
                                  } else if (geolocationError.code === 3) { // TIMEOUT
-                                     console.log(`[Weather] Geolocation timeout (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                     app.utils.logger.debug(`[Weather] Geolocation timeout (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
                                      await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
                                  } else {
-                                     console.log(`[Weather] Geolocation error (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
+                                     app.utils.logger.debug(`[Weather] Geolocation error (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
                                      await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
                                  }
                              }
@@ -217,11 +217,11 @@
                          
                          // If we exhausted attempts without getting location, use default
                          if (geolocationAttempts >= maxGeolocationAttempts && !userDeniedPermission) {
-                             console.log('[Weather] Geolocation timed out after max attempts, using default location (Detroit)');
+                             app.utils.logger.debug('[Weather] Geolocation timed out after max attempts, using default location (Detroit)');
                              location = { lat: 42.3314, lon: -83.0458, source: 'default' }; // Detroit coordinates
                          }
                      } else {
-                        console.log('[Weather] Using cached location from headers:', location);
+                        app.utils.logger.debug('[Weather] Using cached location from headers:', location);
                     }
                     
                                          // Build URL with location parameters
@@ -233,9 +233,9 @@
                      if (location.lat !== null && location.lon !== null && location.source !== 'denied_permission') {
                          params.append('lat', location.lat);
                          params.append('lon', location.lon);
-                         console.log('[Weather] Sending coordinates to server:', location.lat, location.lon);
+                         app.utils.logger.debug('[Weather] Sending coordinates to server:', location.lat, location.lon);
                      } else {
-                         console.log('[Weather] No coordinates to send, server will use fallback location');
+                         app.utils.logger.debug('[Weather] No coordinates to send, server will use fallback location');
                      }
                     
                     // Add cache busting parameter with current date and hour
@@ -244,22 +244,22 @@
                     params.append('_cb', cacheBuster);
                     
                     const url = `${app.config.WEATHER_BASE_URL}/api/weather?${params.toString()}`;
-                    // console.log('[Weather] Making request to:', url);
-                    // console.log('[Weather] Time spent on geolocation:', performance.now() - startTime, 'ms');
+                    app.utils.logger.debug('[Weather] Making request to:', url);
+                    app.utils.logger.debug('[Weather] Time spent on geolocation:', performance.now() - startTime, 'ms');
                     
                     const response = await fetch(url);
-                    // console.log('[Weather] Response received after:', performance.now() - startTime, 'ms');
+                    app.utils.logger.debug('[Weather] Response received after:', performance.now() - startTime, 'ms');
                     
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                     const data = await response.json();
-                    // console.log('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
+                    app.utils.logger.debug('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
                     
                     this.render(data, useMetric);
                 } catch (error) {
                     // If the weather request failed, keep retrying until we succeed
                     if (retryCount < maxRetries) {
                         retryCount++;
-                        console.log(`[Weather] Request failed, retrying in 250ms (attempt ${retryCount}/${maxRetries})...`);
+                        app.utils.logger.debug(`[Weather] Request failed, retrying in 250ms (attempt ${retryCount}/${maxRetries})...`);
                         setTimeout(() => this.fetch(retryCount), 250); // Non-blocking retry
                         return;
                     }
@@ -276,7 +276,7 @@
             const error = this.elements.get('weather-error');
             const loading = this.elements.get('weather-loading');
             
-            console.log('[Weather] ShowError - error:', !!error, 'loading:', !!loading);
+            app.utils.logger.debug('[Weather] ShowError - error:', !!error, 'loading:', !!loading);
             
             this.showElement(error, message);
             this.hideElement(loading);
@@ -288,9 +288,9 @@
             const loading = this.elements.get('weather-loading');
             const container = this.elements.get('weather-container');
             
-            console.log('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
-            console.log('[Weather] Forecast element:', forecast);
-            console.log('[Weather] Forecast element ID:', forecast?.id);
+            app.utils.logger.debug('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
+            app.utils.logger.debug('[Weather] Forecast element:', forecast);
+            app.utils.logger.debug('[Weather] Forecast element ID:', forecast?.id);
             
             if (!forecast || !header) return;
 
@@ -317,9 +317,9 @@
             // Apply horizontal layout using CSS class
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
-                console.log('[Weather] Applied CSS class for horizontal layout');
-                console.log('[Weather] Forecast element classes:', forecast.className);
-                console.log('[Weather] Forecast computed style:', getComputedStyle(forecast).display);
+                app.utils.logger.debug('[Weather] Applied CSS class for horizontal layout');
+                app.utils.logger.debug('[Weather] Forecast element classes:', forecast.className);
+                app.utils.logger.debug('[Weather] Forecast computed style:', getComputedStyle(forecast).display);
             }
         }
 
@@ -394,18 +394,18 @@
 
     app.modules.weather = {
         init() {
-            // console.log('[Weather] Initializing weather widget...');
+            app.utils.logger.debug('[Weather] Initializing weather widget...');
             try {
                 new WeatherWidget();
-                // console.log('[Weather] Weather widget initialized successfully');
+                app.utils.logger.debug('[Weather] Weather widget initialized successfully');
             } catch (error) {
-                console.error('[Weather] Failed to initialize weather widget:', error);
+                app.utils.logger.error('[Weather] Failed to initialize weather widget:', error);
             }
         }
     };
 
     document.addEventListener('DOMContentLoaded', () => {
-        // console.log('[Weather] DOM loaded, initializing weather...');
+        app.utils.logger.debug('[Weather] DOM loaded, initializing weather...');
         app.modules.weather.init();
     });
 
