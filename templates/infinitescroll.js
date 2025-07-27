@@ -272,7 +272,6 @@
             const headerHTML = `
                 <div class="source-header">
                     <img src="${group.icon}" alt="${group.name}" class="source-icon">
-                    <h3 class="source-name">${group.name}</h3>
                 </div>
             `;
             
