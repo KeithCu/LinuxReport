@@ -11,9 +11,11 @@ rate limiting for API calls.
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import os
+import sys
 import math
 import time
 import json
+import argparse
 from collections import defaultdict
 from datetime import date as date_obj
 from datetime import datetime, timedelta
@@ -848,9 +850,77 @@ def init_weather_routes(app):
     API.add_resource(WeatherResource, '/api/weather')
 
 # =============================================================================
+# COMMAND LINE INTERFACE
+# =============================================================================
+
+def geoip_lookup(ip):
+    """
+    Perform IP geolocation lookup and return results.
+    
+    Args:
+        ip (str): IP address to lookup
+        
+    Returns:
+        dict: Geolocation results
+    """
+    print(f"Looking up IP: {ip}")
+    
+    # Check if IP is valid
+    try:
+        import ipaddress
+        ipaddress.ip_address(ip)
+    except ValueError:
+        return {"error": f"Invalid IP address: {ip}"}
+    
+    # Perform fresh lookup directly from GeoIP database (bypass cache)
+    print("Performing fresh lookup from GeoIP database...")
+    lat, lon = get_location_from_ip(ip)
+    
+    if lat is None or lon is None:
+        return {
+            "ip": ip,
+            "lat": DEFAULT_WEATHER_LAT,
+            "lon": DEFAULT_WEATHER_LON,
+            "source": "default",
+            "error": "Lookup failed, using default coordinates"
+        }
+    
+    # Create OpenStreetMap link
+    osm_link = f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}&zoom=12"
+    
+    return {
+        "ip": ip,
+        "lat": lat,
+        "lon": lon,
+        "source": "geoip",
+        "cached": False,
+        "osm_link": osm_link
+    }
+
+def main():
+    """Main CLI entry point."""
+    parser = argparse.ArgumentParser(description='Weather and IP geolocation utilities')
+    parser.add_argument('command', choices=['geoip', 'test'], help='Command to run')
+    parser.add_argument('ip', nargs='?', help='IP address for geoip command')
+    
+    args = parser.parse_args()
+    
+    if args.command == 'geoip':
+        if not args.ip:
+            print("Error: IP address required for geoip command")
+            print("Usage: python weather.py geoip <IP_ADDRESS>")
+            sys.exit(1)
+        
+        result = geoip_lookup(args.ip)
+        print(json.dumps(result, indent=2))
+        
+    elif args.command == 'test':
+        print("Running weather API tests with test IP addresses...")
+        test_weather_api_with_ips()
+
+# =============================================================================
 # MAIN EXECUTION
 # =============================================================================
 
 if __name__ == "__main__":
-    print("Running weather API tests with test IP addresses...")
-    test_weather_api_with_ips()
+    main()

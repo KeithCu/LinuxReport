@@ -40,6 +40,7 @@ from shared import (
     WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API
 )
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
+from shared import DISABLE_CLIENT_GEOLOCATION
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content
 from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event
@@ -296,14 +297,15 @@ def _register_main_routes(flask_app):
             from copy import deepcopy
             response = deepcopy(cached_response)
             
-            # Get cached location for this IP to pass to client
+            # Get cached location for this IP to pass to client (only if client geolocation is enabled)
             client_ip = request.remote_addr
-            cached_lat, cached_lon = get_cached_geolocation(client_ip)
-            
-            # Add location headers if we have cached coordinates
-            if cached_lat is not None and cached_lon is not None:
-                response.headers['X-Weather-Lat'] = str(cached_lat)
-                response.headers['X-Weather-Lon'] = str(cached_lon)
+            if not DISABLE_CLIENT_GEOLOCATION:
+                cached_lat, cached_lon = get_cached_geolocation(client_ip)
+                
+                # Add location headers if we have cached coordinates
+                if cached_lat is not None and cached_lon is not None:
+                    response.headers['X-Weather-Lat'] = str(cached_lat)
+                    response.headers['X-Weather-Lon'] = str(cached_lon)
             
             return response
 
@@ -392,9 +394,12 @@ def _register_main_routes(flask_app):
 
         weather_html = get_default_weather_html()
 
-        # Get cached location for this IP for template rendering
+        # Get cached location for this IP for template rendering (only if client geolocation is enabled)
         client_ip = request.remote_addr
-        template_lat, template_lon = get_cached_geolocation(client_ip)
+        if DISABLE_CLIENT_GEOLOCATION:
+            template_lat, template_lon = None, None
+        else:
+            template_lat, template_lon = get_cached_geolocation(client_ip)
         
         # Render the final page.
         page = render_template('page.html', columns=result,
@@ -431,14 +436,15 @@ def _register_main_routes(flask_app):
         response = make_response(page)
         response.headers['Content-Length'] = str(len(page.encode('utf-8')))
         
-        # Add user-specific location headers for uncached responses
+        # Add user-specific location headers for uncached responses (only if client geolocation is enabled)
         client_ip = request.remote_addr
-        cached_lat, cached_lon = get_cached_geolocation(client_ip)
-        
-        # Add location headers if we have cached coordinates
-        if cached_lat is not None and cached_lon is not None:
-            response.headers['X-Weather-Lat'] = str(cached_lat)
-            response.headers['X-Weather-Lon'] = str(cached_lon)
+        if not DISABLE_CLIENT_GEOLOCATION:
+            cached_lat, cached_lon = get_cached_geolocation(client_ip)
+            
+            # Add location headers if we have cached coordinates
+            if cached_lat is not None and cached_lon is not None:
+                response.headers['X-Weather-Lat'] = str(cached_lat)
+                response.headers['X-Weather-Lon'] = str(cached_lon)
         
         # Add cache control headers for 15 minutes (900 seconds)
         # Use the end_time we already calculated to avoid additional time calls
