@@ -503,7 +503,6 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         if ip:
             if DISABLE_CLIENT_GEOLOCATION:
                 # Skip cache when client geolocation disabled
-                print(f"[DEBUG] Client geolocation disabled - skipping cached location check for IP: {ip}")
                 lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON if DISABLE_IP_GEOLOCATION else get_location_from_ip(ip)
             else:
                 # Try cache first, then fallback
@@ -792,7 +791,6 @@ def init_weather_routes(app):
                 if DISABLE_CLIENT_GEOLOCATION:
                     lat = None
                     lon = None
-                    print(f"[DEBUG] Client geolocation disabled, ignoring provided coordinates")
                 
                 # If no coordinates provided (geolocation failed or disabled), handle IP usage based on setting
                 if lat is None and lon is None:
