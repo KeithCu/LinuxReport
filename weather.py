@@ -794,6 +794,7 @@ def init_weather_routes(app):
                 
                 # If no coordinates provided (geolocation failed or disabled), handle IP usage based on setting
                 if lat is None and lon is None:
+                    print(f"[DEBUG] No coordinates provided, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
                     if DISABLE_IP_GEOLOCATION:
                         # Use Detroit coordinates when IP geolocation is disabled
                         lat = DEFAULT_WEATHER_LAT
@@ -866,13 +867,41 @@ def geoip_lookup(ip):
     # Check if IP is valid
     try:
         import ipaddress
-        ipaddress.ip_address(ip)
+        ip_obj = ipaddress.ip_address(ip)
+        ip_type = "IPv6" if isinstance(ip_obj, ipaddress.IPv6Address) else "IPv4"
+        print(f"IP type: {ip_type}")
     except ValueError:
         return {"error": f"Invalid IP address: {ip}"}
     
     # Perform fresh lookup directly from GeoIP database (bypass cache)
     print("Performing fresh lookup from GeoIP database...")
-    lat, lon = get_location_from_ip(ip)
+    
+    # Test the GeoIP lookup with detailed error handling
+    try:
+        global _geoip_reader
+        if _geoip_reader is None:
+            _geoip_reader = geoip2.database.Reader(GEOIP_DB_PATH)
+        
+        print(f"GeoIP database path: {GEOIP_DB_PATH}")
+        print(f"Database exists: {os.path.exists(GEOIP_DB_PATH)}")
+        
+        response = _geoip_reader.city(ip)
+        lat = response.location.latitude
+        lon = response.location.longitude
+        
+        print(f"GeoIP lookup successful: {lat}, {lon}")
+        print(f"City: {response.city.name if response.city else 'Unknown'}")
+        print(f"Country: {response.country.name if response.country else 'Unknown'}")
+        
+    except Exception as e:
+        print(f"GeoIP lookup failed with error: {type(e).__name__}: {e}")
+        return {
+            "ip": ip,
+            "lat": DEFAULT_WEATHER_LAT,
+            "lon": DEFAULT_WEATHER_LON,
+            "source": "default",
+            "error": f"GeoIP lookup failed: {type(e).__name__}: {e}"
+        }
     
     if lat is None or lon is None:
         return {
@@ -880,7 +909,7 @@ def geoip_lookup(ip):
             "lat": DEFAULT_WEATHER_LAT,
             "lon": DEFAULT_WEATHER_LON,
             "source": "default",
-            "error": "Lookup failed, using default coordinates"
+            "error": "Lookup returned null coordinates"
         }
     
     # Create OpenStreetMap link
@@ -895,11 +924,45 @@ def geoip_lookup(ip):
         "osm_link": osm_link
     }
 
+def test_openweather_api(lat, lon):
+    """
+    Test OpenWeather API directly with given coordinates.
+    
+    Args:
+        lat (float): Latitude
+        lon (float): Longitude
+    """
+    print(f"Testing OpenWeather API with coordinates: {lat}, {lon}")
+    
+    try:
+        # Use the same function that the weather API uses
+        weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=None, units='imperial')
+        
+        if status_code == 200:
+            city_name = weather_data.get('city_name', 'Unknown')
+            print(f"✅ OpenWeather API successful!")
+            print(f"City: {city_name}")
+            print(f"Status: {status_code}")
+            print(f"Data keys: {list(weather_data.keys())}")
+            
+            # Show first daily forecast
+            if 'daily' in weather_data and weather_data['daily']:
+                first_day = weather_data['daily'][0]
+                print(f"First day forecast: {first_day.get('weather', 'Unknown')} - {first_day.get('temp_max', 'N/A')}°F")
+        else:
+            print(f"❌ OpenWeather API failed with status: {status_code}")
+            print(f"Error: {weather_data}")
+            
+    except Exception as e:
+        print(f"❌ OpenWeather API test failed with error: {type(e).__name__}: {e}")
+
 def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(description='Weather and IP geolocation utilities')
-    parser.add_argument('command', choices=['geoip', 'test'], help='Command to run')
+    parser.add_argument('command', choices=['geoip', 'test', 'openweather'], help='Command to run')
     parser.add_argument('ip', nargs='?', help='IP address for geoip command')
+    parser.add_argument('--lat', type=float, help='Latitude for openweather command')
+    parser.add_argument('--lon', type=float, help='Longitude for openweather command')
     
     args = parser.parse_args()
     
@@ -911,6 +974,14 @@ def main():
         
         result = geoip_lookup(args.ip)
         print(json.dumps(result, indent=2))
+        
+    elif args.command == 'openweather':
+        if args.lat is None or args.lon is None:
+            print("Error: Both --lat and --lon required for openweather command")
+            print("Usage: python weather.py openweather --lat <LATITUDE> --lon <LONGITUDE>")
+            sys.exit(1)
+        
+        test_openweather_api(args.lat, args.lon)
         
     elif args.command == 'test':
         print("Running weather API tests with test IP addresses...")
