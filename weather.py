@@ -501,15 +501,15 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
     else:
         # No coordinates provided - handle based on IP availability and settings
         if ip:
-            print(f"[DEBUG] get_weather_data: IP provided: {ip}, DISABLE_CLIENT_GEOLOCATION={DISABLE_CLIENT_GEOLOCATION}, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
+            #print(f"[DEBUG] get_weather_data: IP provided: {ip}, DISABLE_CLIENT_GEOLOCATION={DISABLE_CLIENT_GEOLOCATION}, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
             if DISABLE_CLIENT_GEOLOCATION:
                 # Skip cache when client geolocation disabled
                 if DISABLE_IP_GEOLOCATION:
                     lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
-                    print(f"[DEBUG] get_weather_data: Using Detroit coordinates (IP geolocation disabled)")
+                    # print(f"[DEBUG] get_weather_data: Using Detroit coordinates (IP geolocation disabled)")
                 else:
                     lat, lon = get_location_from_ip(ip)
-                    print(f"[DEBUG] get_weather_data: Using IP-based location: {lat}, {lon}")
+                    # print(f"[DEBUG] get_weather_data: Using IP-based location: {lat}, {lon}")
             else:
                 # Try cache first, then fallback
                 lat, lon = get_cached_geolocation(ip)
@@ -524,8 +524,6 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         else:
             # No IP available, use Detroit coordinates
             lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
-            if DISABLE_CLIENT_GEOLOCATION:
-                print(f"[DEBUG] Client geolocation disabled - using Detroit coordinates")
 
     # Convert coordinates to float if they're strings
     try:
