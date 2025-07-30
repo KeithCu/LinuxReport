@@ -548,51 +548,6 @@ def get_weather_data(lat=None, lon=None, ip=None):
 # HTML GENERATION
 # =============================================================================
 
-def get_weather_html(ip):
-    """
-    Generate HTML for weather forecast display.
-    
-    Args:
-        ip (str): IP address for location detection
-        
-    Returns:
-        str: HTML string for weather forecast display
-    """
-    weather_data, status_code = get_weather_data(ip=ip)
-    if status_code == 200 and weather_data and "daily" in weather_data and len(weather_data["daily"]) > 0:
-        forecast_html = '<div id="weather-forecast" class="weather-forecast">'
-        for i, day in enumerate(weather_data["daily"]):
-            try:
-                d = datetime.fromtimestamp(day["dt"])
-                day_name = "Today" if i == 0 else d.strftime("%a")
-                temp_max = round(day.get("temp_max", 0))
-                temp_min = round(day.get("temp_min", 0))
-                precipitation = round(day.get("precipitation", 0))
-                weather_icon = day.get("weather_icon", "01d")
-                weather_desc = day.get("weather", "N/A")
-                forecast_html += f'''
-                    <div class="weather-day">
-                        <div class="weather-day-name">{day_name}</div>
-                        <img class="weather-icon" src="https://openweathermap.org/img/wn/{weather_icon}.png" alt="{weather_desc}">
-                        <div class="weather-temp">
-                            <span class="temp-max">{temp_max}°</span> /
-                            <span class="temp-min">{temp_min}°</span>
-                        </div>
-                        <div class="weather-precip">{precipitation}% precip</div>
-                    </div>
-                '''
-            except (KeyError, TypeError, ValueError) as e:
-                print(f"Error processing weather day data: {e}")
-                forecast_html += '<div class="weather-day error">Error loading day</div>'
-        forecast_html += '</div>'
-        return f'''
-        <div id="weather-container" class="weather-container">
-            <h3>5-Day Weather</h3>
-            {forecast_html}
-        </div>
-        '''
-    else:
-        return get_default_weather_html()
 
 def get_default_weather_html():
     """
