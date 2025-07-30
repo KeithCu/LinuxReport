@@ -463,6 +463,32 @@ img {
   transform: rotate(180deg);
 }
 
+.weather-unit-toggle {
+  position: absolute;
+  top: 0;
+  right: 30px;
+  background: none;
+  border: none;
+  font-size: 0.9em;
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--text);
+  padding: 0 var(--spacing-xs);
+  z-index: 1;
+  vertical-align: middle;
+  transition: color var(--transition-fast);
+  border-radius: var(--border-radius-sm);
+}
+
+.weather-unit-toggle:hover {
+  color: var(--accent);
+  background-color: var(--btn-hover-bg);
+}
+
+#weather-widget-container.collapsed .weather-unit-toggle {
+  display: none;
+}
+
 #weather-widget-container.collapsed #weather-collapsed-label {
   display: inline !important;
   padding-right: 25px;

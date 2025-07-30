@@ -224,19 +224,7 @@ def rate_limit_check():
 
     g_cs.put(RL_KEY, timestamps_in_window, timeout=RATE_LIMIT_WINDOW + 1)
 
-def fahrenheit_to_celsius(f_temp):
-    """
-    Convert Fahrenheit temperature to Celsius, rounded to a whole number.
-    
-    Args:
-        f_temp (float): Temperature in Fahrenheit
-        
-    Returns:
-        int or None: Temperature in Celsius, or None if input is None
-    """
-    if f_temp is None:
-        return None
-    return round((f_temp - 32) * 5/9)
+
 
 # =============================================================================
 # CACHE MANAGEMENT
@@ -271,14 +259,13 @@ def save_weather_cache_entry(lat, lon, data):
     }
     g_cs.put(CACHE_ENTRY_PREFIX + key, entry, timeout=remaining_timeout)
 
-def get_bucketed_weather_cache(lat, lon, units='imperial'):
+def get_bucketed_weather_cache(lat, lon):
     """
     Returns cached weather data for the bucketed (lat, lon) if present and same day.
     
     Args:
         lat (float): Latitude coordinate
         lon (float): Longitude coordinate
-        units (str): Temperature units ('imperial' or 'metric')
         
     Returns:
         dict or None: Cached weather data or None if not available
@@ -290,30 +277,11 @@ def get_bucketed_weather_cache(lat, lon, units='imperial'):
     
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
         print(f"[DEBUG] Cache HIT for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
-        data = entry['data']
-        if units == 'metric':
-            data = convert_weather_to_metric(data)
-        return data
+        return entry['data']
     print(f"[DEBUG] Cache MISS for key {key}, lat={lat}, lon={lon}")
     return None
 
-def convert_weather_to_metric(data):
-    """
-    Convert weather data from imperial (Fahrenheit) to metric (Celsius) units.
-    
-    Args:
-        data (dict): Weather data in imperial units
-        
-    Returns:
-        dict: Weather data converted to metric units
-    """
-    if 'daily' in data:
-        for day in data['daily']:
-            if 'temp_min' in day:
-                day['temp_min'] = fahrenheit_to_celsius(day['temp_min'])
-            if 'temp_max' in day:
-                day['temp_max'] = fahrenheit_to_celsius(day['temp_max'])
-    return data
+# Temperature conversion functions removed - now handled client-side
 
 # =============================================================================
 # WEATHER DATA PROCESSING
@@ -394,7 +362,7 @@ def _process_openweather_response(weather_data, fetch_time):
     
     return processed_data, city_name
 
-def _log_weather_result(processed_data, city_name, service_name, api_time, units):
+def _log_weather_result(processed_data, city_name, service_name, api_time):
     """
     Log the weather API result.
     
@@ -403,13 +371,11 @@ def _log_weather_result(processed_data, city_name, service_name, api_time, units
         city_name (str): Name of the city
         service_name (str): Name of the weather service used
         api_time (float): Time taken for API call
-        units (str): Temperature units used
     """
     try:
         today_entry = processed_data["daily"][0]
-        # Get the temp (already potentially converted)
+        # Get the temp (always in Fahrenheit)
         current_temp = round(today_entry.get("temp_max", today_entry.get("temp_min", 0)))
-        log_unit = 'C' if units == 'metric' else 'F'
         
         # Ensure proper Unicode handling for city name
         try:
@@ -423,7 +389,7 @@ def _log_weather_result(processed_data, city_name, service_name, api_time, units
             # Fallback to safe string representation
             city_name = repr(city_name)
         
-        print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}{log_unit}, API time: {api_time:.2f}s")
+        print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}°F, API time: {api_time:.2f}s")
     except (IndexError, KeyError, TypeError):
         # Indicate error or missing data
         print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
@@ -472,18 +438,18 @@ def _fetch_from_openweather_api(lat, lon, fetch_time):
     
     return processed_data, city_name, api_time, service_name, None, None
 
-def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
+def get_weather_data(lat=None, lon=None, ip=None):
     """
     Fetches weather data for given coordinates or IP address, using cache or API.
     
     This function first checks the cache for existing weather data. If not found,
     it fetches fresh data from the OpenWeather API and caches the result.
+    All temperatures are returned in Fahrenheit for client-side conversion.
     
     Args:
         lat (float, optional): Latitude coordinate
         lon (float, optional): Longitude coordinate
         ip (str, optional): IP address for geolocation (only used if DISABLE_IP_GEOLOCATION is False)
-        units (str): Temperature units ('imperial' or 'metric')
         
     Returns:
         tuple: (data, status_code) where data includes 'fetch_time' when the data was fetched from the API
@@ -534,7 +500,7 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         lon = DEFAULT_WEATHER_LON
 
     # Check cache first
-    bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
+    bucketed_weather = get_bucketed_weather_cache(lat, lon)
     if bucketed_weather:
         return bucketed_weather, 200
 
@@ -550,7 +516,7 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         lock_key = f"weather_fetch:{bucket_key}"
         with get_lock(lock_key):
             # Re-check cache inside the lock to prevent race condition
-            bucketed_weather = get_bucketed_weather_cache(lat, lon, units=units)
+            bucketed_weather = get_bucketed_weather_cache(lat, lon)
             if bucketed_weather:
                 return bucketed_weather, 200
             
@@ -564,12 +530,8 @@ def get_weather_data(lat=None, lon=None, ip=None, units='imperial'):
         # Save to cache
         save_weather_cache_entry(lat, lon, processed_data)
         
-        # Convert to metric if requested
-        if units == 'metric':
-            processed_data = convert_weather_to_metric(processed_data)
-        
         # Log the result
-        _log_weather_result(processed_data, city_name, service_name, api_time, units)
+        _log_weather_result(processed_data, city_name, service_name, api_time)
         
         return processed_data, 200
         
@@ -686,14 +648,6 @@ def init_weather_routes(app):
     # Create request parser for weather API
     weather_parser = reqparse.RequestParser()
     weather_parser.add_argument(
-        'units', 
-        type=str, 
-        default='imperial', 
-        choices=['imperial', 'metric'], 
-        location='args', 
-        help='Units must be either imperial or metric'
-    )
-    weather_parser.add_argument(
         'lat', 
         type=float, 
         location='args', 
@@ -710,16 +664,11 @@ def init_weather_routes(app):
         """
         Weather API Resource
         
-        Provides weather data for a given location.
+        Provides weather data for a given location in Fahrenheit.
+        Temperature conversion to Celsius is handled client-side.
         
         ---
         parameters:
-          - name: units
-            in: query
-            type: string
-            enum: [imperial, metric]
-            default: imperial
-            description: Temperature units (Fahrenheit or Celsius)
           - name: lat
             in: query
             type: number
@@ -773,7 +722,6 @@ def init_weather_routes(app):
             """Handle GET requests for weather data."""
             args = weather_parser.parse_args()
             ip = request.remote_addr
-            units = args['units']
             
             # Check if request is from a web bot
             user_agent = request.headers.get('User-Agent', '')
@@ -798,7 +746,7 @@ def init_weather_routes(app):
                 
                 # If no coordinates provided (geolocation failed or disabled), handle IP usage based on setting
                 if lat is None and lon is None:
-                    print(f"[DEBUG] No coordinates provided, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
+                    #print(f"[DEBUG] No coordinates provided, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
                     if DISABLE_IP_GEOLOCATION:
                         # Use Detroit coordinates when IP geolocation is disabled
                         lat = DEFAULT_WEATHER_LAT
@@ -819,7 +767,7 @@ def init_weather_routes(app):
                     ip = None
                     print(f"[DEBUG] Using provided coordinates: lat={lat}, lon={lon}")
             
-            weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip, units=units)
+            weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip)
             
             # Log the result for debugging
             if weather_data and 'city_name' in weather_data:
@@ -940,7 +888,7 @@ def test_openweather_api(lat, lon):
     
     try:
         # Use the same function that the weather API uses
-        weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=None, units='imperial')
+        weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=None)
         
         if status_code == 200:
             city_name = weather_data.get('city_name', 'Unknown')

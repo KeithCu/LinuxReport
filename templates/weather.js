@@ -25,7 +25,7 @@
             const ids = [
                 'weather-container', 'weather-widget-container', 'weather-content', 
                 'weather-toggle-btn', 'weather-collapsed-label', 'weather-forecast', 
-                'weather-loading', 'weather-error'
+                'weather-loading', 'weather-error', 'weather-unit-toggle'
             ];
             ids.forEach(id => elements.set(id, document.getElementById(id)));
             elements.set('header', document.querySelector('#weather-container h3'));
@@ -40,6 +40,7 @@
         init() {
             app.utils.logger.debug('[Weather] Initializing weather widget...');
             this.initToggle();
+            this.initUnitToggle();
             app.utils.logger.debug('[Weather] Toggle initialized, calling debouncedLoad...');
             this.debouncedLoad();
             
@@ -111,6 +112,36 @@
             if (collapsedLabel) collapsedLabel.style.display = 'none';
         }
 
+        initUnitToggle() {
+            const unitToggle = this.elements.get('weather-unit-toggle');
+            if (!unitToggle) return;
+
+            // Set initial state
+            const currentUnits = this.getUnits();
+            unitToggle.textContent = currentUnits === 'metric' ? '°C' : '°F';
+            unitToggle.title = `Switch to ${currentUnits === 'metric' ? 'Fahrenheit' : 'Celsius'}`;
+
+            // Add click handler
+            unitToggle.addEventListener('click', () => {
+                const currentUnits = this.getUnits();
+                const newUnits = currentUnits === 'metric' ? 'imperial' : 'metric';
+                
+                // Save preference
+                localStorage.setItem('weatherUnits', newUnits);
+                
+                // Update toggle button
+                unitToggle.textContent = newUnits === 'metric' ? '°C' : '°F';
+                unitToggle.title = `Switch to ${newUnits === 'metric' ? 'Fahrenheit' : 'Celsius'}`;
+                
+                // Re-render current weather data with new units
+                const forecast = this.elements.get('weather-forecast');
+                if (forecast && forecast.children.length > 0) {
+                    // Re-render the current data
+                    this.render(this.currentWeatherData);
+                }
+            });
+        }
+
         load() {
             app.utils.logger.debug('[Weather] load() called');
             const container = this.elements.get('weather-container');
@@ -136,8 +167,23 @@
         }
 
         getUnits() {
-            // Force imperial units for now while debugging
-            return 'imperial';
+            // Get user's preferred temperature units from localStorage or browser locale
+            const savedUnits = localStorage.getItem('weatherUnits');
+            if (savedUnits) {
+                return savedUnits;
+            }
+            
+            // Default to imperial (Fahrenheit) for US users, metric for others
+            const locale = navigator.language || 'en-US';
+            return locale.startsWith('en-US') ? 'imperial' : 'metric';
+        }
+
+        fahrenheitToCelsius(fahrenheit) {
+            return Math.round((fahrenheit - 32) * 5/9);
+        }
+
+        celsiusToFahrenheit(celsius) {
+            return Math.round((celsius * 9/5) + 32);
         }
 
         getCachedLocation() {
@@ -160,7 +206,6 @@
         }
 
         async fetch(retryCount = 0) {
-            const useMetric = this.getUnits() === 'metric';
             const maxRetries = 20; // Much higher retry limit
             
             const attemptFetch = async () => {
@@ -231,10 +276,8 @@
                     }
                     }
                     
-                                         // Build URL with location parameters
-                     const params = new URLSearchParams({
-                         units: useMetric ? 'metric' : 'imperial'
-                     });
+                                         // Build URL with location parameters (server always returns Fahrenheit)
+                     const params = new URLSearchParams();
                      
                      // Add location parameters only if we have valid coordinates and user didn't deny permission
                      // and client geolocation is not disabled
@@ -264,7 +307,7 @@
                     const data = await response.json();
                     app.utils.logger.debug('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
                     
-                    this.render(data, useMetric);
+                    this.render(data);
                 } catch (error) {
                     // If the weather request failed, keep retrying until we succeed
                     if (retryCount < maxRetries) {
@@ -292,7 +335,7 @@
             this.hideElement(loading);
         }
 
-        render(data, useMetric) {
+        render(data) {
             const forecast = this.elements.get('weather-forecast');
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
@@ -304,6 +347,9 @@
             
             if (!forecast || !header) return;
 
+            // Store current weather data for unit toggle re-rendering
+            this.currentWeatherData = data;
+
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
             }
@@ -313,7 +359,7 @@
                 return;
             }
 
-            forecast.innerHTML = data.daily.map(day => this.createDayHTML(day, useMetric)).join('');
+            forecast.innerHTML = data.daily.map(day => this.createDayHTML(day)).join('');
             this.hideElement(loading);
             this.showElement(forecast);
             
@@ -333,15 +379,26 @@
             }
         }
 
-        createDayHTML(day, useMetric) {
-            const unit = 'F';
+        createDayHTML(day) {
+            const useMetric = this.getUnits() === 'metric';
+            const unit = useMetric ? 'C' : 'F';
+            
+            // Convert temperatures if needed (server always provides Fahrenheit)
+            let tempMax = Math.round(day.temp_max);
+            let tempMin = Math.round(day.temp_min);
+            
+            if (useMetric) {
+                tempMax = this.fahrenheitToCelsius(tempMax);
+                tempMin = this.fahrenheitToCelsius(tempMin);
+            }
+            
             return `
                 <div class="weather-day">
                     <div class="weather-day-name">${this.getDayName(day)}</div>
                     <img class="weather-icon" src="https://openweathermap.org/img/wn/${day.weather_icon}.png" alt="${day.weather}" loading="lazy">
                     <div class="weather-temp">
-                        <span class="temp-max">${Math.round(day.temp_max)}°${unit}</span> /
-                        <span class="temp-min">${Math.round(day.temp_min)}°${unit}</span>
+                        <span class="temp-max">${tempMax}°${unit}</span> /
+                        <span class="temp-min">${tempMin}°${unit}</span>
                     </div>
                     <div class="weather-precip">${Math.round(day.precipitation)}% precip</div>
                 </div>
