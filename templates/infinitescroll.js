@@ -5,7 +5,7 @@
  * Handles switching between column and infinite scroll views and dispatches view mode change events.
  * 
  * @author LinuxReport Team
- * @version 3.1.0
+ * @version 3.2.0
  */
 
 (function(app) {
@@ -23,11 +23,8 @@
                 viewModeToggle: document.getElementById('view-mode-toggle')
             };
             
-            // Cache frequently used DOM elements and data
+            // Cache feed information (doesn't change during session)
             this.cachedFeedInfo = new Map();
-            this.cachedItems = null;
-            this.lastCollectionTime = 0;
-            this.collectionCacheTimeout = 5000; // 5 seconds cache
         }
 
         toggleViewMode() {
@@ -96,12 +93,6 @@
         }
 
         collectAllItems() {
-            // Use cache if available and recent
-            const now = Date.now();
-            if (this.cachedItems && (now - this.lastCollectionTime) < this.collectionCacheTimeout) {
-                return this.cachedItems;
-            }
-
             const containers = document.querySelectorAll('.column .box');
             const items = [];
             
@@ -139,10 +130,6 @@
 
             // Trim array to actual size
             items.length = itemIndex;
-            
-            // Cache the result
-            this.cachedItems = items;
-            this.lastCollectionTime = now;
             
             return items;
         }
@@ -243,59 +230,81 @@
         }
 
         renderGroupedItems(container, groupedItems) {
-            const fragment = document.createDocumentFragment();
-            
-            // Pre-allocate template strings for better performance
-            const sourceHeaderTemplate = this.createSourceHeaderTemplate();
-            const itemTemplate = this.createItemTemplate();
-            
-            groupedItems.forEach(group => {
-                fragment.appendChild(this.createSourceGroupElement(group, sourceHeaderTemplate, itemTemplate));
-            });
-            
-            container.appendChild(fragment);
+            // Build all HTML at once for better performance
+            const html = groupedItems.map(group => this.createGroupHTML(group)).join('');
+            container.innerHTML = html;
         }
 
-        createSourceHeaderTemplate() {
-            return document.createElement('template');
-        }
-
-        createItemTemplate() {
-            return document.createElement('template');
-        }
-
-        createSourceGroupElement(group, headerTemplate, itemTemplate) {
-            const groupEl = document.createElement('div');
-            groupEl.className = 'source-group';
-            
-            // Build HTML more efficiently
-            const headerHTML = `
-                <div class="source-header">
-                    <img src="${group.icon}" alt="${group.name}" class="source-icon">
-                </div>
-            `;
-            
+        createGroupHTML(group) {
             const itemsHTML = group.items.map(item => this.createItemHTML(item)).join('');
             
-            groupEl.innerHTML = headerHTML + itemsHTML;
-            return groupEl;
+            return `
+                <div class="source-group">
+                    <div class="source-header">
+                        <img src="${group.icon}" alt="${group.name}" class="source-icon">
+                    </div>
+                    ${itemsHTML}
+                </div>
+            `;
         }
 
         createItemHTML(item) {
-            let timeString = `Timestamp: ${item.timestamp}`;
+            let timeString = '';
+            
+            // Try to use published date first, then fall back to timestamp
             if (item.published) {
                 try {
-                    // Use the timezone manager to format the time in local timezone
-                    if (app.utils.TimezoneManager) {
-                        timeString = `Published: ${app.utils.TimezoneManager.formatLocalTime(item.published)}`;
-                    } else {
-                        const date = new Date(item.published);
+                    const date = new Date(item.published);
+                    if (!isNaN(date.getTime())) {
                         const userLocale = navigator.language || 'en-US';
-                        timeString = `Published: ${isNaN(date.getTime()) ? item.published : date.toLocaleString(userLocale)}`;
+                        
+                        // Format date according to user's locale preferences
+                        const dateString = date.toLocaleDateString(userLocale, {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        });
+                        
+                        // Format time according to user's locale preferences
+                        const timeString = date.toLocaleTimeString(userLocale, {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: userLocale.includes('en') || userLocale.includes('US') || userLocale.includes('CA')
+                        });
+                        
+                        timeString = `Published: ${dateString}, ${timeString}`;
+                    } else {
+                        timeString = `Published: ${item.published}`;
                     }
                 } catch (e) {
                     timeString = `Published: ${item.published}`;
                 }
+            } else if (item.timestamp) {
+                // Convert Unix timestamp (seconds) to milliseconds and create Date object
+                const date = new Date(item.timestamp * 1000);
+                if (!isNaN(date.getTime())) {
+                    const userLocale = navigator.language || 'en-US';
+                    
+                    // Format date according to user's locale preferences
+                    const dateString = date.toLocaleDateString(userLocale, {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                    
+                    // Format time according to user's locale preferences
+                    const timeString = date.toLocaleTimeString(userLocale, {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: userLocale.includes('en') || userLocale.includes('US') || userLocale.includes('CA')
+                    });
+                    
+                    timeString = `Timestamp: ${dateString}, ${timeString}`;
+                } else {
+                    timeString = `Timestamp: ${item.timestamp}`;
+                }
+            } else {
+                timeString = 'No time available';
             }
             
             return `
@@ -313,8 +322,6 @@
         // Method to clear cache when needed (e.g., when content changes)
         clearCache() {
             this.cachedFeedInfo.clear();
-            this.cachedItems = null;
-            this.lastCollectionTime = 0;
         }
     }
 

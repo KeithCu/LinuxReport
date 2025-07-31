@@ -303,9 +303,8 @@
             );
 
             if (newComments.length > 0) {
-                newComments.forEach(comment => {
-                    messagesContainer.appendChild(this.createMessageElement(comment));
-                });
+                const messagesHTML = newComments.map(comment => this.createMessageElement(comment)).join('');
+                messagesContainer.innerHTML += messagesHTML;
                 
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 this.state.lastComments = comments;
@@ -318,29 +317,21 @@
         }
 
         createMessageElement(comment) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `chat-message ${comment.is_own ? 'chat-message-own' : 'chat-message-other'}`;
+            const deleteBtnHTML = this.state.isAdminMode && comment.id 
+                ? `<button class="chat-delete-btn" title="Delete" onclick="app.modules.chat.handleDelete(event, ${comment.id})">✕</button>`
+                : '';
             
-            const textDiv = document.createElement('div');
-            textDiv.textContent = comment.text;
-            messageDiv.appendChild(textDiv);
+            const imageHTML = comment.image_url 
+                ? `<img src="${comment.image_url}" alt="Comment image">`
+                : '';
             
-            if (comment.image_url) {
-                const img = document.createElement('img');
-                img.src = comment.image_url;
-                messageDiv.appendChild(img);
-            }
-            
-            if (this.state.isAdminMode && comment.id) {
-                const deleteBtn = document.createElement('button');
-                deleteBtn.textContent = '✕';
-                deleteBtn.className = 'chat-delete-btn';
-                deleteBtn.title = 'Delete';
-                deleteBtn.addEventListener('click', (e) => this.handleDelete(e, comment.id));
-                messageDiv.appendChild(deleteBtn);
-            }
-            
-            return messageDiv;
+            return `
+                <div class="chat-message ${comment.is_own ? 'chat-message-own' : 'chat-message-other'}">
+                    <div>${comment.text}</div>
+                    ${imageHTML}
+                    ${deleteBtnHTML}
+                </div>
+            `;
         }
 
         async handleDelete(e, commentId) {
@@ -492,8 +483,17 @@
         init() {
             const chatWidget = new ChatWidget();
             if (chatWidget.init()) {
+                // Store globally for onclick handlers
+                window.chatWidget = chatWidget;
                 // Don't initialize SSE or fetch comments until chat is opened
                 // The chat container starts hidden by default
+            }
+        },
+        
+        // Global method for onclick handlers
+        handleDelete(e, commentId) {
+            if (window.chatWidget) {
+                window.chatWidget.handleDelete(e, commentId);
             }
         }
     };

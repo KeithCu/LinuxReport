@@ -197,7 +197,7 @@
                 
                 if (!isNaN(lat) && !isNaN(lon)) {
                     app.utils.logger.debug('[Weather] Found cached location in meta tags:', lat, lon);
-                    return { lat, lon };
+                    return { lat, lon, source: 'cached' };
                 }
             }
             
@@ -206,92 +206,59 @@
         }
 
         async fetch(retryCount = 0) {
-            const maxRetries = 20; // Much higher retry limit
+            const maxRetries = 5; // Reduced retry limit
             
             const attemptFetch = async () => {
                 try {
                     app.utils.logger.debug('[Weather] Starting fetch...');
                     const startTime = performance.now();
                     
-                    // Check if client geolocation is disabled first
+                    // Determine location strategy
                     let location;
                     if (app.config.DISABLE_CLIENT_GEOLOCATION) {
-                        app.utils.logger.debug('[Weather] Client geolocation disabled, skipping cached location check and browser geolocation');
+                        app.utils.logger.debug('[Weather] Client geolocation disabled');
                         location = { lat: null, lon: null, source: 'client_disabled' };
                     } else {
-                        // Only check for cached location if client geolocation is enabled
+                        // Try cached location first
                         location = this.getCachedLocation();
                         
-                        if (!location || location.lat === null || location.lon === null) {
-                        // No cached location, get user's geolocation
-                        app.utils.logger.debug('[Weather] Getting location...');
-                        let geolocationAttempts = 0;
-                        const maxGeolocationAttempts = 60; // Allow up to 60 attempts (15 seconds with 250ms delays)
-                        let userDeniedPermission = false;
-                        
-                        while (geolocationAttempts < maxGeolocationAttempts && !userDeniedPermission) {
+                        if (!location) {
+                            // No cached location, try browser geolocation
                             try {
-                                location = await app.utils.GeolocationManager.getLocation();
-                                app.utils.logger.debug('[Weather] Location obtained:', location);
-                                
-                                // If we got valid coordinates, break out of the retry loop
-                                if (location.lat !== null && location.lon !== null) {
-                                    app.utils.logger.debug('[Weather] Valid coordinates obtained, proceeding with weather request');
-                                    break;
-                                } else {
-                                    geolocationAttempts++;
-                                    app.utils.logger.debug(`[Weather] Geolocation returned null coordinates, retrying... (attempt ${geolocationAttempts}/${maxGeolocationAttempts})`);
-                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                                }
+                                app.utils.logger.debug('[Weather] Requesting browser geolocation...');
+                                const coords = await app.utils.GeolocationManager.getLocation();
+                                location = { 
+                                    lat: coords.lat, 
+                                    lon: coords.lon, 
+                                    source: 'browser' 
+                                };
+                                app.utils.logger.debug('[Weather] Browser geolocation successful:', location);
                             } catch (geolocationError) {
-                                geolocationAttempts++;
-                                
-                                // Check if user explicitly denied permission
+                                app.utils.logger.debug('[Weather] Browser geolocation failed:', geolocationError.message);
                                 if (geolocationError.code === 1) { // PERMISSION_DENIED
-                                    app.utils.logger.debug('[Weather] User denied geolocation permission, letting server use fallback');
-                                    userDeniedPermission = true;
-                                    // Don't send any coordinates - let the server use its own fallback logic
                                     location = { lat: null, lon: null, source: 'denied_permission' };
-                                    break;
-                                } else if (geolocationError.code === 2) { // POSITION_UNAVAILABLE
-                                    app.utils.logger.debug(`[Weather] Position unavailable (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
-                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
-                                } else if (geolocationError.code === 3) { // TIMEOUT
-                                    app.utils.logger.debug(`[Weather] Geolocation timeout (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
-                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
                                 } else {
-                                    app.utils.logger.debug(`[Weather] Geolocation error (attempt ${geolocationAttempts}/${maxGeolocationAttempts}):`, geolocationError.message);
-                                    await new Promise(resolve => setTimeout(resolve, 250)); // 250ms delay
+                                    location = { lat: null, lon: null, source: 'unavailable' };
                                 }
                             }
                         }
-                        
-                        // If we exhausted attempts without getting location, use default
-                        if (geolocationAttempts >= maxGeolocationAttempts && !userDeniedPermission) {
-                            app.utils.logger.debug('[Weather] Geolocation timed out after max attempts, using default location (Detroit)');
-                            location = { lat: 42.3314, lon: -83.0458, source: 'default' }; // Detroit coordinates
-                        }
+                    }
+                    
+                    // Build URL with location parameters
+                    const params = new URLSearchParams();
+                    
+                    // Add location parameters only if we have valid coordinates
+                    if (location.lat !== null && location.lon !== null && 
+                        location.source !== 'denied_permission' && 
+                        location.source !== 'client_disabled') {
+                        params.append('lat', location.lat);
+                        params.append('lon', location.lon);
+                        app.utils.logger.debug('[Weather] Sending coordinates to server:', location.lat, location.lon);
                     } else {
-                        app.utils.logger.debug('[Weather] Using cached location from headers:', location);
-                    }
+                        app.utils.logger.debug('[Weather] No coordinates to send, server will use fallback location');
                     }
                     
-                                         // Build URL with location parameters (server always returns Fahrenheit)
-                     const params = new URLSearchParams();
-                     
-                     // Add location parameters only if we have valid coordinates and user didn't deny permission
-                     // and client geolocation is not disabled
-                     if (location.lat !== null && location.lon !== null && 
-                         location.source !== 'denied_permission' && 
-                         location.source !== 'client_disabled') {
-                         params.append('lat', location.lat);
-                         params.append('lon', location.lon);
-                         app.utils.logger.debug('[Weather] Sending coordinates to server:', location.lat, location.lon);
-                     } else {
-                         app.utils.logger.debug('[Weather] No coordinates to send, server will use fallback location');
-                     }
-                    
-                    // Add cache busting parameter with current date and hour
+                    // Add cache busting parameter
                     const now = new Date();
                     const cacheBuster = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}`;
                     params.append('_cb', cacheBuster);
@@ -309,20 +276,21 @@
                     
                     this.render(data);
                 } catch (error) {
-                    // If the weather request failed, keep retrying until we succeed
+                    // If the weather request failed, retry with exponential backoff
                     if (retryCount < maxRetries) {
                         retryCount++;
-                        app.utils.logger.debug(`[Weather] Request failed, retrying in 250ms (attempt ${retryCount}/${maxRetries})...`);
-                        setTimeout(() => this.fetch(retryCount), 250); // Non-blocking retry
+                        const delay = Math.min(1000 * Math.pow(2, retryCount - 1), 5000); // Max 5 seconds
+                        app.utils.logger.debug(`[Weather] Request failed, retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})...`);
+                        setTimeout(() => this.fetch(retryCount), delay);
                         return;
                     }
                     
-                    this.showError('Unable to load weather data.');
-                    app.utils.handleError('Fetch Weather', error);
+                    app.utils.logger.error('[Weather] Max retries reached, showing error');
+                    this.showError('Unable to load weather data. Please try again later.');
                 }
             };
             
-            return attemptFetch();
+            await attemptFetch();
         }
 
         showError(message) {

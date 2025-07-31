@@ -144,7 +144,7 @@
         },
         
         init() {
-            app.utils.ThemeManager.applySettings();
+            app.utils.UIManager.applySettings();
             app.utils.ScrollManager.restorePosition();
             
             this.reinitPagination();
@@ -197,8 +197,8 @@
         window.location = "/config";
     };
 
-    app.setTheme = (theme) => app.utils.ThemeManager.setTheme(theme);
-    app.setFont = (font) => app.utils.ThemeManager.setFont(font);
+    app.setTheme = (theme) => app.utils.UIManager.setTheme(theme);
+    app.setFont = (font) => app.utils.UIManager.setFont(font);
     app.toggleViewMode = () => app.modules.core.toggleViewMode();
 
     document.addEventListener('DOMContentLoaded', () => {

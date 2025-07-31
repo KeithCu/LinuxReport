@@ -146,59 +146,46 @@
 
   // Geolocation utilities
   app.utils.GeolocationManager = {
-    // Global variable to store location data
-    locationData: null,
-    locationPromise: null,
-
     /**
      * Get user's geolocation with fallback based on DISABLE_IP_GEOLOCATION setting
      * @returns {Promise<{lat: number, lon: number}>}
      */
     async getLocation() {
-      // Always request fresh location from browser - no caching
       return this._requestLocation();
     },
 
     /**
      * Request location from browser geolocation API
-     * @returns {Promise<{lat: number, lon: null}>} - Returns null for lon when geolocation fails
+     * @returns {Promise<{lat: number, lon: number}>} - Returns coordinates or rejects on failure
      */
-            _requestLocation() {
-            return new Promise((resolve, reject) => {
-                        if (!navigator.geolocation) {
-            app.utils.logger.debug('Geolocation not supported, using IP-based location');
-            resolve({ lat: null, lon: null });
-            return;
+    _requestLocation() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          app.utils.logger.debug('Geolocation not supported');
+          reject(new Error('Geolocation not supported'));
+          return;
         }
 
-                const options = {
-                    enableHighAccuracy: false, // Keep false for faster response
-                    timeout: 15000, // Increased timeout to 15 seconds
-                    maximumAge: 3600000 // 1 hour - data within last hour is good enough
-                };
+        const options = {
+          enableHighAccuracy: false, // Keep false for faster response
+          timeout: 10000, // 10 seconds timeout
+          maximumAge: 300000 // 5 minutes - data within last 5 minutes is good enough
+        };
 
-                app.utils.logger.debug('Requesting geolocation with options:', options);
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const { latitude, longitude } = position.coords;
-                        app.utils.logger.info(`Geolocation successful: ${latitude}, ${longitude}`);
-                        resolve({ lat: latitude, lon: longitude });
-                    },
-                    (error) => {
-                        app.utils.logger.warn('Geolocation failed:', error.message, 'Code:', error.code);
-                        // Reject with the error so the caller can check the error code
-                        reject(error);
-                    },
-                    options
-                );
-            });
-        },
-
-    /**
-     * Clear cached location data (kept for compatibility, but no longer needed)
-     */
-    clearLocation() {
-      // No longer caching, so this is a no-op
+        app.utils.logger.debug('Requesting geolocation');
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            app.utils.logger.info(`Geolocation successful: ${latitude}, ${longitude}`);
+            resolve({ lat: latitude, lon: longitude });
+          },
+          (error) => {
+            app.utils.logger.warn('Geolocation failed:', error.message, 'Code:', error.code);
+            reject(error);
+          },
+          options
+        );
+      });
     }
   };
 
@@ -291,48 +278,49 @@
     }
   };
 
-  // Theme management
-  app.utils.ThemeManager = {
+  // UI management (theme and font)
+  app.utils.UIManager = {
     applySettings() {
-        const theme = app.utils.CookieManager.get('Theme') || app.config.DEFAULT_THEME;
-        document.body.setAttribute('data-theme', theme);
-        const themeSelect = document.getElementById('theme-select');
-      if (themeSelect) themeSelect.value = theme;
-
+      const theme = app.utils.CookieManager.get('Theme') || app.config.DEFAULT_THEME;
       const font = app.utils.CookieManager.get('FontFamily') || app.config.DEFAULT_FONT;
-      this.applyFont(font);
-      const fontSelect = document.getElementById('font-select');
-      if (fontSelect) fontSelect.value = font;
-
       const noUnderlines = app.utils.CookieManager.get('NoUnderlines');
+      
+      // Apply all settings at once
+      document.body.setAttribute('data-theme', theme);
+      document.body.setAttribute('data-font', font);
+      
       if (!noUnderlines || noUnderlines === '1') {
         document.body.classList.add('no-underlines');
       }
+      
+      // Update select elements
+      this.updateSelects(theme, font);
     },
-    applyFont(font) {
-      document.body.setAttribute('data-font', font);
+    
+    updateSelects(theme, font) {
+      const themeSelect = document.getElementById('theme-select');
+      const fontSelect = document.getElementById('font-select');
+      
+      if (themeSelect) themeSelect.value = theme;
+      if (fontSelect) fontSelect.value = font;
     },
+    
     setTheme(theme) {
-        // Apply theme immediately using CSS variables
-        document.body.setAttribute('data-theme', theme);
-        app.utils.CookieManager.set('Theme', theme);
-        
-        // Update theme select dropdown if it exists
-        const themeSelect = document.getElementById('theme-select');
-        if (themeSelect) themeSelect.value = theme;
-        
-        // No page reload needed - theme changes instantly!
+      document.body.setAttribute('data-theme', theme);
+      app.utils.CookieManager.set('Theme', theme);
+      
+      const themeSelect = document.getElementById('theme-select');
+      if (themeSelect) themeSelect.value = theme;
     },
+    
     setFont(font) {
       app.utils.ScrollManager.savePosition();
+      document.body.setAttribute('data-font', font);
       app.utils.CookieManager.set('FontFamily', font);
-      this.applyFont(font);
-
+      
       const fontSelect = document.getElementById('font-select');
       if (fontSelect) fontSelect.value = font;
-
-      // The original implementation caused a jarring flicker to force a reflow.
-      // We can simply restore the scroll position, which already uses requestAnimationFrame.
+      
       app.utils.ScrollManager.restorePosition();
     }
   };
