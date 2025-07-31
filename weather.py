@@ -725,8 +725,8 @@ def init_weather_routes(app):
             weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip)
             
             # Log the result for debugging
-            if weather_data and 'city_name' in weather_data:
-                print(f"[DEBUG] Weather API result: city={weather_data['city_name']}, status={status_code}")
+            # if weather_data and 'city_name' in weather_data:
+            #     print(f"[DEBUG] Weather API result: city={weather_data['city_name']}, status={status_code}")
             
             # Flask-RESTful handles JSON serialization automatically
             # Just return the data and status code
