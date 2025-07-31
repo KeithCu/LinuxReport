@@ -449,8 +449,10 @@ def _atexit_handler():
 
 # Register cleanup handlers
 atexit.register(_atexit_handler)
-signal.signal(signal.SIGTERM, _signal_handler)
-signal.signal(signal.SIGINT, _signal_handler)
+# Signal handlers commented out since code always runs under Apache/mod_wsgi
+# mod_wsgi already handles SIGTERM and SIGINT, so registration is ignored
+# signal.signal(signal.SIGTERM, _signal_handler)
+# signal.signal(signal.SIGINT, _signal_handler)
 
 # =============================================================================
 # COMPATIBILITY AND UTILITY CLASSES
