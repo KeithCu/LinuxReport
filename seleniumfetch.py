@@ -65,9 +65,9 @@ HTTP_REQUEST_TIMEOUT = NETWORK_TIMEOUT
 
 # Configuration for keithcu.com RSS feed
 KEITHCU_RSS_CONFIG = {
-    "needs_selenium": True,  # RSS feeds don't need Selenium
+    "needs_selenium": True,  # Using Selenium for testing purposes
     "needs_tor": False,
-    "post_container": "item",  # RSS items are wrapped in <item> tags
+    "post_container": "pre",  # RSS feeds in browser are wrapped in <pre> tags
     "title_selector": "title",
     "link_selector": "link", 
     "link_attr": "text",  # RSS links are text content, not href attributes
@@ -194,6 +194,8 @@ class SharedSeleniumDriver:
                 
                 try:
                     cls._instance = SharedSeleniumDriver(use_tor, user_agent)
+                    # Reset timer only when creating a new instance
+                    cls._reset_timer()
                     print(f"Created new driver instance with Tor: {use_tor}")
                 except Exception as e:
                     print(f"Error creating new driver: {e}")
@@ -202,7 +204,7 @@ class SharedSeleniumDriver:
             
             if cls._instance:
                 cls._instance.last_used = time.time()
-                cls._reset_timer()
+                # Only reset timer when creating a new instance, not on every access
                 return cls._instance.driver
             return None
 
@@ -499,6 +501,46 @@ def extract_post_data(post, config, url, use_selenium):
     Returns:
         dict: Extracted post data with title, link, id, summary, and timestamps, or None if extraction fails
     """
+    # Special handling for RSS feeds loaded through Selenium
+    if use_selenium and config["post_container"] == "pre":
+        try:
+            # Get the raw XML content from the pre tag
+            xml_content = post.text
+            
+            # Parse as XML using BeautifulSoup
+            xml_soup = BeautifulSoup(xml_content, 'xml')
+            items = xml_soup.find_all('item')
+            
+            results = []
+            for item in items:
+                title_tag = item.find('title')
+                link_tag = item.find('link')
+                
+                if title_tag and link_tag:
+                    title = title_tag.get_text().strip()
+                    link = link_tag.get_text().strip()
+                    
+                    if len(title.split()) >= 2:
+                        # Use current time for new articles
+                        published_parsed = time.gmtime()
+                        published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
+                        
+                        results.append({
+                            "title": title, 
+                            "link": link, 
+                            "id": link, 
+                            "summary": title,  # Use title as summary for RSS
+                            "published": published,
+                            "published_parsed": published_parsed
+                        })
+            
+            return results if results else None
+            
+        except Exception as e:
+            print(f"Error parsing RSS content: {e}")
+            return None
+    
+    # Regular processing for non-RSS content
     try:
         if use_selenium:
             title_element = post.find_element(By.CSS_SELECTOR, config["title_selector"])
@@ -658,9 +700,13 @@ def fetch_site_posts(url, user_agent):
                 else:
                     for post in posts:
                         try:
-                            entry = extract_post_data(post, config, url, use_selenium=True)
-                            if entry:
-                                entries.append(entry)
+                            entry_data = extract_post_data(post, config, url, use_selenium=True)
+                            if entry_data:
+                                # Handle both single entry and list of entries
+                                if isinstance(entry_data, list):
+                                    entries.extend(entry_data)
+                                else:
+                                    entries.append(entry_data)
                         except Exception as e:
                             print(f"Error extracting post data: {e}")
                             continue
