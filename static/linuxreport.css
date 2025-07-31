@@ -376,6 +376,14 @@ code {
   font-family: inherit !important;
 }
 
+.linkclass .main-headline {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: inherit; /* Inherits color from parent .linkclass a */
+  font-family: inherit; /* Inherits font family */
+  text-decoration: inherit; /* Inherits text decoration rules */
+}
+
 /* =============================================================================
    6. MEDIA & IMAGES
    ============================================================================= */

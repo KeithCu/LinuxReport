@@ -30,7 +30,7 @@ HEADLINE_TEMPLATE = Template("""
 <div class="linkclass">
 <center>
 <a href="{{ url }}" target="_blank">
-<font size="5"><b>{{ title }}</b></font>
+<span class="main-headline">{{ title }}</span>
 </a>
 {% if image_url %}
 <br/>
