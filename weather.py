@@ -276,7 +276,7 @@ def get_bucketed_weather_cache(lat, lon):
     now = datetime.now(TZ).timestamp()
     
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
-        print(f"[DEBUG] Cache HIT for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
+        #print(f"[DEBUG] Cache HIT for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
         return entry['data']
     print(f"[DEBUG] Cache MISS for key {key}, lat={lat}, lon={lon}")
     return None
@@ -715,7 +715,7 @@ def init_weather_routes(app):
                     else:
                         # Use IP-based location when enabled
                         # ip is already set to request.remote_addr
-                        print(f"[DEBUG] Using IP-based location: ip={ip}")
+                        #print(f"[DEBUG] Using IP-based location: ip={ip}")
                         pass
                 else:
                     # Coordinates provided (geolocation successful), don't use IP
