@@ -10,9 +10,11 @@ configurations, shared driver management, and thread-safe operations.
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
-import os
 import time
 import threading
+import atexit
+import signal
+import sys
 from datetime import datetime, timezone
 from urllib.parse import urljoin, urlparse
 
@@ -142,6 +144,7 @@ class SharedSeleniumDriver:
         _fetch_lock: Thread lock for synchronizing fetch operations
         _timer: Timer for automatic driver cleanup
         _timeout: Timeout duration for driver recycling (seconds)
+        _shutdown_initiated: Flag to prevent duplicate shutdown attempts
     """
     
     _instance = None
@@ -149,6 +152,7 @@ class SharedSeleniumDriver:
     _fetch_lock = threading.Lock()  # New lock for synchronizing fetch operations
     _timer = None
     _timeout = DRIVER_RECYCLE_TIMEOUT  # 5 minutes
+    _shutdown_initiated = False  # Flag to prevent duplicate shutdowns
 
     def __init__(self, use_tor, user_agent):
         """
@@ -179,23 +183,21 @@ class SharedSeleniumDriver:
             webdriver.Chrome: Configured Chrome WebDriver instance
         """
         with cls._lock:
-            if cls._instance is None or not cls._instance._is_valid(use_tor, user_agent):
+            # Check if shutdown has been initiated
+            if cls._shutdown_initiated:
+                print("Driver creation blocked - shutdown in progress")
+                return None
+                
+            if cls._instance is None or not cls._is_instance_valid(cls._instance, use_tor, user_agent):
                 if cls._instance:
-                    try:
-                        cls._instance.driver.quit()
-                    except Exception as e:
-                        print(f"Error quitting old driver: {e}")
-                        try:
-                            cls._instance.driver.close()
-                        except Exception as e2:
-                            print(f"Error closing old driver: {e2}")
-                    finally:
-                        cls._instance = None
+                    cls._cleanup_instance()
                 
                 try:
                     cls._instance = SharedSeleniumDriver(use_tor, user_agent)
+                    print(f"Created new driver instance with Tor: {use_tor}")
                 except Exception as e:
                     print(f"Error creating new driver: {e}")
+                    cls._instance = None
                     return None
             
             if cls._instance:
@@ -236,7 +238,7 @@ class SharedSeleniumDriver:
             pass
 
     @classmethod
-    def _is_valid(cls, use_tor, user_agent):
+    def _is_instance_valid(cls, instance, use_tor, user_agent):
         """
         Check if the current driver instance is valid for the given configuration.
         
@@ -247,20 +249,25 @@ class SharedSeleniumDriver:
         Returns:
             bool: True if current instance matches configuration
         """
-        # Only reuse if config matches
-        if not (cls._instance and
-                cls._instance.use_tor == use_tor and
-                cls._instance.user_agent == user_agent and
-                hasattr(cls._instance, 'driver')):
-            return False
-        
-        # Check if driver is still responsive
         try:
-            # Try to get current URL to test if driver is alive
-            cls._instance.driver.current_url
-            return True
+            # Only reuse if config matches
+            if not (instance and
+                    instance.use_tor == use_tor and
+                    instance.user_agent == user_agent and
+                    hasattr(instance, 'driver')):
+                return False
+            
+            # Check if driver is still responsive with timeout protection
+            try:
+                # Use a simple command with timeout to test if driver is alive
+                instance.driver.execute_script("return document.readyState;")
+                return True
+            except Exception as e:
+                print(f"Driver health check failed: {e}")
+                return False
+                
         except Exception as e:
-            print(f"Driver health check failed: {e}")
+            print(f"Error during driver validation: {e}")
             return False
 
     @classmethod
@@ -272,13 +279,22 @@ class SharedSeleniumDriver:
         the driver is cleaned up after the timeout period.
         """
         try:
-            if cls._timer:
+            if cls._timer and cls._timer.is_alive():
                 cls._timer.cancel()
-                cls._timer = None
-                print(f"Timer cancelled, timeout was {cls._timeout} seconds")
+                # Don't join the timer thread if we're on the same thread
+                if threading.current_thread() != cls._timer:
+                    cls._timer.join(timeout=1.0)
+                    print("Timer joined successfully")
+            print(f"Timer cancelled, timeout was {cls._timeout} seconds")
         except Exception as e:
             print(f"Error cancelling timer: {e}")
+        finally:
+            cls._timer = None
         
+        # Don't create new timer if shutdown is in progress
+        if cls._shutdown_initiated:
+            return
+            
         try:
             cls._timer = threading.Timer(cls._timeout, cls._shutdown)
             cls._timer.daemon = True
@@ -286,8 +302,43 @@ class SharedSeleniumDriver:
             print(f"New timer started with {cls._timeout} second timeout")
         except Exception as e:
             print(f"Error creating timer: {e}")
-            # If timer creation fails, try to shutdown immediately
-            cls._shutdown()
+            # If timer creation fails during normal operation, schedule immediate cleanup
+            if not cls._shutdown_initiated:
+                cls._shutdown()
+
+    @classmethod
+    def _cleanup_instance(cls):
+        """
+        Clean up the current driver instance safely.
+        """
+        if cls._instance:
+            try:
+                # Try to quit the driver gracefully
+                cls._instance.driver.quit()
+                print("WebDriver quit successfully")
+            except Exception as e:
+                print(f"Error quitting WebDriver: {e}")
+                try:
+                    # Fallback: try to close the driver
+                    cls._instance.driver.close()
+                    print("WebDriver closed successfully")
+                except Exception as e2:
+                    print(f"Error closing WebDriver: {e2}")
+                    # Last resort: try to kill the process
+                    try:
+                        if hasattr(cls._instance.driver, 'service') and hasattr(cls._instance.driver.service, 'process'):
+                            process = cls._instance.driver.service.process
+                            if process and process.poll() is None:
+                                process.terminate()
+                                time.sleep(1)
+                                if process.poll() is None:
+                                    process.kill()
+                                print("WebDriver process terminated")
+                    except Exception as e3:
+                        print(f"Error terminating WebDriver process: {e3}")
+            finally:
+                cls._instance = None
+                print("Instance set to None")
 
     @classmethod
     def _shutdown(cls):
@@ -299,28 +350,23 @@ class SharedSeleniumDriver:
         """
         print(f"Shutdown called - instance exists: {cls._instance is not None}")
         with cls._lock:
-            if cls._instance:
-                try:
-                    # Close all windows and quit the driver
-                    cls._instance.driver.quit()
-                    print("WebDriver quit successfully")
-                except Exception as e:
-                    print(f"Error quitting WebDriver: {e}")
-                    try:
-                        # Fallback: try to close the driver
-                        cls._instance.driver.close()
-                        print("WebDriver closed successfully")
-                    except Exception as e2:
-                        print(f"Error closing WebDriver: {e2}")
-                finally:
-                    cls._instance = None
-                    print("Instance set to None")
+            # Set shutdown flag to prevent new instances
+            cls._shutdown_initiated = True
+            
+            # Clean up instance
+            cls._cleanup_instance()
             
             # Cancel any existing timer
             try:
-                if cls._timer:
+                if cls._timer and cls._timer.is_alive():
                     cls._timer.cancel()
                     print("Timer cancelled during shutdown")
+                    # Don't join the timer thread if we're on the same thread
+                    if threading.current_thread() != cls._timer:
+                        cls._timer.join(timeout=1.0)
+                        print("Timer joined successfully")
+                    else:
+                        print("Skipping timer join (same thread)")
             except Exception as e:
                 print(f"Error cancelling timer during shutdown: {e}")
             finally:
@@ -330,13 +376,45 @@ class SharedSeleniumDriver:
     @classmethod
     def force_cleanup(cls):
         """
-        Shutdown and cleanup the current driver instance.
+        Force shutdown and cleanup of all resources.
         
         This method can be called manually to ensure the WebDriver
         is properly shut down, useful for debugging or emergency cleanup.
         """
         print("Forcing WebDriver cleanup...")
-        cls._shutdown()
+        with cls._lock:
+            cls._shutdown_initiated = True
+            
+            # Clean up instance
+            cls._cleanup_instance()
+            
+            # Clean up timer
+            try:
+                if cls._timer and cls._timer.is_alive():
+                    cls._timer.cancel()
+                    # Don't join the timer thread if we're on the same thread
+                    if threading.current_thread() != cls._timer:
+                        cls._timer.join(timeout=2.0)
+                        print("Timer joined successfully during force cleanup")
+                    else:
+                        print("Skipping timer join during force cleanup (same thread)")
+            except Exception as e:
+                print(f"Error during force cleanup timer cancellation: {e}")
+            finally:
+                cls._timer = None
+            
+            # Reset shutdown flag for potential future use
+            cls._shutdown_initiated = False
+            print("Force cleanup completed")
+
+    @classmethod
+    def reset_for_testing(cls):
+        """
+        Reset the class state for testing purposes.
+        """
+        print("Resetting SharedSeleniumDriver for testing...")
+        cls.force_cleanup()
+        cls._shutdown_initiated = False
 
 # =============================================================================
 # GLOBAL CLEANUP FUNCTION
@@ -351,6 +429,26 @@ def cleanup_selenium_drivers():
     """
     print("Cleaning up all Selenium drivers...")
     SharedSeleniumDriver.force_cleanup()
+
+def _signal_handler(signum, frame):
+    """
+    Signal handler for graceful shutdown.
+    """
+    print(f"Received signal {signum}, cleaning up Selenium drivers...")
+    cleanup_selenium_drivers()
+    sys.exit(0)
+
+def _atexit_handler():
+    """
+    Atexit handler for cleanup on normal program termination.
+    """
+    print("Program exiting, cleaning up Selenium drivers...")
+    cleanup_selenium_drivers()
+
+# Register cleanup handlers
+atexit.register(_atexit_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
+signal.signal(signal.SIGINT, _signal_handler)
 
 # =============================================================================
 # COMPATIBILITY AND UTILITY CLASSES
@@ -377,10 +475,9 @@ class FeedParserDict(dict):
         Raises:
             AttributeError: If the key doesn't exist
         """
-        try:
+        if key in self:
             return self[key]
-        except KeyError:
-            raise AttributeError(f"No attribute '{key}'")
+        raise AttributeError(f"No attribute '{key}'")
 
 # =============================================================================
 # CONTENT EXTRACTION FUNCTIONS
@@ -441,7 +538,6 @@ def extract_post_data(post, config, url, use_selenium):
     
     # Use current time for new articles - original timestamps are preserved by merge_entries
     # when articles are re-fetched, maintaining proper chronological ordering
-    import time
     published_parsed = time.gmtime()
     published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
     
@@ -495,26 +591,53 @@ def fetch_site_posts(url, user_agent):
     
     if not config:
         print(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
-        return []
+        return {
+            'entries': [],
+            'etag': "",
+            'modified': datetime.now(timezone.utc),
+            'feed': {'title': url, 'link': url, 'description': ''},
+            'href': url,
+            'status': 404
+        }
 
     etag = ""
     modified = datetime.now(timezone.utc)
     entries = []
+    status = 200
 
     if config.get("needs_selenium", True):
         if "reddit" in base_domain:
             user_agent = g_cs.get("REDDIT_USER_AGENT")
         
         # Acquire the fetch lock before starting the fetch operation
-        if not SharedSeleniumDriver.acquire_fetch_lock():
-            print(f"Failed to acquire fetch lock for {url}, skipping...")
-            return []
-        
+        lock_acquired = False
         try:
+            lock_acquired = SharedSeleniumDriver.acquire_fetch_lock()
+            if not lock_acquired:
+                print(f"Failed to acquire fetch lock for {url}, skipping...")
+                status = 503
+                return {
+                    'entries': [],
+                    'etag': etag,
+                    'modified': modified,
+                    'feed': {'title': url, 'link': url, 'description': ''},
+                    'href': url,
+                    'status': status
+                }
+            
             driver = SharedSeleniumDriver.get_driver(config["needs_tor"], user_agent)
             if not driver:
                 print(f"Failed to get driver for {url}")
-                return []
+                status = 503
+                return {
+                    'entries': [],
+                    'etag': etag,
+                    'modified': modified,
+                    'feed': {'title': url, 'link': url, 'description': ''},
+                    'href': url,
+                    'status': status
+                }
+                
             try:
                 driver.get(url)
                 if base_domain == "reddit.com":
@@ -531,16 +654,25 @@ def fetch_site_posts(url, user_agent):
                 if not posts:
                     snippet = driver.page_source[:500]
                     print("No posts found. Page source snippet:", snippet)
-                    raise Exception("No posts found")
-                for post in posts:
-                    entry = extract_post_data(post, config, url, use_selenium=True)
-                    if entry:
-                        entries.append(entry)
+                    status = 204  # No content
+                else:
+                    for post in posts:
+                        try:
+                            entry = extract_post_data(post, config, url, use_selenium=True)
+                            if entry:
+                                entries.append(entry)
+                        except Exception as e:
+                            print(f"Error extracting post data: {e}")
+                            continue
+                            
             except Exception as e:
                 print(f"Error on {url}: {e}")
+                status = 500
+                
         finally:
             # Always release the fetch lock, even if an error occurs
-            SharedSeleniumDriver.release_fetch_lock()
+            if lock_acquired:
+                SharedSeleniumDriver.release_fetch_lock()
     else:
         print(f"Fetching {base_domain} using requests (no Selenium)")
         try:
@@ -549,11 +681,17 @@ def fetch_site_posts(url, user_agent):
             soup = BeautifulSoup(response.text, 'html.parser')
             posts = soup.select(config["post_container"])
             for post in posts:
-                entry = extract_post_data(post, config, url, use_selenium=False)
-                if entry:
-                    entries.append(entry)
+                try:
+                    entry = extract_post_data(post, config, url, use_selenium=False)
+                    if entry:
+                        entries.append(entry)
+                except Exception as e:
+                    print(f"Error extracting post data: {e}")
+                    continue
+                    
         except Exception as e:
             print(f"Error fetching {base_domain} with requests: {e}")
+            status = 500
 
     result = {
         'entries': entries,
@@ -565,7 +703,7 @@ def fetch_site_posts(url, user_agent):
             'description': ''
         },
         'href': url,
-        'status': 200  # Mimics a successful fetch
+        'status': status
     }
 
     return result
