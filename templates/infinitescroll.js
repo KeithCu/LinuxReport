@@ -22,12 +22,6 @@
                 loadingIndicator: document.getElementById('loading-indicator'),
                 viewModeToggle: document.getElementById('view-mode-toggle')
             };
-            
-            // Cache frequently used DOM elements and data
-            this.cachedFeedInfo = new Map();
-            this.cachedItems = null;
-            this.lastCollectionTime = 0;
-            this.collectionCacheTimeout = 5000; // 5 seconds cache
         }
 
         toggleViewMode() {
@@ -96,66 +90,36 @@
         }
 
         collectAllItems() {
-            // Use cache if available and recent
-            const now = Date.now();
-            if (this.cachedItems && (now - this.lastCollectionTime) < this.collectionCacheTimeout) {
-                return this.cachedItems;
-            }
-
             const containers = document.querySelectorAll('.column .box');
             const items = [];
-            
-            // Pre-allocate array size for better performance
-            let totalItems = 0;
-            containers.forEach(container => {
-                totalItems += container.querySelectorAll('.linkclass').length;
-            });
-            
-            items.length = totalItems;
-            let itemIndex = 0;
 
             containers.forEach(container => {
                 const feedId = container.id;
                 const feedIcon = container.querySelector('img');
                 if (!feedIcon) return;
 
-                const feedInfo = this.getCachedFeedInfo(feedId, feedIcon);
+                const feedInfo = this.extractFeedInfo(feedId, feedIcon);
                 const linkElements = container.querySelectorAll('.linkclass');
                 
                 linkElements.forEach(item => {
                     const linkElement = item.querySelector('a[target="_blank"]');
                     if (!linkElement) return;
 
-                    items[itemIndex++] = {
+                    items.push({
                         title: linkElement.textContent.trim(),
                         link: linkElement.href,
                         source_name: feedInfo.name,
                         source_icon: feedInfo.icon,
                         timestamp: parseInt(item.dataset.index || '0', 10),
                         published: item.dataset.published || ''
-                    };
+                    });
                 });
             });
-
-            // Trim array to actual size
-            items.length = itemIndex;
-            
-            // Cache the result
-            this.cachedItems = items;
-            this.lastCollectionTime = now;
             
             return items;
         }
 
-        getCachedFeedInfo(feedId, feedIcon) {
-            if (this.cachedFeedInfo.has(feedId)) {
-                return this.cachedFeedInfo.get(feedId);
-            }
 
-            const feedInfo = this.extractFeedInfo(feedId, feedIcon);
-            this.cachedFeedInfo.set(feedId, feedInfo);
-            return feedInfo;
-        }
 
         extractFeedInfo(feedId, feedIcon) {
             const feedUrl = feedId.replace(/^feed-/, '');
