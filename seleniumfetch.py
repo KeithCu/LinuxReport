@@ -487,6 +487,70 @@ class FeedParserDict(dict):
 # CONTENT EXTRACTION FUNCTIONS
 # =============================================================================
 
+def parse_relative_time(time_text):
+    """
+    Parse relative time strings like "14 minutes ago", "2 hours ago", etc.
+    
+    Args:
+        time_text (str): Relative time string to parse
+        
+    Returns:
+        tuple: (published_parsed, published) where published_parsed is time.struct_time
+               and published is formatted string, or (None, None) if parsing fails
+    """
+    import re
+    from datetime import datetime, timedelta
+    
+    try:
+        # Convert to lowercase for easier matching
+        time_text = time_text.lower().strip()
+        
+        # Patterns for different time units
+        patterns = [
+            (r'(\d+)\s+minutes?\s+ago', 'minutes'),
+            (r'(\d+)\s+hours?\s+ago', 'hours'),
+            (r'(\d+)\s+days?\s+ago', 'days'),
+            (r'(\d+)\s+weeks?\s+ago', 'weeks'),
+            (r'(\d+)\s+months?\s+ago', 'months'),
+            (r'(\d+)\s+years?\s+ago', 'years'),
+        ]
+        
+        for pattern, unit in patterns:
+            match = re.search(pattern, time_text)
+            if match:
+                value = int(match.group(1))
+                
+                # Calculate the actual time
+                now = datetime.now()
+                
+                if unit == 'minutes':
+                    delta = timedelta(minutes=value)
+                elif unit == 'hours':
+                    delta = timedelta(hours=value)
+                elif unit == 'days':
+                    delta = timedelta(days=value)
+                elif unit == 'weeks':
+                    delta = timedelta(weeks=value)
+                elif unit == 'months':
+                    # Approximate months as 30 days
+                    delta = timedelta(days=value * 30)
+                elif unit == 'years':
+                    # Approximate years as 365 days
+                    delta = timedelta(days=value * 365)
+                
+                published_time = now - delta
+                published_parsed = published_time.timetuple()
+                published = published_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
+                
+                return published_parsed, published
+        
+        # If no pattern matches, return None
+        return None, None
+        
+    except Exception as e:
+        print(f"Error parsing relative time '{time_text}': {e}")
+        return None, None
+
 def extract_post_data(post, config, url, use_selenium):
     """
     Extract post data from a web element using the provided configuration.
