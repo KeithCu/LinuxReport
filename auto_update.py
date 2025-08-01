@@ -595,8 +595,36 @@ def _try_call_model(client, model, messages, max_tokens):
                         "response_time": response_time,
                         "messages": prepared_messages # Log potentially modified messages
                     }
-                    with open(API_RESPONSE_LOG, "a", encoding="utf-8") as f:
-                        f.write(json.dumps(log_entry, ensure_ascii=False, indent=2) + "\n")
+                    
+                    # Read existing entries
+                    entries = []
+                    if os.path.exists(API_RESPONSE_LOG):
+                        try:
+                            with open(API_RESPONSE_LOG, "r", encoding="utf-8") as f:
+                                for line in f:
+                                    line = line.strip()
+                                    if line:
+                                        try:
+                                            entries.append(json.loads(line))
+                                        except json.JSONDecodeError:
+                                            continue
+                        except Exception as e:
+                            logger.warning(f"Error reading existing log entries: {str(e)}")
+                            # Continue with empty entries list if file is corrupted
+                    
+                    # Add new entry
+                    entries.append(log_entry)
+                    
+                    # Keep only the last MAX_PREVIOUS_HEADLINES entries
+                    if len(entries) > MAX_PREVIOUS_HEADLINES:
+                        entries = entries[-MAX_PREVIOUS_HEADLINES:]
+                        logger.debug(f"Truncated {API_RESPONSE_LOG} to {MAX_PREVIOUS_HEADLINES} entries")
+                    
+                    # Write back to file
+                    with open(API_RESPONSE_LOG, "w", encoding="utf-8") as f:
+                        for entry in entries:
+                            f.write(json.dumps(entry, ensure_ascii=False, indent=2) + "\n")
+                    
                     logger.debug(f"Logged API response to {API_RESPONSE_LOG}")
                 except Exception as log_error:
                     logger.warning(f"Failed to log API response: {str(log_error)}")
@@ -623,6 +651,8 @@ def extract_top_titles_from_ai(text):
         logger.warning("Empty text provided to extract_top_titles_from_ai")
         return []
     
+    messages = []
+
     logger.debug(f"Extracting titles from AI response (length: {len(text)})")
         
     # Try to find the marker by looking for the marker word with any surrounding characters
@@ -727,6 +757,9 @@ def extract_top_titles_from_ai(text):
 
 def _prepare_messages(prompt_mode, filtered_articles):
     """Prepares the message list based on the prompt mode."""
+    # Default empty messages list
+    messages = []
+    
     if INCLUDE_ARTICLE_SUMMARY_FOR_LLM:
         def article_line(i, article):
             summary = article.get('summary') or article.get('html_content') or ''
@@ -747,12 +780,14 @@ def _prepare_messages(prompt_mode, filtered_articles):
             {"role": "system", "content": PROMPT_O3_SYSTEM},
             {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
         ]
-    # else: # THIRTY_B mode
-    #     mode_instructions = REPORT_PROMPT
-    #     user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
-    #     messages = [
-    #         {"role": "user", "content": PROMPT_30B.format(mode_instructions=mode_instructions) + "\n" + user_list}
-    #     ]
+    else:
+        # Default case if prompt_mode is not recognized
+        logger.warning(f"Unhandled prompt_mode: {prompt_mode}. Using default O3 prompt.")
+        user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
+        messages = [
+            {"role": "system", "content": PROMPT_O3_SYSTEM},
+            {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
+        ]
     return messages
 
 def ask_ai_top_articles(articles, dry_run=False):
