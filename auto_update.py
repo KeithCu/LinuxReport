@@ -47,7 +47,7 @@ from enum import Enum  # Ensure this is included if not already
 # - ERROR: Shows only errors
 # - CRITICAL: Shows only critical errors
 # Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
-LOG_LEVEL = "DEBUG"  # Change to "DEBUG" for maximum verbosity
+LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
 LOG_FILE = "auto_update.log"  # Single log file that gets appended to
 
 # Configure logging
@@ -393,8 +393,7 @@ class ModelSelector:
         }
         
         logger.debug(f"Loaded {len(self.failed_models)} failed models from cache")
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f"Failed models: {list(self.failed_models)}")
+        logger.info(f"Failed models: {list(self.failed_models)}")
         
     def mark_failed(self, model):
         """Mark a model as failed with timestamp."""
@@ -582,8 +581,7 @@ def _try_call_model(client, model, messages, max_tokens):
             logger.info(f"Model {model} responded in {response_time:.3f}s, finish_reason: {finish_reason}")
             logger.debug(f"Response length: {len(response_text)} characters")
             
-            if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(f"Full response from {model}:\n{response_text}")
+            logger.info(f"Full response from {model}:\n{response_text}")
             
             # Log the API response only if global logging is enabled
             if GLOBAL_LOGGING_ENABLED:
