@@ -1093,20 +1093,7 @@ def create_embedding_visualization(mode=None, output_file="embedding_visualizati
     matplotlib.use('Agg')  # Use non-interactive backend
     logger.info("Set matplotlib backend to Agg")
     
-    # Re-import matplotlib.pyplot after setting backend
-    import matplotlib.pyplot as plt
-    import matplotlib.patches as patches
-    from matplotlib.colors import LinearSegmentedColormap
-    import numpy as np
-    from sklearn.decomposition import PCA
-    from sklearn.manifold import TSNE
-    
     logger.info("Computing embeddings for titles...")
-    
-    # Limit to 200 most recent selections
-    if len(previous_selections) > 200:
-        previous_selections = previous_selections[-200:]
-        logger.info(f"Limited to 200 most recent selections")
     
     # Extract titles and compute embeddings
     titles = [sel["title"] for sel in previous_selections]
