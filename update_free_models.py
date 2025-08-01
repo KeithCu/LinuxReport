@@ -2,6 +2,7 @@ import sys
 import re
 import logging
 import requests
+from datetime import datetime
 
 # Add the current directory to the path to import local modules
 sys.path.append('.')
@@ -59,13 +60,24 @@ def update_script_file(latest_models):
 
         # --- Merging and Sorting Logic ---
         
-        # Determine the final set of active models:
-        # Start with existing active models, add new ones from the API.
-        final_active_models = set(existing_active_models) | set(latest_models)
-        # Ensure that any model present in the commented map is NOT in the active list.
+        # Identify models that were active but are no longer in the latest free list.
+        models_to_comment_out = set(existing_active_models) - set(latest_models)
+        
+        # Get today's date for the comment
+        removal_date = datetime.now().strftime("%Y-%m-%d")
+
+        for model in models_to_comment_out:
+            if model not in commented_models_map:
+                # Add to commented_models_map to preserve it, but commented out.
+                commented_models_map[model] = f'    # "{model}", # Removed by openrouter.ai on: {removal_date}'
+
+        # The final list of active models should be what the API currently reports as free.
+        final_active_models = set(latest_models)
+        
+        # Remove any models that are manually commented out, to respect the user's choice.
         final_active_models -= set(commented_models_map.keys())
 
-        # Get a single, sorted list of all unique model names (both active and commented)
+        # The final list to be written to the file includes both active and commented models, sorted alphabetically.
         all_unique_models = sorted(list(final_active_models | set(commented_models_map.keys())))
 
         # --- Rebuilding the List ---
