@@ -203,25 +203,26 @@ USER_ONLY_INSTRUCTION_MODELS = [
 # PROMPT TEMPLATES
 # =============================================================================
 
-PROMPT_30B = f""" Prompt:
-Given this list of news headlines, follow these steps:
-Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
-Think carefully and consisely about relevance, interest, and topic distinction.
-From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
-After reasoning, output {TITLE_MARKER} followed by the top 3 headlines in this format, with no extra text but title:
+# This is commented out because it causes many models to generate far too many tokens and fail.
+# PROMPT_30B = f""" Prompt:
+# Given this list of news headlines, follow these steps:
+# Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
+# Think carefully and consisely about relevance, interest, and topic distinction.
+# From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
+# After reasoning, output {TITLE_MARKER} followed by the top 3 headlines in this format, with no extra text but title:
 
-{TITLE_MARKER}
-Best headline
-Second Best headline
-Third Best headline
-"""
+# {TITLE_MARKER}
+# Best headline
+# Second Best headline
+# Third Best headline
+# """
 
 # O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = f"""
 INSTRUCTIONS:
 1. Write exactly ONE paragraph (40 words or less) explaining your choices
-2. Write {TITLE_MARKER} on its own line
-3. List exactly 3 titles from the list of titles below, one per line
+2. Write {TITLE_MARKER} on its own line.
+3. List exactly 3 best titles for the listed audience from the list of titles below, one per line
 4. Do NOT include any extra text on the title lines, put your comments and disclaimers above or below the list of titles.
 5. IMPORTANT: You must select ONLY from the provided list of titles - do not make up new titles
 6. Order the titles by importance - most important/interesting first
@@ -746,12 +747,12 @@ def _prepare_messages(prompt_mode, filtered_articles):
             {"role": "system", "content": PROMPT_O3_SYSTEM},
             {"role": "user",   "content": PROMPT_O3_USER_TEMPLATE.format(mode_instructions=mode_instructions) + user_list},
         ]
-    else: # THIRTY_B mode
-        mode_instructions = REPORT_PROMPT
-        user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
-        messages = [
-            {"role": "user", "content": PROMPT_30B.format(mode_instructions=mode_instructions) + "\n" + user_list}
-        ]
+    # else: # THIRTY_B mode
+    #     mode_instructions = REPORT_PROMPT
+    #     user_list = "\n".join(article_line(i, article) for i, article in enumerate(filtered_articles, 1))
+    #     messages = [
+    #         {"role": "user", "content": PROMPT_30B.format(mode_instructions=mode_instructions) + "\n" + user_list}
+    #     ]
     return messages
 
 def ask_ai_top_articles(articles, dry_run=False):
