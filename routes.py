@@ -264,8 +264,8 @@ def _register_main_routes(flask_app):
         start_time = time.time()
 
         # Get user agent and check if it's a bot (including our custom deploy bot)
-        user_agent = request.headers.get('User-Agent', '').lower()
-        is_deploy_bot = 'deploybot' in user_agent
+        user_agent = request.headers.get('User-Agent', '')
+        is_deploy_bot = 'DeployBot' in user_agent
         is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
 
         # Determine the order of RSS feeds to display.
