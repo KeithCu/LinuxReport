@@ -66,7 +66,9 @@ def wake_up_site(dir_name, url):
     while attempt <= max_attempts:
         # Make the HTTP request
         try:
-            req = urllib.request.Request(url, headers={'User-Agent': 'Deploy-Script/1.0'})
+            # Use Googlebot user agent to prevent triggering refreshes/background updates
+            # This ensures deploy requests don't trigger background refreshes when starting the app
+            req = urllib.request.Request(url, headers={'User-Agent': 'LinuxReportDeployBot'})
             with urllib.request.urlopen(req, timeout=10) as response:
                 http_status = response.getcode()
                 response_content = response.read().decode('utf-8')

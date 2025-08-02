@@ -262,7 +262,12 @@ def _register_main_routes(flask_app):
 
         # Single kernel time call at start - use time.time() as unified time format
         start_time = time.time()
-        
+
+        # Get user agent and check if it's a bot (including our custom deploy bot)
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_deploy_bot = 'deploybot' in user_agent
+        is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+
         # Determine the order of RSS feeds to display.
         page_order = None
         if request.cookies.get('UrlsVer') == URLS_COOKIE_VERSION:
@@ -413,21 +418,18 @@ def _register_main_routes(flask_app):
                                weather_lat=template_lat, weather_lon=template_lon)
 
         # Trigger background fetching if needed
-        if need_fetch and ENABLE_BACKGROUND_REFRESH:
-            # Check if the request is from a web bot
-            user_agent = request.headers.get('User-Agent', '')
-            is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
-            
-            if not is_web_bot:
-                fetch_urls_thread()
+        if need_fetch and ENABLE_BACKGROUND_REFRESH and not is_web_bot:
+            fetch_urls_thread()
 
         # Single kernel time call at end and track performance stats
         end_time = time.time()
-        if not is_admin:
+        # Don't track stats only for deploy bot (other bots should count as users)
+        if not is_admin and not is_deploy_bot:
             render_time = end_time - start_time
             update_performance_stats(render_time, end_time)
-        else:
-            # Add stats display to the page for admin mode - pass end_time to avoid additional time call
+        
+        # Still show stats for admin users
+        if is_admin:
             stats_html = get_admin_stats_html()
             if stats_html:
                 page = page.replace('</body>', f'{stats_html}</body>')

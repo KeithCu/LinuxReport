@@ -52,7 +52,7 @@ wake_up_site() {
     
     while [ $attempt -le $max_attempts ]; do
         # Make the request with User-Agent header
-        response=$(curl -s -w "HTTP_STATUS:%{http_code}" -H "User-Agent: Deploy-Script/1.0" --connect-timeout 10 --max-time 10 "$url")
+        response=$(curl -s -w "HTTP_STATUS:%{http_code}" -H "User-Agent: LinuxReportDeployBot" --connect-timeout 10 --max-time 10 "$url")
         http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
         response_content=$(echo "$response" | grep -v "HTTP_STATUS:")
         

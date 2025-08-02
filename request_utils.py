@@ -57,7 +57,8 @@ WEB_BOT_USER_AGENTS = [
     "Hydrozen.io",
     "SummalyBot",
     "DotBot",
-    "Coccocbot"
+    "Coccocbot",
+    "LinuxReportDeployBot",
 ]
 
 # =============================================================================
