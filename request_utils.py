@@ -126,7 +126,7 @@ def dynamic_rate_limit():
         return "500 per minute"
     
     user_agent = request.headers.get('User-Agent', '')
-    if any(bot in user_agent for bot in WEB_BOT_USER_AGENTS):
+    if is_web_bot(user_agent):
         return "20 per minute"
     
     return "100 per minute"

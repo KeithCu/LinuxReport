@@ -37,7 +37,7 @@ from shared import (
     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML, 
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
-    WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API
+    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API
 )
 from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation

@@ -34,7 +34,7 @@ from flask_restful import Resource, reqparse
 # =============================================================================
 from shared import (
     limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT, 
-    TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS,
+    TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, 
     API, DISABLE_IP_GEOLOCATION, DISABLE_CLIENT_GEOLOCATION
 )
 from request_utils import is_web_bot

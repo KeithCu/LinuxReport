@@ -41,7 +41,7 @@ from flask_restful import Api
 import FeedHistory
 from SqliteLock import LockBase, DiskcacheSqliteLock
 from app_config import get_settings_config, get_allowed_domains, get_allowed_requester_domains, get_cdn_config, get_object_store_config, get_welcome_html, get_reports_config, get_storage_config
-from request_utils import get_rate_limit_key, dynamic_rate_limit, WEB_BOT_USER_AGENTS, get_ip_prefix, format_last_updated
+from request_utils import get_rate_limit_key, dynamic_rate_limit, get_ip_prefix, format_last_updated
 from models import DiskCacheWrapper, RssFeed
 
 # =============================================================================
@@ -147,7 +147,7 @@ EXPIRE_YEARS: int = 86400 * 365 * 2  # 2 years
 # =============================================================================
 
 # Current application mode
-MODE = Mode.AI_REPORT
+MODE = Mode.TRUMP_REPORT
 
 # URL cookie version for cache invalidation
 URLS_COOKIE_VERSION = "2"
