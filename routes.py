@@ -39,6 +39,7 @@ from shared import (
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
     WEB_BOT_USER_AGENTS, INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API
 )
+from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
 from shared import DISABLE_CLIENT_GEOLOCATION
 from workers import fetch_urls_parallel, fetch_urls_thread
@@ -266,7 +267,7 @@ def _register_main_routes(flask_app):
         # Get user agent and check if it's a bot (including our custom deploy bot)
         user_agent = request.headers.get('User-Agent', '')
         is_deploy_bot = 'DeployBot' in user_agent
-        is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+        is_web_bot = is_web_bot(user_agent)
 
         # Determine the order of RSS feeds to display.
         page_order = None

@@ -15,6 +15,7 @@ import datetime
 from flask import request
 from flask_login import current_user
 from flask_limiter.util import get_remote_address
+import ahocorasick
 
 # =============================================================================
 # WEB BOT DETECTION
@@ -61,6 +62,35 @@ WEB_BOT_USER_AGENTS = [
     "LinuxReportDeployBot",
 ]
 
+# Initialize Aho-Corasick automaton for efficient web bot detection
+
+# Create and initialize the automaton once at module level
+_BOT_AUTOMATON = ahocorasick.Automaton()
+for bot_pattern in WEB_BOT_USER_AGENTS:
+    _BOT_AUTOMATON.add_word(bot_pattern, bot_pattern)
+_BOT_AUTOMATON.make_automaton()
+
+def is_web_bot(user_agent: str) -> bool:
+    """
+    Check if the user agent string contains any web bot patterns using Aho-Corasick algorithm.
+    
+    This implementation is more efficient than regex or simple substring matching
+    for multiple patterns, especially as the number of patterns grows.
+    
+    Args:
+        user_agent: The User-Agent header string to check
+        
+    Returns:
+        bool: True if any web bot pattern is found, False otherwise
+    """
+    try:
+        # Use the Aho-Corasick automaton to find matches
+        # The iter method returns an iterator. We only care if it yields at least one match.
+        next(_BOT_AUTOMATON.iter(user_agent))
+        return True
+    except StopIteration:
+        return False
+
 # =============================================================================
 # RATE LIMITING CONFIGURATION
 # =============================================================================
@@ -83,9 +113,7 @@ def get_rate_limit_key():
 
     # Check if request is from a web bot
     user_agent = request.headers.get('User-Agent', '')
-    is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
-    
-    if is_web_bot:
+    if is_web_bot(user_agent):
         return f"bot:{get_remote_address()}"
     
     return f"user:{get_remote_address()}"
@@ -93,23 +121,19 @@ def get_rate_limit_key():
 def dynamic_rate_limit():
     """
     Return rate limit based on user type.
-    
-    Provides different rate limits for different types of users:
-    - Admins: Higher limits for administrative functions
-    - Bots: Lower limits to prevent abuse
-    - Regular users: Standard limits
-    
-    Returns:
-        str: Rate limit string in format "X per minute"
     """
-    key = get_rate_limit_key()
+    if current_user.is_authenticated:
+        return "500 per minute"
     
-    if key.startswith("admin:"):
-        return "50 per minute"  # Higher limits for admins
-    elif key.startswith("bot:"):
-        return "10 per minute"    # Lower limits for bots
-    else:
-        return "20 per minute"  # Standard limits for users
+    user_agent = request.headers.get('User-Agent', '')
+    if any(bot in user_agent for bot in WEB_BOT_USER_AGENTS):
+        return "20 per minute"
+    
+    return "100 per minute"
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
 
 def get_ip_prefix(ip_str):
     """
