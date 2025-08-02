@@ -28,27 +28,36 @@ WEB_BOT_USER_AGENTS = [
     "Google-InspectionTool",
     "Google-Site-Verification",
     "Google-Extended",
-
+    "GoogleOther",
     # Bing Crawlers
     "Bingbot",
     "AdIdxBot",
     "MicrosoftPreview",
-
     # Yandex Crawlers
     "YandexBot",
     "YandexMobileBot",
     "YandexImages",
-
+    # Other Search Engine Crawlers
+    "Slurp",  # Yahoo
+    "Sogou web spider",  # Sogou
+    "Yeti",  # Naver
+    "Baiduspider",  # Baidu
+    "DuckDuckBot",  # DuckDuckGo
     # AI-Related Crawlers
     "GPTBot",
     "ClaudeBot",
+    "ChatGPT-User",
+    "anthropic-ai",
+    "PerplexityBot",
+    "cohere-ai",
     "CCBot",
     "Bytespider",
     "Applebot",
-
+    # Social Media Crawlers
+    "facebookexternalhit",
+    "Twitterbot",
+    "LinkedInBot",
     # Other Common Crawlers
-    "Baiduspider",
-    "DuckDuckBot",
     "AhrefsBot",
     "SemrushBot",
     "MJ12bot",
@@ -61,7 +70,6 @@ WEB_BOT_USER_AGENTS = [
     "Coccocbot",
     "LinuxReportDeployBot",
 ]
-
 # Initialize Aho-Corasick automaton for efficient web bot detection
 
 # Create and initialize the automaton once at module level
