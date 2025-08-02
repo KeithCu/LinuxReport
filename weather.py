@@ -681,11 +681,11 @@ def init_weather_routes(app):
             
             # Check if request is from a web bot
             user_agent = request.headers.get('User-Agent', '')
-            is_web_bot = is_web_bot(user_agent)
+            is_bot = is_web_bot(user_agent)
             
             # For web bots or requests from news.thedetroitilove.com, use default (Detroit) coordinates
             referrer = request.headers.get('Referer', '')
-            if is_web_bot or 'news.thedetroitilove.com' in referrer:
+            if is_bot or 'news.thedetroitilove.com' in referrer:
                 lat = DEFAULT_WEATHER_LAT
                 lon = DEFAULT_WEATHER_LON
                 ip = None  # Don't use IP for geolocation
