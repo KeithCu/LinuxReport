@@ -37,6 +37,7 @@ from shared import (
     TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, WEB_BOT_USER_AGENTS,
     API, DISABLE_IP_GEOLOCATION, DISABLE_CLIENT_GEOLOCATION
 )
+from request_utils import is_web_bot
 from app_config import DEBUG, get_weather_api_key
 
 # =============================================================================
@@ -680,7 +681,7 @@ def init_weather_routes(app):
             
             # Check if request is from a web bot
             user_agent = request.headers.get('User-Agent', '')
-            is_web_bot = any(bot in user_agent for bot in WEB_BOT_USER_AGENTS)
+            is_web_bot = is_web_bot(user_agent)
             
             # For web bots or requests from news.thedetroitilove.com, use default (Detroit) coordinates
             referrer = request.headers.get('Referer', '')

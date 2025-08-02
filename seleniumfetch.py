@@ -38,6 +38,14 @@ from webdriver_manager.core.os_manager import ChromeType
 from shared import g_cs, CUSTOM_FETCH_CONFIG
 
 # =============================================================================
+# FEATURE FLAGS
+# =============================================================================
+
+# Global flag to enable/disable date extraction feature
+# Set to True to enable date extraction, False to disable
+ENABLE_DATE_EXTRACTION = False
+
+# =============================================================================
 # TIMEOUT CONSTANTS
 # =============================================================================
 
@@ -644,10 +652,47 @@ def extract_post_data(post, config, url, use_selenium):
     if filter_pattern and filter_pattern not in link:
         return None
     
-    # Use current time for new articles - original timestamps are preserved by merge_entries
-    # when articles are re-fetched, maintaining proper chronological ordering
-    published_parsed = time.gmtime()
-    published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
+    # Extract published date if feature is enabled and selector is provided
+    published_parsed = None
+    published = None
+    
+    if ENABLE_DATE_EXTRACTION and "published_selector" in config:
+        try:
+            if use_selenium:
+                # Handle XPath selectors (starting with .// or //)
+                if config["published_selector"].startswith(('.//', '//')):
+                    from selenium.webdriver.common.by import By
+                    date_element = post.find_element(By.XPATH, config["published_selector"])
+                    date_text = date_element.text.strip()
+                else:
+                    # Handle CSS selectors
+                    date_element = post.find_element(By.CSS_SELECTOR, config["published_selector"])
+                    date_text = date_element.text.strip()
+            else:
+                # BeautifulSoup extraction
+                if config["published_selector"].startswith(('.//', '//')):
+                    # Convert XPath to CSS if possible, or use lxml
+                    from lxml import html
+                    import lxml.etree
+                    # For now, fallback to current time for XPath with BeautifulSoup
+                    date_text = None
+                else:
+                    date_element = post.select_one(config["published_selector"])
+                    date_text = date_element.text.strip() if date_element else None
+            
+            if date_text:
+                published_parsed, published = parse_relative_time(date_text)
+                
+        except Exception as e:
+            print(f"Warning: Failed to extract date for {url}: {e}")
+            # Fallback to current time
+            published_parsed = None
+            published = None
+    
+    # Use current time if date extraction failed or is disabled
+    if not published_parsed:
+        published_parsed = time.gmtime()
+        published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
     
     return {
         "title": title, 
