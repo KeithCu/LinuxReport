@@ -279,7 +279,7 @@ def get_bucketed_weather_cache(lat, lon):
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
         #print(f"[DEBUG] Cache HIT for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
         return entry['data']
-    print(f"[DEBUG] Cache MISS for key {key}, lat={lat}, lon={lon}")
+    #print(f"[DEBUG] Cache MISS for key {key}, lat={lat}, lon={lon}")
     return None
 
 # Temperature conversion functions removed - now handled client-side
@@ -301,7 +301,7 @@ def _process_openweather_response(weather_data, fetch_time):
     """
     # Determine city name for logging
     city_name = weather_data.get("city", {}).get("name", "Unknown location")
-    print(f"[DEBUG] Raw city name from API: {repr(city_name)}")
+    #print(f"[DEBUG] Raw city name from API: {repr(city_name)}")
     
     # Fix Unicode encoding issue - the city name might be coming as bytes or with encoding issues
     if isinstance(city_name, str):
@@ -317,7 +317,7 @@ def _process_openweather_response(weather_data, fetch_time):
             # If all else fails, use the original
             pass
     
-    print(f"[DEBUG] Processed city name: {repr(city_name)}")
+    #print(f"[DEBUG] Processed city name: {repr(city_name)}")
     # print(f"[DEBUG] Raw API response city data: {weather_data.get('city', {})}")
 
     daily_data = defaultdict(list)
