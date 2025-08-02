@@ -267,7 +267,7 @@ def _register_main_routes(flask_app):
         # Get user agent and check if it's a bot (including our custom deploy bot)
         user_agent = request.headers.get('User-Agent', '')
         is_deploy_bot = 'DeployBot' in user_agent
-        is_web_bot = is_web_bot(user_agent)
+        is_bot = is_web_bot(user_agent)
 
         # Determine the order of RSS feeds to display.
         page_order = None
@@ -419,7 +419,7 @@ def _register_main_routes(flask_app):
                                weather_lat=template_lat, weather_lon=template_lon)
 
         # Trigger background fetching if needed
-        if need_fetch and ENABLE_BACKGROUND_REFRESH and not is_web_bot:
+        if need_fetch and ENABLE_BACKGROUND_REFRESH and not is_bot:
             fetch_urls_thread()
 
         # Single kernel time call at end and track performance stats
