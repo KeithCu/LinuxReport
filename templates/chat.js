@@ -46,13 +46,8 @@
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
             window.addEventListener('resize', this.handleResize);
             
-            // Initialize beep sound after everything else is set up
-            // This way CSP errors won't prevent chat from working
-            try {
-                this.initBeepSound();
-            } catch (error) {
-                console.warn('[Chat] Beep sound initialization failed, but chat will continue to work:', error.message);
-            }
+            // Don't initialize beep sound until chat is actually opened
+            // This prevents unnecessary download when chat window is closed
             
             return true;
         }
@@ -445,6 +440,14 @@
                 this.closeChat();
             } else {
                 container.style.display = 'flex';
+                // Initialize beep sound only when chat is first opened
+                if (!this.beepSound) {
+                    try {
+                        this.initBeepSound();
+                    } catch (error) {
+                        console.warn('[Chat] Beep sound initialization failed, but chat will continue to work:', error.message);
+                    }
+                }
                 this.startChatSession();
             }
         }
