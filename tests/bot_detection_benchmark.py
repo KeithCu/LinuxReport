@@ -44,15 +44,15 @@ BOT_PATTERNS = [
     "LinuxReportDeployBot",
 ]
 
-# A larger, more realistic list of user agents for robust benchmarking.
+# User agents for benchmarking with 90% non-bot, 10% bot distribution
 USER_AGENTS = [
+    # Standard non-bot user agent (will be used 90% of the time)
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36",
+    
+    # Various bot user agents (will be used 10% of the time combined)
     "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.1 Mobile/15E148 Safari/604.1",
-    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
     "Googlebot-Image/1.0",
     "Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)",
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
     "AhrefsBot/7.0; +http://ahrefs.com/robot/",
     "SemrushBot/7~bl; +http://www.semrush.com/bot.html",
     "Mozilla/5.0 (compatible; Yahoo! Slurp; http://help.yahoo.com/help/us/ysearch/slurp)",
@@ -98,10 +98,18 @@ def check_bot_ahocorasick(user_agent):
 
 def run_benchmark(func, num_runs=10000):
     """Runs a benchmark for a given function."""
-    total_time = timeit.timeit(
-        lambda: func(random.choice(USER_AGENTS)),
-        number=num_runs
-    )
+    # Ensure 90% non-bot, 10% bot distribution
+    non_bot_ua = USER_AGENTS[0]  # First user agent is the non-bot
+    bot_uas = USER_AGENTS[1:]    # Rest are bots
+    
+    def test_function():
+        # 90% chance of non-bot, 10% chance of bot
+        if random.random() < 0.9:
+            return func(non_bot_ua)
+        else:
+            return func(random.choice(bot_uas))
+    
+    total_time = timeit.timeit(test_function, number=num_runs)
     # Return average time in microseconds
     return (total_time / num_runs) * 1e6
 
