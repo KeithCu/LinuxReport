@@ -118,7 +118,7 @@
 
             // Set initial state
             const currentUnits = this.getUnits();
-            unitToggle.textContent = currentUnits === 'metric' ? '°C' : '°F';
+            unitToggle.textContent = currentUnits === 'metric' ? '°F' : '°C';
             unitToggle.title = `Switch to ${currentUnits === 'metric' ? 'Fahrenheit' : 'Celsius'}`;
 
             // Add click handler
@@ -130,7 +130,7 @@
                 localStorage.setItem('weatherUnits', newUnits);
                 
                 // Update toggle button
-                unitToggle.textContent = newUnits === 'metric' ? '°C' : '°F';
+                unitToggle.textContent = newUnits === 'metric' ? '°F' : '°C';
                 unitToggle.title = `Switch to ${newUnits === 'metric' ? 'Fahrenheit' : 'Celsius'}`;
                 
                 // Re-render current weather data with new units
