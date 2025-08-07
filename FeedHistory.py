@@ -221,6 +221,18 @@ class FeedHistory:
         with open(self.data_file, "w") as f:
             json.dump(serializable_data, f, indent=4, sort_keys=True)
 
+    def reset_history(self, url: str) -> None:
+        """
+        Reset the history for a given URL.
+        
+        Args:
+            url (str): The RSS feed URL to reset
+        """
+        with self.lock:
+            if url in self.data:
+                del self.data[url]
+                self._save_data()
+
     # =============================================================================
     # FEED UPDATE AND TRACKING METHODS
     # =============================================================================

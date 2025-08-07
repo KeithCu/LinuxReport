@@ -41,6 +41,7 @@ class UrlForm(FlaskForm):
     """
     pri = IntegerField('Priority', validators=[validators.Optional()])
     url = StringField('URL', render_kw={"readonly": True, "style": "width: 300px;"})
+    reset = BooleanField('Reset', default=False)
 
 class CustomRSSForm(FlaskForm):
     """

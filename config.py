@@ -5,7 +5,7 @@ from flask_login import current_user
 from shared import (
     limiter, dynamic_rate_limit, PATH, ABOVE_HTML_FILE,
     ENABLE_URL_CUSTOMIZATION, SITE_URLS, ALL_URLS, FAVICON,
-    EXPIRE_YEARS, URLS_COOKIE_VERSION, clear_page_caches
+    EXPIRE_YEARS, URLS_COOKIE_VERSION, clear_page_caches, g_c, history
 )
 from forms import ConfigForm, UrlForm, CustomRSSForm
 from caching import _file_cache
@@ -49,6 +49,7 @@ def init_config_routes(app):
                         urlf = UrlForm()
                         urlf.pri = (i + 1) * 10
                         urlf.url = p_url
+                        urlf.reset = False  # Explicitly set reset to False
                         form.urls.append_entry(urlf)
                     else:
                         custom_count += 1
@@ -115,6 +116,15 @@ def init_config_routes(app):
                 urls = list(form.urls)
                 url_custom = list(form.url_custom)
                 
+                # Handle feed resets
+                if is_admin:
+                    for url_form in urls:
+                        if url_form.reset.data:
+                            url_to_reset = url_form.url.data
+                            g_c.clear_last_fetch(url_to_reset)
+                            history.reset_history(url_to_reset)
+                            flash(f"'{url_to_reset}' has been reset and will be refreshed soon.", "success")
+
                 for site in url_custom:
                     if len(site.url.data) > 10 and len(site.url.data) < 120:
                         urls.append(site)

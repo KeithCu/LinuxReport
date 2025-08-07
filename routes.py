@@ -475,7 +475,6 @@ Disallow: /admin/
 Disallow: /login
 Disallow: /logout
 Disallow: /config/
-Disallow: /api/
 
 Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
 """

@@ -78,6 +78,11 @@
             <div class="url-entry" draggable="true">
               {{ render_field(urlf.pri) }}
               {{ render_field(urlf.url) }}
+              {% if is_admin %}
+                <div class="form-group-inline">
+                  {{ urlf.reset.label }} {{ urlf.reset() }}
+                </div>
+              {% endif %}
             </div>
             {% endfor %}
             <div class="url-instructions"><i>Add Custom RSS feeds here. More coming...</i></div>

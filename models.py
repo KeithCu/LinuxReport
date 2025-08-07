@@ -219,6 +219,15 @@ class DiskCacheWrapper:
         all_fetches[url] = timestamp
         self.put('all_last_fetches', all_fetches, timeout)
 
+    def clear_last_fetch(self, url: str) -> None:
+        """
+        Clear the last fetch time for a URL in the shared disk cache.
+        
+        Args:
+            url (str): URL to clear last fetch time for
+        """
+        self.set_last_fetch(url, None)
+
 class User(UserMixin):
     """
     Simple user model for Flask-Login that works with config.yaml.
