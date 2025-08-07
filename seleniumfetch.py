@@ -622,9 +622,29 @@ def extract_post_data(post, config, url, use_selenium):
         else:
             title_element = post.select_one(config["title_selector"])
             if not title_element:
+                print(f"No title element found with selector '{config['title_selector']}'")
+                # Show what elements are available for debugging
+                try:
+                    all_links = post.find_all('a')
+                    print(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
+                except:
+                    pass
                 return None
             title = title_element.text.strip()
-    except Exception:
+    except Exception as e:
+        print(f"Error extracting title with selector '{config['title_selector']}': {e}")
+        # Show what text content is available for debugging
+        try:
+            if use_selenium:
+                all_text = post.text[:200] + "..." if len(post.text) > 200 else post.text
+            else:
+                all_text = post.get_text()[:200] + "..." if len(post.get_text()) > 200 else post.get_text()
+            print(f"Available text content: {all_text}")
+            # Also show available classes for debugging
+            if not use_selenium:
+                print(f"Available classes: {post.get('class', [])}") 
+        except Exception as debug_e:
+            print(f"Error during debug output: {debug_e}")
         return None
     
     if len(title.split()) < 2:
@@ -637,6 +657,15 @@ def extract_post_data(post, config, url, use_selenium):
         else:
             link_element = post.select_one(config["link_selector"])
             if not link_element:
+                print(f"No link element found with selector '{config['link_selector']}'")
+                # Show what elements are available for debugging
+                try:
+                    all_links = post.find_all('a')
+                    print(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
+                    # Also show available classes for debugging
+                    print(f"Available classes: {post.get('class', [])}")
+                except Exception as debug_e:
+                    print(f"Error during debug output: {debug_e}")
                 return None
             # Handle RSS feeds where links are text content, not href attributes
             if config["link_attr"] == "text":
@@ -645,7 +674,20 @@ def extract_post_data(post, config, url, use_selenium):
                 link = link_element.get(config["link_attr"])
             if link and link.startswith('/'):
                 link = urljoin(url, link)
-    except Exception:
+    except Exception as e:
+        print(f"Error extracting link with selector '{config['link_selector']}': {e}")
+        # Show what link content is available for debugging
+        try:
+            if use_selenium:
+                all_links = post.find_elements(By.TAG_NAME, "a")
+                print(f"Available links: {[a.get_attribute('href') for a in all_links[:3]]}")
+            else:
+                all_links = post.find_all('a')
+                print(f"Available links: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
+                # Also show available classes for debugging
+                print(f"Available classes: {post.get('class', [])}")
+        except Exception as debug_e:
+            print(f"Error during debug output: {debug_e}")
         return None
     
     filter_pattern = config.get("filter_pattern", "")
@@ -661,7 +703,6 @@ def extract_post_data(post, config, url, use_selenium):
             if use_selenium:
                 # Handle XPath selectors (starting with .// or //)
                 if config["published_selector"].startswith(('.//', '//')):
-                    from selenium.webdriver.common.by import By
                     date_element = post.find_element(By.XPATH, config["published_selector"])
                     date_text = date_element.text.strip()
                 else:

@@ -50,9 +50,10 @@ Allies: Elon Musk (DOGE - Department of Government Efficiency), Russell Vought (
             "needs_selenium": True,
             "needs_tor": False,
             "post_container": ".post-item",
-            "title_selector": ".title a",
-            "link_selector": ".preview-parent",
+            "title_selector": ".kHEnUT.title a",
+            "link_selector": ".flLuNk.preview-parent",
             "link_attr": "href",
+            "published_selector": ".//span[contains(text(), 'posted')]/following-sibling::span[1]",
             "filter_pattern": ""
         },
         "breitbart.com": {
