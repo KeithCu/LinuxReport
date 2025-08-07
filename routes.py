@@ -466,6 +466,23 @@ def _register_main_routes(flask_app):
         
         return response
 
+    @flask_app.route('/robots.txt')
+    def robots():
+        """Serve robots.txt file for search engine crawlers."""
+        robots_content = f"""User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /login
+Disallow: /logout
+Disallow: /config/
+Disallow: /api/
+
+Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
+"""
+        response = make_response(robots_content)
+        response.headers['Content-Type'] = 'text/plain'
+        return response
+
     @flask_app.route('/sitemap.xml')
     def sitemap():
         # Try to get cached sitemap
