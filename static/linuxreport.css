@@ -1384,22 +1384,7 @@ a:focus {
   background-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Enhanced link styling for better visibility */
-.linkclass a {
-  color: var(--link) !important;
-  text-decoration: none !important;
-  font-family: inherit !important;
-  transition: color 0.15s ease-out;
-}
 
-.linkclass a:hover {
-  color: var(--accent-primary, #1a0dab) !important;
-  text-decoration: underline !important;
-}
-
-.linkclass a:visited {
-  color: var(--text-secondary, #666) !important;
-}
 
 /* Source logo containers - better visual integration */
 .box center {
