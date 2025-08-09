@@ -190,10 +190,12 @@ The project includes a comprehensive weather system with caching and geolocation
 
 The weather system implements intelligent geolocation handling:
 
-1. **Browser Geolocation**: Primary method using `navigator.geolocation.getCurrentPosition()`
-2. **Fallback Strategy**: Controlled by `DISABLE_IP_GEOLOCATION` flag in `shared.py`:
-   - **Enabled (`True`)**: Always show Detroit weather when geolocation fails
-   - **Disabled (`False`)**: Use IP-based geolocation when geolocation fails
+1. **Client Geolocation**: Controlled by `DISABLE_CLIENT_GEOLOCATION` flag:
+   - **Enabled (`False`)**: Browser geolocation using `navigator.geolocation.getCurrentPosition()`
+   - **Disabled (`True`)**: Skip browser geolocation entirely
+2. **Server Geolocation**: Controlled by `DISABLE_IP_GEOLOCATION` flag in `shared.py`:
+   - **Enabled (`False`)**: Use IP-based location when client geolocation fails or is disabled
+   - **Disabled (`True`)**: Always show Detroit weather when client geolocation fails
 3. **Caching**: Location data is cached to avoid repeated permission requests
 4. **Error Handling**: Graceful degradation with appropriate fallbacks
 
@@ -313,6 +315,9 @@ The image processing system has been refactored to consolidate functionality int
 3. **Geolocation System**:
    - `app.utils.GeolocationManager`: Global geolocation utility in `app.js`
    - Browser geolocation API integration with high accuracy settings
+   - Client-side control via `DISABLE_CLIENT_GEOLOCATION` flag in `app.js`:
+     - **When `DISABLE_CLIENT_GEOLOCATION = True`**: Skip browser geolocation entirely
+     - **When `DISABLE_CLIENT_GEOLOCATION = False`**: Attempt browser geolocation
    - Backend-controlled fallback logic based on `DISABLE_IP_GEOLOCATION` flag:
      - **When `DISABLE_IP_GEOLOCATION = True`**: Always show Detroit weather when geolocation fails
      - **When `DISABLE_IP_GEOLOCATION = False`**: Use IP-based location when geolocation fails
