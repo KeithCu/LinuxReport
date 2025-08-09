@@ -21,6 +21,14 @@
   /* Secondary text color */
   --text-secondary: #666666;
   
+  /* Accent colors for enhanced visual hierarchy */
+  --accent-primary: #1a0dab;
+  --accent-secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --info: #17a2b8;
+  
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -55,6 +63,12 @@
   --btn-hover-bg: #0078D7;
   --btn-hover-text: #ffffff;
   --text-secondary: #666666;
+  --accent-primary: #0078D7;
+  --accent-secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --info: #17a2b8;
 }
 
 [data-theme="paper"] {
@@ -103,6 +117,12 @@
   --btn-hover-bg: #505050;
   --btn-hover-text: #ffffff;
   --text-secondary: #a0a0a0;
+  --accent-primary: #8ab4f8;
+  --accent-secondary: #8e9aaf;
+  --success: #40c057;
+  --warning: #fab005;
+  --danger: #fa5252;
+  --info: #339af0;
 }
 
 [data-theme="monokai"] {
@@ -1317,6 +1337,145 @@ a:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* =============================================================================
+   CARD-BASED LAYOUT ENHANCEMENTS
+   ============================================================================= */
+
+/* Main content boxes - subtle card styling without wasting space */
+.box {
+  background: var(--bg);
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  transition: box-shadow 0.2s ease-out;
+}
+
+.box:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* Dark theme adjustments for cards */
+[data-theme="dark"] .box {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .box:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Article links - enhanced without spacing changes */
+.linkclass {
+  margin-bottom: var(--spacing-sm);
+  font-size: large;
+  line-height: 1.2;
+  padding: 2px 0; /* Minimal padding for visual separation */
+  border-radius: 2px;
+  transition: background-color 0.15s ease-out;
+}
+
+.linkclass:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+[data-theme="dark"] .linkclass:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Enhanced link styling for better visibility */
+.linkclass a {
+  color: var(--link) !important;
+  text-decoration: none !important;
+  font-family: inherit !important;
+  transition: color 0.15s ease-out;
+}
+
+.linkclass a:hover {
+  color: var(--accent-primary, #1a0dab) !important;
+  text-decoration: underline !important;
+}
+
+.linkclass a:visited {
+  color: var(--text-secondary, #666) !important;
+}
+
+/* Source logo containers - better visual integration */
+.box center {
+  margin-bottom: var(--spacing-xs);
+}
+
+.box center img {
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease-out;
+}
+
+.box center img:hover {
+  transform: scale(1.02);
+}
+
+/* Image containers within articles */
+.image-container {
+  margin: var(--spacing-xs) 0;
+}
+
+.image-container img {
+  border-radius: var(--border-radius-sm);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.image-container img:hover {
+  transform: scale(1.01);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Pagination controls - better integration */
+.pagination-controls {
+  margin: var(--spacing-xs) 0;
+  text-align: center;
+}
+
+.pagination-controls button {
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--border-radius-sm);
+  color: var(--btn-text);
+  cursor: pointer;
+  font-size: 0.9em;
+  margin: 0 2px;
+  padding: 4px 8px;
+  transition: all 0.15s ease-out;
+}
+
+.pagination-controls button:hover:not(:disabled) {
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pagination-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Last updated text - subtle styling */
+.box small {
+  color: var(--text-secondary);
+  font-size: 0.85em;
+}
+
+/* Enhanced main headline styling */
+.linkclass .main-headline {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: inherit;
+  font-family: inherit;
+  text-decoration: inherit;
+  line-height: 1.3;
 }
 
 /* =============================================================================
