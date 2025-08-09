@@ -1148,7 +1148,8 @@ textarea:focus {
 
 /* Infinite scroll elements */
 .source-group {
-  /* Container for source groups */
+  margin-bottom: var(--spacing-md);
+  border-radius: var(--border-radius-md);
 }
 
 .source-header {
@@ -1316,4 +1317,152 @@ a:focus {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* =============================================================================
+   GPU ACCELERATION & SMOOTH ANIMATIONS
+   ============================================================================= */
+
+/* GPU acceleration base class */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Dragging states with GPU acceleration */
+.dragging {
+  opacity: 0.8;
+  transform: scale(0.98) translateZ(0);
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+}
+
+.dragging-normal {
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Drag clone styling for smooth visual feedback */
+.drag-clone {
+  opacity: 0.9;
+  transform: scale(1.02) rotate(2deg) translateZ(0);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  border: 2px dashed var(--btn-border);
+  background: var(--btn-hover-bg);
+  pointer-events: none;
+  z-index: 1001;
+}
+
+/* Chat container GPU optimization */
+#chat-container {
+  transform: translateZ(0);
+  will-change: transform, opacity;
+}
+
+/* Smooth transitions for interactive elements */
+.btn,
+.url-entry,
+.linkclass,
+.chat-message {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.btn:hover,
+.url-entry:hover {
+  transform: translateY(-1px) translateZ(0);
+  box-shadow: var(--shadow-md);
+}
+
+.btn:active,
+.url-entry:active {
+  transform: translateY(0) scale(0.98) translateZ(0);
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Animation performance optimizations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale3d(0.3, 0.3, 0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale3d(1.05, 1.05, 1.05);
+  }
+  70% {
+    transform: scale3d(0.9, 0.9, 0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale3d(1, 1, 1);
+  }
+}
+
+/* Apply animations to specific elements */
+.chat-message {
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.infinite-item {
+  animation: fadeInUp 0.4s ease-out;
+}
+
+/* Performance hint classes */
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-auto {
+  will-change: auto;
+}
+
+/* Force GPU layer creation for smooth animations */
+.smooth-transform {
+  transform: translateZ(0);
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Optimized transitions for common UI patterns */
+.fade-transition {
+  transition: opacity 0.3s ease-out;
+}
+
+.scale-transition {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.slide-transition {
+  transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }

@@ -42,6 +42,12 @@
                 this.elements.set(id, el);
             }
             
+            // Enable GPU acceleration for chat container
+            const container = this.elements.get('chat-container');
+            if (container) {
+                app.utils.AnimationManager.enableGPUAcceleration(container);
+            }
+            
             this.setupEventListeners();
             document.addEventListener('visibilitychange', this.handleVisibilityChange);
             window.addEventListener('resize', this.handleResize);
@@ -177,15 +183,18 @@
                 newX = Math.max(0, Math.min(newX, window.innerWidth - container.offsetWidth));
                 newY = Math.max(0, Math.min(newY, window.innerHeight - container.offsetHeight));
 
-                // TUTORIAL: Inline styles for dynamic positioning during drag
-                // These cannot be moved to CSS because:
-                // 1. The position values are calculated dynamically based on mouse movement
-                // 2. CSS cannot access JavaScript variables or perform calculations
-                // 3. The position needs to update in real-time as the user drags
-                // 4. The values depend on window size, container size, and mouse position
-                // Alternative: Could use CSS transforms, but would still need JS for calculations
-                container.style.left = `${newX}px`;
-                container.style.top = `${newY}px`;
+                // TUTORIAL: Using CSS transforms for GPU-accelerated movement
+                // Benefits of transforms over left/top positioning:
+                // 1. GPU acceleration - transforms are handled by the GPU compositor
+                // 2. Better performance - no layout recalculation or repaint
+                // 3. Smoother animations - 60fps performance on most devices
+                // 4. translate3d forces hardware acceleration even for 2D movement
+                // 5. Maintains document flow - doesn't trigger expensive layout operations
+                container.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+                
+                // Store position for resize handling
+                this.state.currentX = newX;
+                this.state.currentY = newY;
             });
         }
 
@@ -397,21 +406,42 @@
             const container = this.elements.get('chat-container');
             if (!container) return;
             
-            // Ensure chat stays within viewport bounds
-            const rect = container.getBoundingClientRect();
+            // Get current position from stored state or compute from transform
+            let currentX = this.state.currentX;
+            let currentY = this.state.currentY;
             
-            // TUTORIAL: Inline styles for viewport boundary correction
-            // These cannot be moved to CSS because:
-            // 1. The position values are calculated based on viewport size and element size
-            // 2. CSS cannot access window.innerWidth or getBoundingClientRect()
-            // 3. The correction only happens when the element goes outside viewport bounds
-            // 4. The values are dynamic and depend on current window size
-            // Alternative: Could use CSS position: fixed with max-width/max-height, but less precise
+            if (currentX === undefined || currentY === undefined) {
+                // Fallback: extract position from current transform
+                const transform = container.style.transform;
+                if (transform && transform.includes('translate3d')) {
+                    const match = transform.match(/translate3d\(([^,]+)px,\s*([^,]+)px,\s*[^)]+\)/);
+                    if (match) {
+                        currentX = parseFloat(match[1]);
+                        currentY = parseFloat(match[2]);
+                    }
+                } else {
+                    currentX = 0;
+                    currentY = 0;
+                }
+            }
+            
+            // Ensure chat stays within viewport bounds using transforms
+            const rect = container.getBoundingClientRect();
+            let newX = currentX;
+            let newY = currentY;
+            
             if (rect.right > window.innerWidth) {
-                container.style.left = `${window.innerWidth - rect.width}px`;
+                newX = window.innerWidth - container.offsetWidth;
             }
             if (rect.bottom > window.innerHeight) {
-                container.style.top = `${window.innerHeight - rect.height}px`;
+                newY = window.innerHeight - container.offsetHeight;
+            }
+            
+            // Apply corrected position with GPU acceleration
+            if (newX !== currentX || newY !== currentY) {
+                container.style.transform = `translate3d(${newX}px, ${newY}px, 0)`;
+                this.state.currentX = newX;
+                this.state.currentY = newY;
             }
         }
 
@@ -437,9 +467,43 @@
             const isVisible = inlineDisplay !== 'none' && computedDisplay !== 'none';
 
             if (isVisible) {
-                this.closeChat();
+                // Animate chat closing with smooth fade and scale
+                app.utils.AnimationManager.animateTransform(
+                    container, 
+                    'scale(0.9) translate3d(20px, -20px, 0)', 
+                    200, 
+                    'ease-in'
+                );
+                app.utils.AnimationManager.fadeTransition(container, 0, 200);
+                
+                setTimeout(() => {
+                    this.closeChat();
+                    // Reset transform for next open
+                    container.style.transform = this.state.currentX !== undefined ? 
+                        `translate3d(${this.state.currentX}px, ${this.state.currentY}px, 0)` : '';
+                }, 200);
             } else {
                 container.style.display = 'flex';
+                
+                // Animate chat opening with smooth scale and fade
+                container.style.opacity = '0';
+                container.style.transform = (this.state.currentX !== undefined ? 
+                    `translate3d(${this.state.currentX}px, ${this.state.currentY}px, 0) ` : '') + 
+                    'scale(0.8)';
+                
+                // Force reflow then animate
+                container.offsetHeight;
+                
+                app.utils.AnimationManager.animateTransform(
+                    container, 
+                    (this.state.currentX !== undefined ? 
+                        `translate3d(${this.state.currentX}px, ${this.state.currentY}px, 0) ` : '') + 
+                    'scale(1)', 
+                    300, 
+                    'cubic-bezier(0.34, 1.56, 0.64, 1)'
+                );
+                app.utils.AnimationManager.fadeTransition(container, 1, 300);
+                
                 // Initialize beep sound only when chat is first opened
                 if (!this.beepSound) {
                     try {

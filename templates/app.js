@@ -454,6 +454,69 @@
     }
   };
 
+  // GPU-accelerated animation utilities
+  app.utils.AnimationManager = {
+    /**
+     * Apply GPU-accelerated transform with smooth transition
+     * @param {Element} element - Element to animate
+     * @param {string} transform - Transform string (e.g., 'translateX(100px)')
+     * @param {number} duration - Animation duration in ms
+     * @param {string} easing - Easing function
+     */
+    animateTransform(element, transform, duration = 300, easing = 'ease-out') {
+      if (!element) return;
+      
+      // Force GPU acceleration
+      element.style.willChange = 'transform';
+      element.style.transition = `transform ${duration}ms ${easing}`;
+      element.style.transform = transform;
+      
+      // Clean up after animation
+      setTimeout(() => {
+        element.style.willChange = '';
+        element.style.transition = '';
+      }, duration);
+    },
+
+    /**
+     * Add GPU acceleration hints to an element
+     * @param {Element} element - Element to optimize
+     */
+    enableGPUAcceleration(element) {
+      if (!element) return;
+      element.style.transform = element.style.transform || 'translateZ(0)';
+      element.style.willChange = 'transform';
+    },
+
+    /**
+     * Remove GPU acceleration hints from an element
+     * @param {Element} element - Element to clean up
+     */
+    disableGPUAcceleration(element) {
+      if (!element) return;
+      element.style.willChange = '';
+    },
+
+    /**
+     * Smooth fade transition with GPU acceleration
+     * @param {Element} element - Element to fade
+     * @param {number} targetOpacity - Target opacity (0-1)
+     * @param {number} duration - Duration in ms
+     */
+    fadeTransition(element, targetOpacity, duration = 300) {
+      if (!element) return;
+      
+      element.style.willChange = 'opacity';
+      element.style.transition = `opacity ${duration}ms ease-out`;
+      element.style.opacity = targetOpacity;
+      
+      setTimeout(() => {
+        element.style.willChange = '';
+        element.style.transition = '';
+      }, duration);
+    }
+  };
+
   app.utils.DragDropManager = {
     init(options) {
       const { containerSelector, itemSelector, onDrop } = options;
@@ -461,19 +524,59 @@
       if (!container) return;
 
       let draggedItem = null;
+      let draggedItemClone = null;
 
       container.addEventListener('dragstart', e => {
         if (e.target.matches(itemSelector)) {
           draggedItem = e.target;
-          draggedItem.classList.add('dragging');
+          
+          // Add GPU-accelerated dragging class for smooth animations
+          draggedItem.classList.add('dragging', 'gpu-accelerated');
+          
+          // Create a visual clone for smoother drag feedback
+          draggedItemClone = draggedItem.cloneNode(true);
+          draggedItemClone.classList.add('drag-clone', 'gpu-accelerated');
+          draggedItemClone.style.position = 'absolute';
+          draggedItemClone.style.pointerEvents = 'none';
+          draggedItemClone.style.zIndex = '1000';
+          draggedItemClone.style.opacity = '0.8';
+          draggedItemClone.style.transform = 'scale(1.02) rotate(2deg)';
+          draggedItemClone.style.transition = 'transform 0.2s ease-out';
+          
+          // Make original item semi-transparent during drag
+          draggedItem.style.opacity = '0.5';
+          draggedItem.style.transform = 'scale(0.98)';
+          draggedItem.style.transition = 'all 0.2s ease-out';
         }
       });
 
       container.addEventListener('dragend', e => {
         if (draggedItem) {
-          draggedItem.classList.remove('dragging');
+          // Remove GPU-accelerated classes and reset styles
+          draggedItem.classList.remove('dragging', 'gpu-accelerated');
           draggedItem.classList.add('dragging-normal');
+          
+          // Animate back to normal state
+          draggedItem.style.opacity = '';
+          draggedItem.style.transform = '';
+          draggedItem.style.transition = 'all 0.3s ease-out';
+          
+          // Remove clone if it exists
+          if (draggedItemClone && draggedItemClone.parentNode) {
+            draggedItemClone.remove();
+          }
+          
+          // Clean up references
           draggedItem = null;
+          draggedItemClone = null;
+          
+          // Clean up transition after animation
+          setTimeout(() => {
+            const items = container.querySelectorAll(itemSelector);
+            items.forEach(item => {
+              item.style.transition = '';
+            });
+          }, 300);
         }
       });
 
@@ -481,6 +584,12 @@
         e.preventDefault();
         const afterElement = this.getDragAfterElement(container, e.clientY, itemSelector);
         if (draggedItem) {
+          // Add smooth transition for reordering
+          const items = container.querySelectorAll(`${itemSelector}:not(.dragging)`);
+          items.forEach(item => {
+            item.style.transition = 'transform 0.2s ease-out';
+          });
+          
           container.insertBefore(draggedItem, afterElement);
         }
       });
