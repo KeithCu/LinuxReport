@@ -137,7 +137,9 @@
                 const forecast = this.elements.get('weather-forecast');
                 if (forecast && forecast.children.length > 0) {
                     // Re-render the current data
-                    this.render(this.currentWeatherData);
+                    this.render(this.currentWeatherData).catch(error => {
+                        app.utils.logger.error('[Weather] Error re-rendering after unit change:', error);
+                    });
                 }
             });
         }
@@ -204,6 +206,92 @@
             app.utils.logger.debug('[Weather] No cached location found in meta tags');
             return null;
         }
+
+        /**
+         * Gets cached icon data from localStorage
+         * @param {string} iconCode - Weather icon code (e.g., '01d')
+         * @returns {string|null} Cached icon data URL or null if not found
+         */
+        getCachedIcon(iconCode) {
+            try {
+                const cacheKey = `weather_icon_${iconCode}`;
+                return localStorage.getItem(cacheKey);
+            } catch (error) {
+                app.utils.logger.debug('[Weather] Error reading cached icon:', error);
+                return null;
+            }
+        }
+
+        /**
+         * Caches icon data in localStorage
+         * @param {string} iconCode - Weather icon code
+         * @param {string} dataUrl - Base64 data URL of the icon
+         */
+        setCachedIcon(iconCode, dataUrl) {
+            try {
+                const cacheKey = `weather_icon_${iconCode}`;
+                localStorage.setItem(cacheKey, dataUrl);
+                app.utils.logger.debug('[Weather] Cached icon:', iconCode);
+            } catch (error) {
+                app.utils.logger.debug('[Weather] Error caching icon:', error);
+            }
+        }
+
+
+
+        /**
+         * Loads and caches a weather icon using persistent localStorage
+         * @param {string} iconCode - Weather icon code
+         * @returns {Promise<string>} Promise resolving to icon data URL or official URL
+         */
+        async loadAndCacheIcon(iconCode) {
+            // Check persistent localStorage cache first
+            const cached = this.getCachedIcon(iconCode);
+            if (cached) {
+                app.utils.logger.debug('[Weather] Using cached icon for:', iconCode);
+                return cached;
+            }
+
+            // Load from network and cache persistently
+            try {
+                app.utils.logger.debug('[Weather] Fetching icon from network:', iconCode);
+                const iconUrl = `https://openweathermap.org/img/wn/${iconCode}.png`;
+                const response = await fetch(iconUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                const dataUrl = await this.blobToDataUrl(blob);
+                
+                // Cache the icon persistently
+                this.setCachedIcon(iconCode, dataUrl);
+                app.utils.logger.debug('[Weather] Successfully cached icon:', iconCode);
+                
+                return dataUrl;
+            } catch (error) {
+                app.utils.logger.debug('[Weather] Failed to cache icon, using direct URL:', iconCode, error);
+                // Return official URL as fallback
+                return `https://openweathermap.org/img/wn/${iconCode}.png`;
+            }
+        }
+
+        /**
+         * Converts a blob to a data URL
+         * @param {Blob} blob - The blob to convert
+         * @returns {Promise<string>} Promise resolving to data URL
+         */
+        blobToDataUrl(blob) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        }
+
+
 
         async fetch(retryCount = 0) {
             const maxRetries = 5; // Reduced retry limit
@@ -274,7 +362,7 @@
                     const data = await response.json();
                     app.utils.logger.debug('[Weather] Data parsed after:', performance.now() - startTime, 'ms');
                     
-                    this.render(data);
+                    await this.render(data);
                 } catch (error) {
                     // If the weather request failed, retry with exponential backoff
                     if (retryCount < maxRetries) {
@@ -303,7 +391,7 @@
             this.hideElement(loading);
         }
 
-        render(data) {
+        async render(data) {
             const forecast = this.elements.get('weather-forecast');
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
@@ -327,7 +415,12 @@
                 return;
             }
 
-            forecast.innerHTML = data.daily.map(day => this.createDayHTML(day)).join('');
+            // Create day HTML elements with cached icons
+            const dayElements = await Promise.all(
+                data.daily.map(day => this.createDayHTML(day))
+            );
+            
+            forecast.innerHTML = dayElements.join('');
             this.hideElement(loading);
             this.showElement(forecast);
             
@@ -347,7 +440,7 @@
             }
         }
 
-        createDayHTML(day) {
+        async createDayHTML(day) {
             const useMetric = this.getUnits() === 'metric';
             const unit = useMetric ? 'C' : 'F';
             
@@ -360,10 +453,13 @@
                 tempMin = this.fahrenheitToCelsius(tempMin);
             }
             
+            // Load and cache the weather icon
+            const iconSrc = await this.loadAndCacheIcon(day.weather_icon);
+            
             return `
                 <div class="weather-day">
                     <div class="weather-day-name">${this.getDayName(day)}</div>
-                    <img class="weather-icon" src="https://openweathermap.org/img/wn/${day.weather_icon}.png" alt="${day.weather}" loading="lazy">
+                    <img class="weather-icon" src="${iconSrc}" alt="${day.weather}" loading="lazy">
                     <div class="weather-temp">
                         <span class="temp-max">${tempMax}°${unit}</span> /
                         <span class="temp-min">${tempMin}°${unit}</span>
