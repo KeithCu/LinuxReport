@@ -82,11 +82,21 @@
             
             if (this.elements.loadingIndicator) this.elements.loadingIndicator.style.display = 'block';
 
+            // Announce loading to screen readers
+            if (app.modules.AccessibilityManager) {
+                app.modules.AccessibilityManager.announceLoading('Loading articles in infinite scroll view');
+            }
+
             const allItems = this.collectAllItems();
             const groupedItems = this.groupItemsBySource(allItems);
             this.renderGroupedItems(this.elements.infiniteContent, groupedItems);
 
             if (this.elements.loadingIndicator) this.elements.loadingIndicator.style.display = 'none';
+
+            // Announce completion to screen readers
+            if (app.modules.AccessibilityManager) {
+                app.modules.AccessibilityManager.announceToScreenReader(`Loaded ${allItems.length} articles in infinite scroll view`);
+            }
         }
 
         collectAllItems() {

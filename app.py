@@ -42,6 +42,7 @@ from models import User
 # Define the order of JavaScript modules for loading
 JS_MODULES = [
     'app.js',
+    'accessibility.js',
     'infinitescroll.js',
     'core.js',
     'weather.js',
