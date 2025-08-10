@@ -103,7 +103,7 @@ MAX_ARTICLES_PER_FEED_FOR_LLM = 5  # How many articles from each feed to conside
 # Global LLM/AI settings
 MAX_TOKENS = 10000
 TIMEOUT = 120
-MODEL_CACHE_DURATION = EXPIRE_DAY * 7
+MODEL_CACHE_DURATION = EXPIRE_DAY * 60  # 30 days (1 month) - EXPIRE_DAY is 12 hours, so 60 * 12 = 720 hours = 30 days
 
 # Global logging configuration
 GLOBAL_LOGGING_ENABLED = True
@@ -271,7 +271,6 @@ INPUT TITLES:
 
 # Global tracking with persistence
 FAILED_MODELS_CACHE_KEY = "failed_llm_models"
-FAILED_MODELS_RETRY_HOURS = 24  # Retry failed models after 24 hours
 
 # Run mode configuration
 RUN_MODE = "normal"  # options: "normal", "compare", "visualize"
@@ -341,7 +340,7 @@ def load_failed_models():
     # Filter out models that have been failed for too long
     failed_models = {
         model for model, fail_time in failed_models_data.items()
-        if current_time - fail_time < FAILED_MODELS_RETRY_HOURS * 3600
+        if current_time - fail_time < MODEL_CACHE_DURATION
     }
     
     logger.debug(f"Loaded {len(failed_models)} failed models from cache")
@@ -367,15 +366,6 @@ def mark_model_success(model, forced_model=None):
     if model != forced_model:  # Don't cache forced models
         g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
         logger.info(f"Cached working model: {model}")
-        
-    # Remove from failed models if it was there
-    failed_models = load_failed_models()
-    if model in failed_models:
-        failed_models_data = g_c.get(FAILED_MODELS_CACHE_KEY) or {}
-        if model in failed_models_data:
-            del failed_models_data[model]
-            g_c.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
-        logger.info(f"Removed model from failed list: {model}")
 
 def get_next_model(use_random=True, forced_model=None, current_model=None):
     """Get the next model to try."""
