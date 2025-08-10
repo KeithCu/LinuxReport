@@ -299,6 +299,119 @@ provider_client_cache = None
 ALL_URLS = {}  # Initialized here, passed to utils
 
 # =============================================================================
+# MODEL MANAGER CLASS
+# =============================================================================
+
+class ModelManager:
+    """Manages model selection, caching, and failure tracking.
+    
+    This class consolidates all model management logic including:
+    - Model selection (random, cached, forced, fallback)
+    - Failure tracking and blacklisting
+    - Success caching
+    - Model-specific behavior detection
+    
+    All model-related operations should go through this class to ensure
+    consistent behavior and proper caching.
+    """
+    
+    def __init__(self, cache_duration=None):
+        """Initialize the model manager.
+        
+        Args:
+            cache_duration: Duration in seconds for caching. Defaults to MODEL_CACHE_DURATION.
+        """
+        self.cache_duration = cache_duration or MODEL_CACHE_DURATION
+        self.failed_models_cache_key = FAILED_MODELS_CACHE_KEY
+        self.working_model_cache_key = "working_llm_model"
+        
+    def get_failed_models(self):
+        """Get the set of currently failed models."""
+        failed_models_data = g_c.get(self.failed_models_cache_key) or {}
+        current_time = time.time()
+        
+        # Filter out models that have been failed for too long
+        failed_models = {
+            model for model, fail_time in failed_models_data.items()
+            if current_time - fail_time < self.cache_duration
+        }
+        
+        logger.debug(f"Loaded {len(failed_models)} failed models from cache")
+        return failed_models
+    
+    def mark_failed(self, model):
+        """Mark a model as failed with timestamp."""
+        if model not in FREE_MODELS:
+            logger.warning(f"Attempted to mark unknown model as failed: {model}")
+            return
+            
+        failed_models_data = g_c.get(self.failed_models_cache_key) or {}
+        failed_models_data[model] = time.time()
+        g_c.put(self.failed_models_cache_key, failed_models_data, timeout=self.cache_duration)
+        logger.info(f"Marked model as failed: {model}")
+    
+    def mark_success(self, model, forced_model=None):
+        """Mark a model as successful and update cache."""
+        if model not in FREE_MODELS:
+            logger.warning(f"Attempted to mark unknown model as successful: {model}")
+            return
+            
+        if model != forced_model:  # Don't cache forced models
+            g_c.put(self.working_model_cache_key, model, timeout=self.cache_duration)
+            logger.info(f"Cached working model: {model}")
+    
+    def get_available_model(self, use_random=True, forced_model=None, current_model=None):
+        """Get the next available model to try.
+        
+        Args:
+            use_random: Whether to use random selection or cached model
+            forced_model: Specific model to use (takes precedence)
+            current_model: Current model to avoid selecting again
+            
+        Returns:
+            Model name or None if no models available
+        """
+        failed_models = self.get_failed_models()
+        
+        # 1. Forced model takes precedence
+        if forced_model:
+            logger.debug(f"Using forced model: {forced_model}")
+            return forced_model
+            
+        # 2. Try cached model if not using random selection
+        if not use_random:
+            cached_model = g_c.get(self.working_model_cache_key)
+            if cached_model and cached_model not in failed_models:
+                logger.debug(f"Using cached model: {cached_model}")
+                return cached_model
+                
+        # 3. Try random available model
+        available_models = [m for m in FREE_MODELS if m not in failed_models and m != current_model]
+        if available_models:
+            selected_model = random.choice(available_models)
+            logger.debug(f"Selected random model: {selected_model} from {len(available_models)} available")
+            return selected_model
+            
+        # 4. Final fallback
+        if FALLBACK_MODEL not in failed_models:
+            logger.debug(f"Using fallback model: {FALLBACK_MODEL}")
+            return FALLBACK_MODEL
+        else:
+            logger.error("No models available - all models have failed")
+            return None
+    
+    def get_comparison_models(self):
+        """Get models for comparison mode."""
+        return "google/gemma-3-27b-it", "mistralai/mistral-small-3.1-24b-instruct"
+    
+    def is_user_only_instruction_model(self, model):
+        """Check if a model requires user-only instructions."""
+        return model in USER_ONLY_INSTRUCTION_MODELS
+
+# Create global model manager instance
+model_manager = ModelManager()
+
+# =============================================================================
 # SIMPLIFIED PROVIDER FUNCTIONS
 # =============================================================================
 
@@ -332,71 +445,7 @@ def get_openrouter_client():
     provider_client_cache = client
     return client
 
-def load_failed_models():
-    """Load failed models from cache with timestamp."""
-    failed_models_data = g_c.get(FAILED_MODELS_CACHE_KEY) or {}
-    current_time = time.time()
-    
-    # Filter out models that have been failed for too long
-    failed_models = {
-        model for model, fail_time in failed_models_data.items()
-        if current_time - fail_time < MODEL_CACHE_DURATION
-    }
-    
-    logger.debug(f"Loaded {len(failed_models)} failed models from cache")
-    return failed_models
 
-def mark_model_failed(model):
-    """Mark a model as failed with timestamp."""
-    if model not in FREE_MODELS:
-        logger.warning(f"Attempted to mark unknown model as failed: {model}")
-        return
-        
-    failed_models_data = g_c.get(FAILED_MODELS_CACHE_KEY) or {}
-    failed_models_data[model] = time.time()
-    g_c.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=MODEL_CACHE_DURATION)
-    logger.info(f"Marked model as failed: {model}")
-
-def mark_model_success(model, forced_model=None):
-    """Mark a model as successful and update cache."""
-    if model not in FREE_MODELS:
-        logger.warning(f"Attempted to mark unknown model as successful: {model}")
-        return
-        
-    if model != forced_model:  # Don't cache forced models
-        g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
-        logger.info(f"Cached working model: {model}")
-
-def get_next_model(use_random=True, forced_model=None, current_model=None):
-    """Get the next model to try."""
-    failed_models = load_failed_models()
-    
-    # 1. Forced model takes precedence
-    if forced_model:
-        logger.debug(f"Using forced model: {forced_model}")
-        return forced_model
-        
-    # 2. Try cached model if not using random selection
-    if not use_random:
-        cached_model = g_c.get("working_llm_model")
-        if cached_model and cached_model not in failed_models:
-            logger.debug(f"Using cached model: {cached_model}")
-            return cached_model
-            
-    # 3. Try random available model
-    available_models = [m for m in FREE_MODELS if m not in failed_models and m != current_model]
-    if available_models:
-        selected_model = random.choice(available_models)
-        logger.debug(f"Selected random model: {selected_model} from {len(available_models)} available")
-        return selected_model
-        
-    # 4. Final fallback
-    if FALLBACK_MODEL not in failed_models:
-        logger.debug(f"Using fallback model: {FALLBACK_MODEL}")
-        return FALLBACK_MODEL
-    else:
-        logger.error("No models available - all models have failed")
-        return None
 
 def call_openrouter_model(model, messages, max_tokens, label=""):
     """Call OpenRouter model with retry logic, timeout, and logging."""
@@ -404,9 +453,7 @@ def call_openrouter_model(model, messages, max_tokens, label=""):
     response_text = _try_call_model(client, model, messages, max_tokens)
     return response_text, model
 
-def get_comparison_models():
-    """Get models for comparison mode."""
-    return "google/gemma-3-27b-it", "mistralai/mistral-small-3.1-24b-instruct"
+
 
 # Provider registry - simplified to just track the provider name
 PROVIDER_NAME = "openrouter"
@@ -421,7 +468,7 @@ def _try_call_model(client, model, messages, max_tokens):
 
         # If the model requires user-only instructions and the current message structure
         # is [system_prompt, user_prompt] (typical for O3 mode), combine them.
-        if model in USER_ONLY_INSTRUCTION_MODELS and \
+        if model_manager.is_user_only_instruction_model(model) and \
            len(prepared_messages) == 2 and \
            prepared_messages[0].get("role") == "system" and \
            prepared_messages[1].get("role") == "user":
@@ -722,7 +769,7 @@ def _try_ai_models(messages, filtered_articles):
             logger.info(f"3rd attempt: explicitly using fallback model: {current_model}")
         else:
             # Get next model to try (for attempts 1 and 2)
-            current_model = get_next_model(current_model=current_model)
+            current_model = model_manager.get_available_model(current_model=current_model)
             if not current_model:
                 logger.error("No more models available to try")
                 break
@@ -735,22 +782,22 @@ def _try_ai_models(messages, filtered_articles):
             
             if not response_text:
                 logger.warning(f"Model {current_model} returned no response")
-                mark_model_failed(current_model)
+                model_manager.mark_failed(current_model)
                 continue
             
             # Process the response
             top_articles = _process_ai_response(response_text, filtered_articles, f"model {current_model}")
             if top_articles and len(top_articles) >= 3:
                 logger.info(f"Successfully got {len(top_articles)} articles from model {current_model}")
-                mark_model_success(current_model)
+                model_manager.mark_success(current_model)
                 return response_text, top_articles, current_model
             else:
                 logger.warning(f"Model {current_model} failed to produce enough articles")
-                mark_model_failed(current_model)
+                model_manager.mark_failed(current_model)
                 
         except Exception as e:
             logger.error(f"Model {current_model} failed: {str(e)}")
-            mark_model_failed(current_model)
+            model_manager.mark_failed(current_model)
     
     logger.error("All model attempts failed")
     return None, [], None
@@ -879,7 +926,7 @@ def run_comparison(articles):
     logger.info(f"Comparison mode: {len(filtered_articles)} articles after deduplication")
 
     # Get comparison models and run them
-    model1, model2 = get_comparison_models()
+    model1, model2 = model_manager.get_comparison_models()
     logger.info(f"Comparison model 1: {model1}")
     logger.info(f"Comparison model 2: {model2}")
     
@@ -1313,7 +1360,7 @@ def configure_global_settings(args):
         logger.info("Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM to True")
     
     # Configure models
-    MODEL_1 = get_next_model(use_random=USE_RANDOM_MODELS, forced_model=args.force_model)
+    MODEL_1 = model_manager.get_available_model(use_random=USE_RANDOM_MODELS, forced_model=args.force_model)
     MODEL_2 = FALLBACK_MODEL
     logger.info(f"Configured provider: {PROVIDER_NAME}, MODEL_1={MODEL_1}, MODEL_2={MODEL_2}")
     
