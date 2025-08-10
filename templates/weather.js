@@ -23,13 +23,13 @@
         getElements() {
             const elements = new Map();
             const ids = [
-                'weather-widget-container', 'weather-content', 
+                'weather-widget-container', 'weather-content',
                 'weather-toggle-btn', 'weather-collapsed-label', 'weather-unit-toggle'
             ];
             ids.forEach(id => elements.set(id, document.getElementById(id)));
             
-            // Use weather-content as the main container for hiding/showing
-            elements.set('weather-container', document.getElementById('weather-content'));
+            // Use weather-widget-container as the main container for hiding/showing
+            elements.set('weather-container', document.getElementById('weather-widget-container'));
             
             // Look for weather elements inside the weather-content-inner div
             const contentInner = document.querySelector('.weather-content-inner');
