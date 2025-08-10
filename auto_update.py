@@ -66,6 +66,10 @@ logging.getLogger("httpcore").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("openai").setLevel(logging.WARNING)
 
+# Suppress tqdm progress bars
+import os
+os.environ['TQDM_DISABLE'] = '1'
+
 logger = logging.getLogger(__name__)
 
 # Log startup information
