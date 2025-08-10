@@ -9,7 +9,7 @@ from timeit import default_timer as timer
 import json
 import traceback
 import time
-from abc import ABC, abstractmethod
+
 from typing import Dict, List, Optional, Tuple
 import random
 import logging
@@ -300,246 +300,126 @@ provider_client_cache = None
 ALL_URLS = {}  # Initialized here, passed to utils
 
 # =============================================================================
-# PROVIDER CLASS HIERARCHY
+# SIMPLIFIED PROVIDER FUNCTIONS
 # =============================================================================
 
-class LLMProvider(ABC):
-    """Abstract base class for LLM providers."""
+def get_openrouter_client():
+    """Get an OpenRouter API client with caching."""
+    global provider_client_cache
     
-    def __init__(self, name: str):
-        self.name = name
-        self._client = None
+    if provider_client_cache is not None:
+        return provider_client_cache
     
-    @property
-    @abstractmethod
-    def api_key_env_var(self) -> str:
-        """Get the environment variable name for the API key."""
-        pass
+    # Import here to avoid circular imports
+    from openai import OpenAI
     
-    @property
-    @abstractmethod
-    def base_url(self) -> str:
-        """Get the base URL for the API."""
-        pass
+    api_key = os.environ.get("OPENROUTER_API_KEY")
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY not set")
     
-    @property
-    @abstractmethod
-    def primary_model(self) -> str:
-        """Get the primary model name."""
-        pass
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1"
+    )
     
-    @property
-    @abstractmethod
-    def fallback_model(self) -> str:
-        """Get the fallback model name."""
-        pass
+    # Add OpenRouter-specific headers
+    headers = {
+        "HTTP-Referer": "https://linuxreport.net",
+        "X-Title": "LinuxReport"
+    }
+    for header, value in headers.items():
+        client._client.headers[header] = value
     
-    def get_comparison_models(self) -> Tuple[str, str]:
-        """Get models for comparison mode (default to primary/fallback)."""
-        return self.primary_model, self.fallback_model
-    
-    def get_api_key(self) -> str:
-        """Get the API key from environment variables."""
-        api_key = os.environ.get(self.api_key_env_var)
-        if not api_key:
-            raise ValueError(f"API key {self.api_key_env_var} not set for provider {self.name}")
-        return api_key
-    
-    def get_client(self, use_cache: bool = True):
-        """Get an API client for this provider."""
-        global provider_client_cache
-        
-        # Use cached client if available and requested
-        if use_cache and provider_client_cache is not None:
-            return provider_client_cache
-        
-        # Import here to avoid circular imports
-        from openai import OpenAI
-        
-        # Create new client
-        client = OpenAI(
-            api_key=self.get_api_key(),
-            base_url=self.base_url
-        )
-        
-        # Apply any provider-specific configuration
-        self._configure_client(client)
-        
-        # Cache the client if requested
-        if use_cache:
-            provider_client_cache = client
-        
-        return client
-    
-    def _configure_client(self, client):
-        """Configure the client with provider-specific settings."""
-        pass  # Default implementation does nothing
-    
-    def call_model(self, model: str, messages: List[Dict[str, str]], max_tokens: int, label: str = "") -> Tuple[str, str]:
-        """Call the model with retry logic, timeout, and logging."""
-        client = self.get_client(use_cache=False)
-        response_text = _try_call_model(client, model, messages, max_tokens)
-        return response_text, model
-    
-    def __str__(self) -> str:
-        return f"{self.name} Provider (primary: {self.primary_model}, fallback: {self.fallback_model})"
+    provider_client_cache = client
+    return client
 
+def load_failed_models():
+    """Load failed models from cache with timestamp."""
+    failed_models_data = g_c.get(FAILED_MODELS_CACHE_KEY) or {}
+    current_time = time.time()
+    
+    # Filter out models that have been failed for too long
+    failed_models = {
+        model for model, fail_time in failed_models_data.items()
+        if current_time - fail_time < FAILED_MODELS_RETRY_HOURS * 3600
+    }
+    
+    logger.debug(f"Loaded {len(failed_models)} failed models from cache")
+    return failed_models
 
-class ModelSelector:
-    """Simple model selection and fallback logic."""
-    
-    def __init__(self, use_random=True, forced_model=None):
-        self.use_random = use_random
-        self.forced_model = forced_model
-        self.cache = g_c
-        self._load_failed_models()
-        logger.info(f"ModelSelector initialized: use_random={use_random}, forced_model={forced_model}")
+def mark_model_failed(model):
+    """Mark a model as failed with timestamp."""
+    if model not in FREE_MODELS:
+        logger.warning(f"Attempted to mark unknown model as failed: {model}")
+        return
         
-    def _load_failed_models(self):
-        """Load failed models from cache with timestamp."""
-        failed_models_data = self.cache.get(FAILED_MODELS_CACHE_KEY) or {}
-        current_time = time.time()
-        
-        # Filter out models that have been failed for too long
-        self.failed_models = {
-            model for model, fail_time in failed_models_data.items()
-            if current_time - fail_time < FAILED_MODELS_RETRY_HOURS * 3600
-        }
-        
-        logger.debug(f"Loaded {len(self.failed_models)} failed models from cache")
-        logger.info(f"Failed models: {list(self.failed_models)}")
-        
-    def mark_failed(self, model):
-        """Mark a model as failed with timestamp."""
-        if model not in FREE_MODELS:
-            logger.warning(f"Attempted to mark unknown model as failed: {model}")
-            return
-            
-        failed_models_data = self.cache.get(FAILED_MODELS_CACHE_KEY) or {}
-        failed_models_data[model] = time.time()
-        self.cache.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
-        self.failed_models.add(model)
-        logger.info(f"Marked model as failed: {model}")
-        
-    def mark_success(self, model):
-        """Mark a model as successful and update cache."""
-        if model not in FREE_MODELS:
-            logger.warning(f"Attempted to mark unknown model as successful: {model}")
-            return
-            
-        if model != self.forced_model:  # Don't cache forced models
-            self.cache.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
-            logger.info(f"Cached working model: {model}")
-            
-        # Remove from failed models if it was there
-        if model in self.failed_models:
-            self.failed_models.remove(model)
-            failed_models_data = self.cache.get(FAILED_MODELS_CACHE_KEY) or {}
-            if model in failed_models_data:
-                del failed_models_data[model]
-                self.cache.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
-            logger.info(f"Removed model from failed list: {model}")
-            
-    def get_next_model(self, current_model=None):
-        """Get the next model to try."""
-        # Reload failed models to check for retry eligibility
-        self._load_failed_models()
-        
-        # 1. Forced model takes precedence
-        if self.forced_model:
-            logger.debug(f"Using forced model: {self.forced_model}")
-            return self.forced_model
-            
-        # 2. Try cached model if not using random selection
-        if not self.use_random:
-            cached_model = self.cache.get("working_llm_model")
-            if cached_model and cached_model not in self.failed_models:
-                logger.debug(f"Using cached model: {cached_model}")
-                return cached_model
-                
-        # 3. Try random available model
-        available_models = [m for m in FREE_MODELS if m not in self.failed_models and m != current_model]
-        if available_models:
-            selected_model = random.choice(available_models)
-            logger.debug(f"Selected random model: {selected_model} from {len(available_models)} available")
-            return selected_model
-            
-        # 4. Final fallback
-        if FALLBACK_MODEL not in self.failed_models:
-            logger.debug(f"Using fallback model: {FALLBACK_MODEL}")
-            return FALLBACK_MODEL
-        else:
-            logger.error("No models available - all models have failed")
-            return None
-        
-    def get_model_status(self):
-        """Get current status of all models."""
-        self._load_failed_models()  # Refresh status
-        status = {
-            "forced_model": self.forced_model,
-            "use_random": self.use_random,
-            "failed_models": list(self.failed_models),
-            "cached_model": self.cache.get("working_llm_model"),
-            "available_models": [m for m in FREE_MODELS if m not in self.failed_models]
-        }
-        logger.debug(f"Model status: {status}")
-        return status
+    failed_models_data = g_c.get(FAILED_MODELS_CACHE_KEY) or {}
+    failed_models_data[model] = time.time()
+    g_c.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
+    logger.info(f"Marked model as failed: {model}")
 
-class OpenRouterProvider(LLMProvider):
-    """Provider implementation for OpenRouter."""
+def mark_model_success(model, forced_model=None):
+    """Mark a model as successful and update cache."""
+    if model not in FREE_MODELS:
+        logger.warning(f"Attempted to mark unknown model as successful: {model}")
+        return
+        
+    if model != forced_model:  # Don't cache forced models
+        g_c.put("working_llm_model", model, timeout=MODEL_CACHE_DURATION)
+        logger.info(f"Cached working model: {model}")
+        
+    # Remove from failed models if it was there
+    failed_models = load_failed_models()
+    if model in failed_models:
+        failed_models_data = g_c.get(FAILED_MODELS_CACHE_KEY) or {}
+        if model in failed_models_data:
+            del failed_models_data[model]
+            g_c.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
+        logger.info(f"Removed model from failed list: {model}")
+
+def get_next_model(use_random=True, forced_model=None, current_model=None):
+    """Get the next model to try."""
+    failed_models = load_failed_models()
     
-    def __init__(self, forced_model=None):
-        super().__init__("openrouter")
-        self.model_selector = ModelSelector(use_random=USE_RANDOM_MODELS, forced_model=forced_model)
-        self._selected_model = self.model_selector.get_next_model()
-        logger.info(f"OpenRouterProvider initialized with selected model: {self._selected_model}")
-    
-    @property
-    def api_key_env_var(self) -> str:
-        return "OPENROUTER_API_KEY"
-    
-    @property
-    def base_url(self) -> str:
-        return "https://openrouter.ai/api/v1"
-    
-    @property
-    def primary_model(self) -> str:
-        return self._selected_model
-    
-    @property
-    def fallback_model(self) -> str:
+    # 1. Forced model takes precedence
+    if forced_model:
+        logger.debug(f"Using forced model: {forced_model}")
+        return forced_model
+        
+    # 2. Try cached model if not using random selection
+    if not use_random:
+        cached_model = g_c.get("working_llm_model")
+        if cached_model and cached_model not in failed_models:
+            logger.debug(f"Using cached model: {cached_model}")
+            return cached_model
+            
+    # 3. Try random available model
+    available_models = [m for m in FREE_MODELS if m not in failed_models and m != current_model]
+    if available_models:
+        selected_model = random.choice(available_models)
+        logger.debug(f"Selected random model: {selected_model} from {len(available_models)} available")
+        return selected_model
+        
+    # 4. Final fallback
+    if FALLBACK_MODEL not in failed_models:
+        logger.debug(f"Using fallback model: {FALLBACK_MODEL}")
         return FALLBACK_MODEL
-    
-    def get_comparison_models(self) -> Tuple[str, str]:
-        """Get models specific for comparison mode."""
-        return "google/gemma-3-27b-it", "mistralai/mistral-small-3.1-24b-instruct"
-    
-    def _configure_client(self, client):
-        """Add OpenRouter-specific headers."""
-        headers = {
-            "HTTP-Referer": "https://linuxreport.net",
-            "X-Title": "LinuxReport"
-        }
-        for header, value in headers.items():
-            client._client.headers[header] = value
-        logger.debug(f"OpenRouter headers configured: {headers}")
+    else:
+        logger.error("No models available - all models have failed")
+        return None
 
-# Provider registry
-PROVIDERS = {
-    "openrouter": OpenRouterProvider  # Store the class, not an instance
-}
+def call_openrouter_model(model, messages, max_tokens, label=""):
+    """Call OpenRouter model with retry logic, timeout, and logging."""
+    client = get_openrouter_client()
+    response_text = _try_call_model(client, model, messages, max_tokens)
+    return response_text, model
 
-# Global provider instance
-_provider_instance = None
+def get_comparison_models():
+    """Get models for comparison mode."""
+    return "google/gemma-3-27b-it", "mistralai/mistral-small-3.1-24b-instruct"
 
-def get_provider(name: str, forced_model=None) -> LLMProvider:
-    """Get a provider by name."""
-    global _provider_instance
-    if _provider_instance is None:
-        if name not in PROVIDERS:
-            raise ValueError(f"Unknown provider: {name}")
-        _provider_instance = PROVIDERS[name](forced_model=forced_model)  # Pass forced_model to provider
-    return _provider_instance
+# Provider registry - simplified to just track the provider name
+PROVIDER_NAME = "openrouter"
 
 def _try_call_model(client, model, messages, max_tokens):
     max_retries = 1
@@ -823,8 +703,7 @@ def ask_ai_top_articles(articles, dry_run=False):
             logger.debug(f"  Message {i+1} ({msg['role']}): {msg['content'][:200]}...")
 
     # Try AI selection with simplified logic
-    provider = get_provider(PROVIDER, forced_model=None)
-    response_text, top_articles, used_model = _try_ai_models(provider, messages, filtered_articles)
+    response_text, top_articles, used_model = _try_ai_models(messages, filtered_articles)
     
     # Check if we succeeded
     if not top_articles or len(top_articles) < 3:
@@ -837,12 +716,10 @@ def ask_ai_top_articles(articles, dry_run=False):
     return response_text, top_articles, used_model
 
 
-def _try_ai_models(provider, messages, filtered_articles):
-    """Simplified model selection logic that uses the provider's ModelSelector."""
+def _try_ai_models(messages, filtered_articles):
+    """Simplified model selection logic."""
     logger.info("Starting AI model selection process")
     
-    # Use the provider's model selector to get models to try
-    model_selector = provider.model_selector
     current_model = None
     
     # Try up to 3 different models (including fallback)
@@ -855,7 +732,7 @@ def _try_ai_models(provider, messages, filtered_articles):
             logger.info(f"3rd attempt: explicitly using fallback model: {current_model}")
         else:
             # Get next model to try (for attempts 1 and 2)
-            current_model = model_selector.get_next_model(current_model)
+            current_model = get_next_model(current_model=current_model)
             if not current_model:
                 logger.error("No more models available to try")
                 break
@@ -863,8 +740,8 @@ def _try_ai_models(provider, messages, filtered_articles):
         logger.info(f"Trying model: {current_model}")
         
         # Try the model
-        result = _try_model_call(provider, messages, filtered_articles, f"model {current_model}", 
-                               lambda: provider.call_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
+        result = _try_model_call(messages, filtered_articles, f"model {current_model}", 
+                               lambda: call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
         
         if result:
             return result
@@ -873,7 +750,7 @@ def _try_ai_models(provider, messages, filtered_articles):
     return None, [], None
 
 
-def _try_model_call(provider, messages, filtered_articles, model_context, call_func):
+def _try_model_call(messages, filtered_articles, model_context, call_func):
     """Helper function to try a model call and process the response."""
     try:
         result = call_func()
@@ -903,8 +780,7 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
                 actual_model = model_context.replace("model ", "")
             
             # Mark the model as successful
-            if hasattr(provider, 'model_selector'):
-                provider.model_selector.mark_success(actual_model)
+            mark_model_success(actual_model)
             
             return response_text, top_articles, actual_model
         else:
@@ -914,11 +790,10 @@ def _try_model_call(provider, messages, filtered_articles, model_context, call_f
     except Exception as e:
         logger.error(f"{model_context} failed: {str(e)}")
         # Mark model as failed if we can identify it
-        if hasattr(provider, 'model_selector'):
-            if model_context.startswith("model "):
-                # Extract model name from context
-                model_name = model_context.replace("model ", "")
-                provider.model_selector.mark_failed(model_name)
+        if model_context.startswith("model "):
+            # Extract model name from context
+            model_name = model_context.replace("model ", "")
+            mark_model_failed(model_name)
         return None
 
 
@@ -1042,23 +917,22 @@ def run_comparison(articles):
     logger.info(f"Comparison mode: {len(filtered_articles)} articles after deduplication")
 
     # Get comparison models and run them
-    provider = get_provider(PROVIDER, forced_model=None)
-    model1, model2 = provider.get_comparison_models()
+    model1, model2 = get_comparison_models()
     logger.info(f"Comparison model 1: {model1}")
     logger.info(f"Comparison model 2: {model2}")
     
     # Run both models
-    _run_comparison_model(provider, model1, filtered_articles, "Comparison 1")
-    _run_comparison_model(provider, model2, filtered_articles, "Comparison 2")
+    _run_comparison_model(model1, filtered_articles, "Comparison 1")
+    _run_comparison_model(model2, filtered_articles, "Comparison 2")
 
     logger.info("--- Comparison Mode Finished ---")
 
 
-def _run_comparison_model(provider, model, filtered_articles, label):
+def _run_comparison_model(model, filtered_articles, label):
     """Helper function to run a single comparison model."""
     try:
         messages = _prepare_messages(PROMPT_MODE, filtered_articles)
-        response_text, used_model = provider.call_model(model, messages, MAX_TOKENS, label)
+        response_text, used_model = call_openrouter_model(model, messages, MAX_TOKENS, label)
         
         if response_text:
             logger.info(f"{label} completed successfully")
@@ -1484,11 +1358,10 @@ if __name__ == "__main__":
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
         logger.info("Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM to True")
 
-    # Configure primary provider from CLI - only if we're actually going to run
-    provider = get_provider(PROVIDER, forced_model=args.force_model)
-    MODEL_1 = provider.primary_model
-    MODEL_2 = provider.fallback_model
-    logger.info(f"Configured provider: {PROVIDER}, MODEL_1={MODEL_1}, MODEL_2={MODEL_2}")
+    # Configure models from CLI - only if we're actually going to run
+    MODEL_1 = get_next_model(use_random=USE_RANDOM_MODELS, forced_model=args.force_model)
+    MODEL_2 = FALLBACK_MODEL
+    logger.info(f"Configured provider: {PROVIDER_NAME}, MODEL_1={MODEL_1}, MODEL_2={MODEL_2}")
 
     if args.prompt_mode:
         try:
