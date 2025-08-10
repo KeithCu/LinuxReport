@@ -1,7 +1,3 @@
-# Suppress tqdm progress bars before any imports
-import os
-os.environ['TQDM_DISABLE'] = '1'
-
 """
 embeddings_dedup.py
 
@@ -13,6 +9,7 @@ using advanced NLP techniques to identify and filter duplicate or similar conten
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import os
 import re
 import warnings
 import math
@@ -93,7 +90,7 @@ def get_embedding(text):
                 return None
         # Return a zero vector of the same shape as a normal embedding
         try:
-            return embedder.encode(" ", convert_to_tensor=True) * 0
+            return embedder.encode(" ", convert_to_tensor=True, show_progress_bar=False) * 0
         except Exception as e:
             logger.warning(f"Failed to create zero embedding: {e}")
             return None
@@ -113,7 +110,7 @@ def get_embedding(text):
     
     # Compute embedding
     try:
-        embedding = embedder.encode(text, convert_to_tensor=True)
+        embedding = embedder.encode(text, convert_to_tensor=True, show_progress_bar=False)
         embedding_cache[text] = embedding
         return embedding
     except Exception as e:

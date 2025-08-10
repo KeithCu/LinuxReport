@@ -73,12 +73,24 @@ def wake_up_site(dir_name, url):
                 http_status = response.getcode()
                 response_content = response.read().decode('utf-8')
                 
-                # Get line 9 (index 8) for title
+                # Search for title in the top 15 lines
                 content_lines = response_content.strip().split('\n')
-                if len(content_lines) >= 9:
-                    response_preview = content_lines[8].strip()
-                else:
-                    response_preview = ""
+                response_preview = ""
+                
+                # Look for title tag in the first 15 lines
+                for i in range(min(15, len(content_lines))):
+                    line = content_lines[i].strip()
+                    if '<title>' in line and '</title>' in line:
+                        response_preview = line
+                        break
+                
+                # If no title found in first 15 lines, use the first non-empty line as fallback
+                if not response_preview:
+                    for i in range(min(15, len(content_lines))):
+                        line = content_lines[i].strip()
+                        if line and not line.startswith('<!') and not line.startswith('<html'):
+                            response_preview = line
+                            break
         except urllib.error.HTTPError as e:
             http_status = e.code
             response_preview = ""
