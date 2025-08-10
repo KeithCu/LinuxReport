@@ -23,12 +23,22 @@
         getElements() {
             const elements = new Map();
             const ids = [
-                'weather-container', 'weather-widget-container', 'weather-content', 
-                'weather-toggle-btn', 'weather-collapsed-label', 'weather-forecast', 
-                'weather-loading', 'weather-error', 'weather-unit-toggle'
+                'weather-widget-container', 'weather-content', 
+                'weather-toggle-btn', 'weather-collapsed-label', 'weather-unit-toggle'
             ];
             ids.forEach(id => elements.set(id, document.getElementById(id)));
-            elements.set('header', document.querySelector('#weather-container h3'));
+            
+            // Use weather-content as the main container for hiding/showing
+            elements.set('weather-container', document.getElementById('weather-content'));
+            
+            // Look for weather elements inside the weather-content-inner div
+            const contentInner = document.querySelector('.weather-content-inner');
+            if (contentInner) {
+                elements.set('weather-forecast', contentInner.querySelector('#weather-forecast'));
+                elements.set('weather-loading', contentInner.querySelector('#weather-loading'));
+                elements.set('weather-error', contentInner.querySelector('#weather-error'));
+                elements.set('header', contentInner.querySelector('h3'));
+            }
             
             // Cache meta elements for location data
             elements.set('latMeta', document.querySelector('meta[name="weather-lat"]'));
@@ -500,6 +510,8 @@
             
             if (toggleBtn) {
                 toggleBtn.innerHTML = isCollapsed ? '&#9650;' : '&#9660;';
+                // Set aria-expanded attribute for accessibility
+                toggleBtn.setAttribute('aria-expanded', !isCollapsed);
             }
             
             if (saveCookie) {

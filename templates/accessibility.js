@@ -136,22 +136,16 @@
                 if (nextBtn) nextBtn.setAttribute('aria-disabled', nextBtn.disabled);
             });
 
-            // Update toggle buttons
+            // Update toggle buttons (weather widget manages its own ARIA attributes)
             const ariaControls = [
-                { btn: 'weather-toggle-btn', container: 'weather-widget-container', stateClass: 'collapsed' },
                 { btn: 'chat-toggle-btn', container: 'chat-container', stateAttr: 'aria-hidden' }
             ];
 
-            ariaControls.forEach(({ btn, container, stateClass, stateAttr }) => {
+            ariaControls.forEach(({ btn, container, stateAttr }) => {
                 const toggle = document.getElementById(btn);
                 const target = document.getElementById(container);
                 if (toggle && target) {
-                    let isExpanded;
-                    if (stateClass) {
-                        isExpanded = !target.classList.contains(stateClass);
-                    } else {
-                        isExpanded = target.getAttribute(stateAttr) !== 'true';
-                    }
+                    const isExpanded = target.getAttribute(stateAttr) !== 'true';
                     toggle.setAttribute('aria-expanded', isExpanded);
                 }
             });
