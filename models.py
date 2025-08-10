@@ -105,7 +105,7 @@ class DiskCacheWrapper:
         Args:
             cache_dir (str): Directory path for cache storage
         """
-        self.cache = diskcache.Cache(cache_dir, disk_min_file_size=1000000)
+        self.cache = diskcache.Cache(cache_dir, disk_min_file_size=10000000)
 
     def get(self, key: str) -> Any:
         """
