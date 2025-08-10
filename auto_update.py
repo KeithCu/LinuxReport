@@ -169,9 +169,10 @@ FREE_MODELS = [
     "nvidia/llama-3.1-nemotron-ultra-253b-v1:free",
     # "nvidia/llama-3.3-nemotron-super-49b-v1:free", # Removed by openrouter.ai on: 2025-08-01
    # "open-r1/olympiccoder-32b:free", Generates too many tokens
+    "openai/gpt-oss-20b:free",
     # "opengvlab/internvl3-14b:free", # Removed by openrouter.ai on: 2025-08-01
     # "openrouter/cypher-alpha:free", # Removed by openrouter.ai on: 2025-08-01
-    "openrouter/horizon-alpha",
+    # "openrouter/horizon-alpha", # Removed by openrouter.ai on: 2025-08-10
     "qwen/qwen-2.5-72b-instruct:free",
     "qwen/qwen-2.5-coder-32b-instruct:free",
     "qwen/qwen2.5-vl-32b-instruct:free",
@@ -188,7 +189,7 @@ FREE_MODELS = [
     "sarvamai/sarvam-m:free",
     "shisa-ai/shisa-v2-llama3.3-70b:free",
     "tencent/hunyuan-a13b-instruct:free",
-    "thudm/glm-4-32b:free",
+    # "thudm/glm-4-32b:free", # Removed by openrouter.ai on: 2025-08-10
     "thudm/glm-z1-32b:free",
     "tngtech/deepseek-r1t-chimera:free",
     "tngtech/deepseek-r1t2-chimera:free",
