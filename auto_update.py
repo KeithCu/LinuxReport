@@ -739,62 +739,34 @@ def _try_ai_models(messages, filtered_articles):
             
         logger.info(f"Trying model: {current_model}")
         
-        # Try the model
-        result = _try_model_call(messages, filtered_articles, f"model {current_model}", 
-                               lambda: call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}"))
-        
-        if result:
-            return result
+        # Try the model directly
+        try:
+            response_text, used_model = call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}")
+            
+            if not response_text:
+                logger.warning(f"Model {current_model} returned no response")
+                mark_model_failed(current_model)
+                continue
+            
+            # Process the response
+            top_articles = _process_ai_response(response_text, filtered_articles, f"model {current_model}")
+            if top_articles and len(top_articles) >= 3:
+                logger.info(f"Successfully got {len(top_articles)} articles from model {current_model}")
+                mark_model_success(current_model)
+                return response_text, top_articles, current_model
+            else:
+                logger.warning(f"Model {current_model} failed to produce enough articles")
+                mark_model_failed(current_model)
+                
+        except Exception as e:
+            logger.error(f"Model {current_model} failed: {str(e)}")
+            mark_model_failed(current_model)
     
     logger.error("All model attempts failed")
     return None, [], None
 
 
-def _try_model_call(messages, filtered_articles, model_context, call_func):
-    """Helper function to try a model call and process the response."""
-    try:
-        result = call_func()
-        
-        # Standardize return types - all call_func should return (response_text, used_model)
-        if isinstance(result, tuple):
-            response_text, used_model = result
-        else:
-            # Handle case where call_func returns just response_text
-            response_text = result
-            used_model = None
-        
-        if not response_text:
-            logger.warning(f"{model_context} returned no response")
-            return None
-        
-        # Process the response
-        top_articles = _process_ai_response(response_text, filtered_articles, model_context)
-        if top_articles and len(top_articles) >= 3:
-            logger.info(f"Successfully got {len(top_articles)} articles from {model_context}")
-            
-            # Determine the actual model name
-            if used_model:
-                actual_model = used_model
-            else:
-                # Extract model name from context like "model model_name"
-                actual_model = model_context.replace("model ", "")
-            
-            # Mark the model as successful
-            mark_model_success(actual_model)
-            
-            return response_text, top_articles, actual_model
-        else:
-            logger.warning(f"{model_context} failed to produce enough articles")
-            return None
-            
-    except Exception as e:
-        logger.error(f"{model_context} failed: {str(e)}")
-        # Mark model as failed if we can identify it
-        if model_context.startswith("model "):
-            # Extract model name from context
-            model_name = model_context.replace("model ", "")
-            mark_model_failed(model_name)
-        return None
+
 
 
 def _process_ai_response(response_text, filtered_articles, model_context):
@@ -934,14 +906,17 @@ def _run_comparison_model(model, filtered_articles, label):
         messages = _prepare_messages(PROMPT_MODE, filtered_articles)
         response_text, used_model = call_openrouter_model(model, messages, MAX_TOKENS, label)
         
-        if response_text:
-            logger.info(f"{label} completed successfully")
-            # Optionally process and log the results
-            top_articles = _process_ai_response(response_text, filtered_articles, f"{label} ({model})")
-            if top_articles:
-                logger.info(f"{label} selected {len(top_articles)} articles")
+        if not response_text:
+            logger.error(f"{label} returned no response")
+            return
+        
+        logger.info(f"{label} completed successfully")
+        # Process and log the results
+        top_articles = _process_ai_response(response_text, filtered_articles, f"{label} ({model})")
+        if top_articles:
+            logger.info(f"{label} selected {len(top_articles)} articles")
         else:
-            logger.error(f"{label} failed for {PROVIDER}")
+            logger.warning(f"{label} failed to produce articles")
             
     except Exception as e:
         logger.error(f"{label} failed with exception: {e}")
@@ -1270,7 +1245,8 @@ def _process_normal_mode(mode, articles, html_file, dry_run):
     logger.info("Normal mode processing completed successfully")
     return 0
 
-if __name__ == "__main__":
+def parse_arguments():
+    """Parse command line arguments and return a config object."""
     parser = argparse.ArgumentParser(description='Generate report with optional force update')
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
@@ -1281,97 +1257,113 @@ if __name__ == "__main__":
     parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
     parser.add_argument('--force-model', type=str, help='Force the use of a specific model (overrides random/cached selection)')
+    
     args = parser.parse_args()
-
     logger.info("Command line arguments parsed")
-    logger.info(f"Arguments: force={args.force}, forceimage={args.forceimage}, dry_run={args.dry_run}, compare={args.compare}, visualize={args.visualize}, include_summary={args.include_summary}, prompt_mode={args.prompt_mode}, use_cached_model={args.use_cached_model}, force_model={args.force_model}")
+    
+    return args
 
-    # Handle visualization mode immediately, before any mode detection
-    if args.visualize:
-        RUN_MODE = "visualize"
-        logger.info("Set RUN_MODE to 'visualize'")
-        logger.info("Starting main processing for visualization mode...")
-        exit_code = main(None, None, None, dry_run=args.dry_run)
-        sys.exit(exit_code)
-
-    # Set USE_RANDOM_MODELS based on command line argument
-    USE_RANDOM_MODELS = not args.use_cached_model
-    logger.info(f"USE_RANDOM_MODELS set to: {USE_RANDOM_MODELS}")
-
-    # Revert to CWD-based mode detection
+def detect_mode():
+    """Detect the current mode based on working directory and settings files."""
     cwd = os.getcwd()
     logger.info(f"Current working directory: {cwd}")
-    selected_mode_enum = None
-    selected_mode_str = None
-
-    # Try to find a matching settings file in the current directory
+    
     for mode_enum_val in Mode:
         settings_file = f"{mode_enum_val.value}_report_settings.py"
         if os.path.isfile(settings_file):
-            # Load the settings file to get its path
             spec = importlib.util.spec_from_file_location("module_name", settings_file)
             module = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(module)
             
-            # Check if the current directory matches the configured path
             if cwd == module.CONFIG.PATH:
-                selected_mode_enum = mode_enum_val
-                selected_mode_str = mode_enum_val.value
-                # Store the loaded module and config
-                loaded_settings_module = module
-                loaded_settings_config = module.CONFIG
-                logger.info(f"Matched mode '{selected_mode_str}' with path {module.CONFIG.PATH}")
-                break
-            else:
-                pass
+                logger.info(f"Matched mode '{mode_enum_val.value}' with path {module.CONFIG.PATH}")
+                return mode_enum_val.value, module, module.CONFIG
+    
+    logger.error(f"Could not determine mode from current directory: {cwd}")
+    logger.error("Expected to find a settings file with a matching PATH in the current directory.")
+    sys.exit(1)
 
-    if selected_mode_enum is None:
-        logger.error(f"Could not determine mode from current directory: {cwd}")
-        logger.error("Expected to find a settings file with a matching PATH in the current directory.")
-        sys.exit(1)
-
-    logger.info(f"Detected mode '{selected_mode_str}' based on current directory.")
-
-    # Handle forceimage case early
-    if args.forceimage:
-        logger.info("Running in forceimage mode - only refreshing images")
-        refresh_images_only(selected_mode_str, None)
-        sys.exit(0)
-
-    # Check schedule using the config's SCHEDULE field
+def should_run_update(args, settings_config):
+    """Determine if the update should run based on schedule and arguments."""
+    if args.force or args.dry_run or args.compare:
+        return True
+    
     current_hour = datetime.datetime.now(TZ).hour
-    should_run = args.force or (loaded_settings_config.SCHEDULE and current_hour in loaded_settings_config.SCHEDULE) or args.dry_run or args.compare
+    scheduled = settings_config.SCHEDULE and current_hour in settings_config.SCHEDULE
+    
+    logger.info(f"Schedule check: current_hour={current_hour}, scheduled_hours={settings_config.SCHEDULE}, should_run={scheduled}")
+    
+    if not scheduled:
+        logger.info(f"Skipping update based on schedule (Current hour: {current_hour}, Scheduled: {settings_config.SCHEDULE}). Use --force to override.")
+    
+    return scheduled
 
-    logger.info(f"Schedule check: current_hour={current_hour}, scheduled_hours={loaded_settings_config.SCHEDULE}, should_run={should_run}")
-
-    if not should_run:
-        logger.info(f"Skipping update for mode '{selected_mode_str}' based on schedule (Current hour: {current_hour}, Scheduled: {loaded_settings_config.SCHEDULE}). Use --force to override.")
-        sys.exit(0)
-
-    # Set RUN_MODE to 'compare' if --compare is specified
+def configure_global_settings(args):
+    """Configure global settings based on command line arguments."""
+    global USE_RANDOM_MODELS, RUN_MODE, INCLUDE_ARTICLE_SUMMARY_FOR_LLM, PROMPT_MODE, MODEL_1, MODEL_2
+    
+    # Handle visualization mode
+    if args.visualize:
+        RUN_MODE = "visualize"
+        logger.info("Set RUN_MODE to 'visualize'")
+        return
+    
+    # Set model selection behavior
+    USE_RANDOM_MODELS = not args.use_cached_model
+    logger.info(f"USE_RANDOM_MODELS set to: {USE_RANDOM_MODELS}")
+    
+    # Set comparison mode
     if args.compare:
         RUN_MODE = "compare"
         logger.info("Set RUN_MODE to 'compare'")
     
-    # Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM from CLI flag
+    # Set summary inclusion
     if args.include_summary:
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
         logger.info("Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM to True")
-
-    # Configure models from CLI - only if we're actually going to run
+    
+    # Configure models
     MODEL_1 = get_next_model(use_random=USE_RANDOM_MODELS, forced_model=args.force_model)
     MODEL_2 = FALLBACK_MODEL
     logger.info(f"Configured provider: {PROVIDER_NAME}, MODEL_1={MODEL_1}, MODEL_2={MODEL_2}")
-
+    
+    # Set prompt mode
     if args.prompt_mode:
         try:
             prompt_mode_enum = PromptMode(args.prompt_mode.upper())
             PROMPT_MODE = prompt_mode_enum
             logger.info(f"Set PROMPT_MODE to {PROMPT_MODE}")
         except ValueError:
-            logger.warning(f"Invalid prompt mode specified: {args.prompt_mode}. Using 30B mode.")
-            PROMPT_MODE = PromptMode.THIRTY_B
+            logger.warning(f"Invalid prompt mode specified: {args.prompt_mode}. Using default O3 mode.")
+            PROMPT_MODE = PromptMode.O3
 
+if __name__ == "__main__":
+    args = parse_arguments()
+    
+    # Handle visualization mode immediately
+    if args.visualize:
+        configure_global_settings(args)
+        logger.info("Starting main processing for visualization mode...")
+        exit_code = main(None, None, None, dry_run=args.dry_run)
+        sys.exit(exit_code)
+    
+    # Detect mode and load settings
+    selected_mode_str, loaded_settings_module, loaded_settings_config = detect_mode()
+    logger.info(f"Detected mode '{selected_mode_str}' based on current directory.")
+    
+    # Handle forceimage case early
+    if args.forceimage:
+        logger.info("Running in forceimage mode - only refreshing images")
+        refresh_images_only(selected_mode_str, None)
+        sys.exit(0)
+    
+    # Check if we should run
+    if not should_run_update(args, loaded_settings_config):
+        sys.exit(0)
+    
+    # Configure global settings
+    configure_global_settings(args)
+    
     logger.info("Starting main processing...")
     exit_code = main(selected_mode_str, loaded_settings_module, loaded_settings_config, dry_run=args.dry_run)
     sys.exit(exit_code)
