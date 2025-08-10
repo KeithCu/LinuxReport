@@ -23,7 +23,7 @@ from image_utils import (
     score_image_candidate
 )
 # Import from the new candidate selector module
-from image_candidate_selector import process_candidate_images
+from image_parser import process_candidate_images
 
 
 
