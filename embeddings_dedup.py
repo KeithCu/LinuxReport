@@ -1,3 +1,7 @@
+# Suppress tqdm progress bars before any imports
+import os
+os.environ['TQDM_DISABLE'] = '1'
+
 """
 embeddings_dedup.py
 
@@ -9,7 +13,6 @@ using advanced NLP techniques to identify and filter duplicate or similar conten
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
-import os
 import re
 import warnings
 import math
