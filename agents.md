@@ -48,7 +48,7 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 ├── Tor.py                    # Tor network integration and utilities
 ├── SqliteLock.py             # SQLite locking mechanisms for concurrency
 ├── ObjectStorageLock.py      # Object storage locking for distributed systems
-├── article_deduplication.py  # Article deduplication algorithms
+├── embeddings_dedup.py  # Article deduplication algorithms
 ├── FeedHistory.py            # Feed history tracking and management
 ├── Reddit.py                 # Reddit-specific fetching and processing
 ├── custom_site_handlers.py   # Custom site-specific handlers

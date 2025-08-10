@@ -1,5 +1,5 @@
 """
-article_deduplication.py
+embeddings_dedup.py
 
 Article deduplication system using sentence embeddings for intelligent content filtering.
 Provides functionality for article fetching, similarity detection, and deduplication

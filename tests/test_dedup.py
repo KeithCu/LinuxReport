@@ -21,12 +21,14 @@ import warnings
 # Add the parent directory to the path so we can import the modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from article_deduplication import (
+from embeddings_dedup import (
     get_embedding, 
     deduplicate_articles_with_exclusions, 
     get_best_matching_article,
     clamp_similarity,
-    THRESHOLD
+    THRESHOLD,
+    embedding_cache,
+    st_util
 )
 
 
@@ -36,7 +38,6 @@ class TestArticleDeduplication(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         # Clear any existing embedding cache to ensure clean tests
-        from article_deduplication import embedding_cache
         embedding_cache.clear()
         
         # Test articles with various similarity patterns
@@ -328,7 +329,6 @@ class TestArticleDeduplication(unittest.TestCase):
 
     def test_cache_consistency(self):
         """Test that the embedding cache works correctly under various conditions."""
-        from article_deduplication import embedding_cache
         
         # Clear cache
         embedding_cache.clear()
@@ -411,7 +411,6 @@ class TestArticleDeduplication(unittest.TestCase):
         emb1 = get_embedding(text1)
         emb2 = get_embedding(text2)
         emb3 = get_embedding(text3)
-        from article_deduplication import st_util, clamp_similarity
         # Similar texts should have high similarity
         sim_similar = clamp_similarity(st_util.cos_sim(emb1, emb2).item())
         self.assertGreaterEqual(sim_similar, 0.8)  # Should be very similar
@@ -545,7 +544,6 @@ class TestArticleDeduplication(unittest.TestCase):
 
     def test_cache_behavior(self):
         """Test that the embedding cache works correctly."""
-        from article_deduplication import embedding_cache
         
         # Clear cache
         embedding_cache.clear()
@@ -571,7 +569,6 @@ class TestArticleDeduplication(unittest.TestCase):
             ("Trump Delivers Victory in 12-Day War!", "Trump Delivers Victory in 12-Day War"),
             ("TRUMP DELIVERS VICTORY IN 12-DAY WAR", "trump delivers victory in 12-day war"),
         ]
-        from article_deduplication import st_util, clamp_similarity
         for text1, text2 in test_cases:
             emb1 = get_embedding(text1)
             emb2 = get_embedding(text2)

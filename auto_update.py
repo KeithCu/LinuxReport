@@ -23,7 +23,7 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 from image_parser import custom_fetch_largest_image
-from article_deduplication import (
+from embeddings_dedup import (
     fetch_recent_articles, get_embedding, deduplicate_articles_with_exclusions,
     get_best_matching_article
 )

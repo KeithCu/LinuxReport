@@ -18,7 +18,7 @@ from jinja2 import Template
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from article_deduplication import extract_articles_from_html
+from embeddings_dedup import extract_articles_from_html
 from image_parser import custom_fetch_largest_image
 
 # =============================================================================
