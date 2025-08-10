@@ -1,6 +1,11 @@
 #!/bin/bash
 
 # =============================================================================
+# deploy.sh - Bash version of deploy.py
+# Performs the same operations: chown, restart Apache, wake up sites
+# =============================================================================
+
+# =============================================================================
 # CONFIGURATION - Edit these values as needed
 # =============================================================================
 
@@ -21,14 +26,27 @@ declare -A urls=(
 # FUNCTIONS
 # =============================================================================
 
+# Function to run a command with error handling
+run_command() {
+    local cmd=$1
+    local check=${2:-true}
+    
+    if [[ "$check" == "true" ]]; then
+        if ! eval "$cmd" 2>/dev/null; then
+            echo "Error running command: $cmd"
+            exit 1
+        fi
+    else
+        eval "$cmd" 2>/dev/null || true
+    fi
+}
+
 # Function to change ownership for a directory
 chown_directory() {
     local dir=$1
     
     echo "Changing ownership for $dir..."
-    cd "$dir"
-    sudo chown -R http:http *
-    cd ..
+    run_command "cd \"$dir\" && sudo chown -R http:http * && cd .."
 }
 
 # Function to wake up a site with curl
@@ -52,13 +70,38 @@ wake_up_site() {
     
     while [ $attempt -le $max_attempts ]; do
         # Make the request with User-Agent header
+        # Use LinuxReportDeployBot user agent to prevent triggering refreshes/background updates
+        # This ensures deploy requests don't trigger background refreshes when starting the app
         response=$(curl -s -w "HTTP_STATUS:%{http_code}" -H "User-Agent: LinuxReportDeployBot" --connect-timeout 10 --max-time 10 "$url")
         http_status=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
         response_content=$(echo "$response" | grep -v "HTTP_STATUS:")
         
-        # Extract title from line 9 (similar to Python version)
-        title_line=$(echo "$response_content" | sed -n '9p')
-        title=$(echo "$title_line" | sed 's/<title>//' | sed 's/<\/title>//' | xargs)
+        # Extract title using improved logic (search first 15 lines for title tag)
+        title=""
+        line_number=1
+        
+        # Look for title tag in the first 15 lines
+        while [ $line_number -le 15 ] && [ -z "$title" ]; do
+            title_line=$(echo "$response_content" | sed -n "${line_number}p")
+            if echo "$title_line" | grep -q "<title>.*</title>"; then
+                title=$(echo "$title_line" | sed 's/<title>//' | sed 's/<\/title>//' | xargs)
+                break
+            fi
+            line_number=$((line_number + 1))
+        done
+        
+        # If no title found in first 15 lines, use the first non-empty line as fallback
+        if [ -z "$title" ]; then
+            line_number=1
+            while [ $line_number -le 15 ]; do
+                title_line=$(echo "$response_content" | sed -n "${line_number}p" | xargs)
+                if [ -n "$title_line" ] && ! echo "$title_line" | grep -q "^<!" && ! echo "$title_line" | grep -q "^<html"; then
+                    title="$title_line"
+                    break
+                fi
+                line_number=$((line_number + 1))
+            done
+        fi
         
         # Check if we got a successful response with content
         if [[ -n "$title" ]]; then
@@ -251,7 +294,7 @@ else
     
     # Step 2: Restart web server
     echo "Step 2: Restarting web server..."
-    sudo systemctl restart "$WEB_SERVER_SERVICE"
+    run_command "sudo systemctl restart \"$WEB_SERVER_SERVICE\""
     sleep 0.25
     
     # Step 3: Wake up all sites concurrently
