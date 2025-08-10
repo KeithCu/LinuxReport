@@ -354,7 +354,7 @@ def mark_model_failed(model):
         
     failed_models_data = g_c.get(FAILED_MODELS_CACHE_KEY) or {}
     failed_models_data[model] = time.time()
-    g_c.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=EXPIRE_WEEK)
+    g_c.put(FAILED_MODELS_CACHE_KEY, failed_models_data, timeout=MODEL_CACHE_DURATION)
     logger.info(f"Marked model as failed: {model}")
 
 def mark_model_success(model, forced_model=None):
