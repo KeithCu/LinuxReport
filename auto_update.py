@@ -554,16 +554,11 @@ def _try_ai_models(messages, filtered_articles):
         
         # On the 3rd attempt, explicitly use the fallback model
         if attempt == 3:
-            current_model = model_manager.get_available_model(use_random=False, forced_model=None, current_model=current_model)
-            if not current_model:
-                current_model = FALLBACK_MODEL
+            current_model = FALLBACK_MODEL
             logger.info(f"3rd attempt: explicitly using fallback model: {current_model}")
         else:
             # Get next model to try (for attempts 1 and 2)
             current_model = model_manager.get_available_model(current_model=current_model)
-            if not current_model:
-                logger.error("No more models available to try")
-                break
             
         logger.info(f"Trying model: {current_model}")
         

@@ -203,14 +203,6 @@ class ModelManager:
             selected_model = random.choice(available_models)
             logger.debug(f"Selected random model: {selected_model} from {len(available_models)} available")
             return selected_model
-            
-        # 4. Final fallback
-        if FALLBACK_MODEL not in failed_models:
-            logger.debug(f"Using fallback model: {FALLBACK_MODEL}")
-            return FALLBACK_MODEL
-        else:
-            logger.error("No models available - all models have failed")
-            return None
     
     def get_comparison_models(self):
         """Get models for comparison mode."""
