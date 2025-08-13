@@ -37,7 +37,7 @@ from shared import (
     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML, 
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
-    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API
+    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE
 )
 from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
@@ -499,6 +499,8 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
             urls.append(f'<url><loc>{domain}/</loc><changefreq>hourly</changefreq><priority>1.0</priority></url>')
             # Add old_headlines page
             urls.append(f'<url><loc>{domain}/old_headlines</loc><changefreq>daily</changefreq><priority>0.8</priority></url>')
+            # Add RSS feed
+            urls.append(f'<url><loc>{domain}/rss</loc><changefreq>hourly</changefreq><priority>0.9</priority></url>')
 
         sitemap_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -509,6 +511,105 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
 
         response = make_response(sitemap_xml)
         response.headers['Content-Type'] = 'application/xml'
+        return response
+
+    @flask_app.route('/rss')
+    @flask_app.route('/rss/')
+    @limiter.limit(dynamic_rate_limit)
+    def rss_feed():
+        """
+        Generate RSS feed for the current report type.
+        
+        Returns an RSS 2.0 feed containing the latest headlines from all sources.
+        The feed is cached for performance and includes proper headers for feed readers.
+        """
+        # Check cache first
+        cache_key = f'rss-feed:{MODE.value}'
+        cached_feed = g_cm.get(cache_key)
+        if cached_feed:
+            response = make_response(cached_feed)
+            response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+            response.headers['Cache-Control'] = 'public, max-age=900'  # 15 minutes
+            return response
+
+        # Get current headlines from cache
+        headlines = []
+        for url in SITE_URLS:
+            rss_info = ALL_URLS.get(url)
+            if not rss_info:
+                continue
+                
+            # Get cached feed data
+            feed_data = g_c.get(url)
+            if not feed_data or not feed_data.entries:
+                continue
+                
+            # Add entries from this feed
+            for entry in feed_data.entries[:10]:  # Limit to 10 per feed
+                if entry.get('title') and entry.get('link'):
+                    headlines.append({
+                        'title': entry['title'],
+                        'link': entry['link'],
+                        'description': entry.get('summary', ''),
+                        'published': entry.get('published_parsed'),
+                        'source': rss_info.logo_alt,
+                        'source_url': rss_info.site_url
+                    })
+
+        # Sort by publication date (newest first)
+        headlines.sort(key=lambda x: x['published'] or (0, 0, 0, 0, 0, 0, 0, 0, 0), reverse=True)
+        
+        # Limit to 50 total headlines
+        headlines = headlines[:50]
+
+        # Generate RSS XML
+        rss_items = []
+        for headline in headlines:
+            # Format date for RSS
+            if headline['published']:
+                pub_date = datetime.datetime(*headline['published'][:6]).strftime('%a, %d %b %Y %H:%M:%S %z')
+            else:
+                pub_date = datetime.datetime.now().strftime('%a, %d %b %Y %H:%M:%S %z')
+            
+            # Clean description
+            description = headline['description']
+            if description:
+                # Remove HTML tags and limit length
+                import re
+                description = re.sub(r'<[^>]+>', '', description)
+                description = description[:300] + '...' if len(description) > 300 else description
+            else:
+                description = f"Read more at {headline['source']}"
+            
+            rss_items.append(f'''  <item>
+    <title>{headline['title']}</title>
+    <link>{headline['link']}</link>
+    <description>{description}</description>
+    <pubDate>{pub_date}</pubDate>
+    <source url="{headline['source_url']}">{headline['source']}</source>
+  </item>''')
+
+        # Build RSS feed
+        current_time = datetime.datetime.now().strftime('%a, %d %b %Y %H:%M:%S %z')
+        rss_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>{WEB_TITLE}</title>
+    <link>{request.host_url.rstrip('/')}</link>
+    <description>{WEB_DESCRIPTION}</description>
+    <language>en-us</language>
+    <lastBuildDate>{current_time}</lastBuildDate>
+    <atom:link href="{request.url}" rel="self" type="application/rss+xml" />
+{chr(10).join(rss_items)}
+  </channel>
+</rss>'''
+
+        # Cache the feed
+        g_cm.set(cache_key, rss_xml, ttl=900)  # 15 minutes
+
+        response = make_response(rss_xml)
+        response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+        response.headers['Cache-Control'] = 'public, max-age=900'
         return response
 
     # Rate limit error handler

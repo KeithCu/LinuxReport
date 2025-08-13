@@ -823,6 +823,47 @@ main > div:first-child {
   opacity: 0.8;
 }
 
+/* RSS Feed Link Styles */
+#rss-feed-link {
+  display: block;
+  text-decoration: none;
+  color: var(--text);
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin: var(--spacing-sm) auto;
+  border: 1px solid var(--btn-border);
+  border-radius: var(--border-radius-sm);
+  background: var(--btn-bg);
+  transition: all var(--transition-normal);
+  max-width: 200px;
+  text-align: center;
+  position: relative;
+  font-weight: normal;
+  box-shadow: var(--shadow-sm);
+  font-size: 0.9em;
+}
+
+#rss-feed-link .rss-feed-title {
+  display: inline;
+  margin-bottom: 0;
+  font-size: 1em;
+}
+
+#rss-feed-link .rss-feed-subtitle {
+  display: none;
+}
+
+#rss-feed-link:hover {
+  transform: scale(1.02);
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text) !important;
+  box-shadow: var(--shadow-md);
+}
+
+.rss-feed-subtitle {
+  font-size: 0.7em;
+  opacity: 0.8;
+}
+
 @keyframes pulse {
   0% {
     transform: scale(1);
