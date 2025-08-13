@@ -501,6 +501,8 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
             urls.append(f'<url><loc>{domain}/old_headlines</loc><changefreq>daily</changefreq><priority>0.8</priority></url>')
             # Add RSS feed
             urls.append(f'<url><loc>{domain}/rss</loc><changefreq>hourly</changefreq><priority>0.9</priority></url>')
+            # Add JSON API
+            urls.append(f'<url><loc>{domain}/api/headlines</loc><changefreq>hourly</changefreq><priority>0.8</priority></url>')
 
         sitemap_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -513,26 +515,14 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         response.headers['Content-Type'] = 'application/xml'
         return response
 
-    @flask_app.route('/rss')
-    @flask_app.route('/rss/')
-    @limiter.limit(dynamic_rate_limit)
-    def rss_feed():
+    def _get_headlines_data():
         """
-        Generate RSS feed for the current report type.
+        Shared function to get current headlines data from cache.
         
-        Returns an RSS 2.0 feed containing the latest headlines from all sources.
-        The feed is cached for performance and includes proper headers for feed readers.
+        Returns:
+            list: List of headline dictionaries with title, link, description, 
+                  published, source, and source_url keys.
         """
-        # Check cache first
-        cache_key = f'rss-feed:{MODE.value}'
-        cached_feed = g_cm.get(cache_key)
-        if cached_feed:
-            response = make_response(cached_feed)
-            response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
-            response.headers['Cache-Control'] = 'public, max-age=900'  # 15 minutes
-            return response
-
-        # Get current headlines from cache
         headlines = []
         for url in SITE_URLS:
             rss_info = ALL_URLS.get(url)
@@ -561,6 +551,30 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         
         # Limit to 50 total headlines
         headlines = headlines[:50]
+        
+        return headlines
+
+    @flask_app.route('/rss')
+    @flask_app.route('/rss/')
+    @limiter.limit(dynamic_rate_limit)
+    def rss_feed():
+        """
+        Generate RSS feed for the current report type.
+        
+        Returns an RSS 2.0 feed containing the latest headlines from all sources.
+        The feed is cached for performance and includes proper headers for feed readers.
+        """
+        # Check cache first
+        cache_key = f'rss-feed:{MODE.value}'
+        cached_feed = g_cm.get(cache_key)
+        if cached_feed:
+            response = make_response(cached_feed)
+            response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+            response.headers['Cache-Control'] = 'public, max-age=900'  # 15 minutes
+            return response
+
+        # Get headlines using shared function
+        headlines = _get_headlines_data()
 
         # Generate RSS XML
         rss_items = []
@@ -609,6 +623,74 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
 
         response = make_response(rss_xml)
         response.headers['Content-Type'] = 'application/rss+xml; charset=utf-8'
+        response.headers['Cache-Control'] = 'public, max-age=900'
+        return response
+
+    @flask_app.route('/api/headlines')
+    @flask_app.route('/api/headlines/')
+    @limiter.limit(dynamic_rate_limit)
+    def api_headlines():
+        """
+        Generate JSON API endpoint for current headlines.
+        
+        Returns a JSON response containing the latest headlines from all sources.
+        The response is cached for performance and includes proper headers for API consumers.
+        """
+        # Check cache first
+        cache_key = f'json-headlines:{MODE.value}'
+        cached_response = g_cm.get(cache_key)
+        if cached_response:
+            response = make_response(cached_response)
+            response.headers['Content-Type'] = 'application/json; charset=utf-8'
+            response.headers['Cache-Control'] = 'public, max-age=900'  # 15 minutes
+            return response
+
+        # Get headlines using shared function
+        headlines = _get_headlines_data()
+
+        # Convert to JSON-friendly format
+        json_headlines = []
+        for headline in headlines:
+            # Format date for JSON (ISO 8601)
+            if headline['published']:
+                pub_date = datetime.datetime(*headline['published'][:6]).isoformat() + 'Z'
+            else:
+                pub_date = datetime.datetime.now().isoformat() + 'Z'
+            
+            # Clean description
+            description = headline['description']
+            if description:
+                # Remove HTML tags and limit length
+                import re
+                description = re.sub(r'<[^>]+>', '', description)
+                description = description[:300] + '...' if len(description) > 300 else description
+            else:
+                description = f"Read more at {headline['source']}"
+            
+            json_headlines.append({
+                'title': headline['title'],
+                'link': headline['link'],
+                'description': description,
+                'published': pub_date,
+                'source': headline['source'],
+                'source_url': headline['source_url']
+            })
+
+        # Build JSON response
+        json_response = {
+            'title': WEB_TITLE,
+            'description': WEB_DESCRIPTION,
+            'url': request.host_url.rstrip('/'),
+            'last_updated': datetime.datetime.now().isoformat() + 'Z',
+            'headlines': json_headlines
+        }
+
+        # Cache the response
+        json_string = json.dumps(json_response, indent=2)
+        g_cm.set(cache_key, json_string, ttl=900)  # 15 minutes
+
+        response = make_response(json_string)
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
         response.headers['Cache-Control'] = 'public, max-age=900'
         return response
 

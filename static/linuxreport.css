@@ -781,6 +781,10 @@ main > div:first-child {
   margin: var(--spacing-sm) 0;
 }
 
+main {
+  text-align: center;
+}
+
 #old-headlines-link {
   display: block;
   text-decoration: none;
@@ -823,7 +827,52 @@ main > div:first-child {
   opacity: 0.8;
 }
 
-/* RSS Feed Link Styles */
+/* API Links Container Styles */
+.api-links-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-sm) auto;
+  width: 260px;
+  text-align: center;
+  position: relative;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.api-link {
+  display: inline-block;
+  text-decoration: none;
+  color: var(--text);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--border-radius-sm);
+  background: var(--btn-bg);
+  transition: all var(--transition-normal);
+  text-align: center;
+  position: relative;
+  font-weight: normal;
+  box-shadow: var(--shadow-sm);
+  font-size: 0.9em;
+  flex: 1;
+  min-width: 120px;
+}
+
+.api-link .api-link-title {
+  display: inline;
+  margin-bottom: 0;
+  font-size: 1em;
+}
+
+.api-link:hover {
+  transform: scale(1.02);
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text) !important;
+  box-shadow: var(--shadow-md);
+}
+
+/* Legacy RSS styles for backward compatibility */
 #rss-feed-link {
   display: block;
   text-decoration: none;
