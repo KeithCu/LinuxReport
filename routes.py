@@ -523,6 +523,12 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
             list: List of headline dictionaries with title, link, description, 
                   published, source, and source_url keys.
         """
+        # Check cache first for headlines data
+        cache_key = f'headlines-data:{MODE.value}'
+        cached_headlines = g_cm.get(cache_key)
+        if cached_headlines:
+            return cached_headlines
+        
         headlines = []
         for url in SITE_URLS:
             rss_info = ALL_URLS.get(url)
@@ -551,6 +557,9 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         
         # Limit to 50 total headlines
         headlines = headlines[:50]
+        
+        # Cache the headlines data for 10 minutes
+        g_cm.set(cache_key, headlines, ttl=EXPIRE_MINUTES * 2)
         
         return headlines
 
