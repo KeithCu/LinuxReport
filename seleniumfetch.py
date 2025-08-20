@@ -100,39 +100,55 @@ def create_driver(use_tor, user_agent):
     Returns:
         webdriver.Chrome: Configured Chrome WebDriver instance
     """
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument(f"--user-agent={user_agent}")
-    # Additional options to reduce resource usage
-    options.add_argument("--disable-extensions")
-    options.add_argument("--disable-plugins")
-    options.add_argument("--disable-images")
-    options.add_argument("--disable-background-timer-throttling")
-    options.add_argument("--disable-backgrounding-occluded-windows")
-    options.add_argument("--disable-renderer-backgrounding")
-    options.add_argument("--disable-features=TranslateUI")
-    options.add_argument("--disable-ipc-flooding-protection")
-    options.add_argument("--memory-pressure-off")
-    options.add_argument("--max_old_space_size=4096")  # Limit memory usage
-    
-    if use_tor:
-        options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
+    try:
+        print(f"Creating Chrome driver with Tor: {use_tor}, User-Agent: {user_agent[:50]}...")
+        
+        options = Options()
+        options.add_argument("--headless")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument(f"--user-agent={user_agent}")
+        # Additional options to reduce resource usage
+        options.add_argument("--disable-extensions")
+        options.add_argument("--disable-plugins")
+        options.add_argument("--disable-images")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-features=TranslateUI")
+        options.add_argument("--disable-ipc-flooding-protection")
+        options.add_argument("--memory-pressure-off")
+        options.add_argument("--max_old_space_size=4096")  # Limit memory usage
+        
+        if use_tor:
+            options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
 
-    service = Service(ChromeDriverManager(
-        chrome_type=ChromeType.CHROMIUM).install())
-    driver = webdriver.Chrome(service=service, options=options)
-    
-    # Set timeouts to prevent hanging
-    driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)  # 30 second page load timeout
-    driver.set_script_timeout(SCRIPT_TIMEOUT)     # 30 second script timeout
-    
-    # Disable compression by setting Accept-Encoding to identity via CDP
-    driver.execute_cdp_cmd("Network.enable", {})
-    driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {"Accept-Encoding": "identity"}})
-    return driver
+        print("Installing ChromeDriver...")
+        service = Service(ChromeDriverManager(
+            chrome_type=ChromeType.CHROMIUM).install())
+        print("ChromeDriver installed successfully")
+        
+        print("Creating Chrome WebDriver instance...")
+        driver = webdriver.Chrome(service=service, options=options)
+        print("Chrome WebDriver created successfully")
+        
+        # Set timeouts to prevent hanging
+        driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)  # 30 second page load timeout
+        driver.set_script_timeout(SCRIPT_TIMEOUT)     # 30 second script timeout
+        
+        # Disable compression by setting Accept-Encoding to identity via CDP
+        driver.execute_cdp_cmd("Network.enable", {})
+        driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {"Accept-Encoding": "identity"}})
+        print("Chrome driver setup completed successfully")
+        return driver
+        
+    except Exception as e:
+        print(f"Error creating Chrome driver: {e}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        raise
 
 # =============================================================================
 # SHARED SELENIUM DRIVER MANAGEMENT
@@ -170,10 +186,16 @@ class SharedSeleniumDriver:
             use_tor (bool): Whether to use Tor proxy
             user_agent (str): User agent string for the driver
         """
-        self.driver = create_driver(use_tor, user_agent)
-        self.last_used = time.time()
-        self.use_tor = use_tor
-        self.user_agent = user_agent
+        print(f"Initializing SharedSeleniumDriver with Tor: {use_tor}")
+        try:
+            self.driver = create_driver(use_tor, user_agent)
+            self.last_used = time.time()
+            self.use_tor = use_tor
+            self.user_agent = user_agent
+            print("SharedSeleniumDriver initialized successfully")
+        except Exception as e:
+            print(f"Error in SharedSeleniumDriver.__init__: {e}")
+            raise
 
     @classmethod
     def get_driver(cls, use_tor, user_agent):
@@ -201,12 +223,16 @@ class SharedSeleniumDriver:
                     cls._cleanup_instance()
                 
                 try:
+                    print(f"Attempting to create new SharedSeleniumDriver instance...")
                     cls._instance = SharedSeleniumDriver(use_tor, user_agent)
                     # Reset timer only when creating a new instance
                     cls._reset_timer()
                     print(f"Created new driver instance with Tor: {use_tor}")
                 except Exception as e:
                     print(f"Error creating new driver: {e}")
+                    print(f"Error type: {type(e).__name__}")
+                    import traceback
+                    print(f"Full traceback: {traceback.format_exc()}")
                     cls._instance = None
                     return None
             
