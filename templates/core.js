@@ -144,7 +144,7 @@
         },
         
         init() {
-            app.utils.UIManager.applySettings();
+            
             app.utils.ScrollManager.restorePosition();
             
             this.reinitPagination();
@@ -156,8 +156,7 @@
                 infiniteScrollManager = app.modules.infiniteScroll.create();
             }
 
-            // Initialize timezone conversion for last-updated times
-            app.utils.TimezoneManager.init();
+            
 
             this.setupEventListeners();
         },

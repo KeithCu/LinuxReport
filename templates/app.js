@@ -620,10 +620,37 @@
     }
   };
 
+  app.utils.StaleFeedManager = {
+    init() {
+      document.querySelectorAll('.box').forEach(box => {
+        const firstArticle = box.querySelector('.linkclass');
+        if (firstArticle) {
+          const timestamp = parseInt(firstArticle.dataset.index, 10);
+          if (!isNaN(timestamp)) {
+            const now = Date.now() / 1000;
+            if ((now - timestamp) > 24 * 60 * 60) {
+              box.classList.add('stale-feed');
+            }
+          }
+        }
+      });
+    }
+  };
+
   // =============================================================================
   // EXPOSE APP OBJECT
   // =============================================================================
 
   window.app = app;
+
+  // =============================================================================
+  // INITIALIZE ON DOM CONTENT LOADED
+  // =============================================================================
+
+  document.addEventListener('DOMContentLoaded', () => {
+    app.utils.UIManager.applySettings();
+    app.utils.TimezoneManager.init();
+    app.utils.StaleFeedManager.init();
+  });
 
 })();
