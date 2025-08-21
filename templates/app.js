@@ -628,7 +628,7 @@
           const timestamp = parseInt(firstArticle.dataset.index, 10);
           if (!isNaN(timestamp)) {
             const now = Date.now() / 1000;
-            if ((now - timestamp) > 24 * 60 * 60) {
+            if ((now - timestamp) > 24 * 60 * 60 * 2) {
               box.classList.add('stale-feed');
             }
           }
