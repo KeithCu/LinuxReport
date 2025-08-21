@@ -9,6 +9,7 @@ functions defined in other modules.
 import sys
 import urllib.request
 import urllib.error
+from app import g_logger
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -18,10 +19,11 @@ from seleniumfetch import create_driver
 
 # Import from new modules
 from image_utils import (
-    HEADERS, debug_print,
+    HEADERS,
     is_excluded,
     score_image_candidate
 )
+from app import g_logger
 # Import from the new candidate selector module
 from image_parser import process_candidate_images
 
@@ -34,7 +36,7 @@ def parse_images_from_selenium(driver):
     # processed_urls = set() # Removed - not in original logic here
 
     if not images:
-        print("No images found on the page.")
+        g_logger.warning("No images found on the page.")
         return candidate_images
 
     # Reverted evaluate_image_url closer to original logic/error handling
@@ -50,20 +52,17 @@ def parse_images_from_selenium(driver):
             with urllib.request.urlopen(req, timeout=10) as response:
                 image_data = response.read()
             image_size = len(image_data)
-            # Use imported debug_print
-            debug_print(f"Image size for {img_url}: {image_size} bytes")
+            g_logger.debug(f"Image size for {img_url}: {image_size} bytes")
             return image_size
         # Match original's broader exception catch here
         except Exception as e:
-            # Use imported debug_print
-            debug_print(f"Error downloading or measuring {img_url}: {e}")
+            g_logger.debug(f"Error downloading or measuring {img_url}: {e}")
             return 0
 
     for img in images:
         try:
             img_url_attr = img.get_attribute('src') # Use a distinct name
             # Skip missing, data URIs, or excluded URLs
-            # Use imported is_excluded and debug_print
             if not img_url_attr or img_url_attr.startswith('data:'):
                 continue
             # Resolve relative URLs based on the current page URL
@@ -76,7 +75,7 @@ def parse_images_from_selenium(driver):
                 natural_width = driver.execute_script("return arguments[0].naturalWidth;", img)
                 natural_height = driver.execute_script("return arguments[0].naturalHeight;", img)
             except WebDriverException as e:
-                debug_print(f"Could not get natural dimensions: {e}")
+                g_logger.debug(f"Could not get natural dimensions: {e}")
                 natural_width = natural_height = 0
 
             # Get display dimensions
@@ -84,7 +83,7 @@ def parse_images_from_selenium(driver):
                 display_width = driver.execute_script("return arguments[0].clientWidth;", img)
                 display_height = driver.execute_script("return arguments[0].clientHeight;", img)
             except WebDriverException as e:
-                debug_print(f"Could not get client dimensions: {e}")
+                g_logger.debug(f"Could not get client dimensions: {e}")
                 display_width = display_height = 0
 
             # Extract width and height attributes for scoring
@@ -136,10 +135,10 @@ def parse_images_from_selenium(driver):
             candidate_images.append((img_url, metadata)) # Use resolved img_url
 
         except WebDriverException as e:
-            debug_print(f"Error processing image element with Selenium: {e}")
+            g_logger.debug(f"Error processing image element with Selenium: {e}")
             continue
         except Exception as e:
-            debug_print(f"Unexpected error processing image element: {e}")
+            g_logger.debug(f"Unexpected error processing image element: {e}")
             continue
 
     # Use imported process_candidate_images from image_candidate_selector
@@ -159,12 +158,12 @@ def fetch_largest_image_selenium(url): # Renamed request_url to url
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.TAG_NAME, 'body'))
             )
-            print(f"Page loaded successfully for Selenium processing: {url}") # Use url
+            g_logger.info(f"Page loaded successfully for Selenium processing: {url}") # Use url
         except TimeoutException as e:
-            print(f"Timeout waiting for page to load via Selenium: {e}")
+            g_logger.warning(f"Timeout waiting for page to load via Selenium: {e}")
             # Don't necessarily return None, maybe some images loaded
         except WebDriverException as e:
-            print(f"WebDriver error waiting for page load: {e}")
+            g_logger.error(f"WebDriver error waiting for page load: {e}")
             # Don't necessarily return None
 
         # Call local parse_images_from_selenium
@@ -174,10 +173,10 @@ def fetch_largest_image_selenium(url): # Renamed request_url to url
         return process_candidate_images(candidate_images)
 
     except WebDriverException as e:
-        print(f"WebDriver error accessing the webpage or processing images: {e}")
+        g_logger.error(f"WebDriver error accessing the webpage or processing images: {e}")
         return None
     except Exception as e:
-        print(f"Error accessing the webpage or processing images: {e}")
+        g_logger.error(f"Error accessing the webpage or processing images: {e}")
         return None
     finally:
         if driver:
@@ -198,21 +197,21 @@ if __name__ == '__main__':
  #           'https://www.phoronix.com/news/GCC-15.1-Last-Minute-Znver5-Bit',
  #           'https://www.cnbc.com/2025/04/15/nvidia-says-it-will-record-5point5-billion-quarterly-charge-tied-to-h20-processors-exported-to-china.html'
         ]
-        print("Running test mode on sample URLs:\n")
+        g_logger.info("Running test mode on sample URLs:\n")
         for url_test in test_urls: # Use different variable name
-            print(f"Testing: {url_test}")
+            g_logger.info(f"Testing: {url_test}")
             # Use the main entry point function from image_parser
             result = custom_fetch_largest_image(url_test)
-            print(f"  Result: {result}\n")
-        print("Test mode complete.")
+            g_logger.info(f"  Result: {result}\n")
+        g_logger.info("Test mode complete.")
     elif len(sys.argv) > 1:
         test_url = sys.argv[1]
-        print(f"Testing custom_fetch_largest_image with URL: {test_url}")
+        g_logger.info(f"Testing custom_fetch_largest_image with URL: {test_url}")
         # Use the main entry point function from image_parser
         result = custom_fetch_largest_image(test_url)
         if result:
-            print(f"Result: {result}")
+            g_logger.info(f"Result: {result}")
         else:
-            print("No image found or an error occurred.")
+            g_logger.info("No image found or an error occurred.")
     else:
-        print("Usage: python image_processing.py <URL> or --test-urls")
+        g_logger.info("Usage: python image_processing.py <URL> or --test-urls")

@@ -11,6 +11,7 @@ from io import BytesIO
 from PIL import Image
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
+from app import g_logger
 
 # === Constants and Configuration ===
 DEBUG_LOGGING = True
@@ -23,10 +24,6 @@ IMAGE_EXT_RE = re.compile(r"\\.(jpe?g|png|webp|gif|svg)([?#].*)?$", re.IGNORECAS
 
 def is_excluded(url):
     return bool(EXCLUDED_RE.search(url))
-
-def debug_print(message):
-    if DEBUG_LOGGING:
-        print(f"[DEBUG] {message}")
 
 def parse_dimension(value):
     # Extract leading numeric value (int or float)
@@ -78,13 +75,13 @@ def get_actual_image_dimensions(img_url):
             try:
                 content_length = int(content_length_header)
                 if content_length < 100:  # Skip very small images that are likely icons
-                    debug_print(f"Skipping small image ({content_length} bytes): {img_url}")
+                    g_logger.debug(f"Skipping small image ({content_length} bytes): {img_url}")
                     return 0, 0
             except Exception:
                 pass
         
         if 'svg' in content_type:
-            debug_print(f"SVG image detected for {img_url}, attempting to parse dimensions")
+            g_logger.debug(f"SVG image detected for {img_url}, attempting to parse dimensions")
             try:
                 svg = ET.fromstring(response.content)
                 width = svg.attrib.get('width')
@@ -106,7 +103,7 @@ def get_actual_image_dimensions(img_url):
                     width_val = parse_svgdimension(width)
                     height_val = parse_svgdimension(height)
                     if width_val > 0 and height_val > 0:
-                        debug_print(f"Parsed SVG dimensions from attributes for {img_url}: {int(width_val)}x{int(height_val)}")
+                        g_logger.debug(f"Parsed SVG dimensions from attributes for {img_url}: {int(width_val)}x{int(height_val)}")
                         return int(width_val), int(height_val)
                         
                 viewBox = svg.attrib.get('viewBox')
@@ -116,36 +113,36 @@ def get_actual_image_dimensions(img_url):
                         try:
                             width = float(parts[2])
                             height = float(parts[3])
-                            debug_print(f"Parsed SVG dimensions from viewBox for {img_url}: {int(width)}x{int(height)}")
+                            g_logger.debug(f"Parsed SVG dimensions from viewBox for {img_url}: {int(width)}x{int(height)}")
                             return int(width), int(height)
                         except Exception:
                             pass
                             
                 # More realistic fallback based on SVG content complexity
                 fallback_dim = min(max(int(len(response.content) ** 0.4), 200), 800)
-                debug_print(f"Fallback SVG dimensions based on file size for {img_url}: {fallback_dim}x{fallback_dim}")
+                g_logger.debug(f"Fallback SVG dimensions based on file size for {img_url}: {fallback_dim}x{fallback_dim}")
                 return fallback_dim, fallback_dim
             except Exception as e:
-                debug_print(f"Error parsing SVG for {img_url}: {e}")
+                g_logger.debug(f"Error parsing SVG for {img_url}: {e}")
                 return 640, 480  # Default fallback dimensions
         
         # More efficient image dimension detection using image header only
         try:
             with Image.open(BytesIO(response.content)) as img:
                 width, height = img.size
-                debug_print(f"Got actual dimensions for {img_url}: {width}x{height}")
+                g_logger.debug(f"Got actual dimensions for {img_url}: {width}x{height}")
                 return width, height
         except Image.UnidentifiedImageError:
-            debug_print(f"Could not identify image file: {img_url}")
+            g_logger.debug(f"Could not identify image file: {img_url}")
             return 0, 0
         except Exception as e:
-            debug_print(f"Error reading image dimensions with PIL for {img_url}: {e}")
+            g_logger.debug(f"Error reading image dimensions with PIL for {img_url}: {e}")
             return 0, 0
     except requests.exceptions.RequestException as e:
-        debug_print(f"Request error getting dimensions for {img_url}: {e}")
+        g_logger.debug(f"Request error getting dimensions for {img_url}: {e}")
         return 0, 0
     except Exception as e:
-        debug_print(f"Generic error getting dimensions for {img_url}: {e}")
+        g_logger.debug(f"Generic error getting dimensions for {img_url}: {e}")
         return 0, 0
 
 

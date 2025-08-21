@@ -14,6 +14,7 @@ import time
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
+from app import g_logger
 
 # =============================================================================
 # GLOBAL VARIABLES AND CONSTANTS
@@ -45,6 +46,7 @@ def get_cached_file_content(file_path, encoding='utf-8'):
 
     # Check if cache entry exists and if we should skip the mtime check
     if entry and (now - entry.get('last_check_time', 0)) < _FILE_CHECK_INTERVAL_SECONDS:
+        g_logger.debug(f"File cache hit (skipping mtime check): {file_path}")
         return entry['content']
 
     # Proceed with mtime check or initial load
@@ -54,21 +56,28 @@ def get_cached_file_content(file_path, encoding='utf-8'):
         # File doesn't exist or inaccessible
         if entry:  # Remove stale entry if it exists
             del _file_cache[file_path]
+            g_logger.info(f"Removed stale cache entry for non-existent file: {file_path}")
+        g_logger.warning(f"File not accessible: {file_path}")
         return ''
 
     # If cache entry exists and mtime matches, update check time and return content
     if entry and entry['mtime'] == mtime:
         entry['last_check_time'] = now
+        g_logger.debug(f"File cache hit (mtime unchanged): {file_path}")
         return entry['content']
 
     # Read file fresh or because mtime changed
     try:
         with open(file_path, 'r', encoding=encoding) as f:
             content = f.read()
+        if entry:
+            g_logger.info(f"File cache miss (mtime changed), reloaded: {file_path}")
+        else:
+            g_logger.info(f"File cache miss (first load): {file_path}")
     except FileNotFoundError:
         content = ''
-        # Ensure mtime reflects the non-existent state if we somehow got here
         mtime = -1  # Or some other indicator that it's gone
+        g_logger.warning(f"File not found, caching empty content: {file_path}")
 
     _file_cache[file_path] = {'mtime': mtime, 'content': content, 'last_check_time': now}
     return content
@@ -98,6 +107,7 @@ def get_cached_page(page_name, render_function, file_path=None):
         # Only check mtime every _FILE_CHECK_INTERVAL_SECONDS
         if now - last_check < _FILE_CHECK_INTERVAL_SECONDS:
             # Don't check mtime until interval has elapsed
+            g_logger.debug(f"Page cache hit (skipping mtime check): {page_name}")
             return cache_entry['html']
         
         # Time to check if file changed
@@ -113,8 +123,10 @@ def get_cached_page(page_name, render_function, file_path=None):
         if mtime == cached_mtime:
             # File unchanged, only update 'last_checked'
             cache_entry['last_checked'] = now
+            g_logger.debug(f"Page cache hit (file unchanged): {page_name}")
             return cache_entry['html']
         # File changed! Will fall through and re-render.
+        g_logger.info(f"Page cache miss (file changed), re-rendering: {page_name}")
     else:
         # No cache, get mtime for initial cache
         if file_path:
@@ -126,6 +138,7 @@ def get_cached_page(page_name, render_function, file_path=None):
             mtime = None
 
     # No cache, or file changed, or missing
+    g_logger.info(f"Page cache miss (first render): {page_name}")
     html = render_function()
     _page_cache[page_name] = {
         'html': html,

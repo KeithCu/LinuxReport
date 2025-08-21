@@ -33,12 +33,13 @@ from flask_restful import Resource, reqparse
 # LOCAL IMPORTS
 # =============================================================================
 from shared import (
-    limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT, 
-    TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE, 
+    limiter, dynamic_rate_limit, g_cs, get_lock, USER_AGENT,
+    TZ, g_cm, PATH, EXPIRE_HOUR, MODE_MAP, MODE,
     API, DISABLE_IP_GEOLOCATION, DISABLE_CLIENT_GEOLOCATION
 )
 from request_utils import is_web_bot
 from app_config import DEBUG, get_weather_api_key
+from app import g_logger
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -218,7 +219,7 @@ def rate_limit_check():
         wait_time = (oldest_in_window + RATE_LIMIT_WINDOW) - now
         if wait_time > 0:
             time.sleep(wait_time)
-            print(f"Weather API rate limit exceeded. Sleeping for {wait_time:.2f} seconds. Consider increasing WEATHER_BUCKET_SIZE_MILES.")
+            g_logger.warning(f"Weather API rate limit exceeded. Sleeping for {wait_time:.2f} seconds. Consider increasing WEATHER_BUCKET_SIZE_MILES.")
             now = datetime.now(TZ).timestamp()
 
     timestamps_in_window.append(now)
@@ -390,10 +391,10 @@ def _log_weather_result(processed_data, city_name, service_name, api_time):
             # Fallback to safe string representation
             city_name = repr(city_name)
         
-        print(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}°F, API time: {api_time:.2f}s")
+        g_logger.info(f"Weather API result ({service_name}): city: {city_name}, temp: {current_temp}°F, API time: {api_time:.2f}s")
     except (IndexError, KeyError, TypeError):
         # Indicate error or missing data
-        print(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
+        g_logger.info(f"Weather API result ({service_name}): city: {city_name}, temp: N/A, API time: {api_time:.2f}s")
 
 # =============================================================================
 # API FETCHING
@@ -415,7 +416,7 @@ def _fetch_from_openweather_api(lat, lon, fetch_time):
     
     # Check for valid API key before proceeding
     if not WEATHER_API_KEY or len(WEATHER_API_KEY) < 10:
-        print("Weather API error: WEATHER_API_KEY is missing or too short.")
+        g_logger.error("Weather API error: WEATHER_API_KEY is missing or too short.")
         error_data = {"error": "Weather API key is not configured", "fetch_time": fetch_time}
         return None, "Unknown", 0, service_name, error_data, 500
     
@@ -537,7 +538,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
         return processed_data, 200
         
     except requests.exceptions.RequestException as e:
-        print(f"Weather API error: Failed to fetch weather data from OpenWeather API: {e}")
+        g_logger.error(f"Weather API error: Failed to fetch weather data from OpenWeather API: {e}")
         error_data = {"error": "Failed to fetch weather data from OpenWeather API", "fetch_time": fetch_time}
         return error_data, 500
     except (ValueError, KeyError, TypeError) as e:

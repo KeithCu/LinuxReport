@@ -9,10 +9,10 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 import json
+from app import g_logger
 
 # Import from image_utils
 from image_utils import (
-    debug_print,
     get_actual_image_dimensions,
     HEADERS,
     extract_domain,
@@ -94,7 +94,7 @@ def parse_images_from_soup(soup, base_url):
                         url = urljoin(base_url, img_url)
                         add_candidate(candidate_images, processed_urls, url, {'score': 8000000, 'meta': True})
         except json.JSONDecodeError as e:
-            debug_print(f"Error parsing JSON-LD: {e}")
+            g_logger.debug(f"Error parsing JSON-LD: {e}")
 
     # 3. All <img> tags, robust lazy-load and data-* handling
     for img in soup.find_all('img'):
@@ -116,7 +116,7 @@ def parse_images_from_soup(soup, base_url):
 def process_candidate_images(candidate_images):
     """Process a list of candidate images and return the best one based on a simplified scoring logic."""
     if not candidate_images:
-        print("No candidate images available for processing.")
+        g_logger.warning("No candidate images available for processing.")
         return None
 
     # 1. Prioritize meta images
@@ -142,7 +142,7 @@ def process_candidate_images(candidate_images):
 
     # Ensure we still have candidates after filtering/sorting
     if not top_candidates:
-        print("No suitable candidates remain after processing.")
+        g_logger.warning("No suitable candidates remain after processing.")
         return None
 
     # 4. Fallback: if no dimensions, use original score
@@ -152,9 +152,9 @@ def process_candidate_images(candidate_images):
     best_height = best[1].get('height', 0)
     min_size = 100  # Minimum width and height for a valid image
     if best_width < min_size or best_height < min_size:
-        print("No suitable images found (all images too small).")
+        g_logger.warning("No suitable images found (all images too small).")
         return None
-    print(f"Best image found: {best_url} (score: {best[1].get('score')}, size: {best_width}x{best_height})")
+    g_logger.info(f"Best image found: {best_url} (score: {best[1].get('score')}, size: {best_width}x{best_height})")
     return best_url
 
 def get_final_response(url, headers, max_redirects=2):
@@ -163,7 +163,7 @@ def get_final_response(url, headers, max_redirects=2):
             response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching {url}: {e}")
+            g_logger.error(f"Error fetching {url}: {e}")
             return None
 
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -186,7 +186,7 @@ def get_final_response(url, headers, max_redirects=2):
         else:
             return response
 
-    print("Error: Too many meta refresh redirects")
+    g_logger.error("Error: Too many meta refresh redirects")
     return None
 
 # === Main Fetch Logic ===
@@ -200,55 +200,55 @@ def fetch_largest_image(url):
         base_url = "file://" + os.path.abspath(url)
         candidate_images = parse_images_from_soup(soup, base_url)
         if not candidate_images:
-            print("No suitable images found in local file.")
+            g_logger.warning("No suitable images found in local file.")
             return None
         return process_candidate_images(candidate_images)
 
     try:
         is_direct_image = False
         if IMAGE_EXT_RE.search(url):
-            debug_print(f"URL appears to be an image by extension: {url}")
+            g_logger.debug(f"URL appears to be an image by extension: {url}")
             try:
                 response = requests.head(url, headers=HEADERS, timeout=5, allow_redirects=True)
                 response.raise_for_status()
                 content_type = response.headers.get('Content-Type', '').lower()
-                debug_print(f"HEAD Content-Type for {url}: {content_type}")
+                g_logger.debug(f"HEAD Content-Type for {url}: {content_type}")
                 if 'image/' in content_type:
                     is_direct_image = True
                 else:
-                    debug_print(f"Rejected image URL {url} based on HEAD Content-Type: {content_type}")
+                    g_logger.debug(f"Rejected image URL {url} based on HEAD Content-Type: {content_type}")
             except requests.exceptions.RequestException as e:
-                debug_print(f"HEAD request failed for {url}: {e}, will proceed with GET")
+                g_logger.debug(f"HEAD request failed for {url}: {e}, will proceed with GET")
 
         if is_direct_image:
             width, height = get_actual_image_dimensions(url)
-            debug_print(f"Fetched dimensions for direct image {url}: {width}x{height}")
+            g_logger.debug(f"Fetched dimensions for direct image {url}: {width}x{height}")
             if width > 100 and height > 100:
-                debug_print(f"Accepting direct image URL {url} with size {width}x{height}")
+                g_logger.debug(f"Accepting direct image URL {url} with size {width}x{height}")
                 return url
             else:
-                debug_print(f"Rejected direct image URL {url} due to insufficient size {width}x{height}")
+                g_logger.debug(f"Rejected direct image URL {url} due to insufficient size {width}x{height}")
 
         response = get_final_response(url, HEADERS)
         if response is None:
-            print(f"No valid response received for {url}.")
+            g_logger.error(f"No valid response received for {url}.")
             return None
 
         content_type = response.headers.get('Content-Type', '').lower()
-        debug_print(f"GET Content-Type for {url}: {content_type}")
+        g_logger.debug(f"GET Content-Type for {url}: {content_type}")
         if content_type.startswith('image/') and not is_direct_image:
-            debug_print(f"URL is an image by GET Content-Type: {url}")
+            g_logger.debug(f"URL is an image by GET Content-Type: {url}")
             width, height = get_actual_image_dimensions(url)
-            debug_print(f"Fetched dimensions for {url}: {width}x{height}")
+            g_logger.debug(f"Fetched dimensions for {url}: {width}x{height}")
             if width > 100 and height > 100:
-                debug_print(f"Accepting image URL {url} with size {width}x{height}")
+                g_logger.debug(f"Accepting image URL {url} with size {width}x{height}")
                 return url
             else:
-                debug_print(f"Rejected image URL {url} due to invalid size {width}x{height}")
+                g_logger.debug(f"Rejected image URL {url} due to invalid size {width}x{height}")
                 return None
 
         if 'html' not in content_type:
-            debug_print(f"Content-Type ({content_type}) is not HTML or image, skipping image parsing for {url}")
+            g_logger.debug(f"Content-Type ({content_type}) is not HTML or image, skipping image parsing for {url}")
             return None
 
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -256,38 +256,38 @@ def fetch_largest_image(url):
         candidate_images = parse_images_from_soup(soup, base_url)
 
         if not candidate_images:
-            print("No suitable images found.")
+            g_logger.warning("No suitable images found.")
             return None
 
         return process_candidate_images(candidate_images)
 
     except requests.exceptions.RequestException as e:
-        print(f"Request Error fetching image: {e}")
+        g_logger.error(f"Request Error fetching image: {e}")
         return None
     except Exception as e:
-        print(f"Error fetching image: {e}")
+        g_logger.error(f"Error fetching image: {e}")
         return None
 
 def custom_fetch_largest_image(url, underlying_link=None, html_content=None):
     """Main function to fetch the largest image from a URL, with special handling for certain sites."""
     if underlying_link:
-        print("Using underlying link provided")
+        g_logger.info("Using underlying link provided")
         url_to_process = underlying_link
     elif html_content:
         soup = BeautifulSoup(html_content, "html.parser")
         first_link = soup.find("a")
         if (first_link and first_link.get("href")):
-            print("Using first link from HTML content")
+            g_logger.info("Using first link from HTML content")
             url_to_process = first_link["href"]
         else:
-            print("HTML content provided but no link found, using original URL")
+            g_logger.info("HTML content provided but no link found, using original URL")
             url_to_process = url
     else:
         url_to_process = url
 
     domain = extract_domain(url_to_process)
     if domain in custom_hacks:
-        print(f"Using custom hack for {domain}")
+        g_logger.info(f"Using custom hack for {domain}")
         return custom_hacks[domain](url_to_process)
     else:
         return fetch_largest_image(url_to_process)
