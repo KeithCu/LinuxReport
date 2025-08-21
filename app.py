@@ -12,6 +12,7 @@ import sys
 import os
 import datetime
 import hashlib
+import logging
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -53,6 +54,47 @@ JS_MODULES = [
 
 URLS_COOKIE_VERSION = "2"
 
+# =============================================================================
+# LOGGING CONFIGURATION
+# =============================================================================
+
+# Logging configuration
+# LOG_LEVEL options: DEBUG, INFO, WARNING, ERROR, CRITICAL
+# - DEBUG: Most verbose - shows everything including full AI responses, article lists, etc.
+# - INFO: Default level - shows main process steps, counts, success/failure messages
+# - WARNING: Shows warnings and errors only
+# - ERROR: Shows only errors
+# - CRITICAL: Shows only critical errors
+# Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
+LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
+LOG_FILE = "app.log"  # Single log file that gets appended to
+
+def setup_logging():
+    """Configure logging for the application."""
+    # Configure logging
+    logging.basicConfig(
+        level=getattr(logging, LOG_LEVEL),
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+
+    # Suppress HTTP client debug messages
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("openai").setLevel(logging.WARNING)
+
+    # Create logger instance
+    logger = logging.getLogger(__name__)
+
+    # Log startup information
+    logger.info(f"Starting Flask application with LOG_LEVEL={LOG_LEVEL}")
+    logger.info(f"Log file: {LOG_FILE}")
+
+    return logger
+
 
 # =============================================================================
 # CUSTOM FILTERS AND UTILITIES
@@ -87,7 +129,7 @@ def run_one_time_last_fetch_migration(all_urls):
     """
     with get_lock("last_fetch_migration_lock"):
         if not g_c.has('last_fetch_migration_complete'):
-            print("Running one-time migration for last_fetch times...")
+            g_logger.info("Running one-time migration for last_fetch times...")
             all_fetches = g_c.get('all_last_fetches') or {}
             updated = False
             
@@ -104,7 +146,7 @@ def run_one_time_last_fetch_migration(all_urls):
                 
             # Set the flag to indicate migration is complete
             g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
-            print("Last_fetch migration complete.")
+            g_logger.info("Last_fetch migration complete.")
 
 # =============================================================================
 # FLASK APPLICATION INITIALIZATION
@@ -136,6 +178,9 @@ def create_app():
 # Create the main application instance
 g_app = create_app()
 application = g_app  # WSGI entry point
+
+# Set up logging
+g_logger = setup_logging()
 
 # =============================================================================
 # FLASK EXTENSIONS INITIALIZATION
@@ -210,12 +255,12 @@ def setup_monitoring_dashboard(app):
         
         # Initialize with custom configuration
         dashboard.bind(app, config)
-        print("Flask-MonitoringDashboard initialized successfully")
+        g_logger.info("Flask-MonitoringDashboard initialized successfully")
         
     except ImportError:
-        print("Warning: Flask-MonitoringDashboard not available")
+        g_logger.warning("Flask-MonitoringDashboard not available")
     except Exception as e:
-        print(f"Warning: Failed to initialize Flask-MonitoringDashboard: {e}")
+        g_logger.warning(f"Failed to initialize Flask-MonitoringDashboard: {e}")
 
 # Set up monitoring dashboard
 setup_monitoring_dashboard(g_app)
@@ -315,10 +360,10 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
                 # Clear existing file and rebuild
                 if os.path.exists(js_output_path):
                     os.remove(js_output_path)
-                    print("Removed existing JavaScript bundle for fresh build")
-                
+                    g_logger.info("Removed existing JavaScript bundle for fresh build")
+
                 js_bundle.build()
-                print("JavaScript bundle built successfully")
+                g_logger.info("JavaScript bundle built successfully")
                 
                 # Add header information
                 if os.path.exists(js_output_path):
@@ -333,20 +378,20 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
                     with open(js_output_path, 'w', encoding='utf-8') as f:
                         f.write(header + content)
                     
-                    print(f"JavaScript content changed (new hash: {new_hash}), updated with new header")
+                    g_logger.info(f"JavaScript content changed (new hash: {new_hash}), updated with new header")
                 else:
-                    print("Warning: JavaScript bundle was not created after build")
+                    g_logger.warning("JavaScript bundle was not created after build")
             else:
-                print(f"JavaScript content unchanged (hash: {new_hash}), reusing existing file")
-            
+                g_logger.info(f"JavaScript content unchanged (hash: {new_hash}), reusing existing file")
+
             css_bundle.build()
-            print("CSS cache busting configured successfully")
+            g_logger.info("CSS cache busting configured successfully")
             
             # Run one-time migration of last_fetch times
             run_one_time_last_fetch_migration(ALL_URLS.keys())
             
         except Exception as e:
-            print(f"Warning: Failed to complete startup tasks: {e}")
+            g_logger.warning(f"Failed to complete startup tasks: {e}")
 
 # Perform startup tasks
 perform_startup_tasks(g_app, g_js_bundle, g_css_bundle)
@@ -364,5 +409,5 @@ init_app(g_app)
 # =============================================================================
 
 if DEBUG or g_app.debug:
-    print("Warning: Application is running in debug mode")
+    g_logger.warning("Application is running in debug mode")
 

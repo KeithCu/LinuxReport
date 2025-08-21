@@ -16,12 +16,10 @@ import time
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
-from flask import g, jsonify, render_template, request, make_response, Response, flash, redirect, url_for
+from flask import g, jsonify, render_template, request, make_response, flash, redirect, url_for
 from markupsafe import Markup
-from werkzeug.utils import secure_filename
 from flask_cors import CORS
 from flask_login import login_user, logout_user, login_required, current_user
-from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_restful import Resource
 
@@ -33,21 +31,21 @@ from models import RssInfo, User
 from app_config import DEBUG
 from shared import (
     limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, 
-    EXPIRE_DAY, EXPIRE_HOUR, EXPIRE_YEARS, FAVICON, LOGO_URL, STANDARD_ORDER_STR,
+    EXPIRE_DAY, EXPIRE_YEARS, FAVICON, LOGO_URL, STANDARD_ORDER_STR,
     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML, 
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
-    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE
+    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION
 )
 from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
-from shared import DISABLE_CLIENT_GEOLOCATION
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content
 from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
+from app import g_logger
 
 # =============================================================================
 # GLOBAL CONFIGURATION
@@ -349,7 +347,7 @@ def _register_main_routes(flask_app):
             # Use current start_time to avoid additional kernel calls for fetch timing
             fetch_urls_parallel(needed_urls)
             # We could calculate fetch time using end_time later, but for now just log the count
-            print(f"Fetched {len(needed_urls)} feeds.")
+            g_logger.info(f"Fetched {len(needed_urls)} feeds.")
 
         # 3. Render the RSS feeds into the page layout.
         for url in page_order:

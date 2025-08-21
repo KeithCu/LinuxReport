@@ -48,6 +48,7 @@ from shared import (
 from Tor import fetch_via_tor
 from app_config import DEBUG, USE_TOR
 from object_storage_sync import smart_fetch, publish_bytes
+from app import g_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS AND CONFIGURATION
@@ -115,7 +116,7 @@ class LwnFetcher(FetcherStrategy):
             if title.startswith("[$]"):
                 if link not in pending and link not in displayed:
                     pending[link] = {'title': title, 'published': pub}
-                    print(f"[LWN] Article locked, saving for future: {title} ({link}) at {pub.isoformat()}")
+                    g_logger.info(f"[LWN] Article locked, saving for future: {title} ({link}) at {pub.isoformat()}")
             else:
                 if link not in displayed:
                     ready.append({'link': link, 'title': title, 'html_content': '', 'published': pub, 'published_parsed': entry.published_parsed})
@@ -132,7 +133,7 @@ class LwnFetcher(FetcherStrategy):
                 ready.append({'link': link, 'title': title, 'html_content': '', 'published': now})
                 displayed.add(link)
                 pending.pop(link)
-                print(f"[LWN] Article now available for free: {info['title']} ({link}) at {now.isoformat()}")
+                g_logger.info(f"[LWN] Article now available for free: {info['title']} ({link}) at {now.isoformat()}")
         
         ready.sort(key=lambda x: x['published'])
         g_c.put("lwn_pending", pending)
@@ -144,7 +145,7 @@ class RedditFetcher(FetcherStrategy):
 
     def fetch(self, url, rss_info):
         if USE_TOR:
-            print(f"Using TOR proxy for Reddit URL: {url}")
+            g_logger.info(f"Using TOR proxy for Reddit URL: {url}")
             res = fetch_via_tor(url, rss_info.site_url)
         else:
             res = feedparser.parse(url, agent=USER_AGENT_RANDOM)
@@ -207,7 +208,7 @@ def load_url_worker(url):
     # Use distributed locking to ensure only one process fetches this URL at a time
     with get_lock(lock_key, owner_prefix=f"feed_worker_{os.getpid()}") as lock:
         if not lock.locked():
-            print(f"Could not acquire lock for {url}, another process is fetching.")
+            g_logger.warning(f"Could not acquire lock for {url}, another process is fetching.")
             return
 
         start = timer()
@@ -220,16 +221,16 @@ def load_url_worker(url):
                     if isinstance(rssfeed, RssFeed):
                         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
                         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
-                        print(f"Successfully fetched processed feed from object store: {url}")
+                        g_logger.info(f"Successfully fetched processed feed from object store: {url}")
                         return
                 except Exception as e:
-                    print(f"Error parsing object store feed for {url}: {e}")
+                    g_logger.error(f"Error parsing object store feed for {url}: {e}")
 
         fetcher = get_fetcher(url)
         new_entries = fetcher.fetch(url, rss_info)
 
         if not new_entries:
-            print(f"No entries found for {url}.")
+            g_logger.warning(f"No entries found for {url}.")
             # Continue processing - let the rest of the function handle empty entries
 
         for entry in new_entries:
@@ -277,9 +278,9 @@ def load_url_worker(url):
             try:
                 feed_data = pickle.dumps(rssfeed)
                 publish_bytes(feed_data, url)
-                print(f"Successfully published feed to object store: {url}")
+                g_logger.info(f"Successfully published feed to object store: {url}")
             except Exception as e:
-                print(f"Error publishing feed to object store for {url}: {e}")
+                g_logger.error(f"Error publishing feed to object store for {url}: {e}")
 
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
@@ -288,7 +289,7 @@ def load_url_worker(url):
             g_cm.delete(rss_info.site_url)
             
         end = timer()
-        print(f"Parsing from: {url}, in {end - start:f}.")
+        g_logger.info(f"Parsing from: {url}, in {end - start:f}.")
 
 # =============================================================================
 # LOCKING AND THREADING UTILITIES
@@ -303,10 +304,10 @@ def _acquire_fetch_lock():
     """
     lock = get_lock(GLOBAL_FETCH_MODE_LOCK_KEY, owner_prefix=f"fetch_mode_{os.getpid()}")
     if lock.acquire(timeout_seconds=60, wait=True):
-        print("Acquired global fetch lock.")
+        g_logger.info("Acquired global fetch lock.")
         return lock
     else:
-        print("Failed to acquire global fetch lock after waiting.")
+        g_logger.warning("Failed to acquire global fetch lock after waiting.")
         return None
 
 def _check_fetch_lock_available():
@@ -356,7 +357,7 @@ def process_domain_urls(urls):
         try:
             load_url_worker(url)
         except Exception as exc:  # noqa: E722
-            print(f'{url} generated an exception: {exc}')
+            g_logger.error(f'{url} generated an exception: {exc}')
 
 def process_urls_in_parallel(urls, description="processing"):
     """
@@ -378,7 +379,7 @@ def process_urls_in_parallel(urls, description="processing"):
         domain = get_domain(url)
         domain_to_urls[domain].append(url)
 
-    print(f"{description.capitalize()} {len(urls)} URLs with domain-based parallel processing...")
+    g_logger.info(f"{description.capitalize()} {len(urls)} URLs with domain-based parallel processing...")
     
     # Process each domain's URLs sequentially, but different domains in parallel
     with concurrent.futures.ThreadPoolExecutor(max_workers=10 if not DEBUG else 1) as executor:
@@ -392,7 +393,7 @@ def process_urls_in_parallel(urls, description="processing"):
             try:
                 future.result()  # Ensure exceptions in workers are raised
             except Exception as exc:  # noqa: E722
-                print(f'Domain processing generated an exception during {description}: {exc}')
+                g_logger.error(f'Domain processing generated an exception during {description}: {exc}')
 
 # =============================================================================
 # MAIN FETCH OPERATIONS
@@ -410,14 +411,14 @@ def fetch_urls_parallel(urls):
     """
     lock = _acquire_fetch_lock()
     if not lock:
-        print("Aborting parallel fetch due to inability to acquire global lock.")
+        g_logger.warning("Aborting parallel fetch due to inability to acquire global lock.")
         return
 
     try:
         process_urls_in_parallel(urls, "fetching")
     finally:
         lock.release()
-        print("Released global fetch lock.")
+        g_logger.info("Released global fetch lock.")
 
 def refresh_thread():
     """
@@ -431,7 +432,7 @@ def refresh_thread():
     """
     lock = _acquire_fetch_lock()
     if not lock:
-        print("Aborting refresh thread due to inability to acquire global lock.")
+        g_logger.warning("Aborting refresh thread due to inability to acquire global lock.")
         return
 
     try:
@@ -451,13 +452,13 @@ def refresh_thread():
                     urls_to_refresh.append(url)
 
         if not urls_to_refresh:
-            print("No feeds need refreshing in this cycle.")
+            g_logger.info("No feeds need refreshing in this cycle.")
             return
 
         process_urls_in_parallel(urls_to_refresh, "refreshing")
     finally:
         lock.release()
-        print("Released global fetch lock after refresh.")
+        g_logger.info("Released global fetch lock after refresh.")
 
 def fetch_urls_thread():
     """
@@ -468,10 +469,10 @@ def fetch_urls_thread():
     thread if no other fetch/refresh operation is currently running.
     """
     if not _check_fetch_lock_available():
-        print("Fetch/refresh operation already in progress. Skipping background refresh trigger.")
+        g_logger.info("Fetch/refresh operation already in progress. Skipping background refresh trigger.")
         return
-    
-    print("No fetch operation running. Starting background refresh thread...")
+
+    g_logger.info("No fetch operation running. Starting background refresh thread...")
     t = threading.Thread(target=refresh_thread, args=())
     t.daemon = True
     t.start()
