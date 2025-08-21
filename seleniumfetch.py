@@ -382,11 +382,12 @@ class SharedSeleniumDriver:
         Shutdown and cleanup the current driver instance.
         
         Safely closes the WebDriver and resets the singleton instance
-        to allow for fresh driver creation.
+        to allow for fresh driver creation. This method is called by the timer
+        for automatic driver recycling, so it resets the shutdown flag after cleanup.
         """
         print(f"Shutdown called - instance exists: {cls._instance is not None}")
         with cls._lock:
-            # Set shutdown flag to prevent new instances
+            # Set shutdown flag to prevent new instances during cleanup
             cls._shutdown_initiated = True
             
             # Clean up instance
@@ -408,6 +409,11 @@ class SharedSeleniumDriver:
             finally:
                 cls._timer = None
                 print("Timer set to None")
+            
+            # Reset shutdown flag to allow new driver creation after cleanup
+            # This is safe because we're in a timer callback, not a true shutdown
+            cls._shutdown_initiated = False
+            print("Shutdown completed - ready for new driver creation")
 
     @classmethod
     def force_cleanup(cls):
