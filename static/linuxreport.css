@@ -1457,7 +1457,7 @@ a:focus {
 }
 
 .stale-feed {
-  box-shadow: 0 0 8px 2px rgba(255, 0, 0, 0.7) !important;
+  box-shadow: 0 0 8px 2px rgba(170, 150, 130, 0.7) !important; /* Brighter warm gray glow */
 }
 
 /* Article links - enhanced without spacing changes */
