@@ -137,7 +137,7 @@ def run_one_time_last_fetch_migration(all_urls):
                 if url not in all_fetches:
                     old_last_fetch = g_c.get(url + ":last_fetch")
                     if old_last_fetch:
-                        print(f"Migrating last_fetch for {url}.")
+                        g_logger.info(f"Migrating last_fetch for {url}.")
                         all_fetches[url] = old_last_fetch
                         updated = True
             
@@ -339,7 +339,7 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
                             existing_hash = line.split('// Hash: ')[1].strip()
                             break
                 except Exception as e:
-                    print(f"Warning: Could not read existing JS file: {e}")
+                    g_logger.warning(f"Could not read existing JS file: {e}")
             
             # Calculate hash of source files to see if they changed
             source_files = [

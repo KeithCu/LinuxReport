@@ -14,6 +14,7 @@ import uuid
 import html
 import datetime
 import time
+from app import g_logger
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -174,7 +175,7 @@ class CommentStreamResource(Resource):
                 except GeneratorExit:
                     break
                 except Exception as e:
-                    print(f"SSE Error in chat stream: {e}")
+                    g_logger.error(f"SSE Error in chat stream: {e}")
                     break
         return Response(event_stream(), mimetype='text/event-stream')
 
@@ -249,7 +250,7 @@ class ImageUploadResource(Resource):
             file_url = f"{WEB_UPLOAD_PATH}/{filename}"
             return {"success": True, "url": file_url}, 201
         except (IOError, OSError) as e:
-            print(f"Error saving uploaded image: {e}")
+            g_logger.error(f"Error saving uploaded image: {e}")
             return {"error": "Failed to save the uploaded image on the server."}, 500
 
 
