@@ -36,6 +36,7 @@ from webdriver_manager.core.os_manager import ChromeType
 # LOCAL IMPORTS
 # =============================================================================
 from shared import g_cs, CUSTOM_FETCH_CONFIG
+from app import g_logger
 
 # =============================================================================
 # FEATURE FLAGS
@@ -101,8 +102,8 @@ def create_driver(use_tor, user_agent):
         webdriver.Chrome: Configured Chrome WebDriver instance
     """
     try:
-        print(f"Creating Chrome driver with Tor: {use_tor}, User-Agent: {user_agent[:50]}...")
-        
+        g_logger.info(f"Creating Chrome driver with Tor: {use_tor}, User-Agent: {user_agent[:50]}...")
+
         options = Options()
         options.add_argument("--headless")
         options.add_argument("--disable-gpu")
@@ -120,34 +121,34 @@ def create_driver(use_tor, user_agent):
         options.add_argument("--disable-ipc-flooding-protection")
         options.add_argument("--memory-pressure-off")
         options.add_argument("--max_old_space_size=4096")  # Limit memory usage
-        
+
         if use_tor:
             options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
 
-        print("Installing ChromeDriver...")
+        g_logger.debug("Installing ChromeDriver...")
         service = Service(ChromeDriverManager(
             chrome_type=ChromeType.CHROMIUM).install())
-        print("ChromeDriver installed successfully")
-        
-        print("Creating Chrome WebDriver instance...")
+        g_logger.debug("ChromeDriver installed successfully")
+
+        g_logger.debug("Creating Chrome WebDriver instance...")
         driver = webdriver.Chrome(service=service, options=options)
-        print("Chrome WebDriver created successfully")
-        
+        g_logger.debug("Chrome WebDriver created successfully")
+
         # Set timeouts to prevent hanging
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)  # 30 second page load timeout
         driver.set_script_timeout(SCRIPT_TIMEOUT)     # 30 second script timeout
-        
+
         # Disable compression by setting Accept-Encoding to identity via CDP
         driver.execute_cdp_cmd("Network.enable", {})
         driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {"Accept-Encoding": "identity"}})
-        print("Chrome driver setup completed successfully")
+        g_logger.info("Chrome driver setup completed successfully")
         return driver
         
     except Exception as e:
-        print(f"Error creating Chrome driver: {e}")
-        print(f"Error type: {type(e).__name__}")
+        g_logger.error(f"Error creating Chrome driver: {e}")
+        g_logger.error(f"Error type: {type(e).__name__}")
         import traceback
-        print(f"Full traceback: {traceback.format_exc()}")
+        g_logger.error(f"Full traceback: {traceback.format_exc()}")
         raise
 
 # =============================================================================
@@ -186,15 +187,15 @@ class SharedSeleniumDriver:
             use_tor (bool): Whether to use Tor proxy
             user_agent (str): User agent string for the driver
         """
-        print(f"Initializing SharedSeleniumDriver with Tor: {use_tor}")
+        g_logger.debug(f"Initializing SharedSeleniumDriver with Tor: {use_tor}")
         try:
             self.driver = create_driver(use_tor, user_agent)
             self.last_used = time.time()
             self.use_tor = use_tor
             self.user_agent = user_agent
-            print("SharedSeleniumDriver initialized successfully")
+            g_logger.debug("SharedSeleniumDriver initialized successfully")
         except Exception as e:
-            print(f"Error in SharedSeleniumDriver.__init__: {e}")
+            g_logger.error(f"Error in SharedSeleniumDriver.__init__: {e}")
             raise
 
     @classmethod
@@ -215,7 +216,7 @@ class SharedSeleniumDriver:
         with cls._lock:
             # Check if shutdown has been initiated
             if cls._shutdown_initiated:
-                print("Driver creation blocked - shutdown in progress")
+                g_logger.info("Driver creation blocked - shutdown in progress")
                 return None
                 
             if cls._instance is None or not cls._is_instance_valid(cls._instance, use_tor, user_agent):
@@ -223,16 +224,16 @@ class SharedSeleniumDriver:
                     cls._cleanup_instance()
                 
                 try:
-                    print(f"Attempting to create new SharedSeleniumDriver instance...")
+                    g_logger.info(f"Attempting to create new SharedSeleniumDriver instance...")
                     cls._instance = SharedSeleniumDriver(use_tor, user_agent)
                     # Reset timer only when creating a new instance
                     cls._reset_timer()
-                    print(f"Created new driver instance with Tor: {use_tor}")
+                    g_logger.info(f"Created new driver instance with Tor: {use_tor}")
                 except Exception as e:
-                    print(f"Error creating new driver: {e}")
-                    print(f"Error type: {type(e).__name__}")
+                    g_logger.error(f"Error creating new driver: {e}")
+                    g_logger.error(f"Error type: {type(e).__name__}")
                     import traceback
-                    print(f"Full traceback: {traceback.format_exc()}")
+                    g_logger.error(f"Full traceback: {traceback.format_exc()}")
                     cls._instance = None
                     return None
             
@@ -256,7 +257,7 @@ class SharedSeleniumDriver:
         try:
             return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)  # 30 second timeout
         except Exception as e:
-            print(f"Error acquiring fetch lock: {e}")
+            g_logger.error(f"Error acquiring fetch lock: {e}")
             return False
 
     @classmethod
@@ -299,11 +300,11 @@ class SharedSeleniumDriver:
                 instance.driver.execute_script("return document.readyState;")
                 return True
             except Exception as e:
-                print(f"Driver health check failed: {e}")
+                g_logger.debug(f"Driver health check failed: {e}")
                 return False
-                
+
         except Exception as e:
-            print(f"Error during driver validation: {e}")
+            g_logger.error(f"Error during driver validation: {e}")
             return False
 
     @classmethod
@@ -320,24 +321,24 @@ class SharedSeleniumDriver:
                 # Don't join the timer thread if we're on the same thread
                 if threading.current_thread() != cls._timer:
                     cls._timer.join(timeout=1.0)
-                    print("Timer joined successfully")
-            print(f"Timer cancelled, timeout was {cls._timeout} seconds")
+                    g_logger.debug("Timer joined successfully")
+            g_logger.debug(f"Timer cancelled, timeout was {cls._timeout} seconds")
         except Exception as e:
-            print(f"Error cancelling timer: {e}")
+            g_logger.error(f"Error cancelling timer: {e}")
         finally:
             cls._timer = None
-        
+
         # Don't create new timer if shutdown is in progress
         if cls._shutdown_initiated:
             return
-            
+
         try:
             cls._timer = threading.Timer(cls._timeout, cls._shutdown)
             cls._timer.daemon = True
             cls._timer.start()
-            print(f"New timer started with {cls._timeout} second timeout")
+            g_logger.debug(f"New timer started with {cls._timeout} second timeout")
         except Exception as e:
-            print(f"Error creating timer: {e}")
+            g_logger.error(f"Error creating timer: {e}")
             # If timer creation fails during normal operation, schedule immediate cleanup
             if not cls._shutdown_initiated:
                 cls._shutdown()
@@ -351,15 +352,15 @@ class SharedSeleniumDriver:
             try:
                 # Try to quit the driver gracefully
                 cls._instance.driver.quit()
-                print("WebDriver quit successfully")
+                g_logger.debug("WebDriver quit successfully")
             except Exception as e:
-                print(f"Error quitting WebDriver: {e}")
+                g_logger.error(f"Error quitting WebDriver: {e}")
                 try:
                     # Fallback: try to close the driver
                     cls._instance.driver.close()
-                    print("WebDriver closed successfully")
+                    g_logger.debug("WebDriver closed successfully")
                 except Exception as e2:
-                    print(f"Error closing WebDriver: {e2}")
+                    g_logger.error(f"Error closing WebDriver: {e2}")
                     # Last resort: try to kill the process
                     try:
                         if hasattr(cls._instance.driver, 'service') and hasattr(cls._instance.driver.service, 'process'):
@@ -369,12 +370,12 @@ class SharedSeleniumDriver:
                                 time.sleep(1)
                                 if process.poll() is None:
                                     process.kill()
-                                print("WebDriver process terminated")
+                                g_logger.debug("WebDriver process terminated")
                     except Exception as e3:
-                        print(f"Error terminating WebDriver process: {e3}")
+                        g_logger.error(f"Error terminating WebDriver process: {e3}")
             finally:
                 cls._instance = None
-                print("Instance set to None")
+                g_logger.debug("Instance set to None")
 
     @classmethod
     def _shutdown(cls):
@@ -385,35 +386,35 @@ class SharedSeleniumDriver:
         to allow for fresh driver creation. This method is called by the timer
         for automatic driver recycling, so it resets the shutdown flag after cleanup.
         """
-        print(f"Shutdown called - instance exists: {cls._instance is not None}")
+        g_logger.debug(f"Shutdown called - instance exists: {cls._instance is not None}")
         with cls._lock:
             # Set shutdown flag to prevent new instances during cleanup
             cls._shutdown_initiated = True
-            
+
             # Clean up instance
             cls._cleanup_instance()
-            
+
             # Cancel any existing timer
             try:
                 if cls._timer and cls._timer.is_alive():
                     cls._timer.cancel()
-                    print("Timer cancelled during shutdown")
+                    g_logger.debug("Timer cancelled during shutdown")
                     # Don't join the timer thread if we're on the same thread
                     if threading.current_thread() != cls._timer:
                         cls._timer.join(timeout=1.0)
-                        print("Timer joined successfully")
+                        g_logger.debug("Timer joined successfully")
                     else:
-                        print("Skipping timer join (same thread)")
+                        g_logger.debug("Skipping timer join (same thread)")
             except Exception as e:
-                print(f"Error cancelling timer during shutdown: {e}")
+                g_logger.error(f"Error cancelling timer during shutdown: {e}")
             finally:
                 cls._timer = None
-                print("Timer set to None")
-            
+                g_logger.debug("Timer set to None")
+
             # Reset shutdown flag to allow new driver creation after cleanup
             # This is safe because we're in a timer callback, not a true shutdown
             cls._shutdown_initiated = False
-            print("Shutdown completed - ready for new driver creation")
+            g_logger.debug("Shutdown completed - ready for new driver creation")
 
     @classmethod
     def force_cleanup(cls):
@@ -423,13 +424,13 @@ class SharedSeleniumDriver:
         This method can be called manually to ensure the WebDriver
         is properly shut down, useful for debugging or emergency cleanup.
         """
-        print("Forcing WebDriver cleanup...")
+        g_logger.info("Forcing WebDriver cleanup...")
         with cls._lock:
             cls._shutdown_initiated = True
-            
+
             # Clean up instance
             cls._cleanup_instance()
-            
+
             # Clean up timer
             try:
                 if cls._timer and cls._timer.is_alive():
@@ -437,24 +438,24 @@ class SharedSeleniumDriver:
                     # Don't join the timer thread if we're on the same thread
                     if threading.current_thread() != cls._timer:
                         cls._timer.join(timeout=2.0)
-                        print("Timer joined successfully during force cleanup")
+                        g_logger.debug("Timer joined successfully during force cleanup")
                     else:
-                        print("Skipping timer join during force cleanup (same thread)")
+                        g_logger.debug("Skipping timer join during force cleanup (same thread)")
             except Exception as e:
-                print(f"Error during force cleanup timer cancellation: {e}")
+                g_logger.error(f"Error during force cleanup timer cancellation: {e}")
             finally:
                 cls._timer = None
-            
+
             # Reset shutdown flag for potential future use
             cls._shutdown_initiated = False
-            print("Force cleanup completed")
+            g_logger.info("Force cleanup completed")
 
     @classmethod
     def reset_for_testing(cls):
         """
         Reset the class state for testing purposes.
         """
-        print("Resetting SharedSeleniumDriver for testing...")
+        g_logger.info("Resetting SharedSeleniumDriver for testing...")
         cls.force_cleanup()
         cls._shutdown_initiated = False
 
@@ -469,14 +470,14 @@ def cleanup_selenium_drivers():
     This function can be called from other modules or during application shutdown
     to ensure no WebDriver instances are left running.
     """
-    print("Cleaning up all Selenium drivers...")
+    g_logger.info("Cleaning up all Selenium drivers...")
     SharedSeleniumDriver.force_cleanup()
 
 def _signal_handler(signum, frame):
     """
     Signal handler for graceful shutdown.
     """
-    print(f"Received signal {signum}, cleaning up Selenium drivers...")
+    g_logger.info(f"Received signal {signum}, cleaning up Selenium drivers...")
     cleanup_selenium_drivers()
     sys.exit(0)
 
@@ -484,7 +485,7 @@ def _atexit_handler():
     """
     Atexit handler for cleanup on normal program termination.
     """
-    print("Program exiting, cleaning up Selenium drivers...")
+    g_logger.info("Program exiting, cleaning up Selenium drivers...")
     cleanup_selenium_drivers()
 
 # Register cleanup handlers
@@ -588,7 +589,7 @@ def parse_relative_time(time_text):
         return None, None
         
     except Exception as e:
-        print(f"Error parsing relative time '{time_text}': {e}")
+        g_logger.error(f"Error parsing relative time '{time_text}': {e}")
         return None, None
 
 def extract_post_data(post, config, url, use_selenium):
@@ -643,7 +644,7 @@ def extract_post_data(post, config, url, use_selenium):
             return results if results else None
             
         except Exception as e:
-            print(f"Error parsing RSS content: {e}")
+            g_logger.error(f"Error parsing RSS content: {e}")
             return None
     
     # Regular processing for non-RSS content
@@ -654,29 +655,29 @@ def extract_post_data(post, config, url, use_selenium):
         else:
             title_element = post.select_one(config["title_selector"])
             if not title_element:
-                print(f"No title element found with selector '{config['title_selector']}'")
+                g_logger.debug(f"No title element found with selector '{config['title_selector']}'")
                 # Show what elements are available for debugging
                 try:
                     all_links = post.find_all('a')
-                    print(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
+                    g_logger.info(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
                 except:
                     pass
                 return None
             title = title_element.text.strip()
     except Exception as e:
-        print(f"Error extracting title with selector '{config['title_selector']}': {e}")
+        g_logger.error(f"Error extracting title with selector '{config['title_selector']}': {e}")
         # Show what text content is available for debugging
         try:
             if use_selenium:
                 all_text = post.text[:200] + "..." if len(post.text) > 200 else post.text
             else:
                 all_text = post.get_text()[:200] + "..." if len(post.get_text()) > 200 else post.get_text()
-            print(f"Available text content: {all_text}")
+            g_logger.info(f"Available text content: {all_text}")
             # Also show available classes for debugging
             if not use_selenium:
-                print(f"Available classes: {post.get('class', [])}") 
+                g_logger.info(f"Available classes: {post.get('class', [])}")
         except Exception as debug_e:
-            print(f"Error during debug output: {debug_e}")
+            g_logger.debug(f"Error during debug output: {debug_e}")
         return None
     
     if len(title.split()) < 2:
@@ -689,15 +690,15 @@ def extract_post_data(post, config, url, use_selenium):
         else:
             link_element = post.select_one(config["link_selector"])
             if not link_element:
-                print(f"No link element found with selector '{config['link_selector']}'")
+                g_logger.info(f"No link element found with selector '{config['link_selector']}'")
                 # Show what elements are available for debugging
                 try:
                     all_links = post.find_all('a')
-                    print(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
+                    g_logger.info(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
                     # Also show available classes for debugging
-                    print(f"Available classes: {post.get('class', [])}")
+                    g_logger.info(f"Available classes: {post.get('class', [])}")
                 except Exception as debug_e:
-                    print(f"Error during debug output: {debug_e}")
+                    g_logger.debug(f"Error during debug output: {debug_e}")
                 return None
             # Handle RSS feeds where links are text content, not href attributes
             if config["link_attr"] == "text":
@@ -707,19 +708,19 @@ def extract_post_data(post, config, url, use_selenium):
             if link and link.startswith('/'):
                 link = urljoin(url, link)
     except Exception as e:
-        print(f"Error extracting link with selector '{config['link_selector']}': {e}")
+        g_logger.error(f"Error extracting link with selector '{config['link_selector']}': {e}")
         # Show what link content is available for debugging
         try:
             if use_selenium:
                 all_links = post.find_elements(By.TAG_NAME, "a")
-                print(f"Available links: {[a.get_attribute('href') for a in all_links[:3]]}")
+                g_logger.info(f"Available links: {[a.get_attribute('href') for a in all_links[:3]]}")
             else:
                 all_links = post.find_all('a')
-                print(f"Available links: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
+                g_logger.info(f"Available links: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
                 # Also show available classes for debugging
-                print(f"Available classes: {post.get('class', [])}")
+                g_logger.info(f"Available classes: {post.get('class', [])}")
         except Exception as debug_e:
-            print(f"Error during debug output: {debug_e}")
+            g_logger.debug(f"Error during debug output: {debug_e}")
         return None
     
     filter_pattern = config.get("filter_pattern", "")
@@ -757,7 +758,7 @@ def extract_post_data(post, config, url, use_selenium):
                 published_parsed, published = parse_relative_time(date_text)
                 
         except Exception as e:
-            print(f"Warning: Failed to extract date for {url}: {e}")
+            g_logger.warning(f"Failed to extract date for {url}: {e}")
             # Fallback to current time
             published_parsed = None
             published = None
@@ -816,7 +817,7 @@ def fetch_site_posts(url, user_agent):
         config = KEITHCU_RSS_CONFIG
     
     if not config:
-        print(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
+        g_logger.info(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
         return {
             'entries': [],
             'etag': "",
@@ -840,7 +841,7 @@ def fetch_site_posts(url, user_agent):
         try:
             lock_acquired = SharedSeleniumDriver.acquire_fetch_lock()
             if not lock_acquired:
-                print(f"Failed to acquire fetch lock for {url}, skipping...")
+                g_logger.warning(f"Failed to acquire fetch lock for {url}, skipping...")
                 status = 503
                 return {
                     'entries': [],
@@ -850,10 +851,10 @@ def fetch_site_posts(url, user_agent):
                     'href': url,
                     'status': status
                 }
-            
+
             driver = SharedSeleniumDriver.get_driver(config["needs_tor"], user_agent)
             if not driver:
-                print(f"Failed to get driver for {url}")
+                g_logger.error(f"Failed to get driver for {url}")
                 status = 503
                 return {
                     'entries': [],
@@ -872,14 +873,14 @@ def fetch_site_posts(url, user_agent):
                     try:
                         WebDriverWait(driver, WEBDRIVER_WAIT_TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
                     except Exception as wait_error:
-                        print(f"Timeout waiting for elements on {url}: {wait_error}")
+                        g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
                         # Continue anyway, might still find some content
-                
-                print(f"Some content loaded for {url} with agent: {user_agent}")
+
+                g_logger.info(f"Some content loaded for {url} with agent: {user_agent}")
                 posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
                 if not posts:
                     snippet = driver.page_source[:500]
-                    print("No posts found. Page source snippet:", snippet)
+                    g_logger.info(f"No posts found. Page source snippet: {snippet}")
                     status = 204  # No content
                 else:
                     for post in posts:
@@ -892,11 +893,11 @@ def fetch_site_posts(url, user_agent):
                                 else:
                                     entries.append(entry_data)
                         except Exception as e:
-                            print(f"Error extracting post data: {e}")
+                            g_logger.error(f"Error extracting post data: {e}")
                             continue
                             
             except Exception as e:
-                print(f"Error on {url}: {e}")
+                g_logger.error(f"Error on {url}: {e}")
                 status = 500
                 
         finally:
@@ -904,7 +905,7 @@ def fetch_site_posts(url, user_agent):
             if lock_acquired:
                 SharedSeleniumDriver.release_fetch_lock()
     else:
-        print(f"Fetching {base_domain} using requests (no Selenium)")
+        g_logger.info(f"Fetching {base_domain} using requests (no Selenium)")
         try:
             response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT)
             response.raise_for_status()
@@ -916,11 +917,11 @@ def fetch_site_posts(url, user_agent):
                     if entry:
                         entries.append(entry)
                 except Exception as e:
-                    print(f"Error extracting post data: {e}")
+                    g_logger.error(f"Error extracting post data: {e}")
                     continue
-                    
+
         except Exception as e:
-            print(f"Error fetching {base_domain} with requests: {e}")
+            g_logger.error(f"Error fetching {base_domain} with requests: {e}")
             status = 500
 
     result = {
