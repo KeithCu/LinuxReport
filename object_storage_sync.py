@@ -18,6 +18,7 @@ from functools import wraps
 import json
 import datetime
 import mimetypes
+from app import g_logger
 
 import unittest
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -73,7 +74,7 @@ def get_file_metadata(file_path: str) -> Optional[Dict]:
     try:
         # Check if file exists and is accessible
         if not os.path.exists(file_path):
-            print(f"File does not exist: {file_path}")
+            g_logger.warning(f"File does not exist: {file_path}")
             return None
             
         # Get basic file stats
@@ -99,7 +100,7 @@ def get_file_metadata(file_path: str) -> Optional[Dict]:
             'content': content
         }
     except Exception as e:
-        print(f"Error getting file metadata for {file_path}: {e}")
+        g_logger.error(f"Error getting file metadata for {file_path}: {e}")
         return None
 
 def _init_check():
@@ -141,7 +142,7 @@ def _get_object(obj_name: str) -> Optional[Any]:
         except Exception:
             return None
     except Exception as e:
-        print(f"Error getting object {obj_name}: {e}")
+        g_logger.error(f"Error getting object {obj_name}: {e}")
         raise
 
 @retry(
@@ -165,10 +166,10 @@ def publish_file(file_path: str) -> Any:
         if file_metadata:
             bytes_data = file_metadata['content']
             return publish_bytes(bytes_data, file_path)
-        print(f"No content found in file: {file_path}")
+        g_logger.warning(f"No content found in file: {file_path}")
         return None
     except Exception as e:
-        print(f"Error publishing file: {file_path}, exception: {e}")
+        g_logger.error(f"Error publishing file: {file_path}, exception: {e}")
         raise
 
 @retry(
@@ -188,10 +189,10 @@ def fetch_file(file_path: str) -> tuple[Optional[bytes], Optional[Dict]]:
     """
     try:
         content, metadata = fetch_bytes(file_path)
-        print(f"Fetched file ({len(content) if content else 0} bytes) from key: {file_path}")
+        g_logger.info(f"Fetched file ({len(content) if content else 0} bytes) from key: {file_path}")
         return content, metadata
     except Exception as e:
-        print(f"Error fetching file: {file_path}, exception: {e}")
+        g_logger.error(f"Error fetching file: {file_path}, exception: {e}")
         raise
 
 def _update_bucket_last_written():
@@ -205,7 +206,7 @@ def _update_bucket_last_written():
             object_name=BUCKET_LAST_WRITTEN_KEY
         )
     except Exception as e:
-        print(f"Error updating bucket last-written timestamp: {e}")
+        g_logger.error(f"Error updating bucket last-written timestamp: {e}")
         # Don't raise - this is a best-effort operation
 
 @retry(
@@ -243,11 +244,11 @@ def publish_bytes(bytes_data: bytes, key: str) -> Any:
         
         # Update bucket last-written timestamp
         _update_bucket_last_written()
-        
-        print(f"Published {len(bytes_data)} bytes to object: {object_name}")
+
+        g_logger.info(f"Published {len(bytes_data)} bytes to object: {object_name}")
         return obj
     except Exception as e:
-        print(f"Error publishing bytes with key: {key}, exception: {e}")
+        g_logger.error(f"Error publishing bytes with key: {key}, exception: {e}")
         raise
 
 @retry(
@@ -272,13 +273,13 @@ def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
             _storage_driver.download_object_as_stream(obj, content_buffer)
             content = content_buffer.getvalue()
             metadata = _get_object_metadata(obj)
-            print(f"Retrieved {len(content)} bytes for key: {key}")
+            g_logger.info(f"Retrieved {len(content)} bytes for key: {key}")
             return content, metadata
-        
-        print(f"No content found for key: {key}")
+
+        g_logger.warning(f"No content found for key: {key}")
         return None, None
     except Exception as e:
-        print(f"Error fetching bytes for key: {key}, exception: {e}")
+        g_logger.error(f"Error fetching bytes for key: {key}, exception: {e}")
         raise
 
 @retry(
@@ -350,7 +351,7 @@ def smart_fetch(key: str, cache_expiry: int = DEFAULT_CACHE_EXPIRY) -> tuple[Opt
         return content, metadata
             
     except Exception as e:
-        print(f"Error in smart_fetch for key: {key}, exception: {e}")
+        g_logger.error(f"Error in smart_fetch for key: {key}, exception: {e}")
         raise
 
 class TestObjectStorageSync(unittest.TestCase):
@@ -588,6 +589,6 @@ class TestObjectStorageSync(unittest.TestCase):
 
 if __name__ == '__main__':
     if not init_storage():  # Attempt to initialize storage before running tests
-        print("Storage initialization failed; tests may not run fully.")
-    
+        g_logger.warning("Storage initialization failed; tests may not run fully.")
+
     unittest.main()

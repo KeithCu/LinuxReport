@@ -1,6 +1,7 @@
 import os
 import os.path
 import hashlib
+from app import g_logger
 
 from app_config import get_storage_config, config_manager
 
@@ -82,19 +83,19 @@ def load_storage_secrets():
         _secrets_loaded = True
         
         if STORAGE_ENABLED and (not STORAGE_ACCESS_KEY or not STORAGE_SECRET_KEY):
-            print("Storage is enabled but access key or secret key might be missing after loading.")
+            g_logger.warning("Storage is enabled but access key or secret key might be missing after loading.")
             
     except FileNotFoundError as e: # Specific exception
         _secrets_loaded = False
-        print(f"Configuration file not found: {e}")
+        g_logger.error(f"Configuration file not found: {e}")
         raise ConfigurationError(f"Configuration file not found: {e}")
     except KeyError as e: # Specific exception for missing keys in config
         _secrets_loaded = False
-        print(f"Missing key in configuration data: {e}")
+        g_logger.error(f"Missing key in configuration data: {e}")
         raise ConfigurationError(f"Missing key in configuration data: {e}")
     except Exception as e: # Fallback for other load_config or parsing issues
         _secrets_loaded = False
-        print(f"Error loading storage secrets: {e}")
+        g_logger.error(f"Error loading storage secrets: {e}")
         raise ConfigurationError(f"Error loading storage secrets: {e}") # Wrap in custom error
 
 def init_storage() -> bool:
@@ -110,11 +111,11 @@ def init_storage() -> bool:
     global _storage_driver, _storage_container
     
     if not LIBCLOUD_AVAILABLE:
-        print("Libcloud not available. Storage functionality disabled.")
+        g_logger.warning("Libcloud not available. Storage functionality disabled.")
         return False
-        
+
     if not STORAGE_ENABLED:
-        print("Storage is not enabled in configuration.")
+        g_logger.info("Storage is not enabled in configuration.")
         return False
     
     if _storage_driver is None:
@@ -134,15 +135,15 @@ def init_storage() -> bool:
                 host=STORAGE_HOST,
                 secure=True  # Always use SSL
             )
-            print(f"Storage driver initialized for provider {STORAGE_PROVIDER}")
-            
+            g_logger.info(f"Storage driver initialized for provider {STORAGE_PROVIDER}")
+
             # Create or get container
             try:
                 _storage_container = _storage_driver.get_container(container_name=STORAGE_BUCKET_NAME)
-                print(f"Using existing storage container: {STORAGE_BUCKET_NAME}")
+                g_logger.info(f"Using existing storage container: {STORAGE_BUCKET_NAME}")
             except ContainerDoesNotExistError:
                 _storage_container = _storage_driver.create_container(container_name=STORAGE_BUCKET_NAME)
-                print(f"Created new storage container: {STORAGE_BUCKET_NAME}")
+                g_logger.info(f"Created new storage container: {STORAGE_BUCKET_NAME}")
                                 
             return True
         except LibcloudError as e: # Catch specific libcloud errors during driver init/container ops

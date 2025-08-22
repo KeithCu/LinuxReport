@@ -9,6 +9,7 @@ This includes rendering articles with Jinja2 templates and refreshing images.
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import os
+from app import g_logger
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -99,9 +100,9 @@ def generate_headlines_html(top_articles, output_file, model_name=None):
             os.makedirs(output_dir, exist_ok=True)
         with open(output_file, "w", encoding="utf-8") as f:
             f.write(full_html)
-        print(f"Generated HTML with {len(top_articles[:3])} headlines to {output_file}")
+        g_logger.info(f"Generated HTML with {len(top_articles[:3])} headlines to {output_file}")
     except IOError as e:
-        print(f"Error writing to output file {output_file}: {e}")
+        g_logger.error(f"Error writing to output file {output_file}: {e}")
 
 def refresh_images_only(mode, model_name=None):
     """
@@ -123,23 +124,23 @@ def refresh_images_only(mode, model_name=None):
     html_file = f"{mode}reportabove.html"
     
     if not os.path.exists(html_file):
-        print(f"Cannot refresh images: HTML file {html_file} not found.")
+        g_logger.error(f"Cannot refresh images: HTML file {html_file} not found.")
         return False
 
     # Extract existing articles from the HTML file.
     articles = extract_articles_from_html(html_file)
-    
+
     if not articles:
-        print(f"No articles found in existing HTML file {html_file}. Cannot refresh images.")
+        g_logger.error(f"No articles found in existing HTML file {html_file}. Cannot refresh images.")
         return False
-    
-    print(f"Found {len(articles)} articles in {html_file}, refreshing images...")
-    
+
+    g_logger.info(f"Found {len(articles)} articles in {html_file}, refreshing images...")
+
     # Fetch a new largest image for each article.
     for article in articles:
         article["image_url"] = custom_fetch_largest_image(article["url"])
-    
+
     # Regenerate the HTML with the newly fetched images.
     generate_headlines_html(articles, html_file, model_name)
-    print(f"Successfully refreshed images in {html_file}")
+    g_logger.info(f"Successfully refreshed images in {html_file}")
     return True

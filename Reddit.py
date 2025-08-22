@@ -15,6 +15,9 @@ from urllib.parse import urlparse
 # Third-party imports
 import requests
 
+# Local imports
+from app import g_logger
+
 # --- Configuration ---
 # Credentials are now handled via the token file or initial prompt
 
@@ -55,7 +58,7 @@ def get_initial_token(client_id, client_secret, username, password):
     user_agent = f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{username})'
     headers = {'User-Agent': user_agent}
 
-    print("Attempting to get initial token from Reddit...")
+    g_logger.info("Attempting to get initial token from Reddit...")
     response = None
     try:
         response = requests.post(REDDIT_TOKEN_URL, auth=auth, data=payload, headers=headers)
@@ -67,13 +70,13 @@ def get_initial_token(client_id, client_secret, username, password):
         token_data['client_secret'] = client_secret # Consider security implications
         token_data['username'] = username
         save_token(token_data)
-        print("Successfully retrieved and saved initial token and credentials.")
+        g_logger.info("Successfully retrieved and saved initial token and credentials.")
         return token_data
     except requests.exceptions.RequestException as e:
-        print(f"Error getting initial token: {e}")
+        g_logger.error(f"Error getting initial token: {e}")
         if response is not None:
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
+            g_logger.error(f"Response status: {response.status_code}")
+            g_logger.error(f"Response body: {response.text}")
         return None
 
 def save_token(token_data):
@@ -81,14 +84,14 @@ def save_token(token_data):
     try:
         # Ensure sensitive data like client_secret isn't inadvertently logged
         # In a real app, consider encrypting TOKEN_FILE or using secure storage
-        print(f"Saving token data for user '{token_data.get('username', 'N/A')}' to {TOKEN_FILE}")
+        g_logger.info(f"Saving token data for user '{token_data.get('username', 'N/A')}' to {TOKEN_FILE}")
         with open(TOKEN_FILE, 'w') as f:
             json.dump(token_data, f, indent=4) # Add indent for readability
         os.chmod(TOKEN_FILE, 0o600) # Read/write only for owner
     except IOError as e:
-        print(f"Error saving token file '{TOKEN_FILE}': {e}")
+        g_logger.error(f"Error saving token file '{TOKEN_FILE}': {e}")
     except Exception as e: # Catch other potential errors like permission issues
-        print(f"An unexpected error occurred while saving the token: {e}")
+        g_logger.error(f"An unexpected error occurred while saving the token: {e}")
 
 
 def load_token():
@@ -100,14 +103,14 @@ def load_token():
             token_data = json.load(f)
             # Basic validation: check for essential keys
             if not all(k in token_data for k in ['access_token', 'refresh_token', 'client_id', 'client_secret', 'username']):
-                 print(f"Warning: Token file '{TOKEN_FILE}' is missing essential keys. Re-authentication may be required.")
+                 g_logger.warning(f"Token file '{TOKEN_FILE}' is missing essential keys. Re-authentication may be required.")
                  # Optionally return None or handle partial data
             return token_data
     except (IOError, json.JSONDecodeError) as e:
-        print(f"Error loading or parsing token file '{TOKEN_FILE}': {e}")
+        g_logger.error(f"Error loading or parsing token file '{TOKEN_FILE}': {e}")
         return None
     except Exception as e: # Catch other potential errors
-        print(f"An unexpected error occurred while loading the token: {e}")
+        g_logger.error(f"An unexpected error occurred while loading the token: {e}")
         return None
 
 def refresh_token(current_token_data):
@@ -118,10 +121,10 @@ def refresh_token(current_token_data):
     username = current_token_data.get('username', 'unknown_user') # Get username for user agent
 
     if not refresh_tok:
-        print("Error: No refresh token found in stored data. Need to re-authenticate.")
+        g_logger.error("Error: No refresh token found in stored data. Need to re-authenticate.")
         return None
     if not client_id or not client_secret:
-         print("Error: Missing client credentials (ID, Secret) in stored data for refresh.")
+         g_logger.error("Error: Missing client credentials (ID, Secret) in stored data for refresh.")
          return None # Cannot refresh without credentials
 
     auth = requests.auth.HTTPBasicAuth(client_id, client_secret)
@@ -133,7 +136,7 @@ def refresh_token(current_token_data):
     user_agent = f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{username})'
     headers = {'User-Agent': user_agent}
 
-    print("Attempting to refresh token...")
+    g_logger.info("Attempting to refresh token...")
     response = None
     try:
         response = requests.post(REDDIT_TOKEN_URL, auth=auth, data=payload, headers=headers)
@@ -149,15 +152,15 @@ def refresh_token(current_token_data):
         new_token_data['retrieved_at'] = time.time()
 
         save_token(new_token_data)
-        print("Successfully refreshed and saved token.")
+        g_logger.info("Successfully refreshed and saved token.")
         return new_token_data
     except requests.exceptions.RequestException as e:
-        print(f"Error refreshing token: {e}")
+        g_logger.error(f"Error refreshing token: {e}")
         if response is not None:
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
+            g_logger.error(f"Response status: {response.status_code}")
+            g_logger.error(f"Response body: {response.text}")
         if response is not None and response.status_code in [400, 401]:
-            print("Refresh token might be invalid or expired. Manual re-authentication required.")
+            g_logger.warning("Refresh token might be invalid or expired. Manual re-authentication required.")
             # Consider deleting the invalid token file to force re-auth next time
             # try:
             #     os.remove(TOKEN_FILE)
@@ -176,8 +179,8 @@ def get_valid_token():
     token_data = load_token()
 
     if not token_data:
-        print(f"No token file found ('{TOKEN_FILE}') or file is invalid.")
-        print("Please provide your Reddit API credentials for initial setup.")
+        g_logger.info(f"No token file found ('{TOKEN_FILE}') or file is invalid.")
+        g_logger.info("Please provide your Reddit API credentials for initial setup.")
         try:
             client_id = input("Enter your Reddit Client ID: ").strip()
             client_secret = getpass.getpass("Enter your Reddit Client Secret: ").strip()
@@ -185,21 +188,21 @@ def get_valid_token():
             password = getpass.getpass("Enter your Reddit Password (only needed once): ").strip()
 
             if not all([client_id, client_secret, username, password]):
-                print("Error: All credentials must be provided for initial setup.")
+                g_logger.error("Error: All credentials must be provided for initial setup.")
                 return None, None
 
             token_data = get_initial_token(client_id, client_secret, username, password)
             # Clear password from memory immediately after use
             del password
             if not token_data:
-                print("Failed to obtain initial token.")
+                g_logger.error("Failed to obtain initial token.")
                 return None, None # Failed initial fetch
-            print("Initial token fetch successful.")
+            g_logger.info("Initial token fetch successful.")
         except EOFError: # Handle running in non-interactive environment
-             print("\nError: Cannot prompt for credentials in non-interactive mode and no token file found.")
+             g_logger.error("\nError: Cannot prompt for credentials in non-interactive mode and no token file found.")
              return None, None
         except Exception as e: # Catch other potential input errors
-             print(f"\nAn error occurred during credential input: {e}")
+             g_logger.error(f"\nAn error occurred during credential input: {e}")
              return None, None
 
 
@@ -209,10 +212,10 @@ def get_valid_token():
     current_time = time.time()
 
     if current_time > retrieved_at + expires_in - 60:
-        print("Token expired or nearing expiry, attempting refresh.")
+        g_logger.info("Token expired or nearing expiry, attempting refresh.")
         refreshed_token_data = refresh_token(token_data)
         if not refreshed_token_data:
-            print("Failed to refresh token. Manual intervention may be required.")
+            g_logger.error("Failed to refresh token. Manual intervention may be required.")
             # Depending on policy, could delete token file here or just return failure
             return None, None
         token_data = refreshed_token_data # Use the new token data
@@ -222,7 +225,7 @@ def get_valid_token():
     username = token_data.get('username')
 
     if not access_token or not username:
-        print("Error: Could not retrieve valid access token or username from token data.")
+        g_logger.error("Error: Could not retrieve valid access token or username from token data.")
         return None, None
 
     return access_token, username
@@ -251,7 +254,7 @@ def parse_reddit_url(url):
         subreddit = path_parts[1]
         # Basic check for valid subreddit characters
         if not re.match(r'^[a-zA-Z0-9_]+$', subreddit):
-            print(f"Warning: Invalid subreddit format found: {subreddit}")
+            g_logger.warning(f"Invalid subreddit format found: {subreddit}")
             return None, None
 
         feed_type = 'hot' # Default
@@ -265,7 +268,7 @@ def parse_reddit_url(url):
 
         return subreddit, feed_type
     except Exception as e:
-        print(f"Error parsing URL '{url}': {e}")
+        g_logger.error(f"Error parsing URL '{url}': {e}")
         return None, None
 
 
@@ -325,7 +328,7 @@ def format_reddit_entry(post_wrapper):
             entry['updated_parsed'] = published_parsed
             entry['updated'] = entry['published']
         except (ValueError, TypeError):
-            print(f"Warning: Could not parse timestamp {created_utc}")
+            g_logger.warning(f"Could not parse timestamp {created_utc}")
             entry['published_parsed'] = None
             entry['published'] = None
             entry['updated_parsed'] = None
@@ -354,7 +357,7 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     subreddit, feed_type = parse_reddit_url(feed_url)
 
     if not subreddit or not feed_type:
-        print(f"Error: Could not parse subreddit/feed type from URL: {feed_url}")
+        g_logger.error(f"Could not parse subreddit/feed type from URL: {feed_url}")
         # Return a structure indicating failure, similar to feedparser's bozo=1
         return {
             'bozo': 1,
@@ -368,7 +371,7 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     # Get token AND username
     access_token, username = get_valid_token()
     if not access_token or not username:
-        print("Error: Could not obtain valid Reddit access token and username.")
+        g_logger.error("Could not obtain valid Reddit access token and username.")
         # Return structure indicating auth failure
         return {
             'bozo': 1,
@@ -392,7 +395,7 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     }
     params = {'limit': 25} # Standard Reddit API limit
 
-    print(f"Fetching {feed_type} feed for r/{subreddit} from API: {api_url}")
+    g_logger.info(f"Fetching {feed_type} feed for r/{subreddit} from API: {api_url}")
     output = {
         'bozo': 0, # Assume success unless errors occur
         'bozo_exception': None,
@@ -417,15 +420,15 @@ def fetch_reddit_feed_as_feedparser(feed_url):
 
     except requests.exceptions.Timeout:
         msg = f"Request timed out for {api_url}"
-        print(f"Error: {msg}")
+        g_logger.error(f"Error: {msg}")
         output['bozo'] = 1
         output['bozo_exception'] = requests.exceptions.Timeout(msg)
         return output # Return partial structure with error info
     except requests.exceptions.HTTPError as e:
         msg = f"HTTP error fetching Reddit API data: {e}"
-        print(f"Error: {msg}")
+        g_logger.error(f"Error: {msg}")
         if response:  # Added check to prevent potential error
-            print(f"Response: {response.text[:500]}") # Log part of the response body
+            g_logger.error(f"Response: {response.text[:500]}") # Log part of the response body
         output['bozo'] = 1
         output['bozo_exception'] = e
         # Attempt to parse feed info even on error if possible (e.g. 404)
@@ -435,15 +438,15 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     except requests.exceptions.RequestException as e:
         # Catch other network/request related errors
         msg = f"Network error fetching Reddit API data: {e}"
-        print(f"Error: {msg}")
+        g_logger.error(f"Error: {msg}")
         output['bozo'] = 1
         output['bozo_exception'] = e
         return output # Return partial structure with error info
     except json.JSONDecodeError as e:
         msg = f"Error decoding JSON response from {api_url}: {e}"
-        print(f"Error: {msg}")
+        g_logger.error(f"Error: {msg}")
         if response:  # Add null check here
-            print(f"Response Text: {response.text[:500]}") # Log problematic text
+            g_logger.error(f"Response Text: {response.text[:500]}") # Log problematic text
         output['bozo'] = 1
         output['bozo_exception'] = e
         return output # Return partial structure with error info
@@ -480,20 +483,20 @@ def fetch_reddit_feed_as_feedparser(feed_url):
             output['entries'].append(entry)
 
     if not posts and api_data.get('kind') == 'Listing':
-        print(f"Note: No posts found for r/{subreddit}/{feed_type} (Subreddit might be empty or filtered).")
+        g_logger.info(f"Note: No posts found for r/{subreddit}/{feed_type} (Subreddit might be empty or filtered).")
         # Still a valid response, just no entries. bozo remains 0.
 
     return output
 
 # --- Main Execution Logic ---
 if __name__ == '__main__':
-    print("Attempting to ensure a valid Reddit token exists...")
+    g_logger.info("Attempting to ensure a valid Reddit token exists...")
     # This call will handle loading, prompting for initial creds, or refreshing
     token, user = get_valid_token()
 
     if token and user:
-        print(f"\nSuccessfully obtained a valid token for user: {user}.")
-        print("You can now use functions like fetch_reddit_feed_as_feedparser.")
+        g_logger.info(f"\nSuccessfully obtained a valid token for user: {user}.")
+        g_logger.info("You can now use functions like fetch_reddit_feed_as_feedparser.")
 
         # Example usage (optional):
         # test_url = "https://www.reddit.com/r/python/hot/.rss"
@@ -508,6 +511,6 @@ if __name__ == '__main__':
         #     print("Failed to fetch feed (returned None).")
 
     else:
-        print("\nFailed to obtain a valid Reddit token. Cannot proceed with API calls.")
-        print(f"Check for errors above. If it's the first run, ensure you provide correct credentials when prompted.")
-        print(f"Make sure the token file '{TOKEN_FILE}' is writable if it needs to be created/updated.")
+        g_logger.error("\nFailed to obtain a valid Reddit token. Cannot proceed with API calls.")
+        g_logger.error(f"Check for errors above. If it's the first run, ensure you provide correct credentials when prompted.")
+        g_logger.error(f"Make sure the token file '{TOKEN_FILE}' is writable if it needs to be created/updated.")

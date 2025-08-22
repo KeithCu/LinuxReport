@@ -278,9 +278,9 @@ def get_bucketed_weather_cache(lat, lon):
     now = datetime.now(TZ).timestamp()
     
     if entry and entry.get('date') == today_str and now - entry.get('timestamp', 0) < WEATHER_CACHE_TIMEOUT:
-        #print(f"[DEBUG] Cache HIT for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
+        g_logger.debug(f"Cache HIT for key {key}, city: {entry.get('data', {}).get('city_name', 'unknown')}")
         return entry['data']
-    #print(f"[DEBUG] Cache MISS for key {key}, lat={lat}, lon={lon}")
+    g_logger.debug(f"Cache MISS for key {key}, lat={lat}, lon={lon}")
     return None
 
 # Temperature conversion functions removed - now handled client-side
@@ -302,8 +302,8 @@ def _process_openweather_response(weather_data, fetch_time):
     """
     # Determine city name for logging
     city_name = weather_data.get("city", {}).get("name", "Unknown location")
-    #print(f"[DEBUG] Raw city name from API: {repr(city_name)}")
-    
+    g_logger.debug(f"Raw city name from API: {repr(city_name)}")
+
     # Fix Unicode encoding issue - the city name might be coming as bytes or with encoding issues
     if isinstance(city_name, str):
         try:
@@ -317,9 +317,9 @@ def _process_openweather_response(weather_data, fetch_time):
         except (UnicodeDecodeError, UnicodeEncodeError):
             # If all else fails, use the original
             pass
-    
-    #print(f"[DEBUG] Processed city name: {repr(city_name)}")
-    # print(f"[DEBUG] Raw API response city data: {weather_data.get('city', {})}")
+
+    g_logger.debug(f"Processed city name: {repr(city_name)}")
+    g_logger.debug(f"Raw API response city data: {weather_data.get('city', {})}")
 
     daily_data = defaultdict(list)
     for entry in weather_data.get("list", []):
@@ -423,20 +423,20 @@ def _fetch_from_openweather_api(lat, lon, fetch_time):
     rate_limit_check()
     # Always fetch in imperial (Fahrenheit) for consistent caching
     url = f"https://api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&units=imperial&appid={WEATHER_API_KEY}"
-    # print(f"[DEBUG] OpenWeather API request URL: {url}")
+    g_logger.debug(f"OpenWeather API request URL: {url}")
     start_time = datetime.now(TZ).timestamp()
     response = requests.get(url, timeout=10)
     api_time = datetime.now(TZ).timestamp() - start_time
     response.raise_for_status()
-    
+
     # Ensure proper encoding for JSON parsing
     response.encoding = 'utf-8'
     weather_data = response.json()
-    # print(f"[DEBUG] Full API response: {json.dumps(weather_data, indent=2)}")
-    
+    g_logger.debug(f"Full API response: {json.dumps(weather_data, indent=2)}")
+
     # Process the OpenWeather response
     processed_data, city_name = _process_openweather_response(weather_data, fetch_time)
-    # print(f"[DEBUG] OpenWeather API response - city: {city_name}, status: {response.status_code}")
+    g_logger.debug(f"OpenWeather API response - city: {city_name}, status: {response.status_code}")
     
     return processed_data, city_name, api_time, service_name, None, None
 
@@ -469,15 +469,15 @@ def get_weather_data(lat=None, lon=None, ip=None):
     else:
         # No coordinates provided - handle based on IP availability and settings
         if ip:
-            #print(f"[DEBUG] get_weather_data: IP provided: {ip}, DISABLE_CLIENT_GEOLOCATION={DISABLE_CLIENT_GEOLOCATION}, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
+            g_logger.debug(f"get_weather_data: IP provided: {ip}, DISABLE_CLIENT_GEOLOCATION={DISABLE_CLIENT_GEOLOCATION}, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
             if DISABLE_CLIENT_GEOLOCATION:
                 # Skip cache when client geolocation disabled
                 if DISABLE_IP_GEOLOCATION:
                     lat, lon = DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
-                    # print(f"[DEBUG] get_weather_data: Using Detroit coordinates (IP geolocation disabled)")
+                    g_logger.debug(f"get_weather_data: Using Detroit coordinates (IP geolocation disabled)")
                 else:
                     lat, lon = get_location_from_ip(ip)
-                    # print(f"[DEBUG] get_weather_data: Using IP-based location: {lat}, {lon}")
+                    g_logger.debug(f"get_weather_data: Using IP-based location: {lat}, {lon}")
             else:
                 # Try cache first, then fallback
                 lat, lon = get_cached_geolocation(ip)
@@ -584,12 +584,12 @@ def test_weather_api_with_ips():
     ]
     for ip in test_ips:
         lat, lon = get_location_from_ip(ip)
-        print(f"IP: {ip} => lat: {lat}, lon: {lon}")
+        g_logger.info(f"IP: {ip} => lat: {lat}, lon: {lon}")
         data, status = get_weather_data(ip=ip)
         fetch_time_from_data = data.get('fetch_time', 'N/A')
         if isinstance(fetch_time_from_data, float):
             fetch_time_from_data = f"{fetch_time_from_data:.2f}s"
-        print(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
+        g_logger.info(f"  Weather status: {status}, data keys: {list(data.keys()) if isinstance(data, dict) else type(data)}, fetch time: {fetch_time_from_data}")
 
 # =============================================================================
 # FLASK ROUTES INITIALIZATION
@@ -690,7 +690,7 @@ def init_weather_routes(app):
                 lat = DEFAULT_WEATHER_LAT
                 lon = DEFAULT_WEATHER_LON
                 ip = None  # Don't use IP for geolocation
-                print(f"[DEBUG] Using Detroit coordinates for bot/referrer: lat={lat}, lon={lon}")
+                g_logger.debug(f"Using Detroit coordinates for bot/referrer: lat={lat}, lon={lon}")
             else:
                 # Get coordinates from request parameters
                 lat = args['lat']
@@ -703,32 +703,32 @@ def init_weather_routes(app):
                 
                 # If no coordinates provided (geolocation failed or disabled), handle IP usage based on setting
                 if lat is None and lon is None:
-                    #print(f"[DEBUG] No coordinates provided, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
+                    g_logger.debug(f"No coordinates provided, DISABLE_IP_GEOLOCATION={DISABLE_IP_GEOLOCATION}")
                     if DISABLE_IP_GEOLOCATION:
                         # Use Detroit coordinates when IP geolocation is disabled
                         lat = DEFAULT_WEATHER_LAT
                         lon = DEFAULT_WEATHER_LON
                         ip = None  # Don't use IP for geolocation
-                        print(f"[DEBUG] Using Detroit coordinates (IP geolocation disabled): lat={lat}, lon={lon}")
-                        
+                        g_logger.debug(f"Using Detroit coordinates (IP geolocation disabled): lat={lat}, lon={lon}")
+
                         # Log warning if both client and IP geolocation are disabled
                         if DISABLE_CLIENT_GEOLOCATION:
-                            print(f"[WARNING] Both client geolocation and IP geolocation are disabled - using Detroit fallback")
+                            g_logger.warning(f"Both client geolocation and IP geolocation are disabled - using Detroit fallback")
                     else:
                         # Use IP-based location when enabled
                         # ip is already set to request.remote_addr
-                        #print(f"[DEBUG] Using IP-based location: ip={ip}")
+                        g_logger.debug(f"Using IP-based location: ip={ip}")
                         pass
                 else:
                     # Coordinates provided (geolocation successful), don't use IP
                     ip = None
-                    print(f"[DEBUG] Using provided coordinates: lat={lat}, lon={lon}")
+                    g_logger.debug(f"Using provided coordinates: lat={lat}, lon={lon}")
             
             weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=ip)
             
             # Log the result for debugging
-            # if weather_data and 'city_name' in weather_data:
-            #     print(f"[DEBUG] Weather API result: city={weather_data['city_name']}, status={status_code}")
+            if weather_data and 'city_name' in weather_data:
+                g_logger.debug(f"Weather API result: city={weather_data['city_name']}, status={status_code}")
             
             # Flask-RESTful handles JSON serialization automatically
             # Just return the data and status code
@@ -771,39 +771,39 @@ def geoip_lookup(ip):
     Returns:
         dict: Geolocation results
     """
-    print(f"Looking up IP: {ip}")
-    
+    g_logger.info(f"Looking up IP: {ip}")
+
     # Check if IP is valid
     try:
         import ipaddress
         ip_obj = ipaddress.ip_address(ip)
         ip_type = "IPv6" if isinstance(ip_obj, ipaddress.IPv6Address) else "IPv4"
-        print(f"IP type: {ip_type}")
+        g_logger.info(f"IP type: {ip_type}")
     except ValueError:
         return {"error": f"Invalid IP address: {ip}"}
-    
+
     # Perform fresh lookup directly from GeoIP database (bypass cache)
-    print("Performing fresh lookup from GeoIP database...")
-    
+    g_logger.info("Performing fresh lookup from GeoIP database...")
+
     # Test the GeoIP lookup with detailed error handling
     try:
         global _geoip_reader
         if _geoip_reader is None:
             _geoip_reader = geoip2.database.Reader(GEOIP_DB_PATH)
-        
-        print(f"GeoIP database path: {GEOIP_DB_PATH}")
-        print(f"Database exists: {os.path.exists(GEOIP_DB_PATH)}")
-        
+
+        g_logger.debug(f"GeoIP database path: {GEOIP_DB_PATH}")
+        g_logger.debug(f"Database exists: {os.path.exists(GEOIP_DB_PATH)}")
+
         response = _geoip_reader.city(ip)
         lat = response.location.latitude
         lon = response.location.longitude
-        
-        print(f"GeoIP lookup successful: {lat}, {lon}")
-        print(f"City: {response.city.name if response.city else 'Unknown'}")
-        print(f"Country: {response.country.name if response.country else 'Unknown'}")
-        
+
+        g_logger.info(f"GeoIP lookup successful: {lat}, {lon}")
+        g_logger.debug(f"City: {response.city.name if response.city else 'Unknown'}")
+        g_logger.debug(f"Country: {response.country.name if response.country else 'Unknown'}")
+
     except Exception as e:
-        print(f"GeoIP lookup failed with error: {type(e).__name__}: {e}")
+        g_logger.error(f"GeoIP lookup failed with error: {type(e).__name__}: {e}")
         return {
             "ip": ip,
             "lat": DEFAULT_WEATHER_LAT,
@@ -841,29 +841,29 @@ def test_openweather_api(lat, lon):
         lat (float): Latitude
         lon (float): Longitude
     """
-    print(f"Testing OpenWeather API with coordinates: {lat}, {lon}")
-    
+    g_logger.info(f"Testing OpenWeather API with coordinates: {lat}, {lon}")
+
     try:
         # Use the same function that the weather API uses
         weather_data, status_code = get_weather_data(lat=lat, lon=lon, ip=None)
-        
+
         if status_code == 200:
             city_name = weather_data.get('city_name', 'Unknown')
-            print(f"✅ OpenWeather API successful!")
-            print(f"City: {city_name}")
-            print(f"Status: {status_code}")
-            print(f"Data keys: {list(weather_data.keys())}")
-            
+            g_logger.info(f"✅ OpenWeather API successful!")
+            g_logger.info(f"City: {city_name}")
+            g_logger.info(f"Status: {status_code}")
+            g_logger.debug(f"Data keys: {list(weather_data.keys())}")
+
             # Show first daily forecast
             if 'daily' in weather_data and weather_data['daily']:
                 first_day = weather_data['daily'][0]
-                print(f"First day forecast: {first_day.get('weather', 'Unknown')} - {first_day.get('temp_max', 'N/A')}°F")
+                g_logger.info(f"First day forecast: {first_day.get('weather', 'Unknown')} - {first_day.get('temp_max', 'N/A')}°F")
         else:
-            print(f"❌ OpenWeather API failed with status: {status_code}")
-            print(f"Error: {weather_data}")
-            
+            g_logger.error(f"❌ OpenWeather API failed with status: {status_code}")
+            g_logger.error(f"Error: {weather_data}")
+
     except Exception as e:
-        print(f"❌ OpenWeather API test failed with error: {type(e).__name__}: {e}")
+        g_logger.error(f"❌ OpenWeather API test failed with error: {type(e).__name__}: {e}")
 
 def main():
     """Main CLI entry point."""
@@ -877,23 +877,23 @@ def main():
     
     if args.command == 'geoip':
         if not args.ip:
-            print("Error: IP address required for geoip command")
-            print("Usage: python weather.py geoip <IP_ADDRESS>")
+            g_logger.error("Error: IP address required for geoip command")
+            g_logger.info("Usage: python weather.py geoip <IP_ADDRESS>")
             sys.exit(1)
-        
+
         result = geoip_lookup(args.ip)
-        print(json.dumps(result, indent=2))
-        
+        g_logger.info(json.dumps(result, indent=2))
+
     elif args.command == 'openweather':
         if args.lat is None or args.lon is None:
-            print("Error: Both --lat and --lon required for openweather command")
-            print("Usage: python weather.py openweather --lat <LATITUDE> --lon <LONGITUDE>")
+            g_logger.error("Error: Both --lat and --lon required for openweather command")
+            g_logger.info("Usage: python weather.py openweather --lat <LATITUDE> --lon <LONGITUDE>")
             sys.exit(1)
-        
+
         test_openweather_api(args.lat, args.lon)
-        
+
     elif args.command == 'test':
-        print("Running weather API tests with test IP addresses...")
+        g_logger.info("Running weather API tests with test IP addresses...")
         test_weather_api_with_ips()
 
 # =============================================================================
