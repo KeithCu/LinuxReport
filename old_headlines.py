@@ -4,7 +4,7 @@ import datetime
 from flask import render_template, request
 from flask_login import current_user, login_required
 from flask_restful import Resource
-from shared import MODE_MAP, MODE, PATH, FAVICON, LOGO_URL, WEB_DESCRIPTION, API
+from shared import MODE_MAP, MODE, PATH, FAVICON, LOGO_URL, WEB_DESCRIPTION, API, g_logger
 from caching import get_cached_page
 
 
@@ -77,7 +77,7 @@ def init_old_headlines_routes(app):
             except FileNotFoundError:
                 pass
             except IOError as e:
-                print(f"Error reading archive file {archive_file}: {e}")
+                g_logger.warning(f"Error reading archive file {archive_file}: {e}")
 
             # Sort headlines by timestamp
             headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)

@@ -5,7 +5,7 @@ from flask_login import current_user
 from shared import (
     limiter, dynamic_rate_limit, PATH, ABOVE_HTML_FILE,
     ENABLE_URL_CUSTOMIZATION, SITE_URLS, ALL_URLS, FAVICON,
-    EXPIRE_YEARS, URLS_COOKIE_VERSION, clear_page_caches, g_c, history
+    EXPIRE_YEARS, URLS_COOKIE_VERSION, clear_page_caches, g_c, history, g_logger
 )
 from forms import ConfigForm, UrlForm, CustomRSSForm
 from caching import _file_cache
@@ -31,7 +31,7 @@ def init_config_routes(app):
                     with open(above_html_path, 'r', encoding='utf-8') as f:
                         form.headlines.data = f.read()
                 except Exception as e:
-                    print(f"Error reading headlines file: {e}")
+                    g_logger.warning(f"Error reading headlines file: {e}")
                     form.headlines.data = ""
 
             # Only add URL customization options if enabled
@@ -96,10 +96,10 @@ def init_config_routes(app):
                     above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
                     with open(above_html_path, 'w', encoding='utf-8') as f:
                         f.write(form.headlines.data)
-                    print(f"Saved headlines to {above_html_path}.")
+                    g_logger.info(f"Saved headlines to {above_html_path}.")
                     flash('Headlines saved successfully.', 'success')
                 except Exception as e:
-                    print(f"Error saving headlines file: {e}")
+                    g_logger.error(f"Error saving headlines file: {e}")
                     flash('Error saving headlines. Please try again.', 'error')
 
                 # Clear the cache for the above HTML file (in-memory and diskcache)

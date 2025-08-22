@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 from image_utils import HEADERS
 import requests
+from shared import g_logger
 
 
 def extract_underlying_url(url, selector_func):
@@ -12,13 +13,13 @@ def extract_underlying_url(url, selector_func):
 
         underlying_url = selector_func(soup)
         if (underlying_url):
-            print(f"Found underlying URL: {underlying_url}")
+            g_logger.info(f"Found underlying URL: {underlying_url}")
             return underlying_url
 
-        print("No underlying URL found, falling back to original")
+        g_logger.info("No underlying URL found, falling back to original")
         return None
     except requests.exceptions.RequestException as e:
-        print(f"Error extracting underlying URL: {e}")
+        g_logger.warning(f"Error extracting underlying URL: {e}")
         return None
 
 def citizenfreepress_selector(soup):
@@ -61,7 +62,7 @@ def reddit_custom_fetch(url, underlying_link=None, html_content=None):
     from image_parser import fetch_largest_image
     # If underlying_link is provided and is external, use it
     if underlying_link and 'reddit' not in underlying_link:
-        print(f"Reddit hack: using provided underlying link {underlying_link}")
+        g_logger.info(f"Reddit hack: using provided underlying link {underlying_link}")
         return fetch_largest_image(underlying_link)
     # If html_content is provided, find first external link
     if html_content:
@@ -69,10 +70,10 @@ def reddit_custom_fetch(url, underlying_link=None, html_content=None):
         for link in soup.find_all('a', href=True):
             href = link['href']
             if 'reddit' not in href:
-                print(f"Reddit hack: using link from html_content {href}")
+                g_logger.info(f"Reddit hack: using link from html_content {href}")
                 return fetch_largest_image(href)
     # No HTTP fetch fallback; if no external link found above, no image
-    print(f"No images found in Reddit content, not bothering to try reddit.com: {url}")  # no query to Reddit
+    g_logger.info(f"No images found in Reddit content, not bothering to try reddit.com: {url}")  # no query to Reddit
     return None
 
 # Dictionary mapping domains to their custom handlers
