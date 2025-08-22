@@ -39,7 +39,7 @@ from shared import (
 )
 from request_utils import is_web_bot
 from app_config import DEBUG, get_weather_api_key
-from app import g_logger
+from shared import g_logger
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION
@@ -542,7 +542,7 @@ def get_weather_data(lat=None, lon=None, ip=None):
         error_data = {"error": "Failed to fetch weather data from OpenWeather API", "fetch_time": fetch_time}
         return error_data, 500
     except (ValueError, KeyError, TypeError) as e:
-        print(f"Weather API error: Failed to process weather data from OpenWeather API: {e}")
+        g_logger.error(f"Weather API error: Failed to process weather data from OpenWeather API: {e}")
         error_data = {"error": "Failed to process weather data from OpenWeather API", "fetch_time": fetch_time}
         return error_data, 500
 

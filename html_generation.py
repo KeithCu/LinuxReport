@@ -9,7 +9,7 @@ This includes rendering articles with Jinja2 templates and refreshing images.
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import os
-from app import g_logger
+from shared import g_logger
 
 # =============================================================================
 # THIRD-PARTY IMPORTS

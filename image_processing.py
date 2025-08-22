@@ -9,7 +9,7 @@ functions defined in other modules.
 import sys
 import urllib.request
 import urllib.error
-from app import g_logger
+from shared import g_logger
 
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -23,7 +23,7 @@ from image_utils import (
     is_excluded,
     score_image_candidate
 )
-from app import g_logger
+from shared import g_logger
 # Import from the new candidate selector module
 from image_parser import process_candidate_images
 

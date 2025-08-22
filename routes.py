@@ -45,7 +45,7 @@ from admin_stats import update_performance_stats, get_admin_stats_html, track_ra
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
-from app import g_logger
+from shared import g_logger
 
 # =============================================================================
 # GLOBAL CONFIGURATION

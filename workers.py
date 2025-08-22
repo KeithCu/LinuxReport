@@ -48,7 +48,7 @@ from shared import (
 from Tor import fetch_via_tor
 from app_config import DEBUG, USE_TOR
 from object_storage_sync import smart_fetch, publish_bytes
-from app import g_logger
+from shared import g_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS AND CONFIGURATION

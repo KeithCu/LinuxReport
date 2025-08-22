@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 import requests
 
 # Local imports
-from app import g_logger
+from shared import g_logger
 
 # --- Configuration ---
 # Credentials are now handled via the token file or initial prompt

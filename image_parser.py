@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 import json
-from app import g_logger
+from shared import g_logger
 
 # Import from image_utils
 from image_utils import (

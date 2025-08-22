@@ -12,7 +12,6 @@ import sys
 import os
 import datetime
 import hashlib
-import logging
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -32,10 +31,10 @@ from flask_wtf.csrf import CSRFProtect
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from shared import (
-    EXPIRE_WEEK, FLASK_DASHBOARD, 
-    FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD, 
+    EXPIRE_WEEK, FLASK_DASHBOARD,
+    FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD,
     limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS,
-    set_flask_restful_api
+    set_flask_restful_api, g_logger
 )
 from app_config import DEBUG, get_secret_key
 from models import User
@@ -50,51 +49,7 @@ JS_MODULES = [
     'config.js',
 ]
 
-# Mechanism to invalidate old URL cookies if feeds change
-
-URLS_COOKIE_VERSION = "2"
-
-# =============================================================================
-# LOGGING CONFIGURATION
-# =============================================================================
-
-# Logging configuration
-# LOG_LEVEL options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-# - DEBUG: Most verbose - shows everything including full AI responses, article lists, etc.
-# - INFO: Default level - shows main process steps, counts, success/failure messages
-# - WARNING: Shows warnings and errors only
-# - ERROR: Shows only errors
-# - CRITICAL: Shows only critical errors
-# Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
-LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
-LOG_FILE = "app.log"  # Single log file that gets appended to
-
-def setup_logging():
-    """Configure logging for the application."""
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL),
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-
-    # Suppress HTTP client debug messages
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
-
-    # Create logger instance
-    logger = logging.getLogger(__name__)
-
-    # Log startup information
-    logger.info(f"Starting Flask application with LOG_LEVEL={LOG_LEVEL}")
-    logger.info(f"Log file: {LOG_FILE}")
-
-    return logger
-
+# URLS_COOKIE_VERSION is now imported from shared.py
 
 # =============================================================================
 # CUSTOM FILTERS AND UTILITIES
@@ -179,8 +134,7 @@ def create_app():
 g_app = create_app()
 application = g_app  # WSGI entry point
 
-# Set up logging
-g_logger = setup_logging()
+# Logging is now handled in shared.py and imported
 
 # =============================================================================
 # FLASK EXTENSIONS INITIALIZATION

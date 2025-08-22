@@ -30,7 +30,7 @@ from fake_useragent import UserAgent
 import shared
 from shared import g_cs
 from seleniumfetch import fetch_site_posts
-from app import g_logger
+from shared import g_logger
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION

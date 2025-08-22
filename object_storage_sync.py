@@ -18,7 +18,7 @@ from functools import wraps
 import json
 import datetime
 import mimetypes
-from app import g_logger
+from shared import g_logger
 
 import unittest
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type

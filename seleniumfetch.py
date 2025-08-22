@@ -36,7 +36,7 @@ from webdriver_manager.core.os_manager import ChromeType
 # LOCAL IMPORTS
 # =============================================================================
 from shared import g_cs, CUSTOM_FETCH_CONFIG
-from app import g_logger
+from shared import g_logger
 
 # =============================================================================
 # FEATURE FLAGS

@@ -1,7 +1,7 @@
 import os
 import os.path
 import hashlib
-from app import g_logger
+from shared import g_logger
 
 from app_config import get_storage_config, config_manager
 

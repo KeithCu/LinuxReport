@@ -11,7 +11,7 @@ from io import BytesIO
 from PIL import Image
 import xml.etree.ElementTree as ET
 from urllib.parse import urlparse
-from app import g_logger
+from shared import g_logger
 
 # === Constants and Configuration ===
 DEBUG_LOGGING = True

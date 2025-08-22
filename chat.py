@@ -14,7 +14,7 @@ import uuid
 import html
 import datetime
 import time
-from app import g_logger
+from shared import g_logger
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
