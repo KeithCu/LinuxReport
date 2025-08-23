@@ -73,6 +73,7 @@ import pickle
 # Import from config module
 import object_storage_config as oss_config
 import object_storage_sync
+from shared import g_logger
 from object_storage_sync import (
     publish_file, 
     fetch_file,
@@ -167,7 +168,7 @@ class ObjectStorageLock(LockBase):
                 return False
             elapsed = time.monotonic() - start_time
             if elapsed > timeout_seconds:
-                print(f"Timeout acquiring lock {self.lock_key} for owner {self.owner_id} after {elapsed:.2f}s")
+                g_logger.warning(f"Timeout acquiring lock {self.lock_key} for owner {self.owner_id} after {elapsed:.2f}s")
                 return False
             # Exponential backoff using global constants
             delay = min(MAX_RETRY_INTERVAL, self.retry_interval * (2 ** attempt))
@@ -217,7 +218,7 @@ class ObjectStorageLock(LockBase):
             return False
             
         except Exception as e:
-            print(f"Error acquiring lock {self.lock_key}: {e}")
+            g_logger.error(f"Error acquiring lock {self.lock_key}: {e}")
             return False
             
     def _get_lock_info(self):
@@ -228,7 +229,7 @@ class ObjectStorageLock(LockBase):
                 return pickle.loads(content)
             return None
         except Exception as e:
-            print(f"Error getting lock info for {self.lock_key}: {e}")
+            g_logger.error(f"Error getting lock info for {self.lock_key}: {e}")
             return None
 
     @retry(
@@ -244,7 +245,7 @@ class ObjectStorageLock(LockBase):
             publish_bytes(content, self.lock_object_name)
             return True
         except Exception as e:
-            print(f"Error putting lock info for {self.lock_key}: {e}")
+            g_logger.error(f"Error putting lock info for {self.lock_key}: {e}")
             return False
     
     def release(self) -> bool:
@@ -273,7 +274,7 @@ class ObjectStorageLock(LockBase):
                 oss_config._storage_container.delete_object(obj)
                 success = True
         except Exception as e:
-            print(f"Error releasing lock {self.lock_key}: {e}")
+            g_logger.error(f"Error releasing lock {self.lock_key}: {e}")
             success = False
             
         self._thread_local.lock_count = 0
@@ -311,7 +312,7 @@ class ObjectStorageLock(LockBase):
                 return True
             return False
         except Exception as e:
-            print(f"Error renewing lock {self.lock_key}: {e}")
+            g_logger.error(f"Error renewing lock {self.lock_key}: {e}")
             return False
         
     def __enter__(self):
@@ -467,7 +468,7 @@ if __name__ == '__main__':
                         lock_instance.release()
                     event.set()  # Signal that this thread has finished
                 except Exception as e:
-                    print(f"Thread error: {e}")
+                    g_logger.error(f"Thread error: {e}")
                     event.set()
             
             # Mock the storage to force a delay or inconsistency for simulation

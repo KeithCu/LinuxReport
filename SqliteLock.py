@@ -25,7 +25,7 @@ from filelock import Timeout  # Note: filelock.Timeout is the exception class
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-# (No local imports in this file)
+from shared import g_logger
 
 # =============================================================================
 # ABSTRACT BASE CLASS FOR LOCKS
@@ -141,9 +141,9 @@ class DiskcacheSqliteLock(LockBase):
 
                 return False # Lost the race
         except (diskcache.Timeout, Timeout) as e:
-            print(f"Timeout error while acquiring lock '{self.lock_key}': {e}")
+            g_logger.warning(f"Timeout error while acquiring lock '{self.lock_key}': {e}")
         except Exception as e:
-            print(f"Unexpected error acquiring lock '{self.lock_key}': {e}")
+            g_logger.error(f"Unexpected error acquiring lock '{self.lock_key}': {e}")
         
         self._locked = False
         return False
@@ -169,7 +169,7 @@ class DiskcacheSqliteLock(LockBase):
                     return True
             return False # Lock was not ours
         except Exception as e:
-            print(f"Error releasing lock '{self.lock_key}': {e}")
+            g_logger.error(f"Error releasing lock '{self.lock_key}': {e}")
             return False
 
     def __enter__(self):
