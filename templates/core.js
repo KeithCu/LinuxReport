@@ -123,6 +123,11 @@
             
             if (this.prevBtn) this.prevBtn.disabled = isFirstPage;
             if (this.nextBtn) this.nextBtn.disabled = isLastPage;
+
+            // Announce page change to screen readers
+            if (app.modules.AccessibilityManager) {
+                app.modules.AccessibilityManager.announcePageChange(this.currentPage + 1, this.totalPages);
+            }
         }
     }
 

@@ -1,18 +1,18 @@
-<div class="box" id="feed-{{ feed_id }}">
+<div class="box" id="feed-{{ feed_id }}" role="feed" aria-label="News Feed from {{ feed_id }}">
 <center><a target="_blank" href="{{ link }}"><img loading="lazy" src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height:100px;"/></a></center>
   <center>
-    <small>Last updated: <span class="last-updated-time" data-utc-time="{{ last_fetch }}"></span></small>
+    <small>Last updated: <span class="last-updated-time" data-utc-time="{{ last_fetch }}" aria-live="polite"></span></small>
     <!-- Time is automatically converted from server timezone to your browser's local timezone -->
   </center>
-  <div class="pagination-controls" data-feed-id="feed-{{ feed_id }}">
-    <button class="prev-btn" disabled>&lt;</button>
-    <button class="next-btn">&gt;</button>
+  <div class="pagination-controls" data-feed-id="feed-{{ feed_id }}" role="navigation" aria-label="Article pagination">
+    <button class="prev-btn" disabled aria-label="Previous page">&lt;</button>
+    <button class="next-btn" aria-label="Next page">&gt;</button>
   </div>  
   {%- for e in entries %}
-  <div class="linkclass" data-index="{{ e.published_parsed | timestamp_to_int if e.published_parsed else loop.index0 }}" data-published="{{ e.published if e.published else '' }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
+  <article class="linkclass" data-index="{{ e.published_parsed | timestamp_to_int if e.published_parsed else loop.index0 }}" data-published="{{ e.published if e.published else '' }}" style="{% if loop.index > 8 %} display: none; {% endif %}" role="article" aria-labelledby="article-title-{{ loop.index }}">
     {% if e.link in top_images %}
     <div class="image-container">
-      <a target="_blank" href="{{ e.link }}">
+      <a target="_blank" href="{{ e.link }}" aria-label="View full article with image">
 <div style="display: flex; justify-content: center; align-items: center; margin: 8px 0;">
   <img loading="lazy" src="{{ top_images[e.link] }}" alt="{{ e.title | striptags }}" style="display: block; margin: 0 auto;" />
 </div>
@@ -22,11 +22,16 @@
     <div class="title-container">
       {%- set tooltip = (e.html_content or e.summary)|striptags|truncate(500)|trim %}
       <a target="_blank" href="{{ e.link }}"
-         title="{{ tooltip if tooltip.split()|length >= 3 else '' }}">
+         title="{{ tooltip if tooltip.split()|length >= 3 else '' }}"
+         id="article-title-{{ loop.index }}"
+         aria-describedby="article-summary-{{ loop.index }}">
         {{ e.title | striptags }}
       </a>
+      {% if tooltip and tooltip.split()|length >= 3 %}
+      <div id="article-summary-{{ loop.index }}" class="sr-only">{{ tooltip }}</div>
+      {% endif %}
     </div>
-  </div>
+  </article>
   {%- endfor %}
 </div>
 <br />
