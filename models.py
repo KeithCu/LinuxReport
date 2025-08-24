@@ -34,7 +34,10 @@ import diskcache
 # - CRITICAL: Shows only critical errors
 # Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
 LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
-LOG_FILE = "app.log"  # Single log file that gets appended to
+
+# Get the directory where this script is located and use it for the log file
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE = os.path.join(SCRIPT_DIR, "app.log")  # Log file in the same directory as this script
 
 def setup_logging():
     """Configure logging for the application."""
