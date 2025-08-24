@@ -25,7 +25,7 @@ from filelock import Timeout  # Note: filelock.Timeout is the exception class
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from shared import g_logger
+from models import g_logger
 
 # =============================================================================
 # ABSTRACT BASE CLASS FOR LOCKS

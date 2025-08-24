@@ -24,7 +24,6 @@ License: See LICENSE file
 
 # Standard library imports
 import datetime
-import logging
 import os
 import sys
 from enum import Enum
@@ -281,45 +280,8 @@ def set_flask_restful_api(api_instance):
 # LOGGING CONFIGURATION
 # =============================================================================
 
-# Logging configuration
-# LOG_LEVEL options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-# - DEBUG: Most verbose - shows everything including full AI responses, article lists, etc.
-# - INFO: Default level - shows main process steps, counts, success/failure messages
-# - WARNING: Shows warnings and errors only
-# - ERROR: Shows only errors
-# - CRITICAL: Shows only critical errors
-# Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
-LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
-LOG_FILE = "app.log"  # Single log file that gets appended to
-
-def setup_logging():
-    """Configure logging for the application."""
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL),
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-
-    # Suppress HTTP client debug messages
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
-
-    # Create logger instance
-    logger = logging.getLogger(__name__)
-
-    # Log startup information
-    logger.info(f"Starting Flask application with LOG_LEVEL={LOG_LEVEL}")
-    logger.info(f"Log file: {LOG_FILE}")
-
-    return logger
-
-# Create the global logger instance
-g_logger = setup_logging()
+# Import the global logger from models.py
+from models import g_logger
 
 # =============================================================================
 # GLOBAL CACHE INSTANCES
