@@ -2,6 +2,17 @@
 """
 deploy.py - Python version of deploy.sh
 Performs the same operations: chown, restart Apache, wake up sites
+
+NEW FEATURES:
+- Deploy specific files from LinuxReport2 to all other directories
+- Automatically add deployed files to git in all directories
+- Handle git conflicts by providing a clean deployment workflow
+
+USAGE EXAMPLES:
+  python deploy.py                                    # Full deployment
+  python deploy.py --warmup-only                      # Just warm up sites
+  python deploy.py --files Tor.py config.yaml         # Deploy specific files only (no warmup)
+  python deploy.py --files shared.py app.py           # Deploy multiple files only (no warmup)
 """
 
 import os
@@ -11,6 +22,7 @@ import sys
 import urllib.request
 import urllib.error
 import argparse
+import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
@@ -179,14 +191,131 @@ def wake_up_all_sites_concurrent():
     # Second round
     second_success_count, second_duration = wake_up_sites_round("Second round - waking up all sites again", 4)
 
+def copy_files_to_directories(files, target_dirs):
+    """Copy specified files from LinuxReport2 to other directories"""
+    print(f"📋 Copying {len(files)} file(s) to {len(target_dirs)} directories...")
+
+    linux_report_dir = None
+    for dir_name in URLS.keys():
+        if "LinuxReport2" in dir_name:
+            linux_report_dir = dir_name
+            break
+
+    if not linux_report_dir:
+        print("❌ Could not find LinuxReport2 directory in URLS")
+        return False
+
+    if not os.path.exists(linux_report_dir):
+        print(f"❌ Source directory {linux_report_dir} does not exist")
+        return False
+
+    success_count = 0
+    for target_dir in target_dirs:
+        if target_dir == linux_report_dir:
+            continue  # Skip copying to itself
+
+        if not os.path.exists(target_dir):
+            print(f"⚠️  Target directory {target_dir} does not exist, skipping")
+            continue
+
+        print(f"  📂 Copying to {target_dir}...")
+
+        for file_path in files:
+            source_file = os.path.join(linux_report_dir, file_path)
+            target_file = os.path.join(target_dir, file_path)
+
+            if not os.path.exists(source_file):
+                print(f"    ❌ Source file {source_file} does not exist")
+                continue
+
+            try:
+                # Create target directory if it doesn't exist
+                os.makedirs(os.path.dirname(target_file), exist_ok=True)
+
+                # Copy the file
+                shutil.copy2(source_file, target_file)
+                print(f"    ✅ {file_path} -> {target_dir}")
+                success_count += 1
+
+            except Exception as e:
+                print(f"    ❌ Error copying {file_path} to {target_dir}: {e}")
+
+    print(f"📋 File copying complete! {success_count} files copied successfully")
+    return success_count > 0
+
+def add_files_to_git(files, directories):
+    """Add specified files to git in the given directories"""
+    print(f"🔧 Adding {len(files)} file(s) to git in {len(directories)} directories...")
+
+    success_count = 0
+    for directory in directories:
+        if not os.path.exists(directory):
+            print(f"⚠️  Directory {directory} does not exist, skipping")
+            continue
+
+        print(f"  📂 Adding files to git in {directory}...")
+
+        try:
+            # Change to the target directory
+            original_dir = os.getcwd()
+            os.chdir(directory)
+
+            # Add files to git
+            for file_path in files:
+                if os.path.exists(file_path):
+                    result = run_command(f"git add {file_path}", check=False)
+                    if result is not None:
+                        print(f"    ✅ Added {file_path} to git")
+                        success_count += 1
+                    else:
+                        print(f"    ❌ Failed to add {file_path} to git")
+                else:
+                    print(f"    ⚠️  File {file_path} does not exist in {directory}")
+
+            # Go back to original directory
+            os.chdir(original_dir)
+
+        except Exception as e:
+            print(f"    ❌ Error in {directory}: {e}")
+
+    print(f"🔧 Git add complete! {success_count} files added to git successfully")
+    return success_count > 0
+
+def deploy_files_to_all_directories(files):
+    """Deploy files from LinuxReport2 to all other directories and add to git"""
+    print(f"🚀 Deploying {len(files)} file(s) to all directories...")
+
+    # Get all target directories except LinuxReport2
+    linux_report_dir = None
+    target_dirs = []
+
+    for dir_name in URLS.keys():
+        if "LinuxReport2" in dir_name:
+            linux_report_dir = dir_name
+        else:
+            target_dirs.append(dir_name)
+
+    if not linux_report_dir:
+        print("❌ Could not find LinuxReport2 directory in URLS")
+        return False
+
+    # Step 1: Copy files to all directories
+    copy_success = copy_files_to_directories(files, target_dirs)
+
+    # Step 2: Add files to git in all directories (including source)
+    all_dirs = [linux_report_dir] + target_dirs
+    git_success = add_files_to_git(files, all_dirs)
+
+    return copy_success and git_success
+
 def warm_up_sites_only():
     """Just warm up all sites without chown or restart"""
     print("🔥 Warming up all sites only...")
     print("=" * 100)
-    
+
     # Single round of warm-up
     success_count, duration = wake_up_sites_round("Warming up all sites", 1)
-    
+
     print(f"🔥 Warm-up complete! {success_count}/{len(URLS)} sites warmed up in {duration:.2f} seconds")
 
 def main():
@@ -195,8 +324,10 @@ def main():
     # =============================================================================
     
     parser = argparse.ArgumentParser(description='Deploy and warm up sites')
-    parser.add_argument('--warmup-only', action='store_true', 
+    parser.add_argument('--warmup-only', action='store_true',
                        help='Only warm up sites without chown or restart')
+    parser.add_argument('--files', nargs='+',
+                       help='Deploy specific files from LinuxReport2 to all other directories and add to git')
     
     args = parser.parse_args()
     
@@ -204,29 +335,34 @@ def main():
     # MAIN EXECUTION
     # =============================================================================
     
-    if args.warmup_only:
+    if args.files:
+        # Deploy specific files only (no warmup)
+        deploy_files_to_all_directories(args.files)
+        print("🚀 File deployment complete!")
+
+    elif args.warmup_only:
         # Just warm up sites
         warm_up_sites_only()
     else:
         # Full deployment
         overall_start = time.time()
-        
+
         # Step 1: Change ownership for all directories
         print("Step 1: Changing ownership for all directories...")
         for dir_name in URLS.keys():
             chown_directory(dir_name)
-        
+
         # Step 2: Restart web server
         print("Step 2: Restarting web server...")
         run_command(f"sudo systemctl restart {WEB_SERVER_SERVICE}")
         time.sleep(0.25)
-        
+
         # Step 3: Wake up all sites concurrently
         wake_up_all_sites_concurrent()
-        
+
         overall_end = time.time()
         total_duration = overall_end - overall_start
-        
+
         print(f"🚀 Deployment complete! Total time: {total_duration:.2f} seconds")
 
 if __name__ == "__main__":
