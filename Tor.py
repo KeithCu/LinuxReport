@@ -27,16 +27,14 @@ from fake_useragent import UserAgent
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-import shared
-from shared import g_cs
+
+from shared import g_cs, g_logger
 from seleniumfetch import fetch_site_posts
-from shared import g_logger
+from app_config import get_tor_password
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION
 # =============================================================================
-
-PASSWORD = "TESTPASSWORD"
 
 # =============================================================================
 # GLOBAL VARIABLES AND INITIALIZATION
@@ -159,7 +157,7 @@ def renew_tor_ip():
     # Create socket and connect to Tor control port
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect((host, port))
-        s.send(f'AUTHENTICATE "{PASSWORD}"\r\n'.encode())
+        s.send(f'AUTHENTICATE "{get_tor_password()}"\r\n'.encode())
 
         response = s.recv(1024).decode()
         if "250 OK" not in response:

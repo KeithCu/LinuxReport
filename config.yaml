@@ -20,6 +20,10 @@ storage:
   shared_path: "/run/linuxreport"  # Path for shared data like weather, etc.
 
 
+# Tor network settings
+tor:
+  password: "TESTPASSWORD"  # Password for Tor control port authentication
+
 # Report modes configuration
 # Add any additional report modes here beyond the base modes
 reports:
