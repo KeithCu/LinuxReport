@@ -36,19 +36,17 @@ import feedparser
 from fake_useragent import UserAgent
 
 # Local application imports
-import shared
 from feedfilter import merge_entries
 from seleniumfetch import fetch_site_posts
 from shared import (
     ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
     USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,
     ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_TIMEOUT,
-    ENABLE_OBJECT_STORE_FEED_PUBLISH
+    ENABLE_OBJECT_STORE_FEED_PUBLISH, g_logger
 )
 from Tor import fetch_via_tor
 from app_config import DEBUG, USE_TOR
 from object_storage_sync import smart_fetch, publish_bytes
-from shared import g_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS AND CONFIGURATION
