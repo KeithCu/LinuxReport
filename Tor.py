@@ -9,6 +9,7 @@ managing Tor circuit renewal for IP rotation.
 # =============================================================================
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
+import traceback
 import io
 import random
 import socket
@@ -60,14 +61,17 @@ tor_fetch_lock = threading.Lock()
 def fetch_via_curl(url):
     """
     Fetch Reddit RSS feeds using curl subprocess through Tor SOCKS proxy.
-    
+
     Args:
         url (str): The URL to fetch via Tor network
-        
+
     Returns:
         feedparser.FeedParserDict or None: Parsed RSS feed data or None if failed
     """
+    g_logger.info(f"=== FETCH_VIA_CURL START ===")
+    g_logger.info(f"Function called with URL: {url}")
     g_logger.info(f"Using curl TOR method for: {url}")
+
     result = None
 
     try:
@@ -177,19 +181,34 @@ def renew_tor_ip():
 def fetch_via_tor(url, site_url):
     """
     Fetch content via Tor network with automatic fallback and retry logic.
-    
+
     This function attempts to fetch content using the last successful method first,
     then falls back to alternative methods. If all attempts fail, it renews the
     Tor IP address and retries. Supports both curl and selenium methods.
-    
+
     Args:
         url (str): The RSS feed URL to fetch
         site_url (str): The site URL for selenium-based fetching
-        
+
     Returns:
         dict: Parsed feed data with entries, or empty result dict if all methods fail
     """
-    last_success_method = g_cs.get("REDDIT_LAST_METHOD")
+    g_logger.info(f"=== FETCH_VIA_TOR START ===")
+    g_logger.info(f"Function called with URL: {url}, site_url: {site_url}")
+
+    try:
+        last_success_method = g_cs.get("REDDIT_LAST_METHOD")
+        g_logger.info(f"Successfully got REDDIT_LAST_METHOD: {last_success_method}")
+    except Exception as e:
+        g_logger.error(f"CRITICAL ERROR: Failed to access g_cs.get(): {e}")
+        g_logger.error(f"Exception type: {type(e).__name__}")
+        g_logger.error(f"Full traceback: {traceback.format_exc()}")
+        g_logger.error("This is likely the source of the 'shared' error!")
+        return {
+            'entries': [],
+            'status': 'failed',
+            'bozo_exception': f'g_cs access failed: {str(e)}'
+        }
 
     with tor_fetch_lock:
         max_attempts = 3  # Define how many attempts we try
