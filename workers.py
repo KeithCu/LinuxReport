@@ -39,10 +39,10 @@ from fake_useragent import UserAgent
 from feedfilter import merge_entries
 from seleniumfetch import fetch_site_posts
 from shared import (
-    ALL_URLS, EXPIRE_WEEK, MAX_ITEMS, TZ,
+    ALL_URLS, EXPIRE_WEEK, EXPIRE_YEARS, MAX_ITEMS, TZ,
     USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,
     ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_TIMEOUT,
-    ENABLE_OBJECT_STORE_FEED_PUBLISH, g_logger
+    ENABLE_OBJECT_STORE_FEED_PUBLISH, g_logger, history
 )
 from Tor import fetch_via_tor
 from app_config import DEBUG, USE_TOR
@@ -57,7 +57,7 @@ ua = UserAgent()
 
 # Reddit user agent configuration - Reddit is sensitive to user agents
 if not g_cs.has("REDDIT_USER_AGENT"):
-    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=shared.EXPIRE_YEARS)
+    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=EXPIRE_YEARS)
 
 USER_AGENT_RANDOM = g_cs.get("REDDIT_USER_AGENT")
 
@@ -261,7 +261,7 @@ def load_url_worker(url):
             entries = new_entries
 
         entries = list(itertools.islice(entries, MAX_ITEMS))
-        shared.history.update_fetch(url, new_count)
+        history.update_fetch(url, new_count)
 
         top_articles = []
         if old_feed and old_feed.entries:
@@ -347,7 +347,7 @@ def get_domain(url):
 def process_domain_urls(urls):
     """
     Process URLs from the same domain sequentially to avoid overwhelming servers.
-    
+
     Args:
         urls (list): List of URLs from the same domain to process
     """
@@ -355,7 +355,11 @@ def process_domain_urls(urls):
         try:
             load_url_worker(url)
         except Exception as exc:  # noqa: E722
-            g_logger.error(f'{url} generated an exception: {exc}')
+            g_logger.error(f'CRITICAL ERROR processing {url}: {exc}')
+            g_logger.error(f'Exception type: {type(exc).__name__}')
+            g_logger.error(f'Exception args: {exc.args}')
+            import traceback
+            g_logger.error(f'Full traceback: {traceback.format_exc()}')
 
 def process_urls_in_parallel(urls, description="processing"):
     """
@@ -391,7 +395,12 @@ def process_urls_in_parallel(urls, description="processing"):
             try:
                 future.result()  # Ensure exceptions in workers are raised
             except Exception as exc:  # noqa: E722
-                g_logger.error(f'Domain processing generated an exception during {description}: {exc}')
+                g_logger.error(f'CRITICAL ERROR in domain processing during {description}: {exc}')
+                g_logger.error(f'Exception type: {type(exc).__name__}')
+                g_logger.error(f'Exception args: {exc.args}')
+                import traceback
+                g_logger.error(f'Full traceback: {traceback.format_exc()}')
+                g_logger.error(f'This error occurred during parallel processing of URLs')
 
 # =============================================================================
 # MAIN FETCH OPERATIONS
