@@ -28,7 +28,7 @@ from fake_useragent import UserAgent
 # LOCAL IMPORTS
 # =============================================================================
 
-from shared import g_cs, g_logger
+from shared import g_cs, g_logger, EXPIRE_YEARS
 from seleniumfetch import fetch_site_posts
 from app_config import get_tor_password
 
@@ -44,11 +44,11 @@ ua = UserAgent()
 
 # Initialize Reddit user agent if not already set
 if not g_cs.has("REDDIT_USER_AGENT"):
-    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=shared.EXPIRE_YEARS)
+    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=EXPIRE_YEARS)
 
 # Initialize Reddit method preference if not already set
 if not g_cs.has("REDDIT_METHOD"):
-    g_cs.put("REDDIT_METHOD", "curl", timeout=shared.EXPIRE_YEARS)
+    g_cs.put("REDDIT_METHOD", "curl", timeout=EXPIRE_YEARS)
 
 # Thread lock for Tor fetch operations
 tor_fetch_lock = threading.Lock()
@@ -147,7 +147,7 @@ def renew_tor_ip():
     anonymity. Waits 20-30 seconds for the new circuit to be established.
     """
     # Generate new user agent
-    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=shared.EXPIRE_YEARS)
+    g_cs.put("REDDIT_USER_AGENT", ua.random, timeout=EXPIRE_YEARS)
 
     g_logger.info("Requesting a new TOR IP address...")
 
@@ -206,7 +206,7 @@ def fetch_via_tor(url, site_url):
                 result_default = fetch_site_posts(site_url, None)
                 
             if result_default is not None and len(result_default.get("entries", [])) > 0:
-                g_cs.put("REDDIT_METHOD", default_method, shared.EXPIRE_YEARS)
+                g_cs.put("REDDIT_METHOD", default_method, EXPIRE_YEARS)
                 result = result_default
                 break
             
@@ -218,7 +218,7 @@ def fetch_via_tor(url, site_url):
                 result_alternative = fetch_site_posts(site_url, None)
                 
             if result_alternative is not None and len(result_alternative.get("entries", [])) > 0:
-                g_cs.put("REDDIT_METHOD", alternative_method, shared.EXPIRE_YEARS)
+                g_cs.put("REDDIT_METHOD", alternative_method, EXPIRE_YEARS)
                 result = result_alternative
                 break
             
