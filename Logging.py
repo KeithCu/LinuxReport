@@ -30,25 +30,26 @@ LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(SCRIPT_DIR, "linuxreport.log")  # Log file in the same directory as this script
 
-def _rotate_log_file():
+def _rotate_log_file(log_file=None):
     """
     Rotate the log file to keep only the last 1MB of content.
     Ensures truncation happens at line boundaries to maintain log integrity.
     Works on both Linux (LF) and Windows (CRLF) systems.
     """
     max_size_bytes = 1024 * 1024  # 1MB
+    target_file = log_file or LOG_FILE
 
     try:
-        if not os.path.exists(LOG_FILE):
+        if not os.path.exists(target_file):
             return  # File doesn't exist yet, nothing to rotate
 
         # Check file size
-        file_size = os.path.getsize(LOG_FILE)
+        file_size = os.path.getsize(target_file)
         if file_size <= max_size_bytes:
             return  # File is small enough, no rotation needed
 
         # Read the file from the end to find where to truncate
-        with open(LOG_FILE, 'rb') as f:
+        with open(target_file, 'rb') as f:
             # Move to 1MB from the end
             f.seek(-max_size_bytes, 2)
 
@@ -77,7 +78,7 @@ def _rotate_log_file():
             content_to_keep = remaining_content
 
         # Write the truncated content back to the file
-        with open(LOG_FILE, 'wb') as f:
+        with open(target_file, 'wb') as f:
             f.write(content_to_keep)
 
         print(f"Log file rotated: kept last {len(content_to_keep)} bytes")
@@ -86,17 +87,17 @@ def _rotate_log_file():
         # Don't fail the application if log rotation fails
         print(f"Warning: Failed to rotate log file: {e}")
 
-def _setup_logging():
+def _setup_logging(log_file=None, log_level=None):
     """Configure logging for the application."""
     # Rotate log file if it's too large
-    _rotate_log_file()
+    _rotate_log_file(log_file)
 
     # Configure logging
     logging.basicConfig(
-        level=getattr(logging, LOG_LEVEL),
+        level=getattr(logging, log_level or LOG_LEVEL),
         format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[
-            logging.FileHandler(LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
+            logging.FileHandler(log_file or LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
             logging.StreamHandler(sys.stdout)
         ]
     )
@@ -110,8 +111,8 @@ def _setup_logging():
     logger = logging.getLogger(__name__)
 
     # Log startup information
-    logger.info(f"Starting Flask application with LOG_LEVEL={LOG_LEVEL}")
-    logger.info(f"Log file: {LOG_FILE}")
+    logger.info(f"Starting Flask application with LOG_LEVEL={log_level or LOG_LEVEL}")
+    logger.info(f"Log file: {log_file or LOG_FILE}")
 
     return logger
 

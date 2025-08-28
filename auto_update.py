@@ -33,6 +33,7 @@ from html_generation import (
 
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 from ModelManager import ModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
+from Logging import _setup_logging
 
 from enum import Enum  # Ensure this is included if not already
 
@@ -51,26 +52,8 @@ from enum import Enum  # Ensure this is included if not already
 LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
 LOG_FILE = "auto_update.log"  # Single log file that gets appended to
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL),
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-
-# Suppress HTTP client debug messages
-logging.getLogger("httpcore").setLevel(logging.WARNING)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("openai").setLevel(logging.WARNING)
-
-logger = logging.getLogger(__name__)
-
-# Log startup information
-logger.info(f"Starting auto_update.py with LOG_LEVEL={LOG_LEVEL}")
-logger.info(f"Log file: {LOG_FILE}")
+# Set up custom logging for auto_update
+logger = _setup_logging(LOG_FILE, LOG_LEVEL)
 
 # =============================================================================
 # ENUMERATIONS AND CONSTANTS
@@ -78,7 +61,6 @@ logger.info(f"Log file: {LOG_FILE}")
 
 class PromptMode(Enum):
     O3 = 'o3'
-    THIRTY_B = '30b'  # Represents '30b' prompt
 
 # =============================================================================
 # CORE CONFIGURATION CONSTANTS
@@ -125,20 +107,6 @@ USE_RANDOM_MODELS = True  # Set to True to always try random models, False to us
 # =============================================================================
 # PROMPT TEMPLATES
 # =============================================================================
-
-# This is commented out because it causes many models to generate far too many tokens and fail.
-# PROMPT_30B = f""" Prompt:
-# Given this list of news headlines, follow these steps:
-# Identify headlines relevant to {{mode_instructions}}. Exclude irrelevant ones.
-# Think carefully and consisely about relevance, interest, and topic distinction.
-# From relevant headlines, pick the top 3 most interesting, each covering a completely distinct topic. Ensure they have no similarity in topics.
-# After reasoning, output {TITLE_MARKER} followed by the top 3 headlines in this format, with no extra text but title:
-
-# {TITLE_MARKER}
-# Best headline
-# Second Best headline
-# Third Best headline
-# """
 
 # O3-suggested alternate prompt for reasoning models
 PROMPT_O3_SYSTEM = f"""
