@@ -832,9 +832,10 @@ def fetch_site_posts(url, user_agent):
     status = 200
 
     if config.get("needs_selenium", True):
-        if "reddit" in base_domain:
+        if config.get("use_random_user_agent", False):
+            # Use random user agent to avoid detection (reuse existing REDDIT_USER_AGENT)
             user_agent = g_cs.get("REDDIT_USER_AGENT")
-        
+
         # Acquire the fetch lock before starting the fetch operation
         lock_acquired = False
         try:
@@ -905,8 +906,16 @@ def fetch_site_posts(url, user_agent):
                 SharedSeleniumDriver.release_fetch_lock()
     else:
         g_logger.info(f"Fetching {base_domain} using requests (no Selenium)")
+
+        # Handle user agent for requests
+        request_headers = {}
+        if config.get("use_random_user_agent", False):
+            request_headers['User-Agent'] = g_cs.get("REDDIT_USER_AGENT")
+        else:
+            request_headers['User-Agent'] = user_agent
+
         try:
-            response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT)
+            response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT, headers=request_headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             posts = soup.select(config["post_container"])

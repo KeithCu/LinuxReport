@@ -6,7 +6,7 @@ from app_config import REDDIT_FETCH_CONFIG
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
 		"https://www.reddit.com/r/LocalLlama/.rss": RssInfo("LocalLlama.webp", "Machine Learning sub", "https://www.reddit.com/r/LocalLlama/"),
-		"https://venturebeat.com/category/ai/feed/": RssInfo("VentureBeat_logo.webp", "VentureBeat AI", "https://venturebeat.com/category/ai/"),
+		"https://venturebeat.com/category/ai/fakefeed": RssInfo("VentureBeat_logo.webp", "VentureBeat AI", "https://venturebeat.com/category/ai/"),
 		"https://www.theregister.com/software/ai_ml/headlines.atom": RssInfo("RegisterLogo.webp", "The Register AI News", "https://www.theregister.com/software/ai_ml/"),
         "https://news.smol.ai/rss.xml": RssInfo("smol.webp", "Smol.ai News", "https://news.smol.ai/"),
 		"https://hnrss.org/newest?tags=ai": RssInfo("hackernews.webp", "YCombinator", "https://news.ycombinator.com/"),
@@ -27,7 +27,7 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://huggingface.co/blog/feed.xml",
 		"https://futurism.com/categories/ai-artificial-intelligence/feed",
         "https://news.smol.ai/rss.xml",
-		"https://venturebeat.com/category/ai/feed/",
+		"https://venturebeat.com/category/ai/fakefeed",
 		"https://feed.infoq.com/ai-ml-data-eng/",
 		"https://www.theregister.com/software/ai_ml/headlines.atom",
 		"https://www.reddit.com/r/Python/.rss",
@@ -43,5 +43,16 @@ CONFIG: SiteConfig = SiteConfig(
     SCHEDULE=[7, 11, 15, 19, 23],
     CUSTOM_FETCH_CONFIG={
         "reddit.com": REDDIT_FETCH_CONFIG,
+        "venturebeat.com": {
+            "needs_selenium": True,  # Use Selenium to avoid rate limiting
+            "needs_tor": False,
+            "post_container": "article",
+            "title_selector": "h2 a",
+            "link_selector": "h2 a",
+            "link_attr": "href",
+            "published_selector": "time",
+            "filter_pattern": "",
+            "use_random_user_agent": True  # Use random user agent to avoid detection
+        }
     }
 )

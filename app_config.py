@@ -47,7 +47,8 @@ REDDIT_FETCH_CONFIG = {
     "title_selector": "a[id^='post-title-']",
     "link_selector": "a[id^='post-title-']",
     "link_attr": "href",
-    "filter_pattern": ""
+    "filter_pattern": "",
+    "use_random_user_agent": True  # Use random user agent to avoid detection
 }
 
 # =============================================================================
