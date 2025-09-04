@@ -1,7 +1,27 @@
 from typing import Dict, List
 
 from models import RssInfo, SiteConfig
-from app_config import REDDIT_FETCH_CONFIG
+from app_config import RedditFetchConfig, FetchConfig
+
+class VentureBeatFetchConfig(FetchConfig):
+    """
+    VentureBeat-specific fetch configuration.
+    
+    Inherits from FetchConfig with VentureBeat-specific settings.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=True,
+            needs_tor=False,
+            post_container="article",
+            title_selector="h2 a",
+            link_selector="h2 a",
+            link_attr="href",
+            filter_pattern="",
+            use_random_user_agent=True,
+            published_selector="time"
+        )
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
@@ -42,17 +62,7 @@ CONFIG: SiteConfig = SiteConfig(
     PATH="/srv/http/aireport",
     SCHEDULE=[7, 11, 15, 19, 23],
     CUSTOM_FETCH_CONFIG={
-        "reddit.com": REDDIT_FETCH_CONFIG,
-        "venturebeat.com": {
-            "needs_selenium": True,  # Use Selenium to avoid rate limiting
-            "needs_tor": False,
-            "post_container": "article",
-            "title_selector": "h2 a",
-            "link_selector": "h2 a",
-            "link_attr": "href",
-            "published_selector": "time",
-            "filter_pattern": "",
-            "use_random_user_agent": True  # Use random user agent to avoid detection
-        }
+        "reddit.com": RedditFetchConfig(),
+        "venturebeat.com": VentureBeatFetchConfig()
     }
 )

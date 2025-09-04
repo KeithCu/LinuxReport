@@ -1,6 +1,25 @@
 from models import RssInfo, SiteConfig
-from app_config import REDDIT_FETCH_CONFIG
-import shared
+from app_config import RedditFetchConfig, FetchConfig
+
+class BreitbartTechFetchConfig(FetchConfig):
+    """
+    Breitbart tech-specific fetch configuration.
+    
+    Inherits from FetchConfig with Breitbart tech-specific settings.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=False,
+            needs_tor=False,
+            post_container="article",
+            title_selector="h2 a",
+            link_selector="h2 a",
+            link_attr="href",
+            filter_pattern="/tech/",  # Only tech articles
+            use_random_user_agent=False,
+            published_selector=".header_byline time"
+        )
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={
@@ -42,16 +61,7 @@ CONFIG: SiteConfig = SiteConfig(
     PATH="/srv/http/LinuxReport2",
     SCHEDULE=[0, 8, 12, 16, 20],  # Update schedule for Linux Report
     CUSTOM_FETCH_CONFIG={
-        "reddit.com": REDDIT_FETCH_CONFIG,
-        "breitbart.com": {
-            "needs_selenium": False,
-            "needs_tor": False,
-            "post_container": "article",
-            "title_selector": "h2 a",
-            "link_selector": "h2 a",
-            "link_attr": "href",
-            "published_selector": ".header_byline time",
-            "filter_pattern": "/tech/"
-        },
+        "reddit.com": RedditFetchConfig(),
+        "breitbart.com": BreitbartTechFetchConfig()
     }
 )

@@ -1,4 +1,25 @@
 from models import RssInfo, SiteConfig
+from app_config import FetchConfig
+
+class BandcampFetchConfig(FetchConfig):
+    """
+    Bandcamp-specific fetch configuration.
+    
+    Inherits from FetchConfig with Bandcamp-specific settings.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=True,
+            needs_tor=False,
+            post_container=".music-grid-item",
+            title_selector=".title",
+            link_selector="a",
+            link_attr="href",
+            filter_pattern="",
+            use_random_user_agent=False,
+            published_selector=".date"
+        )
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS = {
@@ -29,15 +50,6 @@ CONFIG: SiteConfig = SiteConfig(
     PATH = "/srv/http/flask",
     SCHEDULE = [0],
     CUSTOM_FETCH_CONFIG={
-        "bandcamp.com": {
-            "needs_selenium": True,
-            "needs_tor": False,
-            "post_container": ".music-grid-item",
-            "title_selector": ".title",
-            "link_selector": "a",
-            "link_attr": "href",
-            "published_selector": None,
-            "filter_pattern": None
-        },
+        "bandcamp.com": BandcampFetchConfig(),
     }
 )

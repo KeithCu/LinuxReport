@@ -1,4 +1,25 @@
 from models import RssInfo, SiteConfig
+from app_config import FetchConfig
+
+class SolarMagazineFetchConfig(FetchConfig):
+    """
+    Solar Magazine-specific fetch configuration.
+    
+    Inherits from FetchConfig with Solar Magazine-specific settings.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=False,
+            needs_tor=False,
+            post_container="h3",
+            title_selector="a",
+            link_selector="a",
+            link_attr="href",
+            filter_pattern="",
+            use_random_user_agent=False,
+            published_selector=".date"
+        )
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={
@@ -31,15 +52,6 @@ CONFIG: SiteConfig = SiteConfig(
     PATH="/srv/http/pvreport",
     SCHEDULE=[1, 7, 13, 19],
     CUSTOM_FETCH_CONFIG={
-        "solarmagazine.com": {
-            "needs_selenium": False,
-            "needs_tor": False,
-            "post_container": "h3",
-            "title_selector": "a",
-            "link_selector": "a",
-            "link_attr": "href",
-            "published_selector": None,
-            "filter_pattern": ""
-        },
+        "solarmagazine.com": SolarMagazineFetchConfig(),
     },
 )

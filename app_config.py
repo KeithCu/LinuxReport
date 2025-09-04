@@ -40,16 +40,46 @@ USE_TOR = True
 # =============================================================================
 
 # --- Shared Reddit Fetch Config ---
-REDDIT_FETCH_CONFIG = {
-    "needs_selenium": True,
-    "needs_tor": True,
-    "post_container": "article",
-    "title_selector": "a[id^='post-title-']",
-    "link_selector": "a[id^='post-title-']",
-    "link_attr": "href",
-    "filter_pattern": "",
-    "use_random_user_agent": True  # Use random user agent to avoid detection
-}
+# Import here to avoid circular imports
+from typing import NamedTuple, Optional
+
+class FetchConfig(NamedTuple):
+    """
+    Base class for fetch configurations.
+    
+    This immutable configuration class provides type safety for all fetch-related
+    settings used across different sites and services.
+    """
+    needs_selenium: bool
+    needs_tor: bool
+    post_container: str
+    title_selector: str
+    link_selector: str
+    link_attr: str
+    filter_pattern: str
+    use_random_user_agent: bool
+    published_selector: Optional[str] = None
+
+class RedditFetchConfig(FetchConfig):
+    """
+    Reddit-specific fetch configuration.
+    
+    Inherits from FetchConfig with Reddit-specific defaults.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=True,
+            needs_tor=True,
+            post_container="article",
+            title_selector="a[id^='post-title-']",
+            link_selector="a[id^='post-title-']",
+            link_attr="href",
+            filter_pattern="",
+            use_random_user_agent=True
+        )
+
+REDDIT_FETCH_CONFIG = RedditFetchConfig()
 
 # =============================================================================
 # CONFIGURATION MANAGER CLASS

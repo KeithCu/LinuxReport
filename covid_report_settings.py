@@ -1,6 +1,5 @@
 from models import RssInfo, SiteConfig
-from app_config import REDDIT_FETCH_CONFIG
-import shared
+from app_config import RedditFetchConfig
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={
@@ -29,6 +28,6 @@ CONFIG: SiteConfig = SiteConfig(
     PATH="/srv/http/CovidReport2",
     SCHEDULE=[8, 12, 18, 23],
     CUSTOM_FETCH_CONFIG={
-        "reddit.com": REDDIT_FETCH_CONFIG
+        "reddit.com": RedditFetchConfig()
     }
 )

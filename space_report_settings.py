@@ -1,6 +1,5 @@
 from models import RssInfo, SiteConfig
-from app_config import REDDIT_FETCH_CONFIG
-import shared
+from app_config import RedditFetchConfig
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
@@ -41,6 +40,6 @@ CONFIG: SiteConfig = SiteConfig(
     PATH="/srv/http/spacereport",
     SCHEDULE=[0, 8, 12, 16, 20],
     CUSTOM_FETCH_CONFIG={
-        "reddit.com": REDDIT_FETCH_CONFIG,
+        "reddit.com": RedditFetchConfig(),
     }
 )

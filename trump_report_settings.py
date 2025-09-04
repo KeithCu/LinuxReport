@@ -1,6 +1,46 @@
 from models import RssInfo, SiteConfig
-from app_config import REDDIT_FETCH_CONFIG
-import shared
+from app_config import RedditFetchConfig, FetchConfig
+
+class PatriotsWinFetchConfig(FetchConfig):
+    """
+    Patriots.win-specific fetch configuration.
+    
+    Inherits from FetchConfig with Patriots.win-specific settings.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=True,
+            needs_tor=False,
+            post_container=".post-item",
+            title_selector=".kHEnUT.title a",
+            link_selector=".flLuNk.preview-parent",
+            link_attr="href",
+            filter_pattern="",
+            use_random_user_agent=False,
+            published_selector=".//span[contains(text(), 'posted')]/following-sibling::span[1]"
+        )
+
+
+class RevolverNewsFetchConfig(FetchConfig):
+    """
+    Revolver.news-specific fetch configuration.
+    
+    Inherits from FetchConfig with Revolver.news-specific settings.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=False,
+            needs_tor=False,
+            post_container="article.item",
+            title_selector="h2.title a",
+            link_selector="h2.title a",
+            link_attr="href",
+            filter_pattern="",
+            use_random_user_agent=False,
+            published_selector=".meta time"
+        )
 import datetime
 
 CONFIG: SiteConfig = SiteConfig(
@@ -46,35 +86,8 @@ Allies: Elon Musk (DOGE - Department of Government Efficiency), Russell Vought (
     PATH="/srv/http/trumpreport",
     SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 18, 20, 22],
     CUSTOM_FETCH_CONFIG={
-        "patriots.win": {
-            "needs_selenium": True,
-            "needs_tor": False,
-            "post_container": ".post-item",
-            "title_selector": ".kHEnUT.title a",
-            "link_selector": ".flLuNk.preview-parent",
-            "link_attr": "href",
-            "published_selector": ".//span[contains(text(), 'posted')]/following-sibling::span[1]",
-            "filter_pattern": ""
-        },
-        "breitbart.com": {
-            "needs_selenium": False,
-            "needs_tor": False,
-            "post_container": "article",
-            "title_selector": "h2 a",
-            "link_selector": "h2 a",
-            "link_attr": "href",
-            "published_selector": ".header_byline time",
-            "filter_pattern": "/tech/"
-        },
-        "revolver.news": {
-            "needs_selenium": False,
-            "needs_tor": False,
-            "post_container": "article.item",
-            "title_selector": "h2.title a",
-            "link_selector": "h2.title a",
-            "link_attr": "href",
-            "filter_pattern": ""
-        },
-        "reddit.com": REDDIT_FETCH_CONFIG,
+        "patriots.win": PatriotsWinFetchConfig(),
+        "revolver.news": RevolverNewsFetchConfig(),
+        "reddit.com": RedditFetchConfig(),
     }
 )

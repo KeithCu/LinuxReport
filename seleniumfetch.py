@@ -72,15 +72,29 @@ HTTP_REQUEST_TIMEOUT = NETWORK_TIMEOUT
 # =============================================================================
 
 # Configuration for keithcu.com RSS feed
-KEITHCU_RSS_CONFIG = {
-    "needs_selenium": True,  # Using Selenium for testing purposes
-    "needs_tor": False,
-    "post_container": "pre",  # RSS feeds in browser are wrapped in <pre> tags
-    "title_selector": "title",
-    "link_selector": "link", 
-    "link_attr": "text",  # RSS links are text content, not href attributes
-    "filter_pattern": ""
-}
+from app_config import FetchConfig
+
+class KeithcuRssFetchConfig(FetchConfig):
+    """
+    Keithcu.com RSS-specific fetch configuration.
+    
+    Inherits from FetchConfig with Keithcu RSS-specific settings.
+    """
+    def __new__(cls):
+        return super().__new__(
+            cls,
+            needs_selenium=True,  # Using Selenium for testing purposes
+            needs_tor=False,
+            post_container="pre",  # RSS feeds in browser are wrapped in <pre> tags
+            title_selector="title",
+            link_selector="link", 
+            link_attr="text",  # RSS links are text content, not href attributes
+            filter_pattern="",
+            use_random_user_agent=False,
+            published_selector=None
+        )
+
+KEITHCU_RSS_CONFIG = KeithcuRssFetchConfig()
 
 # =============================================================================
 # WEBDRIVER CONFIGURATION AND CREATION
@@ -608,7 +622,7 @@ def extract_post_data(post, config, url, use_selenium):
         dict: Extracted post data with title, link, id, summary, and timestamps, or None if extraction fails
     """
     # Special handling for RSS feeds loaded through Selenium
-    if use_selenium and config["post_container"] == "pre":
+    if use_selenium and config.post_container == "pre":
         try:
             # Get the raw XML content from the pre tag
             xml_content = post.text
@@ -649,12 +663,12 @@ def extract_post_data(post, config, url, use_selenium):
     # Regular processing for non-RSS content
     try:
         if use_selenium:
-            title_element = post.find_element(By.CSS_SELECTOR, config["title_selector"])
+            title_element = post.find_element(By.CSS_SELECTOR, config.title_selector)
             title = title_element.text.strip()
         else:
-            title_element = post.select_one(config["title_selector"])
+            title_element = post.select_one(config.title_selector)
             if not title_element:
-                g_logger.debug(f"No title element found with selector '{config['title_selector']}'")
+                g_logger.debug(f"No title element found with selector '{config.title_selector}'")
                 # Show what elements are available for debugging
                 try:
                     all_links = post.find_all('a')
@@ -664,7 +678,7 @@ def extract_post_data(post, config, url, use_selenium):
                 return None
             title = title_element.text.strip()
     except Exception as e:
-        g_logger.error(f"Error extracting title with selector '{config['title_selector']}': {e}")
+        g_logger.error(f"Error extracting title with selector '{config.title_selector}': {e}")
         # Show what text content is available for debugging
         try:
             if use_selenium:
@@ -684,12 +698,12 @@ def extract_post_data(post, config, url, use_selenium):
     
     try:
         if use_selenium:
-            link_element = post.find_element(By.CSS_SELECTOR, config["link_selector"])
-            link = link_element.get_attribute(config["link_attr"])
+            link_element = post.find_element(By.CSS_SELECTOR, config.link_selector)
+            link = link_element.get_attribute(config.link_attr)
         else:
-            link_element = post.select_one(config["link_selector"])
+            link_element = post.select_one(config.link_selector)
             if not link_element:
-                g_logger.info(f"No link element found with selector '{config['link_selector']}'")
+                g_logger.info(f"No link element found with selector '{config.link_selector}'")
                 # Show what elements are available for debugging
                 try:
                     all_links = post.find_all('a')
@@ -700,14 +714,14 @@ def extract_post_data(post, config, url, use_selenium):
                     g_logger.debug(f"Error during debug output: {debug_e}")
                 return None
             # Handle RSS feeds where links are text content, not href attributes
-            if config["link_attr"] == "text":
+            if config.link_attr == "text":
                 link = link_element.get_text().strip()
             else:
-                link = link_element.get(config["link_attr"])
+                link = link_element.get(config.link_attr)
             if link and link.startswith('/'):
                 link = urljoin(url, link)
     except Exception as e:
-        g_logger.error(f"Error extracting link with selector '{config['link_selector']}': {e}")
+        g_logger.error(f"Error extracting link with selector '{config.link_selector}': {e}")
         # Show what link content is available for debugging
         try:
             if use_selenium:
@@ -722,7 +736,7 @@ def extract_post_data(post, config, url, use_selenium):
             g_logger.debug(f"Error during debug output: {debug_e}")
         return None
     
-    filter_pattern = config.get("filter_pattern", "")
+    filter_pattern = config.filter_pattern
     if filter_pattern and filter_pattern not in link:
         return None
     
@@ -734,23 +748,23 @@ def extract_post_data(post, config, url, use_selenium):
         try:
             if use_selenium:
                 # Handle XPath selectors (starting with .// or //)
-                if config["published_selector"].startswith(('.//', '//')):
-                    date_element = post.find_element(By.XPATH, config["published_selector"])
+                if config.published_selector.startswith(('.//', '//')):
+                    date_element = post.find_element(By.XPATH, config.published_selector)
                     date_text = date_element.text.strip()
                 else:
                     # Handle CSS selectors
-                    date_element = post.find_element(By.CSS_SELECTOR, config["published_selector"])
+                    date_element = post.find_element(By.CSS_SELECTOR, config.published_selector)
                     date_text = date_element.text.strip()
             else:
                 # BeautifulSoup extraction
-                if config["published_selector"].startswith(('.//', '//')):
+                if config.published_selector.startswith(('.//', '//')):
                     # Convert XPath to CSS if possible, or use lxml
                     from lxml import html
                     import lxml.etree
                     # For now, fallback to current time for XPath with BeautifulSoup
                     date_text = None
                 else:
-                    date_element = post.select_one(config["published_selector"])
+                    date_element = post.select_one(config.published_selector)
                     date_text = date_element.text.strip() if date_element else None
             
             if date_text:
@@ -831,8 +845,8 @@ def fetch_site_posts(url, user_agent):
     entries = []
     status = 200
 
-    if config.get("needs_selenium", True):
-        if config.get("use_random_user_agent", False):
+    if config.needs_selenium:
+        if config.use_random_user_agent:
             # Use random user agent to avoid detection (reuse existing REDDIT_USER_AGENT)
             user_agent = g_cs.get("REDDIT_USER_AGENT")
 
@@ -852,7 +866,7 @@ def fetch_site_posts(url, user_agent):
                     'status': status
                 }
 
-            driver = SharedSeleniumDriver.get_driver(config["needs_tor"], user_agent)
+            driver = SharedSeleniumDriver.get_driver(config.needs_tor, user_agent)
             if not driver:
                 g_logger.error(f"Failed to get driver for {url}")
                 status = 503
@@ -871,13 +885,13 @@ def fetch_site_posts(url, user_agent):
                     pass
                 else:
                     try:
-                        WebDriverWait(driver, WEBDRIVER_WAIT_TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, config["post_container"])))
+                        WebDriverWait(driver, WEBDRIVER_WAIT_TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, config.post_container)))
                     except Exception as wait_error:
                         g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
                         # Continue anyway, might still find some content
 
                 g_logger.info(f"Some content loaded for {url} with agent: {user_agent}")
-                posts = driver.find_elements(By.CSS_SELECTOR, config["post_container"])
+                posts = driver.find_elements(By.CSS_SELECTOR, config.post_container)
                 if not posts:
                     snippet = driver.page_source[:500]
                     g_logger.info(f"No posts found. Page source snippet: {snippet}")
@@ -909,7 +923,7 @@ def fetch_site_posts(url, user_agent):
 
         # Handle user agent for requests
         request_headers = {}
-        if config.get("use_random_user_agent", False):
+        if config.use_random_user_agent:
             request_headers['User-Agent'] = g_cs.get("REDDIT_USER_AGENT")
         else:
             request_headers['User-Agent'] = user_agent
@@ -918,7 +932,7 @@ def fetch_site_posts(url, user_agent):
             response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT, headers=request_headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
-            posts = soup.select(config["post_container"])
+            posts = soup.select(config.post_container)
             for post in posts:
                 try:
                     entry = extract_post_data(post, config, url, use_selenium=False)
