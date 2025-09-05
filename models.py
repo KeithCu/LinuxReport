@@ -45,7 +45,7 @@ class SiteConfig:
     """
     ALL_URLS: Dict[str, "RssInfo"]
     USER_AGENT: str
-    SITE_URLS: List[str]
+    SITE_URLS: List[str] #This is the order of the URLs in the display (left to right), most active at top
     URL_IMAGES: str
     FAVICON: str
     LOGO_URL: str
@@ -265,29 +265,34 @@ class User(UserMixin):
 # =============================================================================
 
 class LockBase(ABC):
-    """
-    Abstract base class for lock implementations.
-    """
+    """An abstract base class defining the interface for a lock."""
+
     @abstractmethod
     def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+        """Acquires the lock, optionally waiting for it to become available."""
         pass
 
     @abstractmethod
     def release(self) -> bool:
+        """Releases the lock."""
         pass
 
     @abstractmethod
     def __enter__(self):
+        """Enters the context manager, acquiring the lock."""
         pass
 
     @abstractmethod
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exits the context manager, releasing the lock."""
         pass
 
     @abstractmethod
     def locked(self) -> bool:
+        """Checks if the lock is currently held."""
         pass
 
     @abstractmethod
     def renew(self, timeout_seconds: int) -> bool:
+        """Renews the lock with a new timeout."""
         pass

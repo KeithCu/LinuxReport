@@ -40,10 +40,10 @@ from flask_restful import Api
 
 # Local application imports
 import FeedHistory
-from SqliteLock import LockBase, DiskcacheSqliteLock
+from SqliteLock import DiskcacheSqliteLock
+from models import LockBase, DiskCacheWrapper, RssFeed, g_logger
 from app_config import get_settings_config, get_allowed_domains, get_allowed_requester_domains, get_cdn_config, get_object_store_config, get_welcome_html, get_reports_config, get_storage_config
 from request_utils import get_rate_limit_key, dynamic_rate_limit, get_ip_prefix, format_last_updated
-from models import DiskCacheWrapper, RssFeed
 
 # =============================================================================
 # FLASK MONITORING DASHBOARD CONFIGURATION
@@ -275,13 +275,6 @@ def set_flask_restful_api(api_instance):
     """
     global API
     API = api_instance
-
-# =============================================================================
-# LOGGING CONFIGURATION
-# =============================================================================
-
-# Import the global logger from models.py
-from models import g_logger
 
 # =============================================================================
 # GLOBAL CACHE INSTANCES

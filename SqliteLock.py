@@ -25,39 +25,7 @@ from filelock import Timeout  # Note: filelock.Timeout is the exception class
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from models import g_logger
-
-# =============================================================================
-# ABSTRACT BASE CLASS FOR LOCKS
-# =============================================================================
-
-class LockBase(ABC):
-    """An abstract base class defining the interface for a lock."""
-
-    @abstractmethod
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
-        """Acquires the lock, optionally waiting for it to become available."""
-        pass
-
-    @abstractmethod
-    def release(self) -> bool:
-        """Releases the lock."""
-        pass
-
-    @abstractmethod
-    def __enter__(self):
-        """Enters the context manager, acquiring the lock."""
-        pass
-
-    @abstractmethod
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exits the context manager, releasing the lock."""
-        pass
-
-    @abstractmethod
-    def locked(self) -> bool:
-        """Checks if the lock is currently held."""
-        pass
+from models import g_logger, LockBase
 
 # =============================================================================
 # SQLITE-BASED LOCK IMPLEMENTATION
@@ -186,9 +154,13 @@ class DiskcacheSqliteLock(LockBase):
         """Checks if the lock is currently held by this instance and is not expired."""
         if not self._locked:
             return False
-        
+
         if time.monotonic() >= self._lock_expiry:
             self._locked = False # Our lock has expired
             return False
-            
+
         return True
+    def renew(self, timeout_seconds: int) -> bool:
+        """Renews the lock with a new timeout."""
+        pass
+
