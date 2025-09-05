@@ -322,7 +322,6 @@ def _register_main_routes(flask_app):
         cur_col = 0
 
         needed_urls = []
-        need_fetch = False
 
         # 1. See if we need to fetch any RSS feeds
         last_fetch_cache = g_c.get_all_last_fetches(page_order)
@@ -334,13 +333,9 @@ def _register_main_routes(flask_app):
                 ALL_URLS[url] = rss_info
 
             last_fetch = last_fetch_cache.get(url)
-            
-            expired_rss = ENABLE_BACKGROUND_REFRESH and g_c.has_feed_expired(url, last_fetch)
 
             if not g_c.has(url):
                 needed_urls.append(url)
-            elif expired_rss:
-                need_fetch = True
 
         # 2. Fetch any needed feeds
         if len(needed_urls) > 0:
@@ -416,9 +411,8 @@ def _register_main_routes(flask_app):
                                INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG,
                                weather_lat=template_lat, weather_lon=template_lon)
 
-        # Trigger background fetching if needed
-        if need_fetch and ENABLE_BACKGROUND_REFRESH and not is_bot:
-            fetch_urls_thread()
+        # Check if we need to trigger background updates for expired feeds
+        _check_and_trigger_feed_updates(page_order)
 
         # Single kernel time call at end and track performance stats
         end_time = time.time()
@@ -455,12 +449,8 @@ def _register_main_routes(flask_app):
         
         # Store full response cache (but not for admin mode) - cache the response with standard headers
         if not is_admin and page_order_s == STANDARD_ORDER_STR:
-            expire = EXPIRE_MINUTES
-            if need_fetch:
-                expire = 30
-            
-            # Cache the response with standard headers (no user-specific headers)
-            g_cm.set(cache_key, response, ttl=expire)
+            # Cache the response with standard headers
+            g_cm.set(cache_key, response, ttl=EXPIRE_MINUTES)
         
         return response
 
@@ -513,53 +503,84 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         response.headers['Content-Type'] = 'application/xml'
         return response
 
-    def _get_headlines_data():
-        """
-        Shared function to get current headlines data from cache.
-        
-        Returns:
-            list: List of headline dictionaries with title, link, description, 
-                  published, source, and source_url keys.
-        """
-        # Check cache first for headlines data
-        cache_key = f'headlines-data:{MODE.value}'
-        cached_headlines = g_cm.get(cache_key)
-        if cached_headlines:
-            return cached_headlines
-        
-        headlines = []
-        for url in SITE_URLS:
-            rss_info = ALL_URLS.get(url)
-            if not rss_info:
-                continue
-                
-            # Get cached feed data
-            feed_data = g_c.get(url)
-            if not feed_data or not feed_data.entries:
-                continue
-                
-            # Add entries from this feed
-            for entry in feed_data.entries[:10]:  # Limit to 10 per feed
-                if entry.get('title') and entry.get('link'):
-                    headlines.append({
-                        'title': entry['title'],
-                        'link': entry['link'],
-                        'description': entry.get('summary', ''),
-                        'published': entry.get('published_parsed'),
-                        'source': rss_info.logo_alt,
-                        'source_url': rss_info.site_url
-                    })
+def _check_and_trigger_feed_updates(urls_to_check=None):
+    """
+    Check if any feeds are expired and trigger background updates if needed.
+    Only triggers for non-bot requests when background refresh is enabled.
 
-        # Sort by publication date (newest first)
-        headlines.sort(key=lambda x: x['published'] or (0, 0, 0, 0, 0, 0, 0, 0, 0), reverse=True)
-        
-        # Limit to 50 total headlines
-        headlines = headlines[:50]
-        
-        # Cache the headlines data for 10 minutes
-        g_cm.set(cache_key, headlines, ttl=EXPIRE_MINUTES * 2)
-        
-        return headlines
+    Args:
+        urls_to_check (list, optional): List of URLs to check for expiration.
+                                      Defaults to SITE_URLS.
+    """
+    if urls_to_check is None:
+        urls_to_check = SITE_URLS
+
+    # Get user agent and check if it's a bot
+    user_agent = request.headers.get('User-Agent', '')
+    is_bot = is_web_bot(user_agent)
+
+    # Check if any feeds are expired
+    if ENABLE_BACKGROUND_REFRESH and not is_bot:
+        last_fetch_cache = g_c.get_all_last_fetches(urls_to_check)
+        need_fetch = False
+
+        for url in urls_to_check:
+            last_fetch = last_fetch_cache.get(url)
+            if g_c.has_feed_expired(url, last_fetch):
+                need_fetch = True
+                break
+
+        # Trigger background fetching if feeds are expired
+        if need_fetch:
+            fetch_urls_thread()
+
+def _get_headlines_data():
+    """
+    Shared function to get current headlines data from cache.
+
+    Returns:
+        list: List of headline dictionaries with title, link, description,
+              published, source, and source_url keys.
+    """
+    # Check cache first for headlines data
+    cache_key = f'headlines-data:{MODE.value}'
+    cached_headlines = g_cm.get(cache_key)
+    if cached_headlines:
+        return cached_headlines
+
+    headlines = []
+    for url in SITE_URLS:
+        rss_info = ALL_URLS.get(url)
+        if not rss_info:
+            continue
+
+        # Get cached feed data
+        feed_data = g_c.get(url)
+        if not feed_data or not feed_data.entries:
+            continue
+
+        # Add entries from this feed
+        for entry in feed_data.entries[:10]:  # Limit to 10 per feed
+            if entry.get('title') and entry.get('link'):
+                headlines.append({
+                    'title': entry['title'],
+                    'link': entry['link'],
+                    'description': entry.get('summary', ''),
+                    'published': entry.get('published_parsed'),
+                    'source': rss_info.logo_alt,
+                    'source_url': rss_info.site_url
+                })
+
+    # Sort by publication date (newest first)
+    headlines.sort(key=lambda x: x['published'] or (0, 0, 0, 0, 0, 0, 0, 0, 0), reverse=True)
+
+    # Limit to 50 total headlines
+    headlines = headlines[:50]
+
+    # Cache the headlines data for 10 minutes
+    g_cm.set(cache_key, headlines, ttl=EXPIRE_MINUTES * 2)
+
+    return headlines
 
     @flask_app.route('/rss')
     @flask_app.route('/rss/')
@@ -567,10 +588,13 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
     def rss_feed():
         """
         Generate RSS feed for the current report type.
-        
+
         Returns an RSS 2.0 feed containing the latest headlines from all sources.
         The feed is cached for performance and includes proper headers for feed readers.
         """
+        # Check if we need to trigger feed updates for this request
+        _check_and_trigger_feed_updates()
+
         # Check cache first
         cache_key = f'rss-feed:{MODE.value}'
         cached_feed = g_cm.get(cache_key)
@@ -639,10 +663,13 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
     def api_headlines():
         """
         Generate JSON API endpoint for current headlines.
-        
+
         Returns a JSON response containing the latest headlines from all sources.
         The response is cached for performance and includes proper headers for API consumers.
         """
+        # Check if we need to trigger feed updates for this request
+        _check_and_trigger_feed_updates()
+
         # Check cache first
         cache_key = f'json-headlines:{MODE.value}'
         cached_response = g_cm.get(cache_key)
