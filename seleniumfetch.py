@@ -887,11 +887,10 @@ def fetch_site_posts(url, user_agent):
                         g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
                         # Continue anyway, might still find some content
 
-                g_logger.info(f"Some content loaded for {url} with agent: {user_agent}")
                 posts = driver.find_elements(By.CSS_SELECTOR, config.post_container)
                 if not posts:
                     snippet = driver.page_source[:500]
-                    g_logger.info(f"No posts found. Page source snippet: {snippet}")
+                    g_logger.info(f"No posts found for {url}. Page source snippet: {snippet}")
                     status = 204  # No content
                 else:
                     for post in posts:
@@ -916,7 +915,6 @@ def fetch_site_posts(url, user_agent):
             if lock_acquired:
                 SharedSeleniumDriver.release_fetch_lock()
     else:
-        g_logger.info(f"Fetching {base_domain} using requests (no Selenium)")
 
         # Handle user agent for requests
         request_headers = {}
@@ -942,6 +940,8 @@ def fetch_site_posts(url, user_agent):
         except Exception as e:
             g_logger.error(f"Error fetching {base_domain} with requests: {e}")
             status = 500
+
+    g_logger.info(f"Fetched {len(entries)} entries from {url}")
 
     result = {
         'entries': entries,

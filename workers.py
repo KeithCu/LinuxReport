@@ -287,7 +287,7 @@ def load_url_worker(url):
             g_cm.delete(rss_info.site_url)
             
         end = timer()
-        g_logger.info(f"Parsing from: {url}, in {end - start:f}.")
+        g_logger.info(f"Parsing from: {url}, in {end - start:f}. New articles: {new_count}")
 
 # =============================================================================
 # LOCKING AND THREADING UTILITIES
