@@ -151,9 +151,6 @@ def create_driver(use_tor, user_agent):
         driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)  # 30 second page load timeout
         driver.set_script_timeout(SCRIPT_TIMEOUT)     # 30 second script timeout
 
-        # Disable compression by setting Accept-Encoding to identity via CDP
-        driver.execute_cdp_cmd("Network.enable", {})
-        driver.execute_cdp_cmd("Network.setExtraHTTPHeaders", {"headers": {"Accept-Encoding": "identity"}})
         g_logger.info("Chrome driver setup completed successfully")
         return driver
         
