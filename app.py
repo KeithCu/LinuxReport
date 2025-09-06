@@ -151,7 +151,11 @@ def initialize_extensions(app):
     Mobility(app)
     
     # Initialize Flask-Compress for response compression
-    #Compress(app)
+    # Compress(app)
+    # NOTE: Compression is currently handled by Apache mod_deflate/mod_brotli at the server level,
+    # which is more efficient than application-level compression. If deploying with Gunicorn,
+    # nginx, or another WSGI server without compression, uncomment the line above to enable
+    # Flask-Compress for gzip/brotli compression of Flask responses only.
     
     # Initialize Flask-Login
     login_manager = LoginManager()
