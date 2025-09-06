@@ -21,6 +21,7 @@ from urllib.parse import urljoin, urlparse
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
+import random
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -50,10 +51,10 @@ ENABLE_DATE_EXTRACTION = False
 # =============================================================================
 
 # WebDriver timeouts - for browser operations
-WEBDRIVER_TIMEOUT = 10  # 30 seconds for page load and script execution
+WEBDRIVER_TIMEOUT = 30  # 30 seconds for page load and script execution
 
 # Network operation timeouts - for HTTP requests and element waiting
-NETWORK_TIMEOUT = 10  # 10 seconds for HTTP requests and WebDriverWait operations
+NETWORK_TIMEOUT = 20  # 20 seconds for HTTP requests and WebDriverWait operations
 
 # Thread synchronization timeout - for coordinating fetch operations
 FETCH_LOCK_TIMEOUT = 30  # 30 seconds for acquiring fetch lock (longer due to thread coordination)
@@ -123,7 +124,26 @@ def create_driver(use_tor, user_agent):
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument(f"--user-agent={user_agent}")
-        # Additional options to reduce resource usage
+        # Anti-detection measures (these ARE detectable via JS)
+        options.add_argument("--disable-blink-features=AutomationControlled")
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        # NOTE: We DON'T disable useAutomationExtension as that would break Selenium!
+        # Fake window size for headless (server can detect via JS screen.width/height)
+        # Use realistic screen resolutions that actual users have
+        realistic_resolutions = [
+            (1920, 1080),  # Full HD - most common
+            (1366, 768),   # Common laptop
+            (1536, 864),   # Common scaled resolution
+            (1440, 900),   # MacBook resolution
+            (1680, 1050),  # Common desktop
+            (1600, 900),   # Common widescreen
+            (1280, 720),   # HD resolution
+            (2560, 1440),  # QHD
+            (3840, 2160),  # 4K (less common but possible)
+        ]
+        width, height = random.choice(realistic_resolutions)
+        options.add_argument(f"--window-size={width},{height}")
+        # Keep performance optimizations - server can't see these!
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-plugins")
         options.add_argument("--disable-images")
@@ -878,11 +898,15 @@ def fetch_site_posts(url, user_agent):
                 
             try:
                 driver.get(url)
+                # Server sees this GET request immediately - timing detection happens here
+
                 if base_domain == "reddit.com":
                     pass
                 else:
                     try:
-                        WebDriverWait(driver, WEBDRIVER_WAIT_TIMEOUT).until(EC.presence_of_element_located((By.CSS_SELECTOR, config.post_container)))
+                        # Use random timeout to avoid predictable patterns
+                        random_timeout = random.uniform(15, 25)
+                        WebDriverWait(driver, random_timeout).until(EC.presence_of_element_located((By.CSS_SELECTOR, config.post_container)))
                     except Exception as wait_error:
                         g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
                         # Continue anyway, might still find some content
