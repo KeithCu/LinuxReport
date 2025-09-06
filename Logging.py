@@ -92,15 +92,27 @@ def _setup_logging(log_file=None, log_level=None):
     # Rotate log file if it's too large
     _rotate_log_file(log_file)
 
-    # Configure logging
-    logging.basicConfig(
-        level=getattr(logging, log_level or LOG_LEVEL),
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(log_file or LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    # Get the desired log level
+    desired_level = getattr(logging, log_level or LOG_LEVEL)
+
+    # Check if logging is already configured
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        # No handlers configured yet, use basicConfig
+        logging.basicConfig(
+            level=desired_level,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file or LOG_FILE, encoding='utf-8', mode='a'),  # 'a' for append mode
+                logging.StreamHandler(sys.stdout)
+            ]
+        )
+    else:
+        # Logging already configured, just set the level
+        root_logger.setLevel(desired_level)
+        # Also set level on existing handlers
+        for handler in root_logger.handlers:
+            handler.setLevel(desired_level)
 
     # Suppress HTTP client debug messages
     logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -115,6 +127,22 @@ def _setup_logging(log_file=None, log_level=None):
     logger.info(f"Log file: {log_file or LOG_FILE}")
 
     return logger
+
+def ensure_log_level(logger_name=None, level=None):
+    """
+    Ensure a specific logger (or all loggers) respect the configured log level.
+    This is useful for loggers created after the initial setup.
+    """
+    target_level = getattr(logging, level or LOG_LEVEL)
+    if logger_name:
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(target_level)
+    else:
+        # Set level on root logger and propagate to all existing loggers
+        root_logger = logging.getLogger()
+        root_logger.setLevel(target_level)
+        for handler in root_logger.handlers:
+            handler.setLevel(target_level)
 
 # Create the global logger instance
 g_logger = _setup_logging()
