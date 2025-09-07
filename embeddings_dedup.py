@@ -50,7 +50,6 @@ embedding_cache = {}  # Cache for storing computed embeddings
 def clamp_similarity(score):
     """Clamp cosine similarity score to [-1, 1] to avoid floating point artifacts."""
     if not isinstance(score, (int, float)) or math.isnan(score):
-        logger.warning(f"Non-numeric or NaN similarity score: {score}, type: {type(score)}")
         return 0.0
     return max(-1.0, min(1.0, score))
 
@@ -68,19 +67,16 @@ def get_embedding(text):
     Returns:
         torch.Tensor: Embedding vector for the input text
     """
-    global embedder, st_util
+    global embedder
 
     # Initialize embedder once at the top if needed
     if embedder is None:
         embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
 
-    # Input validation
+    # Input validation and conversion
     if text is None:
-        logger.warning("get_embedding called with None text")
         text = ""
-
     if not isinstance(text, str):
-        logger.warning(f"get_embedding called with non-string text: {type(text)}")
         text = str(text)
 
     # Handle empty/whitespace-only strings gracefully
@@ -104,177 +100,114 @@ def get_embedding(text):
 def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
     """
     Deduplicate articles based on their embeddings, excluding similar ones.
-    
+
     Filters a list of articles by comparing their title embeddings against
     a set of excluded embeddings. Articles with similarity scores above the
     threshold are filtered out to avoid duplicate or very similar content.
-    
+
     Args:
         articles (list): List of article dictionaries with 'title' keys
         excluded_embeddings (list): List of embedding tensors to compare against
         threshold (float): Similarity threshold for filtering (default: THRESHOLD)
-        
+
     Returns:
         list: Filtered list of unique articles
     """
     # Input validation
     if not isinstance(articles, list):
-        logger.warning(f"articles must be a list, got {type(articles)}")
         return []
-    
     if not isinstance(excluded_embeddings, list):
-        logger.warning(f"excluded_embeddings must be a list, got {type(excluded_embeddings)}")
         excluded_embeddings = []
-    
     if not isinstance(threshold, (int, float)) or threshold < 0 or threshold > 1:
-        logger.warning(f"threshold must be a number between 0 and 1, got {threshold}")
         threshold = THRESHOLD
-    
+
     unique_articles = []
     do_not_select_similar = excluded_embeddings.copy()  # Start with embeddings of previous selections
-    
-    # Track statistics
-    processed_count = 0
-    filtered_count = 0
-    error_count = 0
 
-    logger.info("Filtering articles by embedding similarity:")
-    for i, article in enumerate(articles):
+    for article in articles:
         # Validate article structure
-        if not isinstance(article, dict):
-            logger.warning(f"Article {i} is not a dictionary: {type(article)}")
-            error_count += 1
+        if not isinstance(article, dict) or "title" not in article:
             continue
-        
-        if "title" not in article:
-            logger.warning(f"Article {i} missing 'title' key: {article}")
-            error_count += 1
-            continue
-        
+
         title = article["title"]
         # Skip empty/whitespace-only or non-string titles
         if not isinstance(title, str) or not title.strip():
-            logger.warning(f"Skipping article with invalid or empty title: {title}")
-            error_count += 1
             continue
-        
-        processed_count += 1
-        
-        # Get embedding with error handling
+
+        # Get embedding
         current_emb = get_embedding(title)
-        if current_emb is None:
-            logger.warning(f"Failed to get embedding for title: {title}")
-            error_count += 1
-            continue
-        
+
         # Check similarity against excluded embeddings
-        try:
-            is_similar = False
-            for emb in do_not_select_similar:
-                if emb is None:
-                    continue
-                similarity = clamp_similarity(st_util.cos_sim(current_emb, emb).item())
-                if similarity >= threshold:
-                    is_similar = True
-                    break
-            
-            if not is_similar:
-                unique_articles.append(article)
-                do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
-            else:
-                logger.debug(f"Filtered by embedding similarity: {title}")
-                filtered_count += 1
-                
-        except Exception as e:
-            logger.warning(f"Error computing similarity for '{title}': {e}")
-            error_count += 1
-            continue
+        is_similar = False
+        for emb in do_not_select_similar:
+            if emb is None:
+                continue
+            similarity = clamp_similarity(st_util.cos_sim(current_emb, emb).item())
+            if similarity >= threshold:
+                is_similar = True
+                break
 
-    # Log summary statistics
-    logger.info(f"Deduplication summary:")
-    logger.info(f"  Processed: {processed_count} articles")
-    logger.info(f"  Filtered: {filtered_count} articles")
-    logger.info(f"  Errors: {error_count} articles")
-    logger.info(f"  Remaining: {len(unique_articles)} articles")
-    
-    if error_count > 0:
-        logger.warning(f"Encountered {error_count} errors during deduplication")
-    
-    if len(unique_articles) == 0 and len(articles) > 0:
-        logger.warning("All articles were filtered out - threshold may be too low")
+        if not is_similar:
+            unique_articles.append(article)
+            do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
 
+    logger.info(f"Filtered {len(articles) - len(unique_articles)} duplicate articles")
     return unique_articles
 
 
 def get_best_matching_article(target_title, articles):
     """
     Find the article with the highest similarity score to the target title.
-    
+
     Compares the target title against all articles in the list using semantic
     similarity. Returns the best matching article if it meets the similarity
     threshold, otherwise returns None.
-    
+
     Args:
         target_title (str): Title to find matches for
         articles (list): List of article dictionaries with 'title' keys
-        
+
     Returns:
         dict: Best matching article if similarity >= THRESHOLD, None otherwise
     """
     # Input validation
-    if not isinstance(target_title, str):
-        logger.warning(f"target_title must be a string, got {type(target_title)}")
+    if not isinstance(target_title, str) or not target_title.strip():
         return None
-    
     if not isinstance(articles, list):
-        logger.warning(f"articles must be a list, got {type(articles)}")
         return None
-    
-    if not target_title.strip():
-        logger.warning("target_title is empty or whitespace-only")
-        return None
-    
+
     # Get target embedding
     target_emb = get_embedding(target_title)
-    if target_emb is None:
-        logger.warning(f"Failed to get embedding for target title: {target_title}")
-        return None
-    
+
     best_match = None
     best_score = 0.0
     valid_articles = 0
-    
-    for i, article in enumerate(articles):
+
+    for article in articles:
         # Validate article structure
         if not isinstance(article, dict) or "title" not in article:
-            logger.warning(f"Article {i} is invalid: {article}")
             continue
-        
+
         article_title = article["title"]
+        if not isinstance(article_title, str) or not article_title.strip():
+            continue
+
         valid_articles += 1
-        
-        # Get article embedding
+
+        # Get article embedding and compute similarity
         article_emb = get_embedding(article_title)
-        if article_emb is None:
-            logger.warning(f"Failed to get embedding for article title: {article_title}")
-            continue
-        
-        # Compute similarity
-        try:
-            score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
-            if score > best_score:
-                best_match = article
-                if score == 1.0:
-                    return best_match
-                best_score = score
-        except Exception as e:
-            logger.warning(f"Error computing similarity for '{article_title}': {e}")
-            continue
-    
+        score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
+
+        if score > best_score:
+            best_match = article
+            if score == 1.0:
+                return best_match
+            best_score = score
+
     if valid_articles == 0:
-        logger.warning("No valid articles found in the list")
         return None
-    
+
+    # Keep the verbose logging for debugging when no match found
     if best_score < THRESHOLD:
         logger.debug(f"No match found above threshold {THRESHOLD}. Scores:")
         for article in articles:
@@ -287,7 +220,7 @@ def get_best_matching_article(target_title, articles):
                     logger.debug(f"Score for '{article['title']}': {score}")
             except Exception as e:
                 logger.debug(f"Error computing score for '{article['title']}': {e}")
-            
+
     return best_match if best_score >= THRESHOLD else None
 
 # =============================================================================
@@ -332,23 +265,23 @@ def extract_articles_from_html(html_file):
 def fetch_recent_articles(all_urls, cache):
     """
     Fetch recent articles from RSS feeds stored in cache.
-    
+
     Retrieves recent articles from cached RSS feed data, limiting the number
     of articles per feed to avoid overwhelming the system. Used for LLM processing.
-    
+
     Args:
         all_urls (dict): Dictionary mapping feed URLs to feed information
         cache (dict): Cache containing RSS feed data
-        
+
     Returns:
         list: List of article dictionaries with 'title' and 'url' keys
     """
     from auto_update import MAX_ARTICLES_PER_FEED_FOR_LLM
+
     articles = []
     for feed_url, _ in all_urls.items():
         feed = cache.get(feed_url)
         if feed is None:
-            logger.info(f"No data found for {feed_url}")
             continue
 
         count = 0
