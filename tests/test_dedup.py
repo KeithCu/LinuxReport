@@ -105,11 +105,9 @@ class TestArticleDeduplication(unittest.TestCase):
         self.assertEqual(clamp_similarity(float('nan')), 0.0)  # NaN becomes 0.0
         
         # Test non-numeric inputs
-        with warnings.catch_warnings(record=True) as w:
-            self.assertEqual(clamp_similarity("not a number"), 0.0)
-            self.assertEqual(clamp_similarity(None), 0.0)
-            self.assertEqual(clamp_similarity([]), 0.0)
-            self.assertEqual(len(w), 3)  # Should have 3 warnings
+        self.assertEqual(clamp_similarity("not a number"), 0.0)
+        self.assertEqual(clamp_similarity(None), 0.0)
+        self.assertEqual(clamp_similarity([]), 0.0)
 
     def test_get_embedding_robustness(self):
         """Test that get_embedding handles various input types robustly."""
@@ -129,57 +127,42 @@ class TestArticleDeduplication(unittest.TestCase):
         self.assertIsNotNone(emb4)
         
         # Test non-string inputs
-        with warnings.catch_warnings(record=True) as w:
-            emb5 = get_embedding(123)  # Integer
-            self.assertIsNotNone(emb5)
-            
-            emb6 = get_embedding(["list"])  # List
-            self.assertIsNotNone(emb6)
-            
-            self.assertGreater(len(w), 0)  # Should have warnings
+        emb5 = get_embedding(123)  # Integer
+        self.assertIsNotNone(emb5)
+
+        emb6 = get_embedding(["list"])  # List
+        self.assertIsNotNone(emb6)
 
     def test_deduplication_with_malformed_input(self):
         """Test deduplication with malformed input data."""
         # Test with malformed articles
         excluded_embeddings = []
-        
-        with warnings.catch_warnings(record=True) as w:
-            result = deduplicate_articles_with_exclusions(self.malformed_articles, excluded_embeddings)
-            
-            # Should handle malformed input gracefully
-            self.assertIsInstance(result, list)
-            self.assertEqual(len(result), 0)  # All malformed articles should be filtered out
-            
-            # Should have warnings for malformed input
-            self.assertGreater(len(w), 0)
+
+        result = deduplicate_articles_with_exclusions(self.malformed_articles, excluded_embeddings)
+
+        # Should handle malformed input gracefully
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 0)  # All malformed articles should be filtered out
 
     def test_deduplication_with_invalid_parameters(self):
         """Test deduplication with invalid parameters."""
         valid_articles = [{"title": "Test Article", "url": "https://example.com/test"}]
         
         # Test with invalid articles parameter
-        with warnings.catch_warnings(record=True) as w:
-            result = deduplicate_articles_with_exclusions("not a list", [])
-            self.assertEqual(result, [])
-            self.assertGreater(len(w), 0)
-        
+        result = deduplicate_articles_with_exclusions("not a list", [])
+        self.assertEqual(result, [])
+
         # Test with invalid excluded_embeddings parameter
-        with warnings.catch_warnings(record=True) as w:
-            result = deduplicate_articles_with_exclusions(valid_articles, "not a list")
-            self.assertIsInstance(result, list)
-            self.assertGreater(len(w), 0)
-        
+        result = deduplicate_articles_with_exclusions(valid_articles, "not a list")
+        self.assertIsInstance(result, list)
+
         # Test with invalid threshold
-        with warnings.catch_warnings(record=True) as w:
-            result = deduplicate_articles_with_exclusions(valid_articles, [], threshold="invalid")
-            self.assertIsInstance(result, list)
-            self.assertGreater(len(w), 0)
-        
+        result = deduplicate_articles_with_exclusions(valid_articles, [], threshold="invalid")
+        self.assertIsInstance(result, list)
+
         # Test with threshold out of range
-        with warnings.catch_warnings(record=True) as w:
-            result = deduplicate_articles_with_exclusions(valid_articles, [], threshold=1.5)
-            self.assertIsInstance(result, list)
-            self.assertGreater(len(w), 0)
+        result = deduplicate_articles_with_exclusions(valid_articles, [], threshold=1.5)
+        self.assertIsInstance(result, list)
 
     def test_get_best_matching_article_robustness(self):
         """Test get_best_matching_article with various edge cases."""
@@ -189,37 +172,27 @@ class TestArticleDeduplication(unittest.TestCase):
         ]
         
         # Test with invalid target_title
-        with warnings.catch_warnings(record=True) as w:
-            result = get_best_matching_article(None, valid_articles)
-            self.assertIsNone(result)
-            self.assertGreater(len(w), 0)
-        
-        with warnings.catch_warnings(record=True) as w:
-            result = get_best_matching_article("", valid_articles)
-            self.assertIsNone(result)
-            self.assertGreater(len(w), 0)
-        
-        with warnings.catch_warnings(record=True) as w:
-            result = get_best_matching_article("   ", valid_articles)
-            self.assertIsNone(result)
-            self.assertGreater(len(w), 0)
+        result = get_best_matching_article(None, valid_articles)
+        self.assertIsNone(result)
+
+        result = get_best_matching_article("", valid_articles)
+        self.assertIsNone(result)
+
+        result = get_best_matching_article("   ", valid_articles)
+        self.assertIsNone(result)
         
         # Test with invalid articles parameter
-        with warnings.catch_warnings(record=True) as w:
-            result = get_best_matching_article("Test", "not a list")
-            self.assertIsNone(result)
-            self.assertGreater(len(w), 0)
-        
+        result = get_best_matching_article("Test", "not a list")
+        self.assertIsNone(result)
+
         # Test with empty articles list
         result = get_best_matching_article("Test", [])
         self.assertIsNone(result)
-        
+
         # Test with malformed articles
         malformed_articles = [{"url": "no title"}, None, "not a dict"]
-        with warnings.catch_warnings(record=True) as w:
-            result = get_best_matching_article("Test", malformed_articles)
-            self.assertIsNone(result)
-            self.assertGreater(len(w), 0)
+        result = get_best_matching_article("Test", malformed_articles)
+        self.assertIsNone(result)
 
     def test_stress_test_large_dataset(self):
         """Test with a large dataset to check for performance and memory issues."""

@@ -40,7 +40,7 @@ THRESHOLD = 0.75  # Similarity threshold for deduplication
 
 # Embedding model instances (lazy-loaded for performance)
 embedder = None
-st_util = None
+st_util = util  # Initialize st_util immediately since it's just a reference to sentence_transformers.util
 embedding_cache = {}  # Cache for storing computed embeddings
 
 # =============================================================================
@@ -57,65 +57,45 @@ def clamp_similarity(score):
 def get_embedding(text):
     """
     Get the embedding vector for a piece of text using SentenceTransformer.
-    
+
     Computes semantic embeddings for text using the configured transformer model.
     Implements caching to avoid recomputing embeddings for the same text.
     Uses lazy loading to defer model initialization until first use.
-    
+
     Args:
         text (str): Text to compute embedding for
-        
+
     Returns:
         torch.Tensor: Embedding vector for the input text
     """
     global embedder, st_util
-    
+
+    # Initialize embedder once at the top if needed
+    if embedder is None:
+        embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
+
     # Input validation
     if text is None:
         logger.warning("get_embedding called with None text")
         text = ""
-    
+
     if not isinstance(text, str):
         logger.warning(f"get_embedding called with non-string text: {type(text)}")
         text = str(text)
-    
+
     # Handle empty/whitespace-only strings gracefully
     if not text.strip():
-        if embedder is None:
-            try:
-                embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
-                st_util = util
-            except Exception as e:
-                logger.warning(f"Failed to initialize SentenceTransformer: {e}")
-                return None
         # Return a zero vector of the same shape as a normal embedding
-        try:
-            return embedder.encode(" ", convert_to_tensor=True, show_progress_bar=False) * 0
-        except Exception as e:
-            logger.warning(f"Failed to create zero embedding: {e}")
-            return None
-    
+        return embedder.encode(" ", convert_to_tensor=True, show_progress_bar=False) * 0
+
     # Check cache first
     if text in embedding_cache:
         return embedding_cache[text]
-    
-    # Initialize model if needed
-    if embedder is None:
-        try:
-            embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
-            st_util = util
-        except Exception as e:
-            logger.warning(f"Failed to initialize SentenceTransformer: {e}")
-            return None
-    
-    # Compute embedding
-    try:
-        embedding = embedder.encode(text, convert_to_tensor=True, show_progress_bar=False)
-        embedding_cache[text] = embedding
-        return embedding
-    except Exception as e:
-        logger.warning(f"Failed to compute embedding for text '{text[:50]}...': {e}")
-        return None
+
+    # Compute embedding (embedder is guaranteed to be initialized at this point)
+    embedding = embedder.encode(text, convert_to_tensor=True, show_progress_bar=False)
+    embedding_cache[text] = embedding
+    return embedding
 
 # =============================================================================
 # DEDUPLICATION FUNCTIONS
