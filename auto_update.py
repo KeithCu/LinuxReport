@@ -215,7 +215,7 @@ def _try_call_model(client, model, messages, max_tokens):
     for attempt in range(1, max_retries + 1):
         start = timer()
         logger.info(f"Calling model {model} (attempt {attempt}/{max_retries})")
-        
+
         prepared_messages = list(messages) # Make a copy to potentially modify
 
         # If the model requires user-only instructions and the current message structure
@@ -224,48 +224,40 @@ def _try_call_model(client, model, messages, max_tokens):
            len(prepared_messages) == 2 and \
            prepared_messages[0].get("role") == "system" and \
            prepared_messages[1].get("role") == "user":
-            
-            logger.debug(f"Model {model} requires user-only instructions. Combining system and user prompts.")
+
             system_content = prepared_messages[0]["content"]
             user_content = prepared_messages[1]["content"]
-            
+
             combined_user_content = f"{system_content}\n\n{user_content}"
             prepared_messages = [{"role": "user", "content": combined_user_content}]
-            logger.debug(f"Combined message length: {len(combined_user_content)} characters")
 
         try:
             if 'mistral' in model.lower():
                 extra_params = MISTRAL_EXTRA_PARAMS
-                logger.debug(f"Using Mistral extra params: {extra_params}")
             else:
                 extra_params = {}
-                
-            logger.debug(f"Making API call to {model} with {len(prepared_messages)} messages, max_tokens={max_tokens}")
-            
+
             response = client.chat.completions.create(
                 model=model,
-                messages=prepared_messages, # Use potentially modified messages
+                messages=prepared_messages,
                 max_tokens=max_tokens,
                 timeout=TIMEOUT,
                 extra_body=extra_params
             )
             end = timer()
-            
+
             # Check if response has choices before accessing
             if not response.choices:
-                logger.error(f"Model {model} returned empty choices")
                 raise RuntimeError(f"Model {model} returned empty choices")
-            
+
             choice = response.choices[0]
             response_text = choice.message.content
             finish_reason = choice.finish_reason
             response_time = end - start
-            
+
             logger.info(f"Model {model} responded in {response_time:.3f}s, finish_reason: {finish_reason}")
             logger.debug(f"Response length: {len(response_text)} characters")
-            
-            logger.info(f"Full response from {model}:\n{response_text}")
-            
+
             # Log the API response only if global logging is enabled
             if GLOBAL_LOGGING_ENABLED:
                 try:
@@ -275,9 +267,9 @@ def _try_call_model(client, model, messages, max_tokens):
                         "response": response_text,
                         "finish_reason": finish_reason,
                         "response_time": response_time,
-                        "messages": prepared_messages # Log potentially modified messages
+                        "messages": prepared_messages
                     }
-                    
+
                     # Read existing entries
                     entries = []
                     if os.path.exists(API_RESPONSE_LOG):
@@ -292,26 +284,22 @@ def _try_call_model(client, model, messages, max_tokens):
                                             continue
                         except Exception as e:
                             logger.warning(f"Error reading existing log entries: {str(e)}")
-                            # Continue with empty entries list if file is corrupted
-                    
+
                     # Add new entry
                     entries.append(log_entry)
-                    
+
                     # Keep only the last MAX_PREVIOUS_HEADLINES entries
                     if len(entries) > MAX_PREVIOUS_HEADLINES:
                         entries = entries[-MAX_PREVIOUS_HEADLINES:]
-                        logger.debug(f"Truncated {API_RESPONSE_LOG} to {MAX_PREVIOUS_HEADLINES} entries")
-                    
+
                     # Write back to file
                     with open(API_RESPONSE_LOG, "w", encoding="utf-8") as f:
                         for entry in entries:
                             f.write(json.dumps(entry, ensure_ascii=False, indent=2) + "\n")
-                    
-                    logger.debug(f"Logged API response to {API_RESPONSE_LOG}")
+
                 except Exception as log_error:
                     logger.warning(f"Failed to log API response: {str(log_error)}")
-                    # Continue execution even if logging fails
-            
+
             return response_text
         except Exception as e:
             error_msg = str(e)
@@ -319,9 +307,7 @@ def _try_call_model(client, model, messages, max_tokens):
                 logger.error(f"Model {model} returned malformed response: {error_msg}")
             else:
                 logger.error(f"Error on attempt {attempt} for model {model}: {error_msg}")
-            # Add failed model to global set
             if attempt < max_retries:
-                logger.debug(f"Waiting 1 second before retry...")
                 time.sleep(1)
     logger.error(f"Model call failed after {max_retries} attempts for model {model}")
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
@@ -330,110 +316,68 @@ def _try_call_model(client, model, messages, max_tokens):
 def extract_top_titles_from_ai(text):
     """Extracts top titles from AI-generated text with multiple fallback strategies."""
     if not text:
-        logger.warning("Empty text provided to extract_top_titles_from_ai")
         return []
-    
-    messages = []
 
-    logger.debug(f"Extracting titles from AI response (length: {len(text)})")
-        
     # Try to find the marker by looking for the marker word with any surrounding characters
     marker_index = text.rfind(TITLE_MARKER)
     if marker_index != -1:
         marker_length = len(TITLE_MARKER)
-        logger.debug(f"Found title marker '{TITLE_MARKER}' at position {marker_index}")
     else:
         # Extract only A-Za-z letters from the marker
         letters = ''.join(c for c in TITLE_MARKER if c.isalpha())
         if letters:
-            # If we have letters, look for those words
             marker_index = text.rfind(letters)
             if marker_index != -1:
                 marker_length = len(letters)
-                logger.debug(f"Found partial marker '{letters}' at position {marker_index}")
         else:
             marker_index = -1
             marker_length = 0
-            logger.debug("No title marker found")
-    
+
     # Get lines to process - either after marker or reversed for bottom-up search
     if marker_index != -1:
-        # When marker is found, trust the model's formatting and only look at lines immediately after
         text = text[marker_index + marker_length:]
         lines = text.splitlines()
         should_reverse = False
-        # Only look at first 10 lines after marker to avoid false positives
-        lines = lines[:10]
-        logger.debug(f"Processing {len(lines)} lines after marker (forward search)")
+        lines = lines[:10]  # Only look at first 10 lines after marker
     else:
-        # For bottom-up search, only look at last 15 lines
-        lines = text.splitlines()[-15:]
+        lines = text.splitlines()[-15:]  # For bottom-up search, look at last 15 lines
         should_reverse = True
         lines = list(reversed(lines))
-        logger.debug(f"Processing {len(lines)} lines from end (reverse search)")
-    
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Lines to process:")
-        for i, line in enumerate(lines):
-            logger.debug(f"  Line {i+1}: '{line}'")
-    
+
     # Process the lines
     titles = []
-    for i, line in enumerate(lines):
+    for line in lines:
         line = line.strip()
         if not line:
-            logger.debug(f"  Skipping empty line {i+1}")
             continue
 
-        # Clean up formatting first - combine all regex operations into one
-        # Remove: asterisks, quotes, dashes, bullets, numbers with periods, extra whitespace
-        original_line = line
+        # Clean up formatting - combine all regex operations into one
         line = re.sub(r'^\*+|\*+$|^["\']|["\']$|^[-–—]+|[-–—]+$|\*\*|^[-–—\s]+|^[#\s]+|^[•\s]+|^\d+\.?\s*', '', line)
         line = line.strip()
-        
-        logger.debug(f"  Line {i+1} cleanup: '{original_line}' -> '{line}'")
-            
+
         # Use different regex patterns based on whether we're going forward or backward
         if should_reverse:
-            # For bottom-up search, just find numbered lines
-            # Pattern explanation:
-            # ^ - Start of line
-            # \d+ - One or more digits
-            # [\.\)\-\s:,]+ - One or more separators (period, parenthesis, dash, space, colon, comma)
-            # (.+) - Capture the rest of the line
             match = re.match(r"^\d+[\.\)\-\s:,]+(.+)", line)
             if match:
                 title = match.group(1)
-                logger.debug(f"  Line {i+1} matched numbered pattern: '{title}'")
             else:
-                logger.debug(f"  Line {i+1} did not match numbered pattern, skipping")
-                continue  # Skip unnumbered lines in bottom-up search
+                continue
         else:
-            # When going forward after marker, accept any non-empty line as a potential title
             title = line
-            logger.debug(f"  Line {i+1} accepted as potential title: '{title}'")
-                
-        # Add the title (no length validation needed since it was done before sending to AI)
+
         titles.append(title)
-        logger.debug(f"  Line {i+1} added: '{title}'")
         if len(titles) == 3:
-            logger.debug(f"  Reached 3 titles, stopping extraction")
             break
-    
+
     if not titles:
         logger.warning("No valid titles found in response")
         return []
-        
+
     # Reverse the titles if we were processing in reverse
     if should_reverse:
         titles = list(reversed(titles))
-        logger.debug("Reversed titles order due to reverse processing")
-        
+
     logger.info(f"Successfully extracted {len(titles)} valid titles")
-    if logger.isEnabledFor(logging.DEBUG):
-        for i, title in enumerate(titles, 1):
-            logger.debug(f"  Final title {i}: '{title}'")
-    
     return titles
 
 
@@ -508,33 +452,27 @@ def ask_ai_top_articles(articles, dry_run=False):
 def _try_ai_models(messages, filtered_articles):
     """Simplified model selection logic."""
     logger.info("Starting AI model selection process")
-    
+
     current_model = None
-    
+
     # Try up to 3 different models (including fallback)
-    for attempt in range(1, 4):
-        logger.info(f"AI selection attempt {attempt}/3")
-        
-        # On the 3rd attempt, explicitly use the fallback model
-        if attempt == 3:
+    for attempt in range(3):
+        if attempt == 2:  # 3rd attempt
             current_model = FALLBACK_MODEL
-            logger.info(f"3rd attempt: explicitly using fallback model: {current_model}")
+            logger.info(f"Using fallback model: {current_model}")
         else:
-            # Get next model to try (for attempts 1 and 2)
             current_model = model_manager.get_available_model(current_model=current_model)
-            
+
         logger.info(f"Trying model: {current_model}")
-        
-        # Try the model directly
+
         try:
-            response_text, used_model = call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt}")
-            
+            response_text, used_model = call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt+1}")
+
             if not response_text:
                 logger.warning(f"Model {current_model} returned no response")
                 model_manager.mark_failed(current_model)
                 continue
-            
-            # Process the response
+
             top_articles = _process_ai_response(response_text, filtered_articles, f"model {current_model}")
             if top_articles and len(top_articles) >= 3:
                 logger.info(f"Successfully got {len(top_articles)} articles from model {current_model}")
@@ -543,11 +481,11 @@ def _try_ai_models(messages, filtered_articles):
             else:
                 logger.warning(f"Model {current_model} failed to produce enough articles")
                 model_manager.mark_failed(current_model)
-                
+
         except Exception as e:
             logger.error(f"Model {current_model} failed: {str(e)}")
             model_manager.mark_failed(current_model)
-    
+
     logger.error("All model attempts failed")
     return None, [], None
 
@@ -591,50 +529,25 @@ def _process_ai_response(response_text, filtered_articles, model_context):
 def _prepare_articles_for_ai(articles):
     """Prepare articles by deduplicating and filtering."""
     logger.info(f"Preparing {len(articles)} articles for AI selection")
-    
-    # Get previous selections for deduplication
-    previous_selections = g_c.get("previously_selected_selections_2")
-    logger.info(f"Retrieved previous_selections from cache: {len(previous_selections) if previous_selections else 0} entries")
-    if previous_selections is None:
-        previous_selections = []
-        logger.info("No previous selections found in cache")
 
+    # Get previous selections for deduplication
+    previous_selections = g_c.get("previously_selected_selections_2") or []
     previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
     previous_urls = [sel["url"] for sel in previous_selections]
-    
-    logger.debug(f"Previous URLs for filtering: {previous_urls}")
 
     # Filter by URL to avoid duplicates
-    logger.info("Filtering articles by URL to avoid duplicates")
-    original_count = len(articles)
     articles = [article for article in articles if article["url"] not in previous_urls]
-    filtered_count = len(articles)
-    logger.info(f"URL filtering: {original_count} -> {filtered_count} articles (removed {original_count - filtered_count})")
-    
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Articles after URL filtering:")
-        for i, article in enumerate(articles, 1):
-            logger.debug(f"  {i}. {article['title']} ({article['url']})")
-    
+
     # Apply embedding-based deduplication
-    logger.info("Applying embedding-based deduplication")
     filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
-    logger.info(f"Embedding filtering: {filtered_count} -> {len(filtered_articles)} articles (removed {filtered_count - len(filtered_articles)})")
-    
-    # Filter by title length (10-200 characters) to prevent AI from selecting headlines that will be rejected later
-    logger.info("Filtering articles by title length (10-200 characters)")
-    length_filtered_count = len(filtered_articles)
+
+    # Filter by title length (10-200 characters)
     filtered_articles = [
-        article for article in filtered_articles 
+        article for article in filtered_articles
         if len(article['title']) >= 10 and len(article['title']) <= 200 and not article['title'].startswith(('http://', 'https://', 'www.'))
     ]
-    final_count = len(filtered_articles)
-    logger.info(f"Title length filtering: {length_filtered_count} -> {final_count} articles (removed {length_filtered_count - final_count})")
-    
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug("Articles after title length filtering:")
-        for i, article in enumerate(filtered_articles, 1):
-            logger.debug(f"  {i}. {article['title']} ({article['url']})")
+
+    logger.info(f"Filtered articles: {len(articles)} -> {len(filtered_articles)} articles")
 
     if not filtered_articles:
         logger.warning("No new articles available after all filtering.")
@@ -907,38 +820,31 @@ def should_run_update(args, settings_config):
 def configure_global_settings(args):
     """Configure global settings based on command line arguments."""
     global USE_RANDOM_MODELS, RUN_MODE, INCLUDE_ARTICLE_SUMMARY_FOR_LLM, PROMPT_MODE, MODEL_1, MODEL_2
-    
+
     # Handle visualization mode
     if args.visualize:
         RUN_MODE = "visualize"
-        logger.info("Set RUN_MODE to 'visualize'")
         return
-    
+
     # Set model selection behavior
     USE_RANDOM_MODELS = not args.use_cached_model
-    logger.info(f"USE_RANDOM_MODELS set to: {USE_RANDOM_MODELS}")
-    
+
     # Set comparison mode
     if args.compare:
         RUN_MODE = "compare"
-        logger.info("Set RUN_MODE to 'compare'")
-    
+
     # Set summary inclusion
     if args.include_summary:
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
-        logger.info("Set INCLUDE_ARTICLE_SUMMARY_FOR_LLM to True")
-    
+
     # Configure models
     MODEL_1 = model_manager.get_available_model(use_random=USE_RANDOM_MODELS, forced_model=args.force_model)
     MODEL_2 = FALLBACK_MODEL
-    logger.info(f"Configured provider: {PROVIDER_NAME}, MODEL_1={MODEL_1}, MODEL_2={MODEL_2}")
-    
+
     # Set prompt mode
     if args.prompt_mode:
         try:
-            prompt_mode_enum = PromptMode(args.prompt_mode.upper())
-            PROMPT_MODE = prompt_mode_enum
-            logger.info(f"Set PROMPT_MODE to {PROMPT_MODE}")
+            PROMPT_MODE = PromptMode(args.prompt_mode.upper())
         except ValueError:
             logger.warning(f"Invalid prompt mode specified: {args.prompt_mode}. Using default O3 mode.")
             PROMPT_MODE = PromptMode.O3
