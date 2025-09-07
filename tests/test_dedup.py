@@ -122,45 +122,43 @@ class TestArticleDeduplication(unittest.TestCase):
         
         emb3 = get_embedding("   ")  # Whitespace only
         self.assertIsNotNone(emb3)
-        
-        emb4 = get_embedding(None)  # None
-        self.assertIsNotNone(emb4)
-        
-        # Test non-string inputs
-        emb5 = get_embedding(123)  # Integer
-        self.assertIsNotNone(emb5)
 
-        emb6 = get_embedding(["list"])  # List
-        self.assertIsNotNone(emb6)
+        # Test None input - should raise exception when calling .strip()
+        with self.assertRaises(AttributeError):
+            get_embedding(None)
+        
+        # Test non-string inputs - should raise exceptions
+        with self.assertRaises((TypeError, AttributeError)):
+            get_embedding(123)  # Integer
+
+        with self.assertRaises((TypeError, AttributeError)):
+            get_embedding(["list"])  # List
 
     def test_deduplication_with_malformed_input(self):
         """Test deduplication with malformed input data."""
-        # Test with malformed articles
+        # Test with malformed articles - should raise exception
         excluded_embeddings = []
 
-        result = deduplicate_articles_with_exclusions(self.malformed_articles, excluded_embeddings)
-
-        # Should handle malformed input gracefully
-        self.assertIsInstance(result, list)
-        self.assertEqual(len(result), 0)  # All malformed articles should be filtered out
+        with self.assertRaises((TypeError, KeyError, AttributeError)):
+            deduplicate_articles_with_exclusions(self.malformed_articles, excluded_embeddings)
 
     def test_deduplication_with_invalid_parameters(self):
         """Test deduplication with invalid parameters."""
         valid_articles = [{"title": "Test Article", "url": "https://example.com/test"}]
-        
-        # Test with invalid articles parameter
-        result = deduplicate_articles_with_exclusions("not a list", [])
-        self.assertEqual(result, [])
 
-        # Test with invalid excluded_embeddings parameter
-        result = deduplicate_articles_with_exclusions(valid_articles, "not a list")
-        self.assertIsInstance(result, list)
+        # Test with invalid articles parameter - should raise exception
+        with self.assertRaises((TypeError, AttributeError)):
+            deduplicate_articles_with_exclusions("not a list", [])
 
-        # Test with invalid threshold
+        # Test with invalid excluded_embeddings parameter - should raise exception
+        with self.assertRaises((TypeError, AttributeError)):
+            deduplicate_articles_with_exclusions(valid_articles, "not a list")
+
+        # Test with invalid threshold - should work fine since threshold is just a number comparison
         result = deduplicate_articles_with_exclusions(valid_articles, [], threshold="invalid")
         self.assertIsInstance(result, list)
 
-        # Test with threshold out of range
+        # Test with threshold out of range - should work fine since threshold is just a number comparison
         result = deduplicate_articles_with_exclusions(valid_articles, [], threshold=1.5)
         self.assertIsInstance(result, list)
 
@@ -170,29 +168,30 @@ class TestArticleDeduplication(unittest.TestCase):
             {"title": "Trump Delivers Victory in 12-Day War", "url": "https://example.com/1"},
             {"title": "Biden Announces New Economic Policy", "url": "https://example.com/2"},
         ]
-        
-        # Test with invalid target_title
-        result = get_best_matching_article(None, valid_articles)
-        self.assertIsNone(result)
 
+        # Test with invalid target_title - should raise exception
+        with self.assertRaises(AttributeError):
+            get_best_matching_article(None, valid_articles)
+
+        # Empty/whitespace strings should work (they get zero embeddings)
         result = get_best_matching_article("", valid_articles)
         self.assertIsNone(result)
 
         result = get_best_matching_article("   ", valid_articles)
         self.assertIsNone(result)
-        
-        # Test with invalid articles parameter
-        result = get_best_matching_article("Test", "not a list")
-        self.assertIsNone(result)
 
-        # Test with empty articles list
+        # Test with invalid articles parameter - should raise exception
+        with self.assertRaises((TypeError, AttributeError)):
+            get_best_matching_article("Test", "not a list")
+
+        # Test with empty articles list - should work fine and return None
         result = get_best_matching_article("Test", [])
         self.assertIsNone(result)
 
-        # Test with malformed articles
+        # Test with malformed articles - should raise exception
         malformed_articles = [{"url": "no title"}, None, "not a dict"]
-        result = get_best_matching_article("Test", malformed_articles)
-        self.assertIsNone(result)
+        with self.assertRaises((TypeError, KeyError, AttributeError)):
+            get_best_matching_article("Test", malformed_articles)
 
     def test_stress_test_large_dataset(self):
         """Test with a large dataset to check for performance and memory issues."""
@@ -314,10 +313,14 @@ class TestArticleDeduplication(unittest.TestCase):
         self.assertIn(text, embedding_cache)
         
         # Test cache with edge cases
-        edge_texts = ["", "   ", None, 123]
+        edge_texts = ["", "   "]
         for text in edge_texts:
             emb = get_embedding(text)
             self.assertIsNotNone(emb)
+
+        # Test None input - should raise exception when calling .strip()
+        with self.assertRaises(AttributeError):
+            get_embedding(None)
         
         # Test cache size doesn't grow excessively
         cache_size = len(embedding_cache)
@@ -480,15 +483,24 @@ class TestArticleDeduplication(unittest.TestCase):
 
     def test_edge_cases(self):
         """Test edge cases that could cause issues."""
-        # Test with edge case articles
+        # Test with edge case articles (excluding None title which should raise exception)
         excluded_embeddings = []
-        
-        # This should not crash
+        valid_edge_cases = [
+            article for article in self.edge_case_articles
+            if article.get("title") is not None
+        ]
+
+        # This should handle valid edge cases gracefully
         try:
-            result = deduplicate_articles_with_exclusions(self.edge_case_articles, excluded_embeddings)
+            result = deduplicate_articles_with_exclusions(valid_edge_cases, excluded_embeddings)
             print(f"Edge cases processed successfully: {len(result)} articles remain")
         except Exception as e:
             self.fail(f"Edge case processing failed: {e}")
+
+        # Test None title specifically - should raise exception when calling .strip()
+        none_title_article = [{"title": None, "url": "https://example.com/none"}]
+        with self.assertRaises(AttributeError):
+            deduplicate_articles_with_exclusions(none_title_article, excluded_embeddings)
 
     def test_get_best_matching_article(self):
         """Test the get_best_matching_article function."""

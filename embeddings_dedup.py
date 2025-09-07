@@ -73,12 +73,6 @@ def get_embedding(text):
     if embedder is None:
         embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
 
-    # Input validation and conversion
-    if text is None:
-        text = ""
-    if not isinstance(text, str):
-        text = str(text)
-
     # Handle empty/whitespace-only strings gracefully
     if not text.strip():
         # Return a zero vector of the same shape as a normal embedding
@@ -113,26 +107,11 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
     Returns:
         list: Filtered list of unique articles
     """
-    # Input validation
-    if not isinstance(articles, list):
-        return []
-    if not isinstance(excluded_embeddings, list):
-        excluded_embeddings = []
-    if not isinstance(threshold, (int, float)) or threshold < 0 or threshold > 1:
-        threshold = THRESHOLD
-
     unique_articles = []
-    do_not_select_similar = excluded_embeddings.copy()  # Start with embeddings of previous selections
+    do_not_select_similar = list(excluded_embeddings)  # Start with embeddings of previous selections
 
     for article in articles:
-        # Validate article structure
-        if not isinstance(article, dict) or "title" not in article:
-            continue
-
         title = article["title"]
-        # Skip empty/whitespace-only or non-string titles
-        if not isinstance(title, str) or not title.strip():
-            continue
 
         # Get embedding
         current_emb = get_embedding(title)
@@ -170,29 +149,14 @@ def get_best_matching_article(target_title, articles):
     Returns:
         dict: Best matching article if similarity >= THRESHOLD, None otherwise
     """
-    # Input validation
-    if not isinstance(target_title, str) or not target_title.strip():
-        return None
-    if not isinstance(articles, list):
-        return None
-
     # Get target embedding
     target_emb = get_embedding(target_title)
 
     best_match = None
     best_score = 0.0
-    valid_articles = 0
 
     for article in articles:
-        # Validate article structure
-        if not isinstance(article, dict) or "title" not in article:
-            continue
-
         article_title = article["title"]
-        if not isinstance(article_title, str) or not article_title.strip():
-            continue
-
-        valid_articles += 1
 
         # Get article embedding and compute similarity
         article_emb = get_embedding(article_title)
@@ -204,22 +168,13 @@ def get_best_matching_article(target_title, articles):
                 return best_match
             best_score = score
 
-    if valid_articles == 0:
-        return None
-
     # Keep the verbose logging for debugging when no match found
     if best_score < THRESHOLD:
         logger.debug(f"No match found above threshold {THRESHOLD}. Scores:")
         for article in articles:
-            if not isinstance(article, dict) or "title" not in article:
-                continue
-            try:
-                article_emb = get_embedding(article["title"])
-                if article_emb is not None:
-                    score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
-                    logger.debug(f"Score for '{article['title']}': {score}")
-            except Exception as e:
-                logger.debug(f"Error computing score for '{article['title']}': {e}")
+            article_emb = get_embedding(article["title"])
+            score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
+            logger.debug(f"Score for '{article['title']}': {score}")
 
     return best_match if best_score >= THRESHOLD else None
 
