@@ -28,7 +28,6 @@ from html_generation import (
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 from ModelManager import ModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
 from Logging import _setup_logging
-from auto_update_visualization import run_visualization_mode
 
 from enum import Enum  # Ensure this is included if not already
 
@@ -143,7 +142,7 @@ INPUT TITLES:
 # =============================================================================
 
 # Run mode configuration
-RUN_MODE = "normal"  # options: "normal", "compare", "visualize"
+RUN_MODE = "normal"  # options: "normal", "compare"
 
 # Provider configuration
 PROVIDER = "openrouter"
@@ -670,10 +669,6 @@ def main(mode, settings_module, settings_config, dry_run=False):
     """Main processing function with improved error handling and dry run logic."""
     global ALL_URLS, REPORT_PROMPT
     
-    # Handle visualization mode specially
-    if RUN_MODE == "visualize":
-        logger.info("Running in visualization mode")
-        return run_visualization_mode()  # No mode required, uses local cache.db
     
     # For other modes, set up the configuration
     ALL_URLS = settings_config.ALL_URLS
@@ -771,7 +766,6 @@ def parse_arguments():
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
     parser.add_argument('--compare', action='store_true', help='Run in comparison mode')
-    parser.add_argument('--visualize', action='store_true', help='Run in visualization mode to create embedding plots')
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
     parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
@@ -821,10 +815,6 @@ def configure_global_settings(args):
     """Configure global settings based on command line arguments."""
     global USE_RANDOM_MODELS, RUN_MODE, INCLUDE_ARTICLE_SUMMARY_FOR_LLM, PROMPT_MODE, MODEL_1, MODEL_2
 
-    # Handle visualization mode
-    if args.visualize:
-        RUN_MODE = "visualize"
-        return
 
     # Set model selection behavior
     USE_RANDOM_MODELS = not args.use_cached_model
@@ -852,12 +842,6 @@ def configure_global_settings(args):
 if __name__ == "__main__":
     args = parse_arguments()
     
-    # Handle visualization mode immediately
-    if args.visualize:
-        configure_global_settings(args)
-        logger.info("Starting main processing for visualization mode...")
-        exit_code = main(None, None, None, dry_run=args.dry_run)
-        sys.exit(exit_code)
     
     # Detect mode and load settings
     selected_mode_str, loaded_settings_module, loaded_settings_config = detect_mode()

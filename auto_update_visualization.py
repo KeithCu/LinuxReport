@@ -212,20 +212,11 @@ if __name__ == "__main__":
     parser.add_argument('--mode', type=str, help='Mode name for cache key (optional)')
     parser.add_argument('--output', type=str, default='embedding_visualization.png', 
                        help='Output filename for visualization')
-    parser.add_argument('--log-level', type=str, default='INFO', 
-                       choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
-                       help='Logging level')
     
     args = parser.parse_args()
     
-    # Update log level if specified
-    if args.log_level != LOG_LEVEL:
-        # Create a new logger with the specified level
-        import logging
-        logging.basicConfig(level=getattr(logging, args.log_level), 
-                           format='%(asctime)s - %(levelname)s - %(message)s')
-        logger = logging.getLogger(__name__)
-        logger.info(f"Log level changed to: {args.log_level}")
+    # Use the configured log level (same pattern as auto_update.py)
+    logger.info(f"Visualization starting with log level: {LOG_LEVEL}")
     
     logger.info("Starting standalone visualization script")
     
