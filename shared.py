@@ -42,7 +42,7 @@ from flask_restful import Api
 import FeedHistory
 from SqliteLock import DiskcacheSqliteLock
 from models import LockBase, DiskCacheWrapper, RssFeed, g_logger
-from app_config import get_settings_config, get_allowed_domains, get_allowed_requester_domains, get_cdn_config, get_object_store_config, get_welcome_html, get_reports_config, get_storage_config
+from app_config import get_settings_config, get_allowed_domains, get_allowed_requester_domains, get_cdn_config, get_object_store_config, get_welcome_html, get_reports_config, get_storage_config, get_proxy_server, get_proxy_username, get_proxy_password
 from request_utils import get_rate_limit_key, dynamic_rate_limit, get_ip_prefix, format_last_updated
 
 # =============================================================================
@@ -201,6 +201,20 @@ DISABLE_IP_GEOLOCATION = False
 # When True: Client geolocation is disabled, server uses IP-based location or defaults
 # When False: Client geolocation is enabled, server respects client-provided coordinates
 DISABLE_CLIENT_GEOLOCATION = True
+
+# =============================================================================
+# PROXYING SETTINGS
+# =============================================================================
+
+# Global flag to enable/disable worker proxying functionality
+# When True, adds proxy headers to requests in workers.py, seleniumfetch.py, and Tor.py
+# When False, requests are made directly without proxy headers
+WORKER_PROXYING = False
+
+# Proxy server configuration (loaded from config.yaml via app_config.py)
+PROXY_SERVER = get_proxy_server()
+PROXY_USERNAME = get_proxy_username()
+PROXY_PASSWORD = get_proxy_password()
 
 # =============================================================================
 # RSS FEED CONFIGURATION

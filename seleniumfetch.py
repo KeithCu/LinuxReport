@@ -36,7 +36,7 @@ from webdriver_manager.core.os_manager import ChromeType
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from shared import g_cs, CUSTOM_FETCH_CONFIG, g_logger
+from shared import g_cs, CUSTOM_FETCH_CONFIG, g_logger, WORKER_PROXYING, PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
 
 # =============================================================================
 # FEATURE FLAGS
@@ -948,6 +948,16 @@ def fetch_site_posts(url, user_agent):
             request_headers['User-Agent'] = user_agent
 
         try:
+            # Add proxy headers if proxying is enabled
+            if WORKER_PROXYING and PROXY_SERVER:
+                request_headers['X-Forwarded-For'] = PROXY_SERVER.split(':')[0]
+                if PROXY_USERNAME and PROXY_PASSWORD:
+                    import base64
+                    auth_string = f"{PROXY_USERNAME}:{PROXY_PASSWORD}"
+                    auth_bytes = auth_string.encode('ascii')
+                    auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+                    request_headers['Proxy-Authorization'] = f'Basic {auth_b64}'
+            
             response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT, headers=request_headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')

@@ -42,7 +42,8 @@ from shared import (
     ALL_URLS, EXPIRE_WEEK, EXPIRE_YEARS, MAX_ITEMS, TZ,
     USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,
     ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_TIMEOUT,
-    ENABLE_OBJECT_STORE_FEED_PUBLISH, g_logger, history
+    ENABLE_OBJECT_STORE_FEED_PUBLISH, g_logger, history, WORKER_PROXYING,
+    PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
 )
 from Tor import fetch_via_tor
 from app_config import DEBUG, USE_TOR
@@ -89,7 +90,20 @@ class DefaultFetcher(FetcherStrategy):
     """The default strategy for fetching standard RSS/Atom feeds."""
 
     def fetch(self, url, rss_info):
-        res = feedparser.parse(url, agent=USER_AGENT)
+        # Add proxy headers if proxying is enabled
+        if WORKER_PROXYING and PROXY_SERVER:
+            # Use configured proxy server
+            headers = {'X-Forwarded-For': PROXY_SERVER.split(':')[0]}
+            if PROXY_USERNAME and PROXY_PASSWORD:
+                import base64
+                auth_string = f"{PROXY_USERNAME}:{PROXY_PASSWORD}"
+                auth_bytes = auth_string.encode('ascii')
+                auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+                headers['Proxy-Authorization'] = f'Basic {auth_b64}'
+            res = feedparser.parse(url, agent=USER_AGENT, request_headers=headers)
+        else:
+            res = feedparser.parse(url, agent=USER_AGENT)
+        
         if not res:
             return []
         

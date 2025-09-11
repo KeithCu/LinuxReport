@@ -29,7 +29,7 @@ from fake_useragent import UserAgent
 # LOCAL IMPORTS
 # =============================================================================
 
-from shared import g_cs, g_logger, EXPIRE_YEARS
+from shared import g_cs, g_logger, EXPIRE_YEARS, WORKER_PROXYING, PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
 from seleniumfetch import fetch_site_posts
 from app_config import get_tor_password
 
@@ -80,8 +80,19 @@ def fetch_via_curl(url):
             "--socks5-hostname", "127.0.0.1:9050",
             "-A", g_cs.get("REDDIT_USER_AGENT"),
             "-H", "Accept: */*",
-            url
         ]
+        
+        # Add proxy headers if proxying is enabled
+        if WORKER_PROXYING and PROXY_SERVER:
+            cmd.extend(["-H", f"X-Forwarded-For: {PROXY_SERVER.split(':')[0]}"])
+            if PROXY_USERNAME and PROXY_PASSWORD:
+                import base64
+                auth_string = f"{PROXY_USERNAME}:{PROXY_PASSWORD}"
+                auth_bytes = auth_string.encode('ascii')
+                auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+                cmd.extend(["-H", f"Proxy-Authorization: Basic {auth_b64}"])
+        
+        cmd.append(url)
 
         g_logger.debug(f"Executing curl command: {' '.join(cmd)}")
         start_time = timer()
@@ -137,8 +148,14 @@ def fetch_via_curl(url):
             result = None
 
     except Exception as e:
-        g_logger.error(f"Curl TOR method failed: {str(e)}")
-        result = None
+        g_logger.warning(f"Curl TOR method failed: {str(e)}, falling back to cached data")
+        # Fall back to cached data if proxying fails
+        cached_feed = g_cs.get(f"tor_cache:{url}")
+        if cached_feed and cached_feed.get('entries'):
+            result = cached_feed
+            g_logger.info(f"Using cached TOR data for {url}: {len(result.get('entries', []))} entries")
+        else:
+            result = None
         
     return result
 

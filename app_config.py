@@ -389,6 +389,43 @@ def is_object_store_enabled() -> bool:
     """
     return config_manager.get('settings.object_store.enabled', False)
 
+def get_proxy_config() -> Dict[str, Any]:
+    """
+    Get the proxy server configuration.
+    
+    Returns:
+        Dict[str, Any]: Proxy configuration dictionary
+    """
+    return config_manager.get('proxy', {})
+
+def get_proxy_server() -> Optional[str]:
+    """
+    Get the proxy server address and port.
+    
+    Returns:
+        Optional[str]: Proxy server address:port or None if not configured
+    """
+    return config_manager.get('proxy.server')
+
+def get_proxy_username() -> Optional[str]:
+    """
+    Get the proxy server username.
+    
+    Returns:
+        Optional[str]: Proxy username or None if not configured
+    """
+    return config_manager.get('proxy.username')
+
+def get_proxy_password() -> Optional[str]:
+    """
+    Get the proxy server password.
+    
+    Returns:
+        Optional[str]: Proxy password or None if not configured
+    """
+    return config_manager.get('proxy.password')
+
+
 # =============================================================================
 # CONFIGURATION VALIDATION
 # =============================================================================
