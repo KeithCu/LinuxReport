@@ -118,7 +118,7 @@ MISTRAL_EXTRA_PARAMS = {
 # Set up logger
 logger = logging.getLogger(__name__)
 
-class ModelManager:
+class LLMModelManager:
     """Manages model selection, caching, and failure tracking.
     
     This class consolidates all model management logic including:

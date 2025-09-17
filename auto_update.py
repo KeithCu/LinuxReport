@@ -26,7 +26,7 @@ from html_generation import (
 )
 
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
-from ModelManager import ModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
+from LLMModelManager import LLMModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
 from Logging import _setup_logging
 
 from enum import Enum  # Ensure this is included if not already
@@ -34,15 +34,6 @@ from enum import Enum  # Ensure this is included if not already
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
-
-# Logging configuration
-# LOG_LEVEL options: DEBUG, INFO, WARNING, ERROR, CRITICAL
-# - DEBUG: Most verbose - shows everything including full AI responses, article lists, etc.
-# - INFO: Default level - shows main process steps, counts, success/failure messages
-# - WARNING: Shows warnings and errors only
-# - ERROR: Shows only errors
-# - CRITICAL: Shows only critical errors
-# Note: Each level includes all levels above it (INFO includes WARNING, ERROR, CRITICAL)
 LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
 LOG_FILE = "auto_update.log"  # Single log file that gets appended to
 
@@ -160,7 +151,7 @@ provider_client_cache = None
 ALL_URLS = {}  # Initialized here, passed to utils
 
 # Create global model manager instance
-model_manager = ModelManager()
+model_manager = LLMModelManager()
 
 # =============================================================================
 # SIMPLIFIED PROVIDER FUNCTIONS

@@ -21,8 +21,8 @@ def get_open_router_models():
         return None
 
 def update_script_file(latest_models):
-    """Updates the FREE_MODELS list in ModelManager.py, preserving and alphabetizing commented-out models."""
-    script_path = "ModelManager.py"
+    """Updates the FREE_MODELS list in LLMModelManager.py, preserving and alphabetizing commented-out models."""
+    script_path = "LLMModelManager.py"
     try:
         with open(script_path, 'r', encoding='utf-8') as f:
             content = f.read()
@@ -30,7 +30,7 @@ def update_script_file(latest_models):
         # Regex to find the FREE_MODELS list
         match = re.search(r"FREE_MODELS = \[(.*?)\]", content, re.DOTALL)
         if not match:
-            print("\nError: Could not find the FREE_MODELS list in ModelManager.py.")
+            print("\nError: Could not find the FREE_MODELS list in LLMModelManager.py.")
             return
 
         existing_list_content = match.group(1)
@@ -100,10 +100,10 @@ def update_script_file(latest_models):
 
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(content)
-        print(f"\nSuccessfully updated the FREE_MODELS list in ModelManager.py.")
+        print(f"\nSuccessfully updated the FREE_MODELS list in LLMModelManager.py.")
 
     except FileNotFoundError:
-        print(f"\nError: The file ModelManager.py was not found.")
+        print(f"\nError: The file LLMModelManager.py was not found.")
     except Exception as e:
         print(f"\nAn error occurred while updating the script: {e}")
 
@@ -119,7 +119,12 @@ def main():
     print(f"Fetched {len(latest_models)} free models from OpenRouter.")
     update_script_file(latest_models)
 
-logging.basicConfig(filename='model_update.log', level=logging.DEBUG)
+# Configure logging for this script
+logging.basicConfig(
+    filename='model_update.log',
+    level=logging.DEBUG,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 if __name__ == "__main__":
     try:

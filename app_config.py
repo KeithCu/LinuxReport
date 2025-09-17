@@ -21,11 +21,11 @@ License: See LICENSE file
 # =============================================================================
 import os
 import socket
-import yaml
-import logging
 from functools import lru_cache
-from typing import Dict, Any, Optional, List
-from pathlib import Path
+from typing import Dict, Any, Optional, List, NamedTuple
+
+import yaml
+from Logging import g_logger as logging
 
 # =============================================================================
 # GLOBAL CONSTANTS AND CONFIGURATION
@@ -41,7 +41,6 @@ USE_TOR = True
 
 # --- Shared Reddit Fetch Config ---
 # Import here to avoid circular imports
-from typing import NamedTuple, Optional
 
 class FetchConfig(NamedTuple):
     """
