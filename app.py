@@ -32,11 +32,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from shared import (
     EXPIRE_WEEK, FLASK_DASHBOARD,
-    FLASK_DASHBOARD_USERNAME, FLASK_DASHBOARD_PASSWORD,
     limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS,
     set_flask_restful_api, g_logger
 )
-from app_config import DEBUG, get_secret_key
+from app_config import DEBUG, get_secret_key, get_dashboard_credentials
 from models import User
 
 # Define the order of JavaScript modules for loading
@@ -206,9 +205,10 @@ def setup_monitoring_dashboard(app):
         from flask_monitoringdashboard.core.config import Config
         
         # Configure Flask-MonitoringDashboard
+        dashboard_credentials = get_dashboard_credentials()
         config = Config()
-        config.USERNAME = FLASK_DASHBOARD_USERNAME
-        config.PASSWORD = FLASK_DASHBOARD_PASSWORD
+        config.USERNAME = dashboard_credentials.get('username')
+        config.PASSWORD = dashboard_credentials.get('password')
         config.DATABASE = 'sqlite:///flask_monitoringdashboard.db'
         
         # Initialize with custom configuration
