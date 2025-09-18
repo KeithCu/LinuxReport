@@ -51,8 +51,6 @@ from request_utils import get_rate_limit_key, dynamic_rate_limit, get_ip_prefix,
 
 # Flask-MonitoringDashboard configuration
 FLASK_DASHBOARD = False
-FLASK_DASHBOARD_USERNAME = "admin"  # Change this to your preferred username
-FLASK_DASHBOARD_PASSWORD = "admin"  # Change this to your preferred password
 
 # =============================================================================
 # CONFIGURATION LOADING AND SETTINGS

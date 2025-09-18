@@ -262,6 +262,16 @@ def get_admin_password() -> Optional[str]:
     """
     return config_manager.get('admin.password')
 
+
+def get_dashboard_credentials() -> Dict[str, str]:
+    """
+    Get the dashboard credentials from configuration.
+
+    Returns:
+        Dict[str, str]: A dictionary with 'username' and 'password' keys.
+    """
+    return config_manager.get('admin.dashboard', {})
+
 def get_secret_key() -> Optional[str]:
     """
     Get the secret key from configuration.
