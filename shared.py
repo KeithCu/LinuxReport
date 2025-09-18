@@ -50,7 +50,7 @@ from request_utils import get_rate_limit_key, dynamic_rate_limit, get_ip_prefix,
 # =============================================================================
 
 # Flask-MonitoringDashboard configuration
-FLASK_DASHBOARD = False
+FLASK_DASHBOARD = True
 
 # =============================================================================
 # CONFIGURATION LOADING AND SETTINGS

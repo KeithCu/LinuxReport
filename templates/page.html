@@ -116,6 +116,9 @@
           <div class="nav-section-right">
             <button id="chat-toggle-btn" class="btn">Chat</button>
             <button id="config-btn" class="btn">Config...</button>
+            {% if is_admin and FLASK_DASHBOARD %}
+            <a href="/dashboard" class="btn" target="_blank">Dashboard</a>
+            {% endif %}
             {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
             <button id="view-mode-toggle" class="btn">Infinite</button>
             {% endif %}

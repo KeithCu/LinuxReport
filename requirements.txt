@@ -2,7 +2,7 @@
 apache_libcloud>=3.8.0
 beautifulsoup4>=4.13.4
 cacheout>=0.16.0
-cssmin>=0.2.1
+cssmin==0.2.0
 diskcache>=5.6.3
 fake_useragent>=2.2.0
 feedparser>=6.0.11
