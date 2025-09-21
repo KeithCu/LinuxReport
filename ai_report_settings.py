@@ -26,7 +26,7 @@ class VentureBeatFetchConfig(FetchConfig):
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
 		"https://www.reddit.com/r/LocalLlama/.rss": RssInfo("LocalLlama.webp", "Machine Learning sub", "https://www.reddit.com/r/LocalLlama/"),
-		"https://venturebeat.com/category/ai/fakefeed": RssInfo("VentureBeat_logo.webp", "VentureBeat AI", "https://venturebeat.com/category/ai/"),
+#		"https://venturebeat.com/category/ai/fakefeed": RssInfo("VentureBeat_logo.webp", "VentureBeat AI", "https://venturebeat.com/category/ai/"),
 		"https://www.theregister.com/software/ai_ml/headlines.atom": RssInfo("RegisterLogo.webp", "The Register AI News", "https://www.theregister.com/software/ai_ml/"),
         "https://news.smol.ai/rss.xml": RssInfo("smol.webp", "Smol.ai News", "https://news.smol.ai/"),
 		"https://hnrss.org/newest?tags=ai": RssInfo("hackernews.webp", "YCombinator", "https://news.ycombinator.com/"),
@@ -47,7 +47,7 @@ CONFIG: SiteConfig = SiteConfig(
 		"https://huggingface.co/blog/feed.xml",
 		"https://futurism.com/categories/ai-artificial-intelligence/feed",
         "https://news.smol.ai/rss.xml",
-		"https://venturebeat.com/category/ai/fakefeed",
+#		"https://venturebeat.com/category/ai/fakefeed",
 		"https://feed.infoq.com/ai-ml-data-eng/",
 		"https://www.theregister.com/software/ai_ml/headlines.atom",
 		"https://www.reddit.com/r/Python/.rss",
