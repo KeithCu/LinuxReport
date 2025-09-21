@@ -1,11 +1,14 @@
 import sys
 import re
-import logging
 import requests
 from datetime import datetime
 
 # Add the current directory to the path to import local modules
 sys.path.append('.')
+from Logging import _setup_logging
+
+# Configure logging for this script
+logger = _setup_logging('model_update.log')
 
 def get_open_router_models():
     """Fetches the list of free models from OpenRouter's API."""
@@ -119,13 +122,6 @@ def main():
     print(f"Fetched {len(latest_models)} free models from OpenRouter.")
     update_script_file(latest_models)
 
-# Configure logging for this script
-logging.basicConfig(
-    filename='model_update.log',
-    level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
-
 if __name__ == "__main__":
     try:
         # Run the main logic and print to console and a file
@@ -151,5 +147,5 @@ if __name__ == "__main__":
         print("\nUpdate summary also written to model_updates.txt")
 
     except Exception as e:
-        logging.exception("An error occurred during model update.")
+        logger.exception("An error occurred during model update.")
         print(f"An error occurred: {e}")

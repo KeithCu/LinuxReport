@@ -10,10 +10,7 @@ import json
 import traceback
 import time
 
-from typing import Dict, List, Optional, Tuple
-import random
-import logging
-
+from typing import List, Optional, Tuple
 
 
 from image_parser import custom_fetch_largest_image
@@ -27,7 +24,7 @@ from html_generation import (
 
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 from LLMModelManager import LLMModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
-from Logging import _setup_logging
+from Logging import _setup_logging, DEBUG
 
 from enum import Enum  # Ensure this is included if not already
 
@@ -420,7 +417,7 @@ def ask_ai_top_articles(articles, dry_run=False):
     messages = _prepare_messages(PROMPT_MODE, filtered_articles)
     logger.info(f"Constructed prompt for {PROMPT_MODE} mode with {len(filtered_articles)} articles")
     
-    if logger.isEnabledFor(logging.DEBUG):
+    if logger.isEnabledFor(DEBUG):
         logger.debug("Prompt messages:")
         for i, msg in enumerate(messages):
             logger.debug(f"  Message {i+1} ({msg['role']}): {msg['content'][:200]}...")
@@ -491,7 +488,7 @@ def _process_ai_response(response_text, filtered_articles, model_context):
     top_titles = extract_top_titles_from_ai(response_text)
     logger.info(f"Extracted {len(top_titles)} titles from AI response")
     
-    if logger.isEnabledFor(logging.DEBUG):
+    if logger.isEnabledFor(DEBUG):
         logger.debug("Extracted titles:")
         for i, title in enumerate(top_titles, 1):
             logger.debug(f"  {i}. {title}")

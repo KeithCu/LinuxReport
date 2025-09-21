@@ -13,19 +13,19 @@ import os
 import re
 import warnings
 import math
-import logging
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 from sentence_transformers import SentenceTransformer, util
 
+from Logging import g_logger
 # =============================================================================
 # LOGGING CONFIGURATION
 # =============================================================================
 
 # Use the root logger to inherit the same configuration as auto_update.py
-logger = logging.getLogger()
+logger = g_logger
 
 # =============================================================================
 # CONSTANTS AND CONFIGURATION

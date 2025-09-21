@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Any, Optional
 from flask_login import UserMixin
 import datetime
-import logging
 import os
 import sys
 

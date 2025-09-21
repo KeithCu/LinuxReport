@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import sys
-import logging
 
 # Visualization imports
 import matplotlib.pyplot as plt

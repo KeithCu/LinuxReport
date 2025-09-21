@@ -1,7 +1,7 @@
 import time
 import random
-import logging
 from shared import g_c
+from Logging import _setup_logging, g_logger
 
 # =============================================================================
 # MODEL CONFIGURATION CONSTANTS
@@ -116,7 +116,7 @@ MISTRAL_EXTRA_PARAMS = {
 }
 
 # Set up logger
-logger = logging.getLogger(__name__)
+logger = g_logger
 
 class LLMModelManager:
     """Manages model selection, caching, and failure tracking.
