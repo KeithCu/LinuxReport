@@ -128,21 +128,10 @@ def create_driver(use_tor, user_agent):
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         # NOTE: We DON'T disable useAutomationExtension as that would break Selenium!
-        # Fake window size for headless (server can detect via JS screen.width/height)
-        # Use realistic screen resolutions that actual users have
-        realistic_resolutions = [
-            (1920, 1080),  # Full HD - most common
-            (1366, 768),   # Common laptop
-            (1536, 864),   # Common scaled resolution
-            (1440, 900),   # MacBook resolution
-            (1680, 1050),  # Common desktop
-            (1600, 900),   # Common widescreen
-            (1280, 720),   # HD resolution
-            (2560, 1440),  # QHD
-            (3840, 2160),  # 4K (less common but possible)
-        ]
-        width, height = random.choice(realistic_resolutions)
-        options.add_argument(f"--window-size={width},{height}")
+        # Use a consistent, common window size to avoid detection patterns
+        # Random window sizes can actually make detection easier as servers look for unusual patterns
+        # Full HD (1920x1080) is the most common desktop resolution and appears natural
+        options.add_argument("--window-size=1920,1080")
         # Keep performance optimizations - server can't see these!
         options.add_argument("--disable-extensions")
         options.add_argument("--disable-plugins")
@@ -362,32 +351,54 @@ class SharedSeleniumDriver:
         """
         Clean up a driver instance safely.
 
+        Uses a two-tier approach: first tries quit(), then close() if quit() fails.
+        Does not attempt process termination as this is overly aggressive and adds
+        unnecessary complexity. The driver process will terminate naturally when
+        the Python process exits.
+
         Args:
             instance: The SharedSeleniumDriver instance to clean up
         """
-        if instance:
-            try:
-                instance.driver.quit()
-                g_logger.debug("WebDriver quit successfully")
-            except Exception as e:
-                g_logger.error(f"Error quitting WebDriver: {e}")
+        if not instance or not hasattr(instance, 'driver'):
+            return
+
+        driver = instance.driver
+
+        try:
+            # Primary cleanup: quit the driver with proper timeout handling
+            # This should be the most reliable method when done correctly
+            if hasattr(driver, 'quit'):
+                # Set shorter timeouts for cleanup to avoid hanging
                 try:
-                    instance.driver.close()
-                    g_logger.debug("WebDriver closed successfully")
-                except Exception as e2:
-                    g_logger.error(f"Error closing WebDriver: {e2}")
-                    # Last resort: try to kill the process
-                    try:
-                        if hasattr(instance.driver, 'service') and hasattr(instance.driver.service, 'process'):
-                            process = instance.driver.service.process
-                            if process and process.poll() is None:
-                                process.terminate()
-                                time.sleep(1)
-                                if process.poll() is None:
-                                    process.kill()
-                                g_logger.debug("WebDriver process terminated")
-                    except Exception as e3:
-                        g_logger.error(f"Error terminating WebDriver process: {e3}")
+                    driver.set_page_load_timeout(5)  # 5 second timeout for cleanup
+                    driver.set_script_timeout(5)
+                except:
+                    pass  # Some drivers might not support timeout changes during cleanup
+
+                driver.quit()
+                g_logger.debug("WebDriver quit successfully")
+
+                # Give the process a moment to terminate gracefully
+                time.sleep(0.5)
+                return
+
+        except Exception as e:
+            g_logger.warning(f"Primary cleanup failed: {e}")
+
+        # Fallback: try to close the driver
+        try:
+            if hasattr(driver, 'close'):
+                driver.close()
+                g_logger.debug("WebDriver closed successfully")
+                time.sleep(0.5)
+                return
+        except Exception as e:
+            g_logger.warning(f"Secondary cleanup failed: {e}")
+
+        # If we get here, both quit() and close() failed
+        # This is rare and usually indicates the driver is in a bad state
+        # The process will likely terminate on its own when the Python process exits
+        g_logger.warning("All cleanup methods failed - driver may be in an inconsistent state")
 
     @classmethod
     def force_cleanup(cls):
@@ -548,6 +559,37 @@ def parse_relative_time(time_text):
         g_logger.error(f"Error parsing relative time '{time_text}': {e}")
         return None, None
 
+def _log_debugging_info(post, use_selenium, context):
+    """
+    Log debugging information for failed element extraction.
+
+    Args:
+        post: The post element being processed
+        use_selenium (bool): Whether using Selenium or BeautifulSoup
+        context (str): Context for the debugging info (e.g., "title", "link")
+    """
+    try:
+        # Show what text content is available for debugging
+        if use_selenium:
+            all_text = post.text[:200] + "..." if len(post.text) > 200 else post.text
+        else:
+            all_text = post.get_text()[:200] + "..." if len(post.get_text()) > 200 else post.get_text()
+        g_logger.info(f"Available text content for {context}: {all_text}")
+
+        # Show available links and classes for debugging
+        try:
+            all_links = post.find_all('a') if not use_selenium else post.find_elements(By.TAG_NAME, "a")
+            links_info = [a.get('href', 'NO_HREF') for a in all_links[:3]]
+            g_logger.info(f"Available links for {context}: {links_info}")
+
+            if not use_selenium:
+                g_logger.info(f"Available classes for {context}: {post.get('class', [])}")
+        except Exception as link_error:
+            g_logger.debug(f"Error getting link info for {context}: {link_error}")
+    except Exception as debug_e:
+        g_logger.debug(f"Error during debug output for {context}: {debug_e}")
+
+
 def extract_post_data(post, config, url, use_selenium):
     """
     Extract post data from a web element using the provided configuration.
@@ -612,28 +654,12 @@ def extract_post_data(post, config, url, use_selenium):
             title_element = post.select_one(config.title_selector)
             if not title_element:
                 g_logger.debug(f"No title element found with selector '{config.title_selector}'")
-                # Show what elements are available for debugging
-                try:
-                    all_links = post.find_all('a')
-                    g_logger.info(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
-                except:
-                    pass
+                _log_debugging_info(post, use_selenium, "title")
                 return None
             title = title_element.text.strip()
     except Exception as e:
         g_logger.error(f"Error extracting title with selector '{config.title_selector}': {e}")
-        # Show what text content is available for debugging
-        try:
-            if use_selenium:
-                all_text = post.text[:200] + "..." if len(post.text) > 200 else post.text
-            else:
-                all_text = post.get_text()[:200] + "..." if len(post.get_text()) > 200 else post.get_text()
-            g_logger.info(f"Available text content: {all_text}")
-            # Also show available classes for debugging
-            if not use_selenium:
-                g_logger.info(f"Available classes: {post.get('class', [])}")
-        except Exception as debug_e:
-            g_logger.debug(f"Error during debug output: {debug_e}")
+        _log_debugging_info(post, use_selenium, "title")
         return None
     
     if len(title.split()) < 2:
@@ -647,14 +673,7 @@ def extract_post_data(post, config, url, use_selenium):
             link_element = post.select_one(config.link_selector)
             if not link_element:
                 g_logger.info(f"No link element found with selector '{config.link_selector}'")
-                # Show what elements are available for debugging
-                try:
-                    all_links = post.find_all('a')
-                    g_logger.info(f"Available links in post: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
-                    # Also show available classes for debugging
-                    g_logger.info(f"Available classes: {post.get('class', [])}")
-                except Exception as debug_e:
-                    g_logger.debug(f"Error during debug output: {debug_e}")
+                _log_debugging_info(post, use_selenium, "link")
                 return None
             # Handle RSS feeds where links are text content, not href attributes
             if config.link_attr == "text":
@@ -665,18 +684,7 @@ def extract_post_data(post, config, url, use_selenium):
                 link = urljoin(url, link)
     except Exception as e:
         g_logger.error(f"Error extracting link with selector '{config.link_selector}': {e}")
-        # Show what link content is available for debugging
-        try:
-            if use_selenium:
-                all_links = post.find_elements(By.TAG_NAME, "a")
-                g_logger.info(f"Available links: {[a.get_attribute('href') for a in all_links[:3]]}")
-            else:
-                all_links = post.find_all('a')
-                g_logger.info(f"Available links: {[a.get('href', 'NO_HREF') for a in all_links[:3]]}")
-                # Also show available classes for debugging
-                g_logger.info(f"Available classes: {post.get('class', [])}")
-        except Exception as debug_e:
-            g_logger.debug(f"Error during debug output: {debug_e}")
+        _log_debugging_info(post, use_selenium, "link")
         return None
     
     filter_pattern = config.filter_pattern
@@ -888,6 +896,8 @@ def fetch_site_posts(url, user_agent):
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             posts = soup.select(config.post_container)
+
+            # Extract post data with consolidated error handling
             for post in posts:
                 try:
                     entry = extract_post_data(post, config, url, use_selenium=False)
@@ -895,8 +905,10 @@ def fetch_site_posts(url, user_agent):
                         entries.append(entry)
                 except Exception as e:
                     g_logger.error(f"Error extracting post data: {e}")
-                    continue
 
+        except requests.exceptions.RequestException as e:
+            g_logger.error(f"Request error for {base_domain}: {e}")
+            status = 500
         except Exception as e:
             g_logger.error(f"Error fetching {base_domain} with requests: {e}")
             status = 500
