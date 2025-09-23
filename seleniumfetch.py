@@ -62,11 +62,6 @@ FETCH_LOCK_TIMEOUT = 30  # 30 seconds for acquiring fetch lock (longer due to th
 # Driver lifecycle timeout - for resource management
 DRIVER_RECYCLE_TIMEOUT = 300  # 5 minutes - timeout for driver recycling
 
-# Legacy constants for backward compatibility (deprecated - use above constants instead)
-PAGE_LOAD_TIMEOUT = WEBDRIVER_TIMEOUT
-SCRIPT_TIMEOUT = WEBDRIVER_TIMEOUT
-WEBDRIVER_WAIT_TIMEOUT = NETWORK_TIMEOUT
-HTTP_REQUEST_TIMEOUT = NETWORK_TIMEOUT
 
 # =============================================================================
 # SPECIAL SITE CONFIGURATIONS
@@ -157,8 +152,8 @@ def create_driver(use_tor, user_agent):
         g_logger.debug("Chrome WebDriver created successfully")
 
         # Set timeouts to prevent hanging
-        driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT)  # 30 second page load timeout
-        driver.set_script_timeout(SCRIPT_TIMEOUT)     # 30 second script timeout
+        driver.set_page_load_timeout(WEBDRIVER_TIMEOUT)  # 30 second page load timeout
+        driver.set_script_timeout(WEBDRIVER_TIMEOUT)     # 30 second script timeout
 
         g_logger.info("Chrome driver setup completed successfully")
         return driver
@@ -892,7 +887,7 @@ def fetch_site_posts(url, user_agent):
                     auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
                     request_headers['Proxy-Authorization'] = f'Basic {auth_b64}'
             
-            response = requests.get(url, timeout=HTTP_REQUEST_TIMEOUT, headers=request_headers)
+            response = requests.get(url, timeout=NETWORK_TIMEOUT, headers=request_headers)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             posts = soup.select(config.post_container)
