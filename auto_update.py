@@ -483,6 +483,7 @@ def _try_ai_models(messages, filtered_articles):
 def _process_ai_response(response_text, filtered_articles, model_context):
     """Process AI response and extract matching articles."""
     logger.info(f"Processing AI response from {model_context}")
+    logger.info(f"Response text: {response_text}")
     
     # Extract titles from response
     top_titles = extract_top_titles_from_ai(response_text)
