@@ -69,9 +69,6 @@ MAX_ARTICLES_PER_FEED_FOR_LLM = 5  # How many articles from each feed to conside
 MAX_TOKENS = 10000
 TIMEOUT = 120
 
-# Global logging configuration
-GLOBAL_LOGGING_ENABLED = True
-API_RESPONSE_LOG = "api_responses.jsonl"
 
 # AI Attribution configuration
 SHOW_AI_ATTRIBUTION = True  # Set to False to hide AI model attribution in headlines
@@ -245,47 +242,6 @@ def _try_call_model(client, model, messages, max_tokens):
             logger.info(f"Model {model} responded in {response_time:.3f}s, finish_reason: {finish_reason}")
             logger.debug(f"Response length: {len(response_text)} characters")
 
-            # Log the API response only if global logging is enabled
-            if GLOBAL_LOGGING_ENABLED:
-                try:
-                    log_entry = {
-                        "timestamp": datetime.datetime.now(TZ).isoformat(),
-                        "model": model,
-                        "response": response_text,
-                        "finish_reason": finish_reason,
-                        "response_time": response_time,
-                        "messages": prepared_messages
-                    }
-
-                    # Read existing entries
-                    entries = []
-                    if os.path.exists(API_RESPONSE_LOG):
-                        try:
-                            with open(API_RESPONSE_LOG, "r", encoding="utf-8") as f:
-                                for line in f:
-                                    line = line.strip()
-                                    if line:
-                                        try:
-                                            entries.append(json.loads(line))
-                                        except json.JSONDecodeError:
-                                            continue
-                        except Exception as e:
-                            logger.warning(f"Error reading existing log entries: {str(e)}")
-
-                    # Add new entry
-                    entries.append(log_entry)
-
-                    # Keep only the last MAX_PREVIOUS_HEADLINES entries
-                    if len(entries) > MAX_PREVIOUS_HEADLINES:
-                        entries = entries[-MAX_PREVIOUS_HEADLINES:]
-
-                    # Write back to file
-                    with open(API_RESPONSE_LOG, "w", encoding="utf-8") as f:
-                        for entry in entries:
-                            f.write(json.dumps(entry, ensure_ascii=False, indent=2) + "\n")
-
-                except Exception as log_error:
-                    logger.warning(f"Failed to log API response: {str(log_error)}")
 
             return response_text
         except Exception as e:
