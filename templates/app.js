@@ -71,7 +71,89 @@
       PRIORITY_MULTIPLIER: 10,
       DELETE_HEADLINE_ENDPOINT: '/api/delete_headline'
     },
-    utils: {},
+    utils: {
+      ForceRefreshManager: {
+        init() {
+          if (!window.isAdmin) return; // Only initialize for admin users
+
+          this.bindEvents();
+          this.log('ForceRefreshManager initialized');
+        },
+
+        bindEvents() {
+          document.addEventListener('click', (event) => {
+            if (event.target.classList.contains('force-refresh-btn')) {
+              event.preventDefault();
+              this.handleForceRefresh(event.target);
+            }
+          });
+        },
+
+        async handleForceRefresh(button) {
+          const feedId = button.getAttribute('data-feed-id');
+          if (!feedId) {
+            this.error('No feed ID found for force refresh button');
+            return;
+          }
+
+          // Show loading state
+          const originalText = button.textContent;
+          button.textContent = '⏳ Refreshing...';
+          button.disabled = true;
+
+          try {
+            const response = await fetch('/api/force_refresh_feed', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': this.getCsrfToken()
+              },
+              body: JSON.stringify({ feed_url: feedId })
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+              // Show success message
+              button.textContent = '✅ Refreshed';
+              this.log(`Successfully initiated refresh for feed: ${feedId}`);
+
+              // Reset button after 2 seconds
+              setTimeout(() => {
+                button.textContent = originalText;
+                button.disabled = false;
+              }, 2000);
+            } else {
+              throw new Error(result.error || 'Unknown error occurred');
+            }
+          } catch (error) {
+            this.error(`Failed to refresh feed ${feedId}:`, error);
+            button.textContent = '❌ Error';
+
+            // Reset button after 3 seconds on error
+            setTimeout(() => {
+              button.textContent = originalText;
+              button.disabled = false;
+            }, 3000);
+          }
+        },
+
+        getCsrfToken() {
+          // Get CSRF token from window variable set by Flask
+          return window.csrf_token || '';
+        },
+
+        log(message) {
+          if (app.config.DEBUG_MODE && app.config.LOG_LEVEL === 'DEBUG') {
+            console.log(`[ForceRefreshManager] ${message}`);
+          }
+        },
+
+        error(message, error) {
+          console.error(`[ForceRefreshManager] ${message}`, error);
+        }
+      }
+    },
     modules: {}
   };
 
@@ -644,6 +726,10 @@
   window.app = app;
 
   // =============================================================================
+  // UTILITIES
+  // =============================================================================
+
+  // =============================================================================
   // INITIALIZE ON DOM CONTENT LOADED
   // =============================================================================
 
@@ -651,6 +737,7 @@
     app.utils.UIManager.applySettings();
     app.utils.TimezoneManager.init();
     app.utils.StaleFeedManager.init();
+    app.utils.ForceRefreshManager.init();
   });
 
 })();

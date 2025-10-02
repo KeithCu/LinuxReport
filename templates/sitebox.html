@@ -3,6 +3,9 @@
   <center>
     <small>Last updated: <span class="last-updated-time" data-utc-time="{{ last_fetch }}"></span></small>
     <!-- Time is automatically converted from server timezone to your browser's local timezone -->
+    {% if current_user.is_authenticated %}
+    <br><button class="force-refresh-btn" data-feed-id="{{ feed_id }}" title="Force refresh this feed">🔄 Refresh</button>
+    {% endif %}
   </center>
   <div class="pagination-controls" data-feed-id="feed-{{ feed_id }}">
     <button class="prev-btn" disabled>&lt;</button>

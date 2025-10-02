@@ -701,6 +701,50 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         response.headers['Cache-Control'] = 'public, max-age=900'
         return response
 
+    @flask_app.route('/api/force_refresh_feed', methods=['POST'])
+    @login_required
+    def force_refresh_feed():
+        """Force refresh a specific RSS feed by marking it as expired."""
+        try:
+            feed_url = request.json.get('feed_url')
+            if not feed_url:
+                return jsonify({'error': 'feed_url parameter is required'}), 400
+
+            # Find the corresponding ALL_URLS key for this site_url
+            all_urls_key = None
+            for url_key, rss_info in ALL_URLS.items():
+                if rss_info.site_url == feed_url:
+                    all_urls_key = url_key  # This is the ALL_URLS key
+                    cache_key = rss_info.site_url  # This is what we use for cache
+                    break
+
+            if not cache_key or not all_urls_key:
+                return jsonify({'error': 'Invalid feed URL'}), 400
+
+            from datetime import datetime, timedelta
+
+            # Clear the cached template from memory cache so it will be re-rendered
+            g_cm.delete(cache_key)
+            # Clear the render time cache
+            g_cm.delete(f"{cache_key}_render_time")
+
+            # Set the last fetch time to be a week old - definitely enough to trigger a refresh
+            week_ago = datetime.now() - timedelta(days=7)
+            g_c.set_last_fetch(all_urls_key, week_ago)
+
+            # Fetch the feed directly using the worker function (no threading needed for single feed)
+            try:
+                from workers import load_url_worker
+                load_url_worker(all_urls_key)
+            except Exception as e:
+                g_logger.error(f"Error refreshing feed {all_urls_key}: {e}")
+
+            return jsonify({'success': True, 'message': f'Force refresh initiated for {feed_url}'})
+
+        except Exception as e:
+            g_logger.error(f"Error in force refresh for {feed_url}: {e}")
+            return jsonify({'error': 'Internal server error'}), 500
+
     # Rate limit error handler
     @flask_app.errorhandler(429)
     def ratelimit_handler(e):
