@@ -348,9 +348,8 @@ class SharedSeleniumDriver:
         Clean up a driver instance safely.
 
         Uses a two-tier approach: first tries quit(), then close() if quit() fails.
-        Does not attempt process termination as this is overly aggressive and adds
-        unnecessary complexity. The driver process will terminate naturally when
-        the Python process exits.
+        As a final fallback, if the driver service process is still alive,
+        attempts to terminate/kill it to avoid lingering Chromium processes.
 
         Args:
             instance: The SharedSeleniumDriver instance to clean up
@@ -360,41 +359,55 @@ class SharedSeleniumDriver:
 
         driver = instance.driver
 
+        did_cleanup_call = False
+
         try:
             # Primary cleanup: quit the driver with proper timeout handling
-            # This should be the most reliable method when done correctly
             if hasattr(driver, 'quit'):
-                # Set shorter timeouts for cleanup to avoid hanging
                 try:
-                    driver.set_page_load_timeout(5)  # 5 second timeout for cleanup
+                    driver.set_page_load_timeout(5)
                     driver.set_script_timeout(5)
                 except:
-                    pass  # Some drivers might not support timeout changes during cleanup
+                    pass
 
                 driver.quit()
+                did_cleanup_call = True
                 g_logger.debug("WebDriver quit successfully")
-
-                # Give the process a moment to terminate gracefully
                 time.sleep(0.5)
-                return
-
         except Exception as e:
             g_logger.warning(f"Primary cleanup failed: {e}")
 
-        # Fallback: try to close the driver
-        try:
-            if hasattr(driver, 'close'):
-                driver.close()
-                g_logger.debug("WebDriver closed successfully")
-                time.sleep(0.5)
-                return
-        except Exception as e:
-            g_logger.warning(f"Secondary cleanup failed: {e}")
+        # Fallback: try to close the driver if quit failed
+        if not did_cleanup_call:
+            try:
+                if hasattr(driver, 'close'):
+                    driver.close()
+                    did_cleanup_call = True
+                    g_logger.debug("WebDriver closed successfully")
+                    time.sleep(0.5)
+            except Exception as e:
+                g_logger.warning(f"Secondary cleanup failed: {e}")
 
-        # If we get here, both quit() and close() failed
-        # This is rare and usually indicates the driver is in a bad state
-        # The process will likely terminate on its own when the Python process exits
-        g_logger.warning("All cleanup methods failed - driver may be in an inconsistent state")
+        # Final safeguard: ensure the chromedriver process is terminated
+        try:
+            service = getattr(driver, 'service', None)
+            proc = getattr(service, 'process', None)
+            pid = getattr(proc, 'pid', None) if proc else None
+            if proc and hasattr(proc, 'poll') and proc.poll() is None:
+                g_logger.info(f"Cleanup: chromedriver pid {pid} still alive after quit/close; terminating...")
+                try:
+                    proc.terminate()
+                    time.sleep(1.0)
+                    if proc.poll() is None:
+                        proc.kill()
+                    g_logger.info(f"Cleanup: chromedriver pid {pid} terminated")
+                except Exception as kill_e:
+                    g_logger.warning(f"Cleanup: failed to terminate chromedriver pid {pid}: {kill_e}")
+        except Exception as e:
+            g_logger.debug(f"Cleanup: unable to inspect/terminate driver service process: {e}")
+
+        if not did_cleanup_call:
+            g_logger.warning("All cleanup methods failed - driver may be in an inconsistent state")
 
     @classmethod
     def force_cleanup(cls):
