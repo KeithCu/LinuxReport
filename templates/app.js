@@ -86,16 +86,36 @@
           const feedBoxes = document.querySelectorAll('.box[id^="feed-"]');
           feedBoxes.forEach(box => {
             const feedId = box.id.replace('feed-', '');
-            const center = box.querySelector('center');
-            if (center && !center.querySelector('.force-refresh-btn')) {
+            if (!box.querySelector('.force-refresh-btn')) {
               const button = document.createElement('button');
               button.className = 'force-refresh-btn';
               button.setAttribute('data-feed-id', feedId);
               button.setAttribute('title', 'Force refresh this feed');
-              button.textContent = '🔄 Refresh';
-              button.style.marginTop = '5px';
-              center.appendChild(document.createElement('br'));
-              center.appendChild(button);
+              button.textContent = '🔄';
+              button.style.cssText = `
+                position: absolute;
+                top: 5px;
+                left: 5px;
+                background: rgba(0, 0, 0, 0.3);
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 4px 6px;
+                font-size: 12px;
+                cursor: pointer;
+                opacity: 0.6;
+                transition: opacity 0.2s;
+                z-index: 10;
+              `;
+              button.addEventListener('mouseenter', () => button.style.opacity = '1');
+              button.addEventListener('mouseleave', () => button.style.opacity = '0.6');
+              
+              // Make the box container relative positioned if it isn't already
+              if (getComputedStyle(box).position === 'static') {
+                box.style.position = 'relative';
+              }
+              
+              box.appendChild(button);
             }
           });
         },
