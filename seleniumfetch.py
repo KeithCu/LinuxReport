@@ -341,6 +341,7 @@ class SharedSeleniumDriver:
             if cls._instance == instance:
                 cls._instance = None
 
+
     @classmethod
     def _cleanup_instance(cls, instance):
         """
@@ -428,12 +429,13 @@ class SharedSeleniumDriver:
 def cleanup_selenium_drivers():
     """
     Global cleanup function to ensure all Selenium drivers are properly shut down.
-    
+
     This function can be called from other modules or during application shutdown
     to ensure no WebDriver instances are left running.
     """
     g_logger.info("Cleaning up all Selenium drivers...")
     SharedSeleniumDriver.force_cleanup()
+
 
 def _signal_handler(signum, frame):
     """
