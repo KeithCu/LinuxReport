@@ -76,8 +76,28 @@
         init() {
           if (!window.isAdmin) return; // Only initialize for admin users
 
+          this.addRefreshButtons();
           this.bindEvents();
           this.log('ForceRefreshManager initialized');
+        },
+
+        addRefreshButtons() {
+          // Find all feed boxes and add refresh buttons
+          const feedBoxes = document.querySelectorAll('.box[id^="feed-"]');
+          feedBoxes.forEach(box => {
+            const feedId = box.id.replace('feed-', '');
+            const center = box.querySelector('center');
+            if (center && !center.querySelector('.force-refresh-btn')) {
+              const button = document.createElement('button');
+              button.className = 'force-refresh-btn';
+              button.setAttribute('data-feed-id', feedId);
+              button.setAttribute('title', 'Force refresh this feed');
+              button.textContent = '🔄 Refresh';
+              button.style.marginTop = '5px';
+              center.appendChild(document.createElement('br'));
+              center.appendChild(button);
+            }
+          });
         },
 
         bindEvents() {
