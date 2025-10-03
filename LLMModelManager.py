@@ -10,6 +10,7 @@ from Logging import _setup_logging, g_logger
 # List of free models to try
 FREE_MODELS = [
     "agentica-org/deepcoder-14b-preview:free",
+    "alibaba/tongyi-deepresearch-30b-a3b:free",
     "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
     "cognitivecomputations/dolphin3.0-mistral-24b:free",
@@ -33,7 +34,8 @@ FREE_MODELS = [
     "google/gemma-3-4b-it:free",
     "google/gemma-3n-e2b-it:free",
     "google/gemma-3n-e4b-it:free",
-    "meta-llama/llama-3.1-405b-instruct:free",
+    "meituan/longcat-flash-chat:free",
+    # "meta-llama/llama-3.1-405b-instruct:free", # Removed by openrouter.ai on: 2025-10-03
     # "meta-llama/llama-3.2-11b-vision-instruct:free", # Removed by openrouter.ai on: 2025-09-07
     "meta-llama/llama-3.2-3b-instruct:free",
     "meta-llama/llama-3.3-70b-instruct:free",
@@ -59,7 +61,7 @@ FREE_MODELS = [
     # "nvidia/llama-3.3-nemotron-super-49b-v1:free", # Removed by openrouter.ai on: 2025-08-01
     "nvidia/nemotron-nano-9b-v2:free",
    # "open-r1/olympiccoder-32b:free", Generates too many tokens
-    "openai/gpt-oss-120b:free",
+    # "openai/gpt-oss-120b:free", # Removed by openrouter.ai on: 2025-10-03
     "openai/gpt-oss-20b:free",
     # "opengvlab/internvl3-14b:free", # Removed by openrouter.ai on: 2025-08-01
     # "openrouter/cypher-alpha:free", # Removed by openrouter.ai on: 2025-08-01
@@ -77,7 +79,7 @@ FREE_MODELS = [
     "qwen/qwen3-4b:free",
     "qwen/qwen3-8b:free",
     "qwen/qwen3-coder:free",
-    "qwen/qwq-32b:free",
+    # "qwen/qwq-32b:free", # Removed by openrouter.ai on: 2025-10-03
     # "rekaai/reka-flash-3:free", # Removed by openrouter.ai on: 2025-09-21
     # "sarvamai/sarvam-m:free", # Removed by openrouter.ai on: 2025-09-07
     "shisa-ai/shisa-v2-llama3.3-70b:free",
@@ -86,7 +88,7 @@ FREE_MODELS = [
     # "thudm/glm-z1-32b:free", # Removed by openrouter.ai on: 2025-09-07
     "tngtech/deepseek-r1t-chimera:free",
     "tngtech/deepseek-r1t2-chimera:free",
-    "x-ai/grok-4-fast:free",
+    # "x-ai/grok-4-fast:free", # Removed by openrouter.ai on: 2025-10-03
     "z-ai/glm-4.5-air:free",
 ]
 
