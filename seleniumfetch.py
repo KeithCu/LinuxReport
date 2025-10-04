@@ -237,6 +237,8 @@ class SharedSeleniumDriver:
         with cls._lock:
             # Clean up expired instances periodically
             cls._cleanup_expired_instances(now)
+            # Also clean up any lingering chromedriver processes
+            cls._cleanup_lingering_processes()
 
             # Check if we have a valid instance for this configuration
             if key in cls._instances:
@@ -405,33 +407,34 @@ class SharedSeleniumDriver:
                 except Exception as kill_e:
                     g_logger.warning(f"Cleanup: failed to terminate chromedriver pid {pid}: {kill_e}")
             
-            # Also kill any lingering chromedriver processes
-            try:
-                import subprocess
-                import os
-                # Find and kill chromedriver processes that might be lingering
-                g_logger.info("Cleanup: searching for lingering chromedriver processes...")
-                result = subprocess.run(['pgrep', '-f', 'chromedriver'], capture_output=True, text=True, timeout=5)
-                g_logger.info(f"Cleanup: pgrep result - returncode: {result.returncode}, stdout: '{result.stdout.strip()}', stderr: '{result.stderr.strip()}'")
-                
-                if result.returncode == 0 and result.stdout.strip():
-                    chromedriver_pids = result.stdout.strip().split('\n')
-                    g_logger.info(f"Cleanup: found {len(chromedriver_pids)} lingering chromedriver processes: {chromedriver_pids}")
-                    for chromedriver_pid in chromedriver_pids:
-                        try:
-                            os.kill(int(chromedriver_pid), 15)  # SIGTERM
-                            g_logger.info(f"Cleanup: terminated chromedriver process {chromedriver_pid}")
-                        except (OSError, ValueError) as e:
-                            g_logger.debug(f"Cleanup: could not terminate chromedriver process {chromedriver_pid}: {e}")
-                else:
-                    g_logger.info("Cleanup: no chromedriver processes found via pgrep")
-            except Exception as chromedriver_cleanup_e:
-                g_logger.warning(f"Cleanup: unable to clean up chromedriver processes: {chromedriver_cleanup_e}")
         except Exception as e:
             g_logger.debug(f"Cleanup: unable to inspect/terminate driver service process: {e}")
 
         if not did_cleanup_call:
             g_logger.warning("All cleanup methods failed - driver may be in an inconsistent state")
+
+    @classmethod
+    def _cleanup_lingering_processes(cls):
+        """
+        Aggressively clean up any lingering chromedriver processes.
+        This is called whenever get_driver is invoked to prevent accumulation.
+        """
+        try:
+            import subprocess
+            import os
+            # Find and kill chromedriver processes that might be lingering
+            result = subprocess.run(['pgrep', '-f', 'chromedriver'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                chromedriver_pids = result.stdout.strip().split('\n')
+                g_logger.info(f"Cleanup: found {len(chromedriver_pids)} lingering chromedriver processes: {chromedriver_pids}")
+                for chromedriver_pid in chromedriver_pids:
+                    try:
+                        os.kill(int(chromedriver_pid), 15)  # SIGTERM
+                        g_logger.info(f"Cleanup: terminated chromedriver process {chromedriver_pid}")
+                    except (OSError, ValueError) as e:
+                        g_logger.debug(f"Cleanup: could not terminate chromedriver process {chromedriver_pid}: {e}")
+        except Exception as e:
+            g_logger.debug(f"Cleanup: unable to clean up lingering chromedriver processes: {e}")
 
     @classmethod
     def force_cleanup(cls):
