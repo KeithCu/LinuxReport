@@ -433,15 +433,17 @@ class SharedSeleniumDriver:
                 for chromedriver_pid in chromedriver_pids:
                     try:
                         # Kill the process group to also kill child Chrome processes
-                        os.killpg(os.getpgid(int(chromedriver_pid)), 15)  # SIGTERM to process group
-                        g_logger.info(f"Cleanup: terminated chromedriver process group {chromedriver_pid}")
+                        os.killpg(os.getpgid(int(chromedriver_pid)), 9)  # SIGKILL to process group
+                        g_logger.info(f"Cleanup: killed chromedriver process group {chromedriver_pid}")
                     except (OSError, ValueError, ProcessLookupError) as e:
                         # Fallback to killing just the chromedriver process
                         try:
-                            os.kill(int(chromedriver_pid), 15)  # SIGTERM
-                            g_logger.info(f"Cleanup: terminated chromedriver process {chromedriver_pid}")
+                            os.kill(int(chromedriver_pid), 9)  # SIGKILL
+                            g_logger.info(f"Cleanup: killed chromedriver process {chromedriver_pid}")
                         except (OSError, ValueError) as e2:
-                            g_logger.debug(f"Cleanup: could not terminate chromedriver process {chromedriver_pid}: {e2}")
+                            g_logger.debug(f"Cleanup: could not kill chromedriver process {chromedriver_pid}: {e2}")
+                    # Brief pause to let process die
+                    time.sleep(0.1)
 
             # Also find and kill any orphaned Chrome processes
             chrome_result = subprocess.run(['pgrep', '-f', 'chrome.*--'], capture_output=True, text=True, timeout=5)
@@ -452,13 +454,15 @@ class SharedSeleniumDriver:
                 g_logger.info(f"Cleanup: found {chrome_count} lingering Chrome processes: {chrome_pids}")
                 for chrome_pid in chrome_pids:
                     try:
-                        os.kill(int(chrome_pid), 15)  # SIGTERM
-                        g_logger.info(f"Cleanup: terminated Chrome process {chrome_pid}")
+                        os.kill(int(chrome_pid), 9)  # SIGKILL
+                        g_logger.info(f"Cleanup: killed Chrome process {chrome_pid}")
                     except (OSError, ValueError) as e:
-                        g_logger.debug(f"Cleanup: could not terminate Chrome process {chrome_pid}: {e}")
+                        g_logger.debug(f"Cleanup: could not kill Chrome process {chrome_pid}: {e}")
+                    # Brief pause to let process die
+                    time.sleep(0.1)
 
             if chromedriver_count > 0 or chrome_count > 0:
-                g_logger.info(f"Cleanup: terminated {chromedriver_count} chromedriver and {chrome_count} Chrome processes")
+                g_logger.info(f"Cleanup: killed {chromedriver_count} chromedriver and {chrome_count} Chrome processes")
             else:
                 g_logger.debug("Cleanup: no lingering browser processes found")
 
