@@ -416,25 +416,54 @@ class SharedSeleniumDriver:
     @classmethod
     def _cleanup_lingering_processes(cls):
         """
-        Aggressively clean up any lingering chromedriver processes.
+        Aggressively clean up any lingering chromedriver and Chrome processes.
         This is called whenever get_driver is invoked to prevent accumulation.
         """
         try:
             import subprocess
             import os
+
             # Find and kill chromedriver processes that might be lingering
-            result = subprocess.run(['pgrep', '-f', 'chromedriver'], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0 and result.stdout.strip():
-                chromedriver_pids = result.stdout.strip().split('\n')
-                g_logger.info(f"Cleanup: found {len(chromedriver_pids)} lingering chromedriver processes: {chromedriver_pids}")
+            chromedriver_result = subprocess.run(['pgrep', '-f', 'chromedriver'], capture_output=True, text=True, timeout=5)
+            chromedriver_count = 0
+            if chromedriver_result.returncode == 0 and chromedriver_result.stdout.strip():
+                chromedriver_pids = chromedriver_result.stdout.strip().split('\n')
+                chromedriver_count = len(chromedriver_pids)
+                g_logger.info(f"Cleanup: found {chromedriver_count} lingering chromedriver processes: {chromedriver_pids}")
                 for chromedriver_pid in chromedriver_pids:
                     try:
-                        os.kill(int(chromedriver_pid), 15)  # SIGTERM
-                        g_logger.info(f"Cleanup: terminated chromedriver process {chromedriver_pid}")
+                        # Kill the process group to also kill child Chrome processes
+                        os.killpg(os.getpgid(int(chromedriver_pid)), 15)  # SIGTERM to process group
+                        g_logger.info(f"Cleanup: terminated chromedriver process group {chromedriver_pid}")
+                    except (OSError, ValueError, ProcessLookupError) as e:
+                        # Fallback to killing just the chromedriver process
+                        try:
+                            os.kill(int(chromedriver_pid), 15)  # SIGTERM
+                            g_logger.info(f"Cleanup: terminated chromedriver process {chromedriver_pid}")
+                        except (OSError, ValueError) as e2:
+                            g_logger.debug(f"Cleanup: could not terminate chromedriver process {chromedriver_pid}: {e2}")
+
+            # Also find and kill any orphaned Chrome processes
+            chrome_result = subprocess.run(['pgrep', '-f', 'chrome.*--'], capture_output=True, text=True, timeout=5)
+            chrome_count = 0
+            if chrome_result.returncode == 0 and chrome_result.stdout.strip():
+                chrome_pids = chrome_result.stdout.strip().split('\n')
+                chrome_count = len(chrome_pids)
+                g_logger.info(f"Cleanup: found {chrome_count} lingering Chrome processes: {chrome_pids}")
+                for chrome_pid in chrome_pids:
+                    try:
+                        os.kill(int(chrome_pid), 15)  # SIGTERM
+                        g_logger.info(f"Cleanup: terminated Chrome process {chrome_pid}")
                     except (OSError, ValueError) as e:
-                        g_logger.debug(f"Cleanup: could not terminate chromedriver process {chromedriver_pid}: {e}")
+                        g_logger.debug(f"Cleanup: could not terminate Chrome process {chrome_pid}: {e}")
+
+            if chromedriver_count > 0 or chrome_count > 0:
+                g_logger.info(f"Cleanup: terminated {chromedriver_count} chromedriver and {chrome_count} Chrome processes")
+            else:
+                g_logger.debug("Cleanup: no lingering browser processes found")
+
         except Exception as e:
-            g_logger.debug(f"Cleanup: unable to clean up lingering chromedriver processes: {e}")
+            g_logger.debug(f"Cleanup: unable to clean up lingering browser processes: {e}")
 
     @classmethod
     def force_cleanup(cls):
