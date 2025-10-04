@@ -388,7 +388,8 @@ class SharedSeleniumDriver:
             except Exception as e:
                 g_logger.warning(f"Secondary cleanup failed: {e}")
 
-        # Final safeguard: ensure the chromedriver process is terminated
+        # Final safeguard: ALWAYS check if chromedriver process is still alive
+        # This runs regardless of whether quit/close succeeded or failed
         try:
             service = getattr(driver, 'service', None)
             proc = getattr(service, 'process', None)
@@ -403,6 +404,24 @@ class SharedSeleniumDriver:
                     g_logger.info(f"Cleanup: chromedriver pid {pid} terminated")
                 except Exception as kill_e:
                     g_logger.warning(f"Cleanup: failed to terminate chromedriver pid {pid}: {kill_e}")
+            
+            # Also kill any lingering chromedriver processes
+            try:
+                import subprocess
+                import os
+                # Find and kill chromedriver processes that might be lingering
+                result = subprocess.run(['pgrep', '-f', 'chromedriver'], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0 and result.stdout.strip():
+                    chromedriver_pids = result.stdout.strip().split('\n')
+                    g_logger.info(f"Cleanup: found {len(chromedriver_pids)} lingering chromedriver processes: {chromedriver_pids}")
+                    for chromedriver_pid in chromedriver_pids:
+                        try:
+                            os.kill(int(chromedriver_pid), 15)  # SIGTERM
+                            g_logger.info(f"Cleanup: terminated chromedriver process {chromedriver_pid}")
+                        except (OSError, ValueError) as e:
+                            g_logger.debug(f"Cleanup: could not terminate chromedriver process {chromedriver_pid}: {e}")
+            except Exception as chromedriver_cleanup_e:
+                g_logger.debug(f"Cleanup: unable to clean up chromedriver processes: {chromedriver_cleanup_e}")
         except Exception as e:
             g_logger.debug(f"Cleanup: unable to inspect/terminate driver service process: {e}")
 
