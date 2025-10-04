@@ -137,9 +137,9 @@ class ConfigManager:
             return config
             
         except yaml.YAMLError as e:
-            raise ValueError(f"Malformed configuration file: {e}")
-        except Exception as e:
-            logging.error(f"Error loading config.yaml: {e}")
+            raise ValueError(f"Malformed configuration file: {e}") from e
+        except (IOError, OSError) as e:
+            logging.error(f"Error reading config.yaml: {e}")
             raise
     
     def get_config(self) -> Dict[str, Any]:
@@ -204,6 +204,16 @@ class ConfigManager:
         if value is None:
             raise ValueError(f"Required configuration key not found: {key_path}")
         return value
+
+    def reload(self) -> None:
+        """
+        Reload configuration from disk (useful for development).
+        
+        This clears the cache and forces a fresh load of the configuration file.
+        """
+        self._config = None
+        self._validated = False
+        self.load_config.cache_clear()
 
 # =============================================================================
 # GLOBAL CONFIGURATION INSTANCE
@@ -447,7 +457,7 @@ def validate_configuration() -> None:
         # Just try to load config, don't validate strictly
         config_manager.get_config()
         print("Configuration loaded")
-    except Exception as e:
+    except (FileNotFoundError, ValueError) as e:
         print(f"Configuration loading failed: {e}")
 
 # =============================================================================
@@ -460,9 +470,7 @@ def reload_configuration() -> None:
     
     This clears the cache and forces a fresh load of the configuration file.
     """
-    config_manager._config = None
-    config_manager._validated = False
-    config_manager.load_config.cache_clear()
+    config_manager.reload()
     print("Configuration reloaded successfully")
 
 # =============================================================================
@@ -472,6 +480,6 @@ def reload_configuration() -> None:
 # Validate configuration on module import
 try:
     validate_configuration()
-except Exception as e:
+except (FileNotFoundError, ValueError) as e:
     print(f"Warning: Configuration validation failed during import: {e}")
     # Don't raise here to allow the module to be imported for testing
