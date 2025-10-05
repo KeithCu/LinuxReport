@@ -717,7 +717,10 @@ def extract_post_data(post, config, url, use_selenium):
     
     # Regular processing for non-RSS content
     try:
-        if use_selenium:
+        # Special case: if title_selector equals post_container, use the post element itself
+        if config.title_selector == config.post_container:
+            title = post.text.strip()
+        elif use_selenium:
             title_element = post.find_element(By.CSS_SELECTOR, config.title_selector)
             title = title_element.text.strip()
         else:
