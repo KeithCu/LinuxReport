@@ -25,6 +25,7 @@ from bisect import bisect_left
 # THIRD-PARTY IMPORTS
 # =============================================================================
 import geoip2.database
+import geoip2.errors
 import requests
 from flask import jsonify, request
 from flask_restful import Resource, reqparse
@@ -194,7 +195,7 @@ def get_location_from_ip(ip):
         lat = response.location.latitude
         lon = response.location.longitude
         return lat, lon
-    except:
+    except (geoip2.errors.AddressNotFoundError, ValueError):
         return DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
 def rate_limit_check():
@@ -802,7 +803,7 @@ def geoip_lookup(ip):
         g_logger.debug(f"City: {response.city.name if response.city else 'Unknown'}")
         g_logger.debug(f"Country: {response.country.name if response.country else 'Unknown'}")
 
-    except Exception as e:
+    except (geoip2.errors.AddressNotFoundError, FileNotFoundError, TypeError) as e:
         g_logger.error(f"GeoIP lookup failed with error: {type(e).__name__}: {e}")
         return {
             "ip": ip,
@@ -862,7 +863,7 @@ def test_openweather_api(lat, lon):
             g_logger.error(f"❌ OpenWeather API failed with status: {status_code}")
             g_logger.error(f"Error: {weather_data}")
 
-    except Exception as e:
+    except (requests.exceptions.RequestException, ValueError, KeyError, TypeError) as e:
         g_logger.error(f"❌ OpenWeather API test failed with error: {type(e).__name__}: {e}")
 
 def main():

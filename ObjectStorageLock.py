@@ -217,19 +217,24 @@ class ObjectStorageLock(LockBase):
                 
             return False
             
-        except Exception as e:
-            g_logger.error(f"Error acquiring lock {self.lock_key}: {e}")
+        except TypeError as e:
+            g_logger.error(f"Error acquiring lock {self.lock_key} due to data issue: {e}")
             return False
             
     def _get_lock_info(self):
         """Get current lock information from storage."""
         try:
-            content, metadata = smart_fetch(self.lock_object_name, cache_expiry=1)  # 1 second cache expiry for locks
+            content, metadata = smart_fetch(self.lock_object_name, cache_expiry=1)
             if content:
                 return pickle.loads(content)
             return None
-        except Exception as e:
-            g_logger.error(f"Error getting lock info for {self.lock_key}: {e}")
+        except pickle.UnpicklingError as e:
+            g_logger.error(f"Error unpickling lock data for {self.lock_key}: {e}")
+            return None
+        except oss_config.ObjectDoesNotExistError:
+            return None  # Lock does not exist, not an error
+        except (oss_config.StorageOperationError, oss_config.LibcloudError) as e:
+            g_logger.warning(f"Could not get lock info for {self.lock_key}: {e}")
             return None
 
     @retry(
@@ -244,9 +249,12 @@ class ObjectStorageLock(LockBase):
             content = pickle.dumps(lock_data)
             publish_bytes(content, self.lock_object_name)
             return True
-        except Exception as e:
-            g_logger.error(f"Error putting lock info for {self.lock_key}: {e}")
-            return False
+        except pickle.PicklingError as e:
+            g_logger.error(f"Error pickling lock data for {self.lock_key}: {e}")
+            raise TypeError(f"Failed to serialize lock data for {self.lock_key}") from e
+        except (oss_config.StorageOperationError, oss_config.LibcloudError) as e:
+            g_logger.warning(f"Storage error putting lock info for {self.lock_key}: {e}")
+            raise
     
     def release(self) -> bool:
         """
@@ -273,8 +281,11 @@ class ObjectStorageLock(LockBase):
                 obj = oss_config._storage_container.get_object(object_name=self.lock_object_name)
                 oss_config._storage_container.delete_object(obj)
                 success = True
-        except Exception as e:
-            g_logger.error(f"Error releasing lock {self.lock_key}: {e}")
+        except oss_config.ObjectDoesNotExistError:
+            g_logger.warning(f"Lock {self.lock_key} was not found during release, assuming already released.")
+            success = True  # If the object is already gone, it's released.
+        except (oss_config.StorageOperationError, oss_config.LibcloudError) as e:
+            g_logger.error(f"Storage error releasing lock {self.lock_key}: {e}")
             success = False
             
         self._thread_local.lock_count = 0
@@ -311,7 +322,7 @@ class ObjectStorageLock(LockBase):
                 self._put_lock_info(lock_data)
                 return True
             return False
-        except Exception as e:
+        except (oss_config.StorageOperationError, oss_config.LibcloudError, TypeError) as e:
             g_logger.error(f"Error renewing lock {self.lock_key}: {e}")
             return False
         

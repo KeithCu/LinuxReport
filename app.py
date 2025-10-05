@@ -217,7 +217,7 @@ def setup_monitoring_dashboard(app):
         
     except ImportError:
         g_logger.warning("Flask-MonitoringDashboard not available")
-    except Exception as e:
+    except (AttributeError, TypeError) as e:
         g_logger.warning(f"Failed to initialize Flask-MonitoringDashboard: {e}")
 
 # Set up monitoring dashboard
@@ -296,7 +296,7 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
                         if line.startswith('// Hash: '):
                             existing_hash = line.split('// Hash: ')[1].strip()
                             break
-                except Exception as e:
+                except IOError as e:
                     g_logger.warning(f"Could not read existing JS file: {e}")
             
             # Calculate hash of source files to see if they changed
@@ -348,7 +348,7 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
             # Run one-time migration of last_fetch times
             run_one_time_last_fetch_migration(ALL_URLS.keys())
             
-        except Exception as e:
+        except (IOError, OSError, RuntimeError) as e:
             g_logger.warning(f"Failed to complete startup tasks: {e}")
 
 # Perform startup tasks

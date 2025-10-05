@@ -10,6 +10,7 @@ configuration page, weather API, authentication, and various utility endpoints.
 # =============================================================================
 import os
 import json
+import sqlite3
 import datetime
 import time
 
@@ -736,12 +737,12 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
             try:
                 from workers import load_url_worker
                 load_url_worker(all_urls_key)
-            except Exception as e:
+            except ImportError as e:
                 g_logger.error(f"Error refreshing feed {all_urls_key}: {e}")
 
             return jsonify({'success': True, 'message': f'Force refresh initiated for {feed_url}'})
 
-        except Exception as e:
+        except (TypeError, ValueError, sqlite3.Error, IOError) as e:
             g_logger.error(f"Error in force refresh for {feed_url}: {e}")
             return jsonify({'error': 'Internal server error'}), 500
 

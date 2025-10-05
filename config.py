@@ -30,7 +30,7 @@ def init_config_routes(app):
 
                     with open(above_html_path, 'r', encoding='utf-8') as f:
                         form.headlines.data = f.read()
-                except Exception as e:
+                except (FileNotFoundError, IOError) as e:
                     g_logger.warning(f"Error reading headlines file: {e}")
                     form.headlines.data = ""
 
@@ -98,7 +98,7 @@ def init_config_routes(app):
                         f.write(form.headlines.data)
                     g_logger.info(f"Saved headlines to {above_html_path}.")
                     flash('Headlines saved successfully.', 'success')
-                except Exception as e:
+                except (FileNotFoundError, IOError) as e:
                     g_logger.error(f"Error saving headlines file: {e}")
                     flash('Error saving headlines. Please try again.', 'error')
 

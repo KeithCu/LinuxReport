@@ -21,6 +21,7 @@ import time
 import sys
 import urllib.request
 import urllib.error
+import socket
 import argparse
 import shutil
 from concurrent.futures import ThreadPoolExecutor
@@ -109,7 +110,7 @@ def wake_up_site(dir_name, url):
         except urllib.error.URLError as e:
             http_status = "000"
             response_preview = ""
-        except Exception as e:
+        except (socket.timeout, ConnectionResetError) as e:
             http_status = "000"
             response_preview = ""
         
@@ -237,7 +238,7 @@ def copy_files_to_directories(files, target_dirs):
                 print(f"    ✅ {file_path} -> {target_dir}")
                 success_count += 1
 
-            except Exception as e:
+            except (IOError, OSError) as e:
                 print(f"    ❌ Error copying {file_path} to {target_dir}: {e}")
 
     print(f"📋 File copying complete! {success_count} files copied successfully")
@@ -275,7 +276,7 @@ def add_files_to_git(files, directories):
             # Go back to original directory
             os.chdir(original_dir)
 
-        except Exception as e:
+        except (subprocess.CalledProcessError, OSError) as e:
             print(f"    ❌ Error in {directory}: {e}")
 
     print(f"🔧 Git add complete! {success_count} files added to git successfully")

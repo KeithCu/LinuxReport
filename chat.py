@@ -10,6 +10,7 @@ as well as image uploads and real-time comment streaming via Server-Sent Events 
 # =============================================================================
 import os
 import json
+import sqlite3
 import uuid
 import html
 import datetime
@@ -174,7 +175,7 @@ class CommentStreamResource(Resource):
                     time.sleep(2)
                 except GeneratorExit:
                     break
-                except Exception as e:
+                except (sqlite3.Error, TypeError, IOError, OSError) as e:
                     g_logger.error(f"SSE Error in chat stream: {e}")
                     break
         return Response(event_stream(), mimetype='text/event-stream')

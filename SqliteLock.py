@@ -10,6 +10,7 @@ coordination.
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import os
+import sqlite3
 import threading
 import time
 import uuid
@@ -110,8 +111,8 @@ class DiskcacheSqliteLock(LockBase):
                 return False # Lost the race
         except (diskcache.Timeout, Timeout) as e:
             g_logger.warning(f"Timeout error while acquiring lock '{self.lock_key}': {e}")
-        except Exception as e:
-            g_logger.error(f"Unexpected error acquiring lock '{self.lock_key}': {e}")
+        except (sqlite3.Error, OSError) as e:
+            g_logger.error(f"Unexpected database or I/O error acquiring lock '{self.lock_key}': {e}")
         
         self._locked = False
         return False
@@ -136,8 +137,8 @@ class DiskcacheSqliteLock(LockBase):
                     self._lock_expiry = 0
                     return True
             return False # Lock was not ours
-        except Exception as e:
-            g_logger.error(f"Error releasing lock '{self.lock_key}': {e}")
+        except (sqlite3.Error, OSError) as e:
+            g_logger.error(f"Database or I/O error releasing lock '{self.lock_key}': {e}")
             return False
 
     def __enter__(self):

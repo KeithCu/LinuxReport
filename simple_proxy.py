@@ -91,10 +91,10 @@ def proxy(path):
     if not target_url:
         return Response('Missing "url" query parameter', 400)
     
-    # Get timeout from query parameter or use default
-    timeout = int(request.args.get('timeout', 30))
-    
     try:
+        # Get timeout from query parameter or use default
+        timeout = int(request.args.get('timeout', 30))
+
         # Forward the request to the target URL
         resp = requests.get(
             target_url, 
@@ -119,12 +119,12 @@ def proxy(path):
         
         return response
         
+    except ValueError:
+        return Response('Invalid "timeout" parameter, must be an integer.', 400)
     except requests.exceptions.Timeout:
         return Response('Request timeout', 408)
     except requests.exceptions.RequestException as e:
         return Response(f'Proxy error: {str(e)}', 502)
-    except Exception as e:
-        return Response(f'Internal error: {str(e)}', 500)
 
 @app.route('/health')
 def health():

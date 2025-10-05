@@ -88,10 +88,8 @@ def save_token(token_data):
         with open(TOKEN_FILE, 'w') as f:
             json.dump(token_data, f, indent=4) # Add indent for readability
         os.chmod(TOKEN_FILE, 0o600) # Read/write only for owner
-    except IOError as e:
+    except (IOError, OSError, TypeError) as e:
         g_logger.error(f"Error saving token file '{TOKEN_FILE}': {e}")
-    except Exception as e: # Catch other potential errors like permission issues
-        g_logger.error(f"An unexpected error occurred while saving the token: {e}")
 
 
 def load_token():
@@ -106,11 +104,8 @@ def load_token():
                  g_logger.warning(f"Token file '{TOKEN_FILE}' is missing essential keys. Re-authentication may be required.")
                  # Optionally return None or handle partial data
             return token_data
-    except (IOError, json.JSONDecodeError) as e:
+    except (IOError, json.JSONDecodeError, OSError, TypeError) as e:
         g_logger.error(f"Error loading or parsing token file '{TOKEN_FILE}': {e}")
-        return None
-    except Exception as e: # Catch other potential errors
-        g_logger.error(f"An unexpected error occurred while loading the token: {e}")
         return None
 
 def refresh_token(current_token_data):
@@ -201,7 +196,7 @@ def get_valid_token():
         except EOFError: # Handle running in non-interactive environment
              g_logger.error("\nError: Cannot prompt for credentials in non-interactive mode and no token file found.")
              return None, None
-        except Exception as e: # Catch other potential input errors
+        except (IOError, OSError, ValueError) as e: # Catch other potential input errors
              g_logger.error(f"\nAn error occurred during credential input: {e}")
              return None, None
 
@@ -267,7 +262,7 @@ def parse_reddit_url(url):
                 feed_type = potential_feed
 
         return subreddit, feed_type
-    except Exception as e:
+    except (AttributeError, TypeError, ValueError) as e:
         g_logger.error(f"Error parsing URL '{url}': {e}")
         return None, None
 

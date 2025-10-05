@@ -35,7 +35,7 @@ class DeleteHeadlineResource(Resource):
                     if entry.get('url') == url and entry.get('timestamp') == timestamp:
                         deleted = True
                         continue
-                except Exception:
+                except json.JSONDecodeError:
                     pass
                 new_lines.append(line)
             if deleted:
@@ -44,7 +44,7 @@ class DeleteHeadlineResource(Resource):
                 return {'success': True}, 200
             else:
                 return {'error': 'Not found'}, 404
-        except Exception as e:
+        except (IOError, OSError) as e:
             return {'error': str(e)}, 500
 
 

@@ -93,10 +93,10 @@ def load_storage_secrets():
         _secrets_loaded = False
         g_logger.error(f"Missing key in configuration data: {e}")
         raise ConfigurationError(f"Missing key in configuration data: {e}")
-    except Exception as e: # Fallback for other load_config or parsing issues
+    except (ValueError, TypeError) as e: # Fallback for other load_config or parsing issues
         _secrets_loaded = False
         g_logger.error(f"Error loading storage secrets: {e}")
-        raise ConfigurationError(f"Error loading storage secrets: {e}") # Wrap in custom error
+        raise ConfigurationError(f"Error loading storage secrets: {e}") from e
 
 def init_storage() -> bool:
     """Initialize storage driver if enabled.
@@ -150,10 +150,10 @@ def init_storage() -> bool:
             _storage_driver = None
             _storage_container = None
             raise StorageConnectionError(f"Libcloud error initializing storage driver: {e}")
-        except Exception as e: # General fallback for other init issues
+        except (AttributeError, TypeError, ValueError) as e: # General fallback for other init issues
             _storage_driver = None
             _storage_container = None
-            raise StorageConnectionError(f"Error initializing storage driver: {e}")
+            raise StorageConnectionError(f"Error initializing storage driver: {e}") from e
     
     return True
 
