@@ -77,7 +77,7 @@ def get_actual_image_dimensions(img_url):
                 if content_length < 100:  # Skip very small images that are likely icons
                     g_logger.debug(f"Skipping small image ({content_length} bytes): {img_url}")
                     return 0, 0
-            except Exception:
+            except (ValueError, TypeError):
                 pass
         
         if 'svg' in content_type:
@@ -115,14 +115,14 @@ def get_actual_image_dimensions(img_url):
                             height = float(parts[3])
                             g_logger.debug(f"Parsed SVG dimensions from viewBox for {img_url}: {int(width)}x{int(height)}")
                             return int(width), int(height)
-                        except Exception:
+                        except (ValueError, IndexError):
                             pass
                             
                 # More realistic fallback based on SVG content complexity
                 fallback_dim = min(max(int(len(response.content) ** 0.4), 200), 800)
                 g_logger.debug(f"Fallback SVG dimensions based on file size for {img_url}: {fallback_dim}x{fallback_dim}")
                 return fallback_dim, fallback_dim
-            except Exception as e:
+            except ET.ParseError as e:
                 g_logger.debug(f"Error parsing SVG for {img_url}: {e}")
                 return 640, 480  # Default fallback dimensions
         
@@ -135,13 +135,13 @@ def get_actual_image_dimensions(img_url):
         except Image.UnidentifiedImageError:
             g_logger.debug(f"Could not identify image file: {img_url}")
             return 0, 0
-        except Exception as e:
+        except (IOError, OSError) as e:
             g_logger.debug(f"Error reading image dimensions with PIL for {img_url}: {e}")
             return 0, 0
     except requests.exceptions.RequestException as e:
         g_logger.debug(f"Request error getting dimensions for {img_url}: {e}")
         return 0, 0
-    except Exception as e:
+    except (AttributeError, TypeError) as e:
         g_logger.debug(f"Generic error getting dimensions for {img_url}: {e}")
         return 0, 0
 

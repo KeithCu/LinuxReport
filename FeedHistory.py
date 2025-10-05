@@ -137,7 +137,7 @@ class FeedHistory:
             
             return loaded
             
-        except (json.JSONDecodeError, Exception) as e:
+        except (json.JSONDecodeError, IOError, TypeError) as e:
             print(f"[FeedHistory] Failed to load JSON: {str(e)}")
             return None
 
@@ -163,7 +163,7 @@ class FeedHistory:
             
             return loaded
             
-        except Exception as e:
+        except (pickle.UnpicklingError, IOError, OSError, TypeError) as e:
             print(f"[FeedHistory] Failed to load pickle: {str(e)}")
             return None
 

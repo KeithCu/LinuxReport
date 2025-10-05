@@ -9,6 +9,7 @@ functions defined in other modules.
 import sys
 import urllib.request
 import urllib.error
+import socket
 from shared import g_logger
 
 from selenium.webdriver.common.by import By
@@ -55,7 +56,7 @@ def parse_images_from_selenium(driver):
             g_logger.debug(f"Image size for {img_url}: {image_size} bytes")
             return image_size
         # Match original's broader exception catch here
-        except Exception as e:
+        except (urllib.error.URLError, socket.timeout, ConnectionResetError) as e:
             g_logger.debug(f"Error downloading or measuring {img_url}: {e}")
             return 0
 
@@ -137,8 +138,8 @@ def parse_images_from_selenium(driver):
         except WebDriverException as e:
             g_logger.debug(f"Error processing image element with Selenium: {e}")
             continue
-        except Exception as e:
-            g_logger.debug(f"Unexpected error processing image element: {e}")
+        except AttributeError as e:
+            g_logger.debug(f"Unexpected attribute error processing image element: {e}")
             continue
 
     # Use imported process_candidate_images from image_candidate_selector
@@ -175,8 +176,8 @@ def fetch_largest_image_selenium(url): # Renamed request_url to url
     except WebDriverException as e:
         g_logger.error(f"WebDriver error accessing the webpage or processing images: {e}")
         return None
-    except Exception as e:
-        g_logger.error(f"Error accessing the webpage or processing images: {e}")
+    except (ConnectionError, IOError) as e:
+        g_logger.error(f"Network error accessing the webpage or processing images: {e}")
         return None
     finally:
         if driver:

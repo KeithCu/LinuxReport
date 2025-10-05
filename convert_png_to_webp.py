@@ -1,6 +1,6 @@
 import os
 import glob
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import sys
 
 # Ensure we have the tabulate package
@@ -73,7 +73,7 @@ for png_file in png_files:
             os.remove(webp_file)
             print(f"  Not worth converting, removed WebP version")
         
-    except Exception as e:
+    except (UnidentifiedImageError, IOError, OSError) as e:
         print(f"  Error processing {basename}: {str(e)}")
         results.append([basename, "Error", str(e), "", "", ""])
 

@@ -264,8 +264,8 @@ def fetch_largest_image(url):
     except requests.exceptions.RequestException as e:
         g_logger.error(f"Request Error fetching image: {e}")
         return None
-    except Exception as e:
-        g_logger.error(f"Error fetching image: {e}")
+    except (AttributeError, TypeError, ValueError) as e:
+        g_logger.error(f"Error processing image data: {e}")
         return None
 
 def custom_fetch_largest_image(url, underlying_link=None, html_content=None):

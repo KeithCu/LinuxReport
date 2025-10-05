@@ -92,7 +92,7 @@ def _rotate_log_file(log_file=None):
 
         print(f"Log file rotated: kept last {len(content_to_keep)} bytes")
 
-    except Exception as e:
+    except (IOError, OSError) as e:
         # Don't fail the application if log rotation fails
         print(f"Warning: Failed to rotate log file: {e}")
 

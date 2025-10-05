@@ -99,7 +99,7 @@ def get_file_metadata(file_path: str) -> Optional[Dict]:
             'content_type': content_type,
             'content': content
         }
-    except Exception as e:
+    except (IOError, OSError) as e:
         g_logger.error(f"Error getting file metadata for {file_path}: {e}")
         return None
 
@@ -139,9 +139,9 @@ def _get_object(obj_name: str) -> Optional[Any]:
         _init_check()
         try:
             return _storage_container.get_object(object_name=obj_name)
-        except Exception:
+        except oss_config.ObjectDoesNotExistError:
             return None
-    except Exception as e:
+    except (ConfigurationError, StorageConnectionError, LibcloudError) as e:
         g_logger.error(f"Error getting object {obj_name}: {e}")
         raise
 
@@ -168,7 +168,7 @@ def publish_file(file_path: str) -> Any:
             return publish_bytes(bytes_data, file_path)
         g_logger.warning(f"No content found in file: {file_path}")
         return None
-    except Exception as e:
+    except (IOError, OSError, ValueError) as e:
         g_logger.error(f"Error publishing file: {file_path}, exception: {e}")
         raise
 
@@ -191,7 +191,7 @@ def fetch_file(file_path: str) -> tuple[Optional[bytes], Optional[Dict]]:
         content, metadata = fetch_bytes(file_path)
         g_logger.info(f"Fetched file ({len(content) if content else 0} bytes) from key: {file_path}")
         return content, metadata
-    except Exception as e:
+    except (IOError, OSError, ValueError) as e:
         g_logger.error(f"Error fetching file: {file_path}, exception: {e}")
         raise
 
@@ -205,7 +205,7 @@ def _update_bucket_last_written():
             container=_storage_container,
             object_name=BUCKET_LAST_WRITTEN_KEY
         )
-    except Exception as e:
+    except (StorageOperationError, LibcloudError) as e:
         g_logger.error(f"Error updating bucket last-written timestamp: {e}")
         # Don't raise - this is a best-effort operation
 
@@ -247,7 +247,7 @@ def publish_bytes(bytes_data: bytes, key: str) -> Any:
 
         g_logger.info(f"Published {len(bytes_data)} bytes to object: {object_name}")
         return obj
-    except Exception as e:
+    except (ValueError, StorageOperationError, LibcloudError) as e:
         g_logger.error(f"Error publishing bytes with key: {key}, exception: {e}")
         raise
 
@@ -278,7 +278,7 @@ def fetch_bytes(key: str) -> tuple[Optional[bytes], Optional[Dict]]:
 
         g_logger.warning(f"No content found for key: {key}")
         return None, None
-    except Exception as e:
+    except (StorageOperationError, LibcloudError) as e:
         g_logger.error(f"Error fetching bytes for key: {key}, exception: {e}")
         raise
 
@@ -350,7 +350,7 @@ def smart_fetch(key: str, cache_expiry: int = DEFAULT_CACHE_EXPIRY) -> tuple[Opt
         
         return content, metadata
             
-    except Exception as e:
+    except (StorageOperationError, LibcloudError, TypeError) as e:
         g_logger.error(f"Error in smart_fetch for key: {key}, exception: {e}")
         raise
 

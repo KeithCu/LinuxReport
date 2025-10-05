@@ -107,8 +107,8 @@ def update_script_file(latest_models):
 
     except FileNotFoundError:
         print(f"\nError: The file LLMModelManager.py was not found.")
-    except Exception as e:
-        print(f"\nAn error occurred while updating the script: {e}")
+    except (IOError, OSError) as e:
+        print(f"\nAn I/O error occurred while updating the script: {e}")
 
 def main():
     """Main function to fetch, compare, and update the free models list."""
@@ -146,6 +146,6 @@ if __name__ == "__main__":
             
         print("\nUpdate summary also written to model_updates.txt")
 
-    except Exception as e:
-        logger.exception("An error occurred during model update.")
-        print(f"An error occurred: {e}")
+    except (IOError, OSError) as e:
+        logger.exception("An I/O error occurred during model update.")
+        print(f"An I/O error occurred: {e}")

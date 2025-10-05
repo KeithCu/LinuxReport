@@ -35,7 +35,7 @@ def get_package_dependencies_from_pypi(package_name: str) -> Set[str]:
                             dependencies.add(package)
             
             return dependencies
-    except Exception as e:
+    except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
         print(f"Warning: Could not get dependencies for {package_name}: {e}")
     
     return set()
@@ -60,7 +60,7 @@ def build_dependency_cache(packages: List[Tuple[str, str]]) -> Dict[str, Set[str
         try:
             deps = get_package_dependencies_from_pypi(package_name)
             cache[package_name] = deps
-        except Exception as e:
+        except (ValueError, TypeError) as e:
             print(f"Error processing {package_name}: {e}")
             cache[package_name] = set()
         

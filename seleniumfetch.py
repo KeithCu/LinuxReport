@@ -159,7 +159,7 @@ def create_driver(use_tor, user_agent):
         g_logger.info("Chrome driver setup completed successfully")
         return driver
         
-    except Exception as e:
+    except (WebDriverException, OSError, ValueError) as e:
         g_logger.error(f"Error creating Chrome driver: {e}")
         g_logger.error(f"Error type: {type(e).__name__}")
         import traceback
@@ -213,7 +213,7 @@ class SharedSeleniumDriver:
             self.use_tor = use_tor
             self.user_agent = user_agent
             g_logger.debug("SharedSeleniumDriver initialized successfully")
-        except Exception as e:
+        except (WebDriverException, OSError, ValueError) as e:
             g_logger.error(f"Error in SharedSeleniumDriver.__init__: {e}")
             raise
 
@@ -261,7 +261,7 @@ class SharedSeleniumDriver:
                 if cls._instance is None:
                     cls._instance = new_instance
                 return new_instance.driver
-            except Exception as e:
+            except (WebDriverException, OSError, ValueError) as e:
                 g_logger.error(f"Error creating new driver: {e}")
                 import traceback
                 g_logger.error(f"Full traceback: {traceback.format_exc()}")
@@ -280,7 +280,7 @@ class SharedSeleniumDriver:
         """
         try:
             return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)
-        except Exception as e:
+        except RuntimeError as e:
             g_logger.error(f"Error acquiring fetch lock: {e}")
             return False
 
@@ -316,7 +316,7 @@ class SharedSeleniumDriver:
             # Quick health check - don't fail if this throws an exception
             instance.driver.execute_script("return document.readyState;")
             return True
-        except Exception as e:
+        except WebDriverException as e:
             g_logger.debug(f"Driver health check failed: {e}")
             return False
 
@@ -370,14 +370,14 @@ class SharedSeleniumDriver:
                 try:
                     driver.set_page_load_timeout(5)
                     driver.set_script_timeout(5)
-                except:
+                except (WebDriverException, OSError):
                     pass
 
                 driver.quit()
                 did_cleanup_call = True
                 g_logger.debug("WebDriver quit successfully")
                 time.sleep(0.5)
-        except Exception as e:
+        except (WebDriverException, OSError) as e:
             g_logger.warning(f"Primary cleanup failed: {e}")
 
         # Fallback: try to close the driver if quit failed
@@ -388,7 +388,7 @@ class SharedSeleniumDriver:
                     did_cleanup_call = True
                     g_logger.debug("WebDriver closed successfully")
                     time.sleep(0.5)
-            except Exception as e:
+            except (WebDriverException, OSError) as e:
                 g_logger.warning(f"Secondary cleanup failed: {e}")
 
         # Final safeguard: ALWAYS check if chromedriver process is still alive
@@ -405,10 +405,10 @@ class SharedSeleniumDriver:
                     if proc.poll() is None:
                         proc.kill()
                     g_logger.info(f"Cleanup: chromedriver pid {pid} terminated")
-                except Exception as kill_e:
+                except (OSError, ProcessLookupError) as kill_e:
                     g_logger.warning(f"Cleanup: failed to terminate chromedriver pid {pid}: {kill_e}")
             
-        except Exception as e:
+        except (AttributeError, TypeError) as e:
             g_logger.debug(f"Cleanup: unable to inspect/terminate driver service process: {e}")
 
         if not did_cleanup_call:
@@ -467,7 +467,7 @@ class SharedSeleniumDriver:
             else:
                 g_logger.debug("Cleanup: no lingering browser processes found")
 
-        except Exception as e:
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
             g_logger.debug(f"Cleanup: unable to clean up lingering browser processes: {e}")
 
     @classmethod
@@ -626,7 +626,7 @@ def parse_relative_time(time_text):
         # If no pattern matches, return None
         return None, None
         
-    except Exception as e:
+    except (ValueError, AttributeError) as e:
         g_logger.error(f"Error parsing relative time '{time_text}': {e}")
         return None, None
 
@@ -655,9 +655,9 @@ def _log_debugging_info(post, use_selenium, context):
 
             if not use_selenium:
                 g_logger.info(f"Available classes for {context}: {post.get('class', [])}")
-        except Exception as link_error:
+        except (WebDriverException, AttributeError) as link_error:
             g_logger.debug(f"Error getting link info for {context}: {link_error}")
-    except Exception as debug_e:
+    except (WebDriverException, AttributeError) as debug_e:
         g_logger.debug(f"Error during debug output for {context}: {debug_e}")
 
 
@@ -712,7 +712,7 @@ def extract_post_data(post, config, url, use_selenium):
             
             return results if results else None
             
-        except Exception as e:
+        except (WebDriverException, AttributeError) as e:
             g_logger.error(f"Error parsing RSS content: {e}")
             return None
     
@@ -752,7 +752,7 @@ def extract_post_data(post, config, url, use_selenium):
                 _log_debugging_info(post, use_selenium, "title")
                 return None
             title = title_element.text.strip()
-    except Exception as e:
+    except (WebDriverException, AttributeError) as e:
         g_logger.error(f"Error extracting title with selector '{config.title_selector}': {e}")
         _log_debugging_info(post, use_selenium, "title")
         return None
@@ -777,7 +777,7 @@ def extract_post_data(post, config, url, use_selenium):
                 link = link_element.get(config.link_attr)
             if link and link.startswith('/'):
                 link = urljoin(url, link)
-    except Exception as e:
+    except (WebDriverException, AttributeError) as e:
         g_logger.error(f"Error extracting link with selector '{config.link_selector}': {e}")
         _log_debugging_info(post, use_selenium, "link")
         return None
@@ -816,7 +816,7 @@ def extract_post_data(post, config, url, use_selenium):
             if date_text:
                 published_parsed, published = parse_relative_time(date_text)
                 
-        except Exception as e:
+        except (WebDriverException, AttributeError) as e:
             g_logger.warning(f"Failed to extract date for {url}: {e}")
             # Fallback to current time
             published_parsed = None
@@ -936,7 +936,7 @@ def fetch_site_posts(url, user_agent):
                         # Use random timeout to avoid predictable patterns
                         random_timeout = random.uniform(15, 25)
                         WebDriverWait(driver, random_timeout).until(EC.presence_of_element_located((By.CSS_SELECTOR, config.post_container)))
-                    except Exception as wait_error:
+                    except (TimeoutException, WebDriverException) as wait_error:
                         g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
                         # Continue anyway, might still find some content
 
@@ -955,11 +955,11 @@ def fetch_site_posts(url, user_agent):
                                     entries.extend(entry_data)
                                 else:
                                     entries.append(entry_data)
-                        except Exception as e:
+                        except WebDriverException as e:
                             g_logger.error(f"Error extracting post data: {e}")
                             continue
                             
-            except Exception as e:
+            except WebDriverException as e:
                 g_logger.error(f"Error on {url}: {e}")
                 status = 500
                 
@@ -998,13 +998,13 @@ def fetch_site_posts(url, user_agent):
                     entry = extract_post_data(post, config, url, use_selenium=False)
                     if entry:
                         entries.append(entry)
-                except Exception as e:
+                except AttributeError as e:
                     g_logger.error(f"Error extracting post data: {e}")
 
         except requests.exceptions.RequestException as e:
             g_logger.error(f"Request error for {base_domain}: {e}")
             status = 500
-        except Exception as e:
+        except AttributeError as e:
             g_logger.error(f"Error fetching {base_domain} with requests: {e}")
             status = 500
 

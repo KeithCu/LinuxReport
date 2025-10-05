@@ -9,6 +9,8 @@ from timeit import default_timer as timer
 import json
 import traceback
 import time
+from openai import APIError, APITimeoutError, RateLimitError
+import requests
 
 from typing import List, Optional, Tuple
 
@@ -244,14 +246,16 @@ def _try_call_model(client, model, messages, max_tokens):
 
 
             return response_text
-        except Exception as e:
-            error_msg = str(e)
-            if "JSONDecodeError" in error_msg:
-                logger.error(f"Model {model} returned malformed response: {error_msg}")
-            else:
-                logger.error(f"Error on attempt {attempt} for model {model}: {error_msg}")
+        except (APITimeoutError, RateLimitError) as e:
+            logger.warning(f"API Error on attempt {attempt} for model {model}: {e}. Retrying...")
             if attempt < max_retries:
-                time.sleep(1)
+                time.sleep(1)  # Wait before retrying
+        except APIError as e:
+            logger.error(f"API Error on attempt {attempt} for model {model}: {e}")
+            # Don't retry on other API errors, as they are likely permanent
+        except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+            error_msg = str(e)
+            logger.error(f"Network or JSON error on attempt {attempt} for model {model}: {error_msg}")
     logger.error(f"Model call failed after {max_retries} attempts for model {model}")
     raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
 
@@ -425,7 +429,7 @@ def _try_ai_models(messages, filtered_articles):
                 logger.warning(f"Model {current_model} failed to produce enough articles")
                 model_manager.mark_failed(current_model)
 
-        except Exception as e:
+        except (RuntimeError, RateLimitError, APITimeoutError) as e:
             logger.error(f"Model {current_model} failed: {str(e)}")
             model_manager.mark_failed(current_model)
 
@@ -561,7 +565,7 @@ def _run_comparison_model(model, filtered_articles, label):
         else:
             logger.warning(f"{label} failed to produce articles")
             
-    except Exception as e:
+    except RuntimeError as e:
         logger.error(f"{label} failed with exception: {e}")
 
 
@@ -652,8 +656,8 @@ def main(mode, settings_module, settings_config, dry_run=False):
     except (FileNotFoundError, ImportError) as e:
         logger.error(f"Configuration error for mode {mode}: {e}")
         return 1
-    except Exception as e:
-        logger.error(f"Unexpected error in mode {mode}: {e}")
+    except (ValueError, AttributeError) as e:
+        logger.error(f"Configuration or data error in mode {mode}: {e}")
         traceback.print_exc()
         return 1
 

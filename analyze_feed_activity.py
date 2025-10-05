@@ -183,7 +183,7 @@ def main():
         
         print(f"\n{'='*80}")
         
-    except Exception as e:
+    except (json.JSONDecodeError, IOError, OSError) as e:
         print(f"Error analyzing {feed_file}: {e}")
 
 

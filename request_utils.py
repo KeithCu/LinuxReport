@@ -185,6 +185,6 @@ def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
         # JavaScript can parse this format correctly
         #print(f"format_last_updated: converted {last_fetch} to {utc_time}")
         return utc_time
-    except Exception as e:
+    except (AttributeError, ValueError, TypeError) as e:
         print(f"format_last_updated: error converting {last_fetch}: {e}")
         return "Unknown"

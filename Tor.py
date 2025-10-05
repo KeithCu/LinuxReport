@@ -13,11 +13,13 @@ import traceback
 import io
 import random
 import socket
+import sqlite3
 import subprocess
 import threading
 import time
 import traceback
 from timeit import default_timer as timer
+from xml.parsers import expat
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -134,7 +136,7 @@ def fetch_via_curl(url):
 
                         if entries_count == 0:
                             result = None
-            except Exception as parse_error:
+            except (expat.ExpatError, TypeError) as parse_error:
                 g_logger.error(f"Error parsing curl content: {str(parse_error)}")
                 g_logger.error(f"Exception type: {type(parse_error).__name__}")
                 g_logger.error(f"Traceback: {traceback.format_exc()}")
@@ -147,7 +149,7 @@ def fetch_via_curl(url):
             g_logger.error(f"Curl failed with error: {stderr}")
             result = None
 
-    except Exception as e:
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
         g_logger.warning(f"Curl TOR method failed: {str(e)}, falling back to cached data")
         # Fall back to cached data if proxying fails
         cached_feed = g_cs.get(f"tor_cache:{url}")
@@ -216,7 +218,7 @@ def fetch_via_tor(url, site_url):
     try:
         last_success_method = g_cs.get("REDDIT_LAST_METHOD")
         g_logger.info(f"Successfully got REDDIT_LAST_METHOD: {last_success_method}")
-    except Exception as e:
+    except (sqlite3.Error, IOError) as e:
         g_logger.error(f"CRITICAL ERROR: Failed to access g_cs.get(): {e}")
         g_logger.error(f"Exception type: {type(e).__name__}")
         g_logger.error(f"Full traceback: {traceback.format_exc()}")

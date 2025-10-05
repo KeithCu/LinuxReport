@@ -30,10 +30,15 @@ from urllib.parse import urlparse
 from collections import defaultdict
 import pickle
 from abc import ABC, abstractmethod
+import socket
+import sqlite3
+import subprocess
+import urllib.error
 
 # Third-party imports
 import feedparser
 from fake_useragent import UserAgent
+from selenium.common.exceptions import WebDriverException
 
 # Local application imports
 from feedfilter import merge_entries
@@ -47,6 +52,7 @@ from shared import (
 )
 from Tor import fetch_via_tor
 from app_config import DEBUG, USE_TOR
+from object_storage_config import StorageOperationError, LibcloudError
 from object_storage_sync import smart_fetch, publish_bytes
 
 # =============================================================================
@@ -235,7 +241,7 @@ def load_url_worker(url):
                         g_c.set_last_fetch(url, datetime.now(TZ), timeout=EXPIRE_WEEK)
                         g_logger.info(f"Successfully fetched processed feed from object store: {url}")
                         return
-                except Exception as e:
+                except (pickle.UnpicklingError, TypeError) as e:
                     g_logger.error(f"Error parsing object store feed for {url}: {e}")
 
         fetcher = get_fetcher(url)
@@ -291,7 +297,7 @@ def load_url_worker(url):
                 feed_data = pickle.dumps(rssfeed)
                 publish_bytes(feed_data, url)
                 g_logger.info(f"Successfully published feed to object store: {url}")
-            except Exception as e:
+            except (pickle.PicklingError, ValueError, StorageOperationError, LibcloudError) as e:
                 g_logger.error(f"Error publishing feed to object store for {url}: {e}")
 
         g_c.put(url, rssfeed, timeout=EXPIRE_WEEK)
@@ -355,7 +361,8 @@ def get_domain(url):
         parts = netloc.split('.')
         # Return the last two parts as the base domain (e.g., bandcamp.com)
         return '.'.join(parts[-2:]) if len(parts) > 1 else netloc
-    except:
+    except (AttributeError, ValueError) as e:
+        g_logger.warning(f"Could not parse domain from URL '{url}': {e}")
         return url
 
 def process_domain_urls(urls):
@@ -368,7 +375,7 @@ def process_domain_urls(urls):
     for url in urls:
         try:
             load_url_worker(url)
-        except Exception as exc:  # noqa: E722
+        except (WebDriverException, socket.timeout, ConnectionResetError, urllib.error.URLError, sqlite3.Error, IOError) as exc:
             g_logger.error(f'CRITICAL ERROR processing {url}: {exc}')
             g_logger.error(f'Exception type: {type(exc).__name__}')
             g_logger.error(f'Exception args: {exc.args}')
@@ -408,7 +415,7 @@ def process_urls_in_parallel(urls, description="processing"):
         for future in concurrent.futures.as_completed(futures):
             try:
                 future.result()  # Ensure exceptions in workers are raised
-            except Exception as exc:  # noqa: E722
+            except (WebDriverException, socket.timeout, ConnectionResetError, urllib.error.URLError, sqlite3.Error, IOError) as exc:
                 g_logger.error(f'CRITICAL ERROR in domain processing during {description}: {exc}')
                 g_logger.error(f'Exception type: {type(exc).__name__}')
                 g_logger.error(f'Exception args: {exc.args}')
