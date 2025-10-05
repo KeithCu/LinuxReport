@@ -58,6 +58,7 @@ settings:
     - "http://127.0.0.1:5000"
     - "https://fonts.googleapis.com"
     - "https://fonts.gstatic.com"
+    - "https://openweathermap.org"
 
   # Domains allowed to make API requests to this server (CORS)
   allowed_requester_domains:

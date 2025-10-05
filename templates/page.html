@@ -25,31 +25,31 @@
 
     <!-- Weather Widget - Positioned at top of page -->
     <div style="text-align: center; width: 100%;">
-      <div id="weather-widget-container" class="weather-widget">
+      <div id="weather-widget-container" class="weather-widget" role="region" aria-label="Weather Information">
         <div id="weather-content">
-          <a href="https://openweathermap.org" target="_blank" class="weather-link">
-            <div class="weather-content-inner">{{ weather_html }}</div>
+          <a href="https://openweathermap.org" target="_blank" class="weather-link" aria-label="Weather data provided by OpenWeather">
+            <div class="weather-content-inner" aria-live="polite">{{ weather_html }}</div>
             <div class="weather-attribution">Data by OpenWeather</div>
           </a>
         </div>
-        <span id="weather-collapsed-label" class="weather-collapsed-label">🌤️ Weather</span>
-        <button id="weather-toggle-btn" class="weather-toggle-btn" title="Toggle Weather">&#9660;</button>
-        <button id="weather-unit-toggle" class="weather-unit-toggle" title="Switch to Celsius">°F</button>
+        <span id="weather-collapsed-label" class="weather-collapsed-label" aria-hidden="true">🌤️ Weather</span>
+        <button id="weather-toggle-btn" class="weather-toggle-btn" title="Toggle Weather" aria-controls="weather-content">&#9660;</button>
+        <button id="weather-unit-toggle" class="weather-unit-toggle" title="Switch to Celsius" aria-label="Toggle temperature units">°F</button>
       </div>
     </div>
 
-    <header>
+    <header role="banner">
          <!-- Above Content -->
-         <div>{{ above_html }}</div>
+         <div role="complementary" aria-label="Site Information">{{ above_html }}</div>
    
       <!-- Logo -->
       <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
 
       <!-- Welcome Message -->
-      <small>{{ welcome_html }}</small>
+      <small role="doc-subtitle">{{ welcome_html }}</small>
     </header>
 
-    <main>
+    <main role="main" id="main-content">
 
       <!-- API Links Container -->
       <div class="api-links-container">
@@ -62,26 +62,26 @@
       </div>
 
       <!-- Old Headlines Link -->
-      <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
+      <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link" role="button" aria-label="View archived headlines">
         <span class="old-headlines-title">📰 Old Headlines Archive</span>
         <small class="old-headlines-subtitle">See the big stories you missed</small>
       </a>
 
       <!-- Navigation Links - Moved here from nav section -->
-      <div style="text-align: center; width: 100%;">
+      <nav role="navigation" aria-label="Site Navigation" style="text-align: center; width: 100%;">
         <div id="nav-controls-container" class="nav-controls">
-          <div class="nav-links-desktop">
-            <a href="https://linuxreport.net" target="_blank" class="nav-link-linux">Linux</a>
-            <a href="https://pvreport.org" target="_blank" class="nav-link-pv">PV</a>
-            <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai">AI</a>
-            <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno">Techno</a>
-            <a href="https://covidreport.org" target="_blank" class="nav-link-covid">Covid</a>
-            <a href="https://trumpreport.info" target="_blank" class="nav-link-truth">Truth</a>
-            <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space">Space!</a>
-            <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
+          <div class="nav-links-desktop" role="menubar" aria-label="Report Navigation">
+            <a href="https://linuxreport.net" target="_blank" class="nav-link-linux" role="menuitem" aria-label="Linux Report">Linux</a>
+            <a href="https://pvreport.org" target="_blank" class="nav-link-pv" role="menuitem" aria-label="PV Report">PV</a>
+            <a href="https://aireport.keithcu.com" target="_blank" class="nav-link-ai" role="menuitem" aria-label="AI Report">AI</a>
+            <a href="https://news.thedetroitilove.com" target="_blank" class="nav-link-techno" role="menuitem" aria-label="Techno Report">Techno</a>
+            <a href="https://covidreport.org" target="_blank" class="nav-link-covid" role="menuitem" aria-label="COVID Report">Covid</a>
+            <a href="https://trumpreport.info" target="_blank" class="nav-link-truth" role="menuitem" aria-label="Truth Report">Truth</a>
+            <a href="https://news.spaceelevatorwiki.com" target="_blank" class="nav-link-space" role="menuitem" aria-label="Space Report">Space!</a>
+            <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank" role="menuitem" aria-label="About Me">Me</a>
           </div>
-          <div class="nav-section-middle">
-            <select id="theme-select" class="theme-select">
+          <div class="nav-section-middle" role="group" aria-label="Display Settings">
+            <select id="theme-select" class="theme-select" aria-label="Select theme">
               <option value="light">Light</option>
               <option value="paper">Paper</option>
               <option value="silver">Silver</option>
@@ -100,7 +100,7 @@
               <option value="solarized">Solarized</option>
               <option value="pastelle">Pastelle</option>
             </select>
-            <select id="font-select" class="font-select">
+            <select id="font-select" class="font-select" aria-label="Select font">
               <option value="system">System Default</option>
               <option value="sans-serif">Sans Serif</option>
               <option value="monospace">Monospace</option>
@@ -113,49 +113,52 @@
               <option value="raleway">Raleway</option>
             </select>
           </div>
-          <div class="nav-section-right">
-            <button id="chat-toggle-btn" class="btn">Chat</button>
-            <button id="config-btn" class="btn">Config...</button>
+          <div class="nav-section-right" role="group" aria-label="Application Controls">
+            <button id="chat-toggle-btn" class="btn" aria-expanded="false" aria-controls="chat-container">Chat</button>
+            <button id="config-btn" class="btn" aria-label="Open configuration">Config...</button>
             {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
-            <button id="view-mode-toggle" class="btn">Infinite</button>
+            <button id="view-mode-toggle" class="btn" aria-label="Toggle infinite scroll mode">Infinite</button>
             {% endif %}
           </div>
         </div>
-      </div>
+      </nav>
 
       <!-- Infinite Scroll Container -->
-      <div id="infinite-scroll-container" class="infinite-scroll-container">
-        <div id="infinite-content" class="infinite-content mobile-view"></div>
-        <div id="loading-indicator" class="loading-indicator"></div>
+      <div id="infinite-scroll-container" class="infinite-scroll-container" role="feed" aria-label="News Feed">
+        <div id="infinite-content" class="infinite-content mobile-view" role="list" aria-label="News Articles"></div>
+        <div id="loading-indicator" class="loading-indicator" role="status" aria-live="polite" aria-label="Loading more articles"></div>
       </div>
 
       <!-- Main Content Columns -->
-      <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}">
-        <div class="column">{{ columns[0] }}</div>
+      <div class="row {% if g.is_mobile %}mobile-view{% else %}desktop-view{% endif %}" role="feed" aria-label="News Articles">
+        <div class="column" role="list" aria-label="News Column 1">{{ columns[0] }}</div>
         {% if not g.is_mobile %}
-        <div class="column">{{ columns[1] }}</div>
-        <div class="column">{{ columns[2] }}</div>
+        <div class="column" role="list" aria-label="News Column 2">{{ columns[1] }}</div>
+        <div class="column" role="list" aria-label="News Column 3">{{ columns[2] }}</div>
         {% endif %}
       </div>
     </main>
 
     <!-- Chat Sidebar -->
-    <aside id="chat-container" class="chat-container">
+    <aside id="chat-container" class="chat-container" role="complementary" aria-label="Visitor Chat" aria-hidden="true">
       <div id="chat-header" class="chat-header">
         <span>Visitor Chat</span>
-        <button id="chat-close-btn" class="chat-close-btn" title="Close Chat">&times;</button>
+        <button id="chat-close-btn" class="chat-close-btn" title="Close Chat" aria-label="Close chat window">&times;</button>
       </div>
-      <div id="chat-messages" class="chat-messages">
+      <div id="chat-messages" class="chat-messages" role="log" aria-label="Chat Messages" aria-live="polite">
         <div id="chat-loading" class="chat-loading">Loading messages...</div>
       </div>
-      <form id="chat-input-area" class="chat-input-area">
+      <form id="chat-input-area" class="chat-input-area" role="form" aria-label="Chat Input">
         <div class="chat-input-wrapper">
-          <textarea id="chat-message-input" class="chat-message-input" placeholder="Type your message (use <b>text</b> for bold)" rows="2"></textarea>
-          <input type="text" id="chat-image-url-input" class="chat-image-input" placeholder="Optional: Image URL or base64">
+          <textarea id="chat-message-input" class="chat-message-input" placeholder="Type your message (use <b>text</b> for bold)" rows="2" aria-label="Chat message"></textarea>
+          <input type="text" id="chat-image-url-input" class="chat-image-input" placeholder="Optional: Image URL or base64" aria-label="Image URL (optional)">
         </div>
-        <button id="chat-send-btn" class="btn">Send</button>
+        <button id="chat-send-btn" class="btn" type="submit" aria-label="Send message">Send</button>
       </form>
     </aside>
+
+    <!-- Skip to main content link for keyboard users -->
+    <a href="#main-content" class="skip-link" aria-label="Skip to main content">Skip to main content</a>
 
     <!-- Link external JS using Flask-Assets -->
     {% assets "js_all" %}

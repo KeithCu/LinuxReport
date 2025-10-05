@@ -514,6 +514,18 @@
                 }
                 this.startChatSession();
             }
+            
+            // Update ARIA attributes for accessibility
+            const toggleBtn = this.elements.get('chat-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.setAttribute('aria-expanded', (!isVisible).toString());
+            }
+            
+            // Announce state change to screen readers
+            if (app.modules.AccessibilityManager) {
+                const state = isVisible ? 'closed' : 'opened';
+                app.modules.AccessibilityManager.announceToScreenReader(`Chat ${state}`);
+            }
         }
 
         cleanup() {

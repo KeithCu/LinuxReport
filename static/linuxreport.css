@@ -6,6 +6,207 @@
    1. CSS CUSTOM PROPERTIES & THEMES
    ============================================================================= */
 
+/* =============================================================================
+   0. ACCESSIBILITY STYLES
+   ============================================================================= */
+
+/* Screen reader only content */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Skip link for keyboard users */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--accent-primary);
+  color: white;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: var(--border-radius-sm);
+  z-index: 1000;
+  transition: top 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.skip-link:focus {
+  top: 6px;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Focus styles for better visibility */
+*:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Enhanced focus styles for interactive elements */
+a:focus,
+button:focus,
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 13, 171, 0.2);
+}
+
+/* Focus styles for news articles */
+.linkclass a:focus {
+  background-color: rgba(26, 13, 171, 0.1);
+  border-radius: var(--border-radius-sm);
+  padding: 4px;
+  margin: -4px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  *:focus {
+    outline: 3px solid var(--text);
+    outline-offset: 1px;
+  }
+  
+  .btn:focus,
+  a:focus {
+    background-color: var(--text);
+    color: var(--bg);
+  }
+}
+
+/* Reduced motion support */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Focus management for dynamic content */
+[aria-hidden="true"] {
+  display: none !important;
+}
+
+[aria-hidden="true"] * {
+  display: none !important;
+}
+
+/* Live region announcements */
+[aria-live="polite"] {
+  position: absolute;
+  left: -10000px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+/* Enhanced button accessibility */
+.btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(26, 13, 171, 0.2);
+}
+
+/* Navigation menu accessibility */
+[role="menubar"] {
+  display: flex;
+  flex-direction: row;
+}
+
+[role="menuitem"] {
+  position: relative;
+}
+
+[role="menuitem"]:focus {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+/* Feed navigation accessibility */
+[role="feed"] {
+  position: relative;
+}
+
+[role="article"] {
+  margin-bottom: var(--spacing-md);
+}
+
+/* Pagination accessibility */
+.pagination-controls button:focus {
+  background-color: var(--accent-primary);
+  color: white;
+  transform: scale(1.05);
+}
+
+.pagination-controls button:disabled:focus {
+  transform: none;
+  background-color: var(--btn-bg);
+  color: var(--text-secondary);
+}
+
+/* Weather widget accessibility */
+.weather-widget button:focus {
+  background-color: var(--accent-primary);
+  color: white;
+  border-radius: var(--border-radius-sm);
+}
+
+/* Chat accessibility */
+#chat-container button:focus {
+  background-color: var(--accent-primary);
+  color: white;
+}
+
+#chat-message-input:focus,
+#chat-image-url-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(26, 13, 171, 0.2);
+}
+
+/* Form accessibility */
+select:focus,
+input:focus,
+textarea:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(26, 13, 171, 0.2);
+}
+
+/* Mobile accessibility improvements */
+@media (max-width: 768px) {
+  .skip-link {
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+  
+  .skip-link:focus {
+    top: 6px;
+  }
+  
+  /* Ensure touch targets are large enough */
+  .btn,
+  .nav-links-mobile a,
+  .linkclass a {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 /* Base CSS Custom Properties */
 :root {
   /* Default theme (silver) */
@@ -469,12 +670,12 @@ img {
 }
 
 #weather-container {
-  visibility: hidden;
-}
+   visibility: hidden;
+ }
 
 #weather-container.loaded {
-  visibility: visible;
-}
+   visibility: visible;
+ }
 #weather-widget-container.collapsed #weather-content {
   display: none;
 }
