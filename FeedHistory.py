@@ -350,6 +350,10 @@ class FeedHistory:
         Returns:
             bool: True if the feed should be refreshed, False otherwise
         """
+        # Ensure last_fetch is timezone-aware using the configured timezone
+        if last_fetch.tzinfo is None:
+            last_fetch = last_fetch.replace(tzinfo=FeedConfig.TZ)
+
         interval = self.get_interval(url)
         # Clamp the interval to the current MAX_INTERVAL
         clamped_interval = min(interval, FeedConfig.MAX_INTERVAL)

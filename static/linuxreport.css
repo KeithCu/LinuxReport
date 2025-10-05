@@ -718,6 +718,11 @@ nav {
   --nav-link-color: #b22222;
 }
 
+/* Robot Report link color */
+.nav-link-robot {
+  --nav-link-color: #FF1493; /* deep pink */
+}
+
 /* Mobile Navigation Border Colors */
 .mobile-view .nav-links-mobile .nav-link-linux {
   border-color: #f47421 !important;
@@ -745,6 +750,10 @@ nav {
 
 .mobile-view .nav-links-mobile .nav-link-space {
   border-color: #b22222 !important;
+}
+
+.mobile-view .nav-links-mobile .nav-link-robot {
+  border-color: #FF1493 !important;
 }
 
 /* =============================================================================
