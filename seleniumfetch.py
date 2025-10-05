@@ -734,6 +734,9 @@ def extract_post_data(post, config, url, use_selenium):
             # Remove action buttons and user tags - remove known patterns from end
             title = re.sub(r'\s+PRO\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
             title = re.sub(r'\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+            title = re.sub(r'\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+            title = re.sub(r'\s+TRUMP\s+TRUTH\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+            title = re.sub(r'\s+TRUMP\s+TRUTH\s*$', '', title, flags=re.IGNORECASE)  # Remove TRUMP TRUTH tags
             title = re.sub(r'\s+PRO\s*$', '', title, flags=re.IGNORECASE)
             # Remove any remaining trailing punctuation and whitespace
             title = re.sub(r'[.\s]+$', '', title).strip()
