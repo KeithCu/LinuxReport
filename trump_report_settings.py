@@ -13,8 +13,8 @@ class PatriotsWinFetchConfig(FetchConfig):
             needs_selenium=True,
             needs_tor=False,
             post_container=".post-item",
-            title_selector=".kHEnUT.title a",
-            link_selector=".flLuNk.preview-parent",
+            title_selector=".post-item",  # Extract text content from post items
+            link_selector=".sc-1bet0vd-0.flLuNk",  # Links are on div elements
             link_attr="href",
             filter_pattern="",
             use_random_user_agent=False,
