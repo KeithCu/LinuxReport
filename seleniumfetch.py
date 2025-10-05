@@ -29,6 +29,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.common.exceptions import WebDriverException, TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
@@ -722,6 +723,16 @@ def extract_post_data(post, config, url, use_selenium):
         if config.title_selector == config.post_container:
             g_logger.info(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
             title = post.text.strip()
+            # Fallbacks for anchors or elements with empty visible text
+            if not title:
+                try:
+                    # Selenium WebElement path
+                    get_attr = getattr(post, 'get_attribute', None)
+                    if callable(get_attr):
+                        title = get_attr('title') or get_attr('innerText') or ''
+                        title = (title or '').strip()
+                except Exception:
+                    pass
             g_logger.debug(f"Raw post text: {repr(title)}")
             # Clean up patriots.win metadata from the end of posts
             # Remove patterns like "posted X ago by username X comments award share report block"

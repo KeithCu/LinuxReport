@@ -41,7 +41,8 @@ URLS = {
     "aireport": "https://aireport.keithcu.com",
     "trumpreport": "https://trumpreport.info",
     "pvreport": "https://pvreport.org",
-    "spacereport": "https://news.spaceelevatorwiki.com"
+    "spacereport": "https://news.spaceelevatorwiki.com",
+    "robotreport": "https://robotreport.keithcu.com"
 }
 
 # =============================================================================
