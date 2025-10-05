@@ -84,6 +84,7 @@ class Mode(str, Enum):
     TRUMP_REPORT = "trump"
     SPACE_REPORT = "space"
     PV_REPORT = "pv"
+    ROBOT_REPORT = "robot"
 
     @classmethod
     def from_config(cls, config_modes):
@@ -146,7 +147,7 @@ EXPIRE_YEARS: int = 86400 * 365 * 2  # 2 years
 # =============================================================================
 
 # Current application mode
-MODE = Mode.SPACE_REPORT
+MODE = Mode.ROBOT_REPORT
 
 # URL cookie version for cache invalidation
 URLS_COOKIE_VERSION = "2"
