@@ -22,6 +22,7 @@ from urllib.parse import urljoin, urlparse
 # THIRD-PARTY IMPORTS
 # =============================================================================
 import random
+import re
 import requests
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -719,7 +720,25 @@ def extract_post_data(post, config, url, use_selenium):
     try:
         # Special case: if title_selector equals post_container, use the post element itself
         if config.title_selector == config.post_container:
+            g_logger.info(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
             title = post.text.strip()
+            g_logger.debug(f"Raw post text: {repr(title)}")
+            # Clean up patriots.win metadata from the end of posts
+            # Remove patterns like "posted X ago by username X comments award share report block"
+            # Remove leading numbers/IDs like "546 "
+            title = re.sub(r'^\d+\s+', '', title)
+            # Remove "posted X ago by..." and everything after it
+            title = re.sub(r'\s*posted\s+\d+\s+(?:hour|minute|second|day)s?\s+ago\s+by\s+.*', '', title, flags=re.IGNORECASE)
+            # Remove remaining metadata patterns
+            title = re.sub(r'\s*\d+\s+comments?\s+.*', '', title, flags=re.IGNORECASE)
+            # Remove action buttons and user tags - remove known patterns from end
+            title = re.sub(r'\s+PRO\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+            title = re.sub(r'\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+            title = re.sub(r'\s+PRO\s*$', '', title, flags=re.IGNORECASE)
+            # Remove any remaining trailing punctuation and whitespace
+            title = re.sub(r'[.\s]+$', '', title).strip()
+            title = title.strip()
+            g_logger.debug(f"Cleaned post title: {repr(title)}")
         elif use_selenium:
             title_element = post.find_element(By.CSS_SELECTOR, config.title_selector)
             title = title_element.text.strip()
