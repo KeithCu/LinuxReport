@@ -17,7 +17,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://spectrum.ieee.org/feeds/topic/robotics.rss": RssInfo("IEEESpectrum.svg", "IEEE Spectrum Robotics", "https://spectrum.ieee.org/topic/robotics/"),
         "https://techxplore.com/rss-feed/robotics-news/": RssInfo("TechXplore.svg", "TechXplore Robotics", "https://techxplore.com/robotics-news/"),
         "https://www.sciencedaily.com/rss/matter_energy/robotics.xml": RssInfo("ScienceDaily.webp", "ScienceDaily Robotics", "https://www.sciencedaily.com/news/matter_energy/robotics/"),
-        "https://nvidianews.nvidia.com/rss?tag=Robotics": RssInfo("NVIDIA.webp", "NVIDIA Robotics", "https://blogs.nvidia.com/blog/tag/robotics/"),
+        "https://blogs.nvidia.com/blog/tag/robotics/feed/": RssInfo("NVIDIA.webp", "NVIDIA Robotics", "https://blogs.nvidia.com/blog/tag/robotics/"),
     },
     SITE_URLS=[
         "https://www.therobotreport.com/feed/",
@@ -30,7 +30,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://spectrum.ieee.org/feeds/topic/robotics.rss",
         "https://techxplore.com/rss-feed/robotics-news/",
         "https://www.sciencedaily.com/rss/matter_energy/robotics.xml",
-        "https://nvidianews.nvidia.com/rss?tag=Robotics",
+        "https://blogs.nvidia.com/blog/tag/robotics/feed/",
     ],
     USER_AGENT="Robot Report -- https://robotreport.keithcu.com",
     URL_IMAGES="https://robotreport.keithcu.com/static/images/",
