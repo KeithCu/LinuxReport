@@ -239,8 +239,10 @@ class SharedSeleniumDriver:
         with cls._lock:
             # Clean up expired instances periodically
             cls._cleanup_expired_instances(now)
-            # Also clean up any lingering chromedriver processes
-            cls._cleanup_lingering_processes()
+            # Also clean up any lingering chromedriver processes (only every 5 minutes)
+            if not hasattr(cls, '_last_cleanup_time') or (now - cls._last_cleanup_time) > 300:
+                cls._cleanup_lingering_processes()
+                cls._last_cleanup_time = now
 
             # Check if we have a valid instance for this configuration
             if key in cls._instances:
@@ -418,58 +420,99 @@ class SharedSeleniumDriver:
     @classmethod
     def _cleanup_lingering_processes(cls):
         """
-        Aggressively clean up any lingering chromedriver and Chrome processes.
-        This is called whenever get_driver is invoked to prevent accumulation.
+        Clean up only truly orphaned chromedriver and Chrome processes.
+        Only kill processes that are very old (>5 minutes) and appear to be orphans.
+        This is called periodically to prevent accumulation without being too aggressive.
         """
         try:
             import subprocess
             import os
+            import time as time_module
 
-            # Find and kill chromedriver processes that might be lingering
+            current_time = time_module.time()
+
+            # Find chromedriver processes and check their age
             chromedriver_result = subprocess.run(['pgrep', '-f', 'chromedriver'], capture_output=True, text=True, timeout=5)
             chromedriver_count = 0
             if chromedriver_result.returncode == 0 and chromedriver_result.stdout.strip():
                 chromedriver_pids = chromedriver_result.stdout.strip().split('\n')
-                chromedriver_count = len(chromedriver_pids)
-                g_logger.info(f"Cleanup: found {chromedriver_count} lingering chromedriver processes: {chromedriver_pids}")
+
                 for chromedriver_pid in chromedriver_pids:
                     try:
-                        # Kill the process group to also kill child Chrome processes
-                        os.killpg(os.getpgid(int(chromedriver_pid)), 9)  # SIGKILL to process group
-                        g_logger.info(f"Cleanup: killed chromedriver process group {chromedriver_pid}")
-                    except (OSError, ValueError, ProcessLookupError) as e:
-                        # Fallback to killing just the chromedriver process
+                        # Check if this process belongs to our current process tree
+                        # by checking if it's a child of our process group
+                        our_pgid = os.getpgid(os.getpid())
                         try:
-                            os.kill(int(chromedriver_pid), 9)  # SIGKILL
-                            g_logger.info(f"Cleanup: killed chromedriver process {chromedriver_pid}")
-                        except (OSError, ValueError) as e2:
-                            g_logger.debug(f"Cleanup: could not kill chromedriver process {chromedriver_pid}: {e2}")
-                    # Brief pause to let process die
-                    time.sleep(0.1)
+                            process_pgid = os.getpgid(int(chromedriver_pid))
+                            # If it's not in our process group, it might be from another request/session
+                            # Be more conservative - only kill processes that are very old
+                            if process_pgid != our_pgid:
+                                # Check process age using /proc filesystem
+                                try:
+                                    with open(f'/proc/{chromedriver_pid}/stat', 'r') as f:
+                                        stat_data = f.read().split()
+                                        start_time_ticks = int(stat_data[21])
+                                        # Convert jiffies to seconds (rough approximation)
+                                        start_time_seconds = start_time_ticks / 100.0
+                                        process_age = current_time - start_time_seconds
 
-            # Also find and kill any orphaned Chrome processes
+                                        # Only kill if process is older than 5 minutes (300 seconds)
+                                        if process_age > 300:
+                                            g_logger.warning(f"Cleanup: killing old orphaned chromedriver process {chromedriver_pid} (age: {process_age:.1f}s)")
+                                            try:
+                                                os.kill(int(chromedriver_pid), 9)  # SIGKILL
+                                                chromedriver_count += 1
+                                                time.sleep(0.1)
+                                            except (OSError, ProcessLookupError):
+                                                pass  # Process might have already died
+                                except (FileNotFoundError, ValueError):
+                                    # Process might have died, skip it
+                                    pass
+                        except (OSError, ProcessLookupError):
+                            # Process might have died, skip it
+                            pass
+                    except (OSError, ValueError):
+                        # Process might have died, skip it
+                        pass
+
+            # For Chrome processes, be even more conservative
+            # Only clean up orphaned Chrome processes that are very old
             chrome_result = subprocess.run(['pgrep', '-f', 'chrome.*--'], capture_output=True, text=True, timeout=5)
             chrome_count = 0
             if chrome_result.returncode == 0 and chrome_result.stdout.strip():
                 chrome_pids = chrome_result.stdout.strip().split('\n')
-                chrome_count = len(chrome_pids)
-                g_logger.info(f"Cleanup: found {chrome_count} lingering Chrome processes: {chrome_pids}")
+
                 for chrome_pid in chrome_pids:
                     try:
-                        os.kill(int(chrome_pid), 9)  # SIGKILL
-                        g_logger.info(f"Cleanup: killed Chrome process {chrome_pid}")
-                    except (OSError, ValueError) as e:
-                        g_logger.debug(f"Cleanup: could not kill Chrome process {chrome_pid}: {e}")
-                    # Brief pause to let process die
-                    time.sleep(0.1)
+                        # Check process age
+                        try:
+                            with open(f'/proc/{chrome_pid}/stat', 'r') as f:
+                                stat_data = f.read().split()
+                                start_time_ticks = int(stat_data[21])
+                                start_time_seconds = start_time_ticks / 100.0
+                                process_age = current_time - start_time_seconds
+
+                                # Only kill Chrome processes older than 10 minutes (600 seconds)
+                                if process_age > 600:
+                                    g_logger.warning(f"Cleanup: killing old orphaned Chrome process {chrome_pid} (age: {process_age:.1f}s)")
+                                    try:
+                                        os.kill(int(chrome_pid), 9)  # SIGKILL
+                                        chrome_count += 1
+                                        time.sleep(0.1)
+                                    except (OSError, ProcessLookupError):
+                                        pass
+                        except (FileNotFoundError, ValueError):
+                            pass
+                    except (OSError, ValueError):
+                        pass
 
             if chromedriver_count > 0 or chrome_count > 0:
-                g_logger.info(f"Cleanup: killed {chromedriver_count} chromedriver and {chrome_count} Chrome processes")
+                g_logger.info(f"Cleanup: killed {chromedriver_count} old chromedriver and {chrome_count} old Chrome processes")
             else:
-                g_logger.debug("Cleanup: no lingering browser processes found")
+                g_logger.debug("Cleanup: no old orphaned browser processes found")
 
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-            g_logger.debug(f"Cleanup: unable to clean up lingering browser processes: {e}")
+            g_logger.debug(f"Cleanup: unable to check for orphaned browser processes: {e}")
 
     @classmethod
     def force_cleanup(cls):
