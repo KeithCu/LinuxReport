@@ -51,16 +51,6 @@
 
     <main>
 
-      <!-- API Links Container -->
-      <div class="api-links-container">
-        <a href="/rss" id="rss-feed-link" class="api-link rss-feed-link" title="Subscribe to RSS feed">
-          <span class="api-link-title">📡 RSS</span>
-        </a>
-        <a href="/api/headlines" id="json-api-link" class="api-link json-api-link" title="Get headlines as JSON">
-          <span class="api-link-title">🔗 JSON</span>
-        </a>
-      </div>
-
       <!-- Old Headlines Link -->
       <a href="/old_headlines" id="old-headlines-link" class="old-headlines-link">
         <span class="old-headlines-title">📰 Old Headlines Archive</span>
@@ -139,6 +129,16 @@
         {% endif %}
       </div>
     </main>
+
+    <!-- API Links Container moved to bottom of page -->
+    <div class="api-links-container">
+      <a href="/rss" id="rss-feed-link" class="api-link rss-feed-link" title="Subscribe to RSS feed">
+        <span class="api-link-title">📡 RSS</span>
+      </a>
+      <a href="/api/headlines" id="json-api-link" class="api-link json-api-link" title="Get headlines as JSON">
+        <span class="api-link-title">🔗 JSON</span>
+      </a>
+    </div>
 
     <!-- Chat Sidebar -->
     <aside id="chat-container" class="chat-container">
