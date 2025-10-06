@@ -18,7 +18,7 @@ import threading
 # Add the parent directory to Python path when running tests directly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from seleniumfetch import SharedSeleniumDriver, fetch_site_posts, cleanup_selenium_drivers, DRIVER_RECYCLE_TIMEOUT
+from seleniumfetch import SharedSeleniumDriver, fetch_site_posts, cleanup_drivers, DRIVER_RECYCLE_TIMEOUT
 
 # Test configuration
 TEST_URL = "https://keithcu.com/wordpress/?feed=rss2"  # RSS feed URL
@@ -57,7 +57,7 @@ def test_1_quick_functionality():
             return False
         
         # Test manual cleanup
-        cleanup_selenium_drivers()
+        cleanup_drivers()
         if SharedSeleniumDriver._instance is None:
             print("✓ Manual cleanup successful")
             return True
@@ -69,7 +69,7 @@ def test_1_quick_functionality():
         print(f"✗ Quick functionality test failed: {e}")
         return False
     finally:
-        cleanup_selenium_drivers()
+        cleanup_drivers()
 
 def test_2_driver_creation_and_persistence():
     """Test that driver is created and remains functional (TTL-based cleanup)."""
@@ -122,7 +122,7 @@ def test_2_driver_creation_and_persistence():
         time.sleep(1)
 
         # Test manual cleanup - this should work
-        cleanup_selenium_drivers()
+        cleanup_drivers()
         if SharedSeleniumDriver._instance is None:
             print("✓ Manual cleanup successful")
             return True
@@ -132,7 +132,7 @@ def test_2_driver_creation_and_persistence():
             
     finally:
         # Force cleanup
-        cleanup_selenium_drivers()
+        cleanup_drivers()
 
 def test_3_fetch_site_posts():
     """Test the fetch_site_posts function with the test URL."""
@@ -189,7 +189,7 @@ def test_3_fetch_site_posts():
             
     finally:
         # Force cleanup
-        cleanup_selenium_drivers()
+        cleanup_drivers()
 
 def test_4_concurrent_access():
     """Test concurrent access to the driver."""
@@ -273,7 +273,7 @@ def test_4_concurrent_access():
             
     finally:
         # Force cleanup
-        cleanup_selenium_drivers()
+        cleanup_drivers()
 
 def test_5_manual_cleanup():
     """Test manual cleanup functionality."""
@@ -293,7 +293,7 @@ def test_5_manual_cleanup():
             
             # Test manual cleanup
             print("Testing manual cleanup...")
-            cleanup_selenium_drivers()
+            cleanup_drivers()
             
             if SharedSeleniumDriver._instance is None:
                 print("✓ Manual cleanup successful")
@@ -367,4 +367,4 @@ if __name__ == '__main__':
     
     # Final cleanup
     print("\nPerforming final cleanup...")
-    cleanup_selenium_drivers() 
+    cleanup_drivers()
