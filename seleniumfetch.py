@@ -35,6 +35,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.core.os_manager import ChromeType
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
+
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
@@ -174,35 +180,31 @@ def create_driver(use_tor, user_agent):
 class SharedSeleniumDriver:
     """
     Thread-safe singleton manager for Selenium WebDriver instances.
-
-    Provides centralized management of Chrome WebDriver instances with TTL-based
-    cleanup and thread synchronization. Implements lazy initialization and
-    periodic driver recycling for resource efficiency.
-
+    
+    Provides centralized management of Chrome WebDriver instances with automatic
+    cleanup, configuration validation, and thread synchronization. Implements
+    lazy initialization and timeout-based driver recycling for resource efficiency.
+    
     Attributes:
-        _instances: Dictionary of driver instances by (use_tor, user_agent) key
+        _instance: Singleton driver instance
         _lock: Thread lock for instance management
         _fetch_lock: Thread lock for synchronizing fetch operations
-        _ttl_timeout: Time-to-live for driver instances (seconds)
-        _instance: Backward compatibility - points to first instance
-        _shutdown_initiated: Backward compatibility flag
-        _timeout: Backward compatibility timeout
+        _timer: Timer for automatic driver cleanup
+        _timeout: Timeout duration for driver recycling (seconds)
+        _shutdown_initiated: Flag to prevent duplicate shutdown attempts
     """
-
-    _instances = {}  # (use_tor, user_agent) -> (driver_instance, last_used_time)
+    
+    _instance = None
     _lock = threading.Lock()
-    _fetch_lock = threading.Lock()
-    _ttl_timeout = DRIVER_RECYCLE_TIMEOUT  # 5 minutes
-
-    # Backward compatibility attributes
-    _instance = None  # Points to first instance for compatibility
-    _shutdown_initiated = False  # Backward compatibility flag
-    _timeout = DRIVER_RECYCLE_TIMEOUT  # Backward compatibility timeout
+    _fetch_lock = threading.Lock()  # New lock for synchronizing fetch operations
+    _timer = None
+    _timeout = DRIVER_RECYCLE_TIMEOUT  # 5 minutes
+    _shutdown_initiated = False  # Flag to prevent duplicate shutdowns
 
     def __init__(self, use_tor, user_agent):
         """
         Initialize a new SharedSeleniumDriver instance.
-
+        
         Args:
             use_tor (bool): Whether to use Tor proxy
             user_agent (str): User agent string for the driver
@@ -214,7 +216,7 @@ class SharedSeleniumDriver:
             self.use_tor = use_tor
             self.user_agent = user_agent
             g_logger.debug("SharedSeleniumDriver initialized successfully")
-        except (WebDriverException, OSError, ValueError) as e:
+        except Exception as e:
             g_logger.error(f"Error in SharedSeleniumDriver.__init__: {e}")
             raise
 
@@ -222,64 +224,61 @@ class SharedSeleniumDriver:
     def get_driver(cls, use_tor, user_agent):
         """
         Get or create a WebDriver instance with the specified configuration.
-
-        Returns an existing driver if configuration matches and is still valid,
-        or creates a new one if needed. Uses TTL-based cleanup for resource management.
-
+        
+        Returns an existing driver if configuration matches, or creates a new
+        one if needed. Automatically manages driver lifecycle and cleanup.
+        
         Args:
             use_tor (bool): Whether to use Tor proxy
             user_agent (str): User agent string for the driver
-
+            
         Returns:
-            webdriver.Chrome: Configured Chrome WebDriver instance, or None if creation fails
+            webdriver.Chrome: Configured Chrome WebDriver instance
         """
-        key = (use_tor, user_agent)
-        now = time.time()
-
         with cls._lock:
-            # Clean up expired instances periodically
-            cls._cleanup_expired_instances(now)
-
-            # Check if we have a valid instance for this configuration
-            if key in cls._instances:
-                instance, last_used = cls._instances[key]
-                if cls._is_instance_valid(instance) and (now - last_used) < cls._ttl_timeout:
-                    instance.last_used = now
-                    return instance.driver
-
-                # Instance is expired or invalid, clean it up
-                cls._cleanup_instance(instance)
-                del cls._instances[key]
-
-            # Create new instance
-            try:
-                g_logger.info(f"Creating new SharedSeleniumDriver instance for Tor: {use_tor}")
-                new_instance = SharedSeleniumDriver(use_tor, user_agent)
-                cls._instances[key] = (new_instance, now)
-                # Update backward compatibility instance (first one created)
-                if cls._instance is None:
-                    cls._instance = new_instance
-                return new_instance.driver
-            except (WebDriverException, OSError, ValueError) as e:
-                g_logger.error(f"Error creating new driver: {e}")
-                import traceback
-                g_logger.error(f"Full traceback: {traceback.format_exc()}")
+            # Check if shutdown has been initiated
+            if cls._shutdown_initiated:
+                g_logger.info("Driver creation blocked - shutdown in progress")
                 return None
+                
+            if cls._instance is None or not cls._is_instance_valid(cls._instance, use_tor, user_agent):
+                if cls._instance:
+                    cls._cleanup_instance()
+                
+                try:
+                    g_logger.info(f"Attempting to create new SharedSeleniumDriver instance...")
+                    cls._instance = SharedSeleniumDriver(use_tor, user_agent)
+                    # Reset timer only when creating a new instance
+                    cls._reset_timer()
+                    g_logger.info(f"Created new driver instance with Tor: {use_tor}")
+                except Exception as e:
+                    g_logger.error(f"Error creating new driver: {e}")
+                    g_logger.error(f"Error type: {type(e).__name__}")
+                    import traceback
+                    g_logger.error(f"Full traceback: {traceback.format_exc()}")
+                    cls._instance = None
+                    return None
+            
+            if cls._instance:
+                cls._instance.last_used = time.time()
+                # Only reset timer when creating a new instance, not on every access
+                return cls._instance.driver
+            return None
 
     @classmethod
     def acquire_fetch_lock(cls):
         """
         Acquire the fetch lock to synchronize fetch operations.
-
+        
         Ensures only one fetch operation can run at a time to prevent
         resource conflicts and rate limiting issues.
-
+        
         Returns:
             bool: True if lock was acquired successfully
         """
         try:
-            return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)
-        except RuntimeError as e:
+            return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)  # 30 second timeout
+        except Exception as e:
             g_logger.error(f"Error acquiring fetch lock: {e}")
             return False
 
@@ -287,7 +286,7 @@ class SharedSeleniumDriver:
     def release_fetch_lock(cls):
         """
         Release the fetch lock after fetch operation is complete.
-
+        
         Safely releases the fetch lock, handling cases where the lock
         may not have been acquired.
         """
@@ -298,125 +297,178 @@ class SharedSeleniumDriver:
             pass
 
     @classmethod
-    def _is_instance_valid(cls, instance):
+    def _is_instance_valid(cls, instance, use_tor, user_agent):
         """
-        Check if a driver instance is still valid and responsive.
-
+        Check if the current driver instance is valid for the given configuration.
+        
         Args:
-            instance: The SharedSeleniumDriver instance to validate
-
+            use_tor (bool): Required Tor configuration
+            user_agent (str): Required user agent string
+            
         Returns:
-            bool: True if instance is valid
+            bool: True if current instance matches configuration
         """
         try:
-            if not (instance and hasattr(instance, 'driver')):
+            # Only reuse if config matches
+            if not (instance and
+                    instance.use_tor == use_tor and
+                    instance.user_agent == user_agent and
+                    hasattr(instance, 'driver')):
+                return False
+            
+            # Check if driver is still responsive with timeout protection
+            try:
+                # Use a simple command with timeout to test if driver is alive
+                instance.driver.execute_script("return document.readyState;")
+                return True
+            except Exception as e:
+                g_logger.debug(f"Driver health check failed: {e}")
                 return False
 
-            # Quick health check - don't fail if this throws an exception
-            instance.driver.execute_script("return document.readyState;")
-            return True
-        except WebDriverException as e:
-            g_logger.debug(f"Driver health check failed: {e}")
+        except Exception as e:
+            g_logger.error(f"Error during driver validation: {e}")
             return False
 
     @classmethod
-    def _cleanup_expired_instances(cls, now):
+    def _reset_timer(cls):
         """
-        Clean up instances that have exceeded their TTL.
-
-        Args:
-            now (float): Current timestamp
+        Reset the cleanup timer for automatic driver recycling.
+        
+        Cancels any existing timer and starts a new one to ensure
+        the driver is cleaned up after the timeout period.
         """
-        expired_keys = []
+        try:
+            if cls._timer and cls._timer.is_alive():
+                cls._timer.cancel()
+                # Don't join the timer thread if we're on the same thread
+                if threading.current_thread() != cls._timer:
+                    cls._timer.join(timeout=1.0)
+                    g_logger.debug("Timer joined successfully")
+            g_logger.debug(f"Timer cancelled, timeout was {cls._timeout} seconds")
+        except Exception as e:
+            g_logger.error(f"Error cancelling timer: {e}")
+        finally:
+            cls._timer = None
 
-        for key, (instance, last_used) in cls._instances.items():
-            if (now - last_used) >= cls._ttl_timeout:
-                expired_keys.append(key)
-
-        for key in expired_keys:
-            instance, _ = cls._instances[key]
-            cls._cleanup_instance(instance)
-            del cls._instances[key]
-            g_logger.debug(f"Cleaned up expired driver instance for {key}")
-
-            # Update backward compatibility instance
-            if cls._instance == instance:
-                cls._instance = None
-
-
-    @classmethod
-    def _cleanup_instance(cls, instance):
-        """
-        Clean up a driver instance safely.
-
-        Attempts to gracefully quit the driver. As a fallback, it uses psutil
-        to forcefully terminate the entire process tree associated with the driver service,
-        ensuring no lingering chromedriver or browser processes are left behind.
-        """
-        if not instance or not hasattr(instance, 'driver'):
+        # Don't create new timer if shutdown is in progress
+        if cls._shutdown_initiated:
             return
 
-        driver = instance.driver
-
-        # Try to get the service process PID before we quit
-        service_pid = None
         try:
-            service_pid = driver.service.process.pid
-        except Exception: # Broad exception to catch AttributeError, psutil.NoSuchProcess, etc.
-            pass
+            cls._timer = threading.Timer(cls._timeout, cls._shutdown)
+            cls._timer.daemon = True
+            cls._timer.start()
+            g_logger.debug(f"New timer started with {cls._timeout} second timeout")
+        except Exception as e:
+            g_logger.error(f"Error creating timer: {e}")
+            # If timer creation fails during normal operation, schedule immediate cleanup
+            if not cls._shutdown_initiated:
+                cls._shutdown()
 
-        # 1. First, try the graceful shutdown
-        try:
-            driver.quit()
-            g_logger.debug("WebDriver quit successfully.")
-            # Give it a moment to shut down
-            time.sleep(1.0)
-        except (WebDriverException, OSError) as e:
-            g_logger.warning(f"Graceful driver.quit() failed: {e}. Proceeding with forceful cleanup.")
-
-        # 2. As a fallback, forcefully terminate the process tree
-        if service_pid:
+    @classmethod
+    def _cleanup_instance(cls):
+        """
+        Clean up the current driver instance safely.
+        """
+        if cls._instance:
             try:
-                import psutil
-                parent = psutil.Process(service_pid)
-                # Kill all children (recursive) and then the parent
-                children = parent.children(recursive=True)
-                for child in children:
-                    try:
-                        child.kill()
-                    except psutil.NoSuchProcess:
-                        pass # Child might have already died
-                
-                try:
-                    parent.kill()
-                    g_logger.info(f"Forcefully terminated chromedriver process tree for PID {service_pid}.")
-                except psutil.NoSuchProcess:
-                    g_logger.debug(f"Chromedriver process {service_pid} was already gone.")
-
-            except ImportError:
-                g_logger.warning("`psutil` is not installed. Cannot perform forceful cleanup of process tree. "
-                                 "Please run `pip install psutil`.")
-            except psutil.NoSuchProcess:
-                # This is expected if driver.quit() was successful
-                g_logger.debug(f"Chromedriver process {service_pid} was already cleaned up.")
+                # Try to quit the driver gracefully
+                cls._instance.driver.quit()
+                g_logger.debug("WebDriver quit successfully")
             except Exception as e:
-                g_logger.error(f"An unexpected error occurred during forceful cleanup: {e}")
+                g_logger.error(f"Error quitting WebDriver: {e}")
+                try:
+                    # Fallback: try to close the driver
+                    cls._instance.driver.close()
+                    g_logger.debug("WebDriver closed successfully")
+                except Exception as e2:
+                    g_logger.error(f"Error closing WebDriver: {e2}")
+                    # Last resort: try to kill the process
+                    try:
+                        if hasattr(cls._instance.driver, 'service') and hasattr(cls._instance.driver.service, 'process'):
+                            process = cls._instance.driver.service.process
+                            if process and process.poll() is None:
+                                process.terminate()
+                                time.sleep(1)
+                                if process.poll() is None:
+                                    process.kill()
+                                g_logger.debug("WebDriver process terminated")
+                    except Exception as e3:
+                        g_logger.error(f"Error terminating WebDriver process: {e3}")
+            finally:
+                cls._instance = None
+                g_logger.debug("Instance set to None")
+
+    @classmethod
+    def _shutdown(cls):
+        """
+        Shutdown and cleanup the current driver instance.
+        
+        Safely closes the WebDriver and resets the singleton instance
+        to allow for fresh driver creation. This method is called by the timer
+        for automatic driver recycling, so it resets the shutdown flag after cleanup.
+        """
+        g_logger.debug(f"Shutdown called - instance exists: {cls._instance is not None}")
+        with cls._lock:
+            # Set shutdown flag to prevent new instances during cleanup
+            cls._shutdown_initiated = True
+
+            # Clean up instance
+            cls._cleanup_instance()
+
+            # Cancel any existing timer
+            try:
+                if cls._timer and cls._timer.is_alive():
+                    cls._timer.cancel()
+                    g_logger.debug("Timer cancelled during shutdown")
+                    # Don't join the timer thread if we're on the same thread
+                    if threading.current_thread() != cls._timer:
+                        cls._timer.join(timeout=1.0)
+                        g_logger.debug("Timer joined successfully")
+                    else:
+                        g_logger.debug("Skipping timer join (same thread)")
+            except Exception as e:
+                g_logger.error(f"Error cancelling timer during shutdown: {e}")
+            finally:
+                cls._timer = None
+                g_logger.debug("Timer set to None")
+
+            # Reset shutdown flag to allow new driver creation after cleanup
+            # This is safe because we're in a timer callback, not a true shutdown
+            cls._shutdown_initiated = False
+            g_logger.debug("Shutdown completed - ready for new driver creation")
 
     @classmethod
     def force_cleanup(cls):
         """
-        Force shutdown and cleanup of all driver instances.
-
-        This method can be called manually to ensure all WebDrivers
-        are properly shut down, useful for debugging or emergency cleanup.
+        Force shutdown and cleanup of all resources.
+        
+        This method can be called manually to ensure the WebDriver
+        is properly shut down, useful for debugging or emergency cleanup.
         """
         g_logger.info("Forcing WebDriver cleanup...")
         with cls._lock:
-            for instance, _ in cls._instances.values():
-                cls._cleanup_instance(instance)
-            cls._instances.clear()
-            # Reset backward compatibility attributes
-            cls._instance = None
+            cls._shutdown_initiated = True
+
+            # Clean up instance
+            cls._cleanup_instance()
+
+            # Clean up timer
+            try:
+                if cls._timer and cls._timer.is_alive():
+                    cls._timer.cancel()
+                    # Don't join the timer thread if we're on the same thread
+                    if threading.current_thread() != cls._timer:
+                        cls._timer.join(timeout=2.0)
+                        g_logger.debug("Timer joined successfully during force cleanup")
+                    else:
+                        g_logger.debug("Skipping timer join during force cleanup (same thread)")
+            except Exception as e:
+                g_logger.error(f"Error during force cleanup timer cancellation: {e}")
+            finally:
+                cls._timer = None
+
+            # Reset shutdown flag for potential future use
             cls._shutdown_initiated = False
             g_logger.info("Force cleanup completed")
 
@@ -427,6 +479,7 @@ class SharedSeleniumDriver:
         """
         g_logger.info("Resetting SharedSeleniumDriver for testing...")
         cls.force_cleanup()
+        cls._shutdown_initiated = False
 
 # =============================================================================
 # GLOBAL CLEANUP FUNCTION
@@ -435,7 +488,7 @@ class SharedSeleniumDriver:
 def cleanup_selenium_drivers():
     """
     Global cleanup function to ensure all Selenium drivers are properly shut down.
-
+    
     This function can be called from other modules or during application shutdown
     to ensure no WebDriver instances are left running.
     """
