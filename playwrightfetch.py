@@ -1,10 +1,10 @@
 """
-seleniumfetch.py
+playwrightfetch.py
 
-Selenium-based web scraping system for JavaScript-rendered content and dynamic sites.
+Playwright-based web scraping system for JavaScript-rendered content and dynamic sites.
 Provides functions to fetch and parse posts from sites requiring JavaScript rendering
-or special handling, using Selenium WebDriver and BeautifulSoup. Includes site-specific
-configurations, shared driver management, and thread-safe operations.
+or special handling, using Playwright and BeautifulSoup. Includes site-specific
+configurations, shared browser management, and thread-safe operations.
 """
 
 # =============================================================================
@@ -25,21 +25,8 @@ import random
 import re
 import requests
 from bs4 import BeautifulSoup
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import WebDriverException, TimeoutException
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.core.os_manager import ChromeType
-
-try:
-    import psutil
-except ImportError:
-    psutil = None
-
+from playwright.sync_api import sync_playwright, Browser, BrowserContext, Page, TimeoutError as PlaywrightTimeoutError
+from playwright.sync_api import expect
 
 # =============================================================================
 # LOCAL IMPORTS
@@ -58,17 +45,20 @@ ENABLE_DATE_EXTRACTION = False
 # TIMEOUT CONSTANTS
 # =============================================================================
 
-# WebDriver timeouts - for browser operations
-WEBDRIVER_TIMEOUT = 30  # 30 seconds for page load and script execution
+# Playwright timeouts - for browser operations
+PLAYWRIGHT_TIMEOUT = 30000  # 30 seconds for page load and script execution
 
 # Network operation timeouts - for HTTP requests and element waiting
-NETWORK_TIMEOUT = 20  # 20 seconds for HTTP requests and WebDriverWait operations
+NETWORK_TIMEOUT = 20  # 20 seconds for HTTP requests
 
 # Thread synchronization timeout - for coordinating fetch operations
 FETCH_LOCK_TIMEOUT = 30  # 30 seconds for acquiring fetch lock (longer due to thread coordination)
 
-# Driver lifecycle timeout - for resource management
-DRIVER_RECYCLE_TIMEOUT = 300  # 5 minutes - timeout for driver recycling
+# Browser lifecycle timeout - for resource management
+BROWSER_RECYCLE_TIMEOUT = 300  # 5 minutes - timeout for browser recycling
+
+# Backward compatibility constant
+DRIVER_RECYCLE_TIMEOUT = BROWSER_RECYCLE_TIMEOUT
 
 
 # =============================================================================
@@ -87,7 +77,7 @@ class KeithcuRssFetchConfig(FetchConfig):
     def __new__(cls):
         return super().__new__(
             cls,
-            needs_selenium=True,  # Using Selenium for testing purposes
+            needs_selenium=True,  # Using Playwright for testing purposes
             needs_tor=False,
             post_container="pre",  # RSS feeds in browser are wrapped in <pre> tags
             title_selector="title",
@@ -101,156 +91,224 @@ class KeithcuRssFetchConfig(FetchConfig):
 KEITHCU_RSS_CONFIG = KeithcuRssFetchConfig()
 
 # =============================================================================
-# WEBDRIVER CONFIGURATION AND CREATION
+# PLAYWRIGHT CONFIGURATION AND CREATION
 # =============================================================================
 
-def create_driver(use_tor, user_agent):
+def create_browser_context(playwright, use_tor, user_agent):
     """
-    Create and configure a Chrome WebDriver instance.
+    Create and configure a Playwright browser context.
     
-    Sets up a headless Chrome browser with appropriate options for web scraping,
+    Sets up a browser context with appropriate options for web scraping,
     including proxy configuration for Tor if enabled and custom user agent.
     
     Args:
+        playwright: Playwright instance
         use_tor (bool): Whether to use Tor proxy for connections
         user_agent (str): User agent string to use for requests
         
     Returns:
-        webdriver.Chrome: Configured Chrome WebDriver instance
+        tuple: (browser, context) - Configured browser and context instances
     """
     try:
-        g_logger.info(f"Creating Chrome driver with Tor: {use_tor}, User-Agent: {user_agent[:50]}...")
+        g_logger.info(f"Creating Playwright browser with Tor: {use_tor}, User-Agent: {user_agent[:50]}...")
 
-        options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument(f"--user-agent={user_agent}")
-        # Anti-detection measures (these ARE detectable via JS)
-        options.add_argument("--disable-blink-features=AutomationControlled")
-        options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        # NOTE: We DON'T disable useAutomationExtension as that would break Selenium!
-        # Use a consistent, common window size to avoid detection patterns
-        # Random window sizes can actually make detection easier as servers look for unusual patterns
-        # Full HD (1920x1080) is the most common desktop resolution and appears natural
-        options.add_argument("--window-size=1920,1080")
-        # Keep performance optimizations - server can't see these!
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-plugins")
-        options.add_argument("--disable-images")
-        options.add_argument("--disable-background-timer-throttling")
-        options.add_argument("--disable-backgrounding-occluded-windows")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--disable-features=TranslateUI")
-        options.add_argument("--disable-ipc-flooding-protection")
-        options.add_argument("--memory-pressure-off")
-        options.add_argument("--max_old_space_size=4096")  # Limit memory usage
+        # Launch browser with appropriate options
+        # Use Playwright's Chromium directly (no system fallback for now)
+        browser = playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-gpu",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-extensions",
+                "--disable-plugins",
+                "--disable-images",
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
+                "--disable-features=TranslateUI",
+                "--disable-ipc-flooding-protection",
+                "--memory-pressure-off",
+                "--max_old_space_size=4096",
+                "--window-size=1920,1080"
+            ]
+        )
+
+        # Create context with user agent and proxy settings
+        context_options = {
+            "user_agent": user_agent,
+            "viewport": {"width": 1920, "height": 1080},
+            "ignore_https_errors": True,
+            "java_script_enabled": True,
+            "extra_http_headers": {
+                "Accept-Language": "en-US,en;q=0.9",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            }
+        }
 
         if use_tor:
-            options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
+            context_options["proxy"] = {
+                "server": "socks5://127.0.0.1:9050"
+            }
 
-        g_logger.debug("Installing ChromeDriver...")
-        service = Service(ChromeDriverManager(
-            chrome_type=ChromeType.CHROMIUM).install())
-        g_logger.debug("ChromeDriver installed successfully")
+        context = browser.new_context(**context_options)
 
-        g_logger.debug("Creating Chrome WebDriver instance...")
-        driver = webdriver.Chrome(service=service, options=options)
-        g_logger.debug("Chrome WebDriver created successfully")
+        # Add stealth measures
+        context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined,
+            });
+            
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5],
+            });
+            
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en'],
+            });
+            
+            window.chrome = {
+                runtime: {},
+            };
+        """)
 
-        # Set timeouts to prevent hanging
-        driver.set_page_load_timeout(WEBDRIVER_TIMEOUT)  # 30 second page load timeout
-        driver.set_script_timeout(WEBDRIVER_TIMEOUT)     # 30 second script timeout
-
-        g_logger.info("Chrome driver setup completed successfully")
-        return driver
+        g_logger.info("Playwright browser setup completed successfully")
+        return browser, context
         
-    except (WebDriverException, OSError, ValueError) as e:
-        g_logger.error(f"Error creating Chrome driver: {e}")
+    except Exception as e:
+        g_logger.error(f"Error creating Playwright browser: {e}")
         g_logger.error(f"Error type: {type(e).__name__}")
         import traceback
         g_logger.error(f"Full traceback: {traceback.format_exc()}")
         raise
 
 # =============================================================================
-# SHARED SELENIUM DRIVER MANAGEMENT
+# SHARED PLAYWRIGHT BROWSER MANAGEMENT
 # =============================================================================
 
-class SharedSeleniumDriver:
+class SharedPlaywrightBrowser:
     """
-    Thread-safe singleton manager for Selenium WebDriver instances.
+    Thread-safe singleton manager for Playwright browser instances.
 
-    Provides simple singleton pattern with thread synchronization.
+    Provides centralized management of Playwright browser instances with TTL-based
+    cleanup and thread synchronization. Implements lazy initialization and
+    periodic browser recycling for resource efficiency.
+
+    Attributes:
+        _instances: Dictionary of browser instances by (use_tor, user_agent) key
+        _lock: Thread lock for instance management
+        _fetch_lock: Thread lock for synchronizing fetch operations
+        _ttl_timeout: Time-to-live for browser instances (seconds)
+        _playwright: Global Playwright instance
+        _instance: Backward compatibility - points to first instance
+        _shutdown_initiated: Backward compatibility flag
+        _timeout: Backward compatibility timeout
     """
 
-    _instance = None
+    _instances = {}  # (use_tor, user_agent) -> (browser_instance, context, last_used_time)
     _lock = threading.Lock()
     _fetch_lock = threading.Lock()
+    _ttl_timeout = BROWSER_RECYCLE_TIMEOUT  # 5 minutes
+    _playwright = None
+
+    # Backward compatibility attributes
+    _instance = None  # Points to first instance for compatibility
+    _shutdown_initiated = False  # Backward compatibility flag
+    _timeout = BROWSER_RECYCLE_TIMEOUT  # Backward compatibility timeout
 
     def __init__(self, use_tor, user_agent):
         """
-        Initialize a new SharedSeleniumDriver instance.
-        
+        Initialize a new SharedPlaywrightBrowser instance.
+
         Args:
             use_tor (bool): Whether to use Tor proxy
-            user_agent (str): User agent string for the driver
+            user_agent (str): User agent string for the browser
         """
-        g_logger.debug(f"Initializing SharedSeleniumDriver with Tor: {use_tor}")
+        g_logger.debug(f"Initializing SharedPlaywrightBrowser with Tor: {use_tor}")
         try:
-            self.driver = create_driver(use_tor, user_agent)
+            # Initialize Playwright if not already done
+            if SharedPlaywrightBrowser._playwright is None:
+                SharedPlaywrightBrowser._playwright = sync_playwright().start()
+            
+            self.browser, self.context = create_browser_context(
+                SharedPlaywrightBrowser._playwright, use_tor, user_agent
+            )
             self.last_used = time.time()
             self.use_tor = use_tor
             self.user_agent = user_agent
-            g_logger.debug("SharedSeleniumDriver initialized successfully")
+            g_logger.debug("SharedPlaywrightBrowser initialized successfully")
         except Exception as e:
-            g_logger.error(f"Error in SharedSeleniumDriver.__init__: {e}")
+            g_logger.error(f"Error in SharedPlaywrightBrowser.__init__: {e}")
             raise
 
     @classmethod
-    def get_driver(cls, use_tor, user_agent):
+    def get_browser_context(cls, use_tor, user_agent):
         """
-        Get or create a shared WebDriver instance.
+        Get or create a browser context with the specified configuration.
 
-        Returns the singleton driver instance, creating it if needed.
+        Returns an existing browser/context if configuration matches and is still valid,
+        or creates a new one if needed. Uses TTL-based cleanup for resource management.
 
         Args:
             use_tor (bool): Whether to use Tor proxy
-            user_agent (str): User agent string for the driver
+            user_agent (str): User agent string for the browser
 
         Returns:
-            webdriver.Chrome: Configured Chrome WebDriver instance
+            tuple: (browser, context) - Configured browser and context instances, or (None, None) if creation fails
         """
-        with cls._lock:
-            # Create instance if needed or invalid
-            if cls._instance is None or not cls._is_instance_valid(cls._instance, use_tor, user_agent):
-                if cls._instance:
-                    cls._cleanup_instance()
-                try:
-                    cls._instance = SharedSeleniumDriver(use_tor, user_agent)
-                    g_logger.info(f"Created new driver instance with Tor: {use_tor}")
-                except Exception as e:
-                    g_logger.error(f"Error creating driver: {e}")
-                    cls._instance = None
-                    return None
+        key = (use_tor, user_agent)
+        now = time.time()
 
-            cls._instance.last_used = time.time()
-            return cls._instance.driver
+        with cls._lock:
+            # Clean up expired instances periodically
+            cls._cleanup_expired_instances(now)
+            # Also clean up any lingering browser processes (only every 5 minutes)
+            if not hasattr(cls, '_last_cleanup_time') or (now - cls._last_cleanup_time) > 300:
+                cls._cleanup_lingering_processes()
+                cls._last_cleanup_time = now
+
+            # Check if we have a valid instance for this configuration
+            if key in cls._instances:
+                instance, context, last_used = cls._instances[key]
+                if cls._is_instance_valid(instance) and (now - last_used) < cls._ttl_timeout:
+                    instance.last_used = now
+                    return instance.browser, context
+
+                # Instance is expired or invalid, clean it up
+                cls._cleanup_instance(instance, context)
+                del cls._instances[key]
+
+            # Create new instance
+            try:
+                g_logger.info(f"Creating new SharedPlaywrightBrowser instance for Tor: {use_tor}")
+                new_instance = SharedPlaywrightBrowser(use_tor, user_agent)
+                cls._instances[key] = (new_instance, new_instance.context, now)
+                # Update backward compatibility instance (first one created)
+                if cls._instance is None:
+                    cls._instance = new_instance
+                return new_instance.browser, new_instance.context
+            except Exception as e:
+                g_logger.error(f"Error creating new browser: {e}")
+                import traceback
+                g_logger.error(f"Full traceback: {traceback.format_exc()}")
+                return None, None
 
     @classmethod
     def acquire_fetch_lock(cls):
         """
         Acquire the fetch lock to synchronize fetch operations.
-        
+
         Ensures only one fetch operation can run at a time to prevent
         resource conflicts and rate limiting issues.
-        
+
         Returns:
             bool: True if lock was acquired successfully
         """
         try:
-            return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)  # 30 second timeout
-        except Exception as e:
+            return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)
+        except RuntimeError as e:
             g_logger.error(f"Error acquiring fetch lock: {e}")
             return False
 
@@ -258,7 +316,7 @@ class SharedSeleniumDriver:
     def release_fetch_lock(cls):
         """
         Release the fetch lock after fetch operation is complete.
-        
+
         Safely releases the fetch lock, handling cases where the lock
         may not have been acquired.
         """
@@ -269,113 +327,219 @@ class SharedSeleniumDriver:
             pass
 
     @classmethod
-    def _is_instance_valid(cls, instance, use_tor, user_agent):
+    def _is_instance_valid(cls, instance):
         """
-        Check if the current driver instance is valid for the given configuration.
-        
+        Check if a browser instance is still valid and responsive.
+
         Args:
-            use_tor (bool): Required Tor configuration
-            user_agent (str): Required user agent string
-            
+            instance: The SharedPlaywrightBrowser instance to validate
+
         Returns:
-            bool: True if current instance matches configuration
+            bool: True if instance is valid
         """
         try:
-            # Only reuse if config matches
-            if not (instance and
-                    instance.use_tor == use_tor and
-                    instance.user_agent == user_agent and
-                    hasattr(instance, 'driver')):
-                return False
-            
-            # Check if driver is still responsive with timeout protection
-            try:
-                # Use a simple command with timeout to test if driver is alive
-                instance.driver.execute_script("return document.readyState;")
-                return True
-            except Exception as e:
-                g_logger.debug(f"Driver health check failed: {e}")
+            if not (instance and hasattr(instance, 'browser')):
                 return False
 
+            # Quick health check - don't fail if this throws an exception
+            # Check if browser is still connected
+            return instance.browser.is_connected()
         except Exception as e:
-            g_logger.error(f"Error during driver validation: {e}")
+            g_logger.debug(f"Browser health check failed: {e}")
             return False
 
+    @classmethod
+    def _cleanup_expired_instances(cls, now):
+        """
+        Clean up instances that have exceeded their TTL.
+
+        Args:
+            now (float): Current timestamp
+        """
+        expired_keys = []
+
+        for key, (instance, context, last_used) in cls._instances.items():
+            if (now - last_used) >= cls._ttl_timeout:
+                expired_keys.append(key)
+
+        for key in expired_keys:
+            instance, context, _ = cls._instances[key]
+            cls._cleanup_instance(instance, context)
+            del cls._instances[key]
+            g_logger.debug(f"Cleaned up expired browser instance for {key}")
+
+            # Update backward compatibility instance
+            if cls._instance == instance:
+                cls._instance = None
 
     @classmethod
-    def _cleanup_instance(cls):
+    def _cleanup_instance(cls, instance, context):
         """
-        Clean up the current driver instance safely.
-        """
-        if cls._instance:
-            try:
-                # Try to quit the driver gracefully
-                cls._instance.driver.quit()
-                g_logger.debug("WebDriver quit successfully")
-            except Exception as e:
-                g_logger.error(f"Error quitting WebDriver: {e}")
-                try:
-                    # Fallback: try to close the driver
-                    cls._instance.driver.close()
-                    g_logger.debug("WebDriver closed successfully")
-                except Exception as e2:
-                    g_logger.error(f"Error closing WebDriver: {e2}")
-                    # Last resort: try to kill the process
-                    try:
-                        if hasattr(cls._instance.driver, 'service') and hasattr(cls._instance.driver.service, 'process'):
-                            process = cls._instance.driver.service.process
-                            if process and process.poll() is None:
-                                process.terminate()
-                                time.sleep(1)
-                                if process.poll() is None:
-                                    process.kill()
-                                g_logger.debug("WebDriver process terminated")
-                    except Exception as e3:
-                        g_logger.error(f"Error terminating WebDriver process: {e3}")
-            finally:
-                cls._instance = None
-                g_logger.debug("Instance set to None")
+        Clean up a browser instance safely.
 
+        Uses a two-tier approach: first tries to close context, then browser.
+        Handles cleanup errors gracefully to avoid hanging processes.
+
+        Args:
+            instance: The SharedPlaywrightBrowser instance to clean up
+            context: The browser context to clean up
+        """
+        if not instance or not hasattr(instance, 'browser'):
+            return
+
+        browser = instance.browser
+
+        try:
+            # Close context first
+            if context:
+                try:
+                    context.close()
+                    g_logger.debug("Browser context closed successfully")
+                    time.sleep(0.5)
+                except Exception as e:
+                    g_logger.warning(f"Context cleanup failed: {e}")
+
+            # Close browser
+            if hasattr(browser, 'close'):
+                try:
+                    browser.close()
+                    g_logger.debug("Browser closed successfully")
+                    time.sleep(0.5)
+                except Exception as e:
+                    g_logger.warning(f"Browser cleanup failed: {e}")
+
+        except Exception as e:
+            g_logger.warning(f"All cleanup methods failed: {e}")
+
+    @classmethod
+    def _cleanup_lingering_processes(cls):
+        """
+        Clean up only truly orphaned browser processes.
+        Only kill processes that are very old (>5 minutes) and appear to be orphans.
+        This is called periodically to prevent accumulation without being too aggressive.
+        """
+        try:
+            import subprocess
+            import os
+            import time as time_module
+
+            current_time = time_module.time()
+
+            # Find browser processes and check their age
+            browser_result = subprocess.run(['pgrep', '-f', 'chrome.*--'], capture_output=True, text=True, timeout=5)
+            browser_count = 0
+            if browser_result.returncode == 0 and browser_result.stdout.strip():
+                browser_pids = browser_result.stdout.strip().split('\n')
+
+                for browser_pid in browser_pids:
+                    try:
+                        # Check if this process belongs to our current process tree
+                        our_pgid = os.getpgid(os.getpid())
+                        try:
+                            process_pgid = os.getpgid(int(browser_pid))
+                            # If it's not in our process group, it might be from another request/session
+                            # Be more conservative - only kill processes that are very old
+                            if process_pgid != our_pgid:
+                                # Check process age using /proc filesystem
+                                try:
+                                    with open(f'/proc/{browser_pid}/stat', 'r') as f:
+                                        stat_data = f.read().split()
+                                        start_time_ticks = int(stat_data[21])
+                                        # Convert jiffies to seconds (rough approximation)
+                                        start_time_seconds = start_time_ticks / 100.0
+                                        process_age = current_time - start_time_seconds
+
+                                        # Only kill if process is older than 5 minutes (300 seconds)
+                                        if process_age > 300:
+                                            g_logger.warning(f"Cleanup: killing old orphaned browser process {browser_pid} (age: {process_age:.1f}s)")
+                                            try:
+                                                os.kill(int(browser_pid), 9)  # SIGKILL
+                                                browser_count += 1
+                                                time.sleep(0.1)
+                                            except (OSError, ProcessLookupError):
+                                                pass  # Process might have already died
+                                except (FileNotFoundError, ValueError):
+                                    # Process might have died, skip it
+                                    pass
+                        except (OSError, ProcessLookupError):
+                            # Process might have died, skip it
+                            pass
+                    except (OSError, ValueError):
+                        # Process might have died, skip it
+                        pass
+
+            if browser_count > 0:
+                g_logger.info(f"Cleanup: killed {browser_count} old orphaned browser processes")
+            else:
+                g_logger.debug("Cleanup: no old orphaned browser processes found")
+
+        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
+            g_logger.debug(f"Cleanup: unable to check for orphaned browser processes: {e}")
 
     @classmethod
     def force_cleanup(cls):
         """
-        Force shutdown and cleanup of the WebDriver instance.
+        Force shutdown and cleanup of all browser instances.
+
+        This method can be called manually to ensure all browsers
+        are properly shut down, useful for debugging or emergency cleanup.
         """
-        g_logger.info("Forcing WebDriver cleanup...")
+        g_logger.info("Forcing Playwright browser cleanup...")
         with cls._lock:
-            cls._cleanup_instance()
+            for instance, context, _ in cls._instances.values():
+                cls._cleanup_instance(instance, context)
+            cls._instances.clear()
+            # Reset backward compatibility attributes
+            cls._instance = None
+            cls._shutdown_initiated = False
+            
+            # Stop Playwright
+            if cls._playwright:
+                try:
+                    cls._playwright.stop()
+                    cls._playwright = None
+                except Exception as e:
+                    g_logger.warning(f"Error stopping Playwright: {e}")
+            
             g_logger.info("Force cleanup completed")
+
+    @classmethod
+    def reset_for_testing(cls):
+        """
+        Reset the class state for testing purposes.
+        """
+        g_logger.info("Resetting SharedPlaywrightBrowser for testing...")
+        cls.force_cleanup()
 
 # =============================================================================
 # GLOBAL CLEANUP FUNCTION
 # =============================================================================
 
-def cleanup_selenium_drivers():
+def cleanup_playwright_browsers():
     """
-    Global cleanup function to ensure all Selenium drivers are properly shut down.
-    
+    Global cleanup function to ensure all Playwright browsers are properly shut down.
+
     This function can be called from other modules or during application shutdown
-    to ensure no WebDriver instances are left running.
+    to ensure no browser instances are left running.
     """
-    g_logger.info("Cleaning up all Selenium drivers...")
-    SharedSeleniumDriver.force_cleanup()
+    g_logger.info("Cleaning up all Playwright browsers...")
+    SharedPlaywrightBrowser.force_cleanup()
 
 
 def _signal_handler(signum, frame):
     """
     Signal handler for graceful shutdown.
     """
-    g_logger.info(f"Received signal {signum}, cleaning up Selenium drivers...")
-    cleanup_selenium_drivers()
+    g_logger.info(f"Received signal {signum}, cleaning up Playwright browsers...")
+    cleanup_playwright_browsers()
     sys.exit(0)
 
 def _atexit_handler():
     """
     Atexit handler for cleanup on normal program termination.
     """
-    g_logger.info("Program exiting, cleaning up Selenium drivers...")
-    cleanup_selenium_drivers()
+    g_logger.info("Program exiting, cleaning up Playwright browsers...")
+    cleanup_playwright_browsers()
 
 # Register cleanup handlers
 atexit.register(_atexit_handler)
@@ -481,58 +645,62 @@ def parse_relative_time(time_text):
         g_logger.error(f"Error parsing relative time '{time_text}': {e}")
         return None, None
 
-def _log_debugging_info(post, use_selenium, context):
+def _log_debugging_info(post, use_playwright, context):
     """
     Log debugging information for failed element extraction.
 
     Args:
         post: The post element being processed
-        use_selenium (bool): Whether using Selenium or BeautifulSoup
+        use_playwright (bool): Whether using Playwright or BeautifulSoup
         context (str): Context for the debugging info (e.g., "title", "link")
     """
     try:
         # Show what text content is available for debugging
-        if use_selenium:
-            all_text = post.text[:200] + "..." if len(post.text) > 200 else post.text
+        if use_playwright:
+            all_text = post.text_content()[:200] + "..." if len(post.text_content()) > 200 else post.text_content()
         else:
             all_text = post.get_text()[:200] + "..." if len(post.get_text()) > 200 else post.get_text()
         g_logger.info(f"Available text content for {context}: {all_text}")
 
         # Show available links and classes for debugging
         try:
-            all_links = post.find_all('a') if not use_selenium else post.find_elements(By.TAG_NAME, "a")
-            links_info = [a.get('href', 'NO_HREF') for a in all_links[:3]]
+            if use_playwright:
+                all_links = post.query_selector_all('a')
+                links_info = [a.get_attribute('href') or 'NO_HREF' for a in all_links[:3]]
+            else:
+                all_links = post.find_all('a')
+                links_info = [a.get('href', 'NO_HREF') for a in all_links[:3]]
             g_logger.info(f"Available links for {context}: {links_info}")
 
-            if not use_selenium:
+            if not use_playwright:
                 g_logger.info(f"Available classes for {context}: {post.get('class', [])}")
-        except (WebDriverException, AttributeError) as link_error:
+        except Exception as link_error:
             g_logger.debug(f"Error getting link info for {context}: {link_error}")
-    except (WebDriverException, AttributeError) as debug_e:
+    except Exception as debug_e:
         g_logger.debug(f"Error during debug output for {context}: {debug_e}")
 
 
-def extract_post_data(post, config, url, use_selenium):
+def extract_post_data(post, config, url, use_playwright):
     """
     Extract post data from a web element using the provided configuration.
     
     Parses title, link, and other metadata from a post element using either
-    Selenium WebElement or BeautifulSoup object depending on the extraction method.
+    Playwright Locator or BeautifulSoup object depending on the extraction method.
     
     Args:
-        post: WebElement (Selenium) or Tag (BeautifulSoup) containing post data
+        post: Locator (Playwright) or Tag (BeautifulSoup) containing post data
         config (dict): Configuration dictionary with selectors and settings
         url (str): Base URL for resolving relative links
-        use_selenium (bool): Whether using Selenium or BeautifulSoup for extraction
+        use_playwright (bool): Whether using Playwright or BeautifulSoup for extraction
         
     Returns:
         dict: Extracted post data with title, link, id, summary, and timestamps, or None if extraction fails
     """
-    # Special handling for RSS feeds loaded through Selenium
-    if use_selenium and config.post_container == "pre":
+    # Special handling for RSS feeds loaded through Playwright
+    if use_playwright and config.post_container == "pre":
         try:
             # Get the raw XML content from the pre tag
-            xml_content = post.text
+            xml_content = post.text_content()
             
             # Parse as XML using BeautifulSoup
             xml_soup = BeautifulSoup(xml_content, 'xml')
@@ -563,7 +731,7 @@ def extract_post_data(post, config, url, use_selenium):
             
             return results if results else None
             
-        except (WebDriverException, AttributeError) as e:
+        except Exception as e:
             g_logger.error(f"Error parsing RSS content: {e}")
             return None
     
@@ -572,15 +740,13 @@ def extract_post_data(post, config, url, use_selenium):
         # Special case: if title_selector equals post_container, use the post element itself
         if config.title_selector == config.post_container:
             g_logger.info(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
-            title = post.text.strip()
+            title = post.text_content().strip()
             # Fallbacks for anchors or elements with empty visible text
             if not title:
                 try:
-                    # Selenium WebElement path
-                    get_attr = getattr(post, 'get_attribute', None)
-                    if callable(get_attr):
-                        title = get_attr('title') or get_attr('innerText') or ''
-                        title = (title or '').strip()
+                    # Playwright Locator path
+                    title = post.get_attribute('title') or post.get_attribute('innerText') or ''
+                    title = (title or '').strip()
                 except Exception:
                     pass
             g_logger.debug(f"Raw post text: {repr(title)}")
@@ -603,33 +769,33 @@ def extract_post_data(post, config, url, use_selenium):
             title = re.sub(r'[.\s]+$', '', title).strip()
             title = title.strip()
             g_logger.debug(f"Cleaned post title: {repr(title)}")
-        elif use_selenium:
-            title_element = post.find_element(By.CSS_SELECTOR, config.title_selector)
-            title = title_element.text.strip()
+        elif use_playwright:
+            title_element = post.locator(config.title_selector).first
+            title = title_element.text_content().strip()
         else:
             title_element = post.select_one(config.title_selector)
             if not title_element:
                 g_logger.debug(f"No title element found with selector '{config.title_selector}'")
-                _log_debugging_info(post, use_selenium, "title")
+                _log_debugging_info(post, use_playwright, "title")
                 return None
             title = title_element.text.strip()
-    except (WebDriverException, AttributeError) as e:
+    except Exception as e:
         g_logger.error(f"Error extracting title with selector '{config.title_selector}': {e}")
-        _log_debugging_info(post, use_selenium, "title")
+        _log_debugging_info(post, use_playwright, "title")
         return None
     
     if len(title.split()) < 2:
         return None
     
     try:
-        if use_selenium:
-            link_element = post.find_element(By.CSS_SELECTOR, config.link_selector)
+        if use_playwright:
+            link_element = post.locator(config.link_selector).first
             link = link_element.get_attribute(config.link_attr)
         else:
             link_element = post.select_one(config.link_selector)
             if not link_element:
                 g_logger.info(f"No link element found with selector '{config.link_selector}'")
-                _log_debugging_info(post, use_selenium, "link")
+                _log_debugging_info(post, use_playwright, "link")
                 return None
             # Handle RSS feeds where links are text content, not href attributes
             if config.link_attr == "text":
@@ -638,9 +804,9 @@ def extract_post_data(post, config, url, use_selenium):
                 link = link_element.get(config.link_attr)
             if link and link.startswith('/'):
                 link = urljoin(url, link)
-    except (WebDriverException, AttributeError) as e:
+    except Exception as e:
         g_logger.error(f"Error extracting link with selector '{config.link_selector}': {e}")
-        _log_debugging_info(post, use_selenium, "link")
+        _log_debugging_info(post, use_playwright, "link")
         return None
     
     filter_pattern = config.filter_pattern
@@ -653,15 +819,15 @@ def extract_post_data(post, config, url, use_selenium):
     
     if ENABLE_DATE_EXTRACTION and "published_selector" in config:
         try:
-            if use_selenium:
+            if use_playwright:
                 # Handle XPath selectors (starting with .// or //)
                 if config.published_selector.startswith(('.//', '//')):
-                    date_element = post.find_element(By.XPATH, config.published_selector)
-                    date_text = date_element.text.strip()
+                    date_element = post.locator(f"xpath={config.published_selector}").first
+                    date_text = date_element.text_content().strip()
                 else:
                     # Handle CSS selectors
-                    date_element = post.find_element(By.CSS_SELECTOR, config.published_selector)
-                    date_text = date_element.text.strip()
+                    date_element = post.locator(config.published_selector).first
+                    date_text = date_element.text_content().strip()
             else:
                 # BeautifulSoup extraction
                 if config.published_selector.startswith(('.//', '//')):
@@ -677,7 +843,7 @@ def extract_post_data(post, config, url, use_selenium):
             if date_text:
                 published_parsed, published = parse_relative_time(date_text)
                 
-        except (WebDriverException, AttributeError) as e:
+        except Exception as e:
             g_logger.warning(f"Failed to extract date for {url}: {e}")
             # Fallback to current time
             published_parsed = None
@@ -692,7 +858,7 @@ def extract_post_data(post, config, url, use_selenium):
         "title": title, 
         "link": link, 
         "id": link, 
-        "summary": post.text.strip(),
+        "summary": post.text_content().strip() if use_playwright else post.text.strip(),
         "published": published,
         "published_parsed": published_parsed
     }
@@ -705,7 +871,7 @@ def fetch_site_posts(url, user_agent):
     """
     Fetch posts from a website using appropriate method based on configuration.
     
-    Determines the best method to fetch content (Selenium vs requests) based on
+    Determines the best method to fetch content (Playwright vs requests) based on
     site configuration and domain analysis. Handles JavaScript-rendered content
     and provides fallback mechanisms for different site types.
     
@@ -752,7 +918,7 @@ def fetch_site_posts(url, user_agent):
     entries = []
     status = 200
 
-    if config.needs_selenium:
+    if config.needs_selenium:  # Note: still using needs_selenium flag for compatibility
         if config.use_random_user_agent:
             # Use random user agent to avoid detection (reuse existing REDDIT_USER_AGENT)
             user_agent = g_cs.get("REDDIT_USER_AGENT")
@@ -760,7 +926,7 @@ def fetch_site_posts(url, user_agent):
         # Acquire the fetch lock before starting the fetch operation
         lock_acquired = False
         try:
-            lock_acquired = SharedSeleniumDriver.acquire_fetch_lock()
+            lock_acquired = SharedPlaywrightBrowser.acquire_fetch_lock()
             if not lock_acquired:
                 g_logger.warning(f"Failed to acquire fetch lock for {url}, skipping...")
                 status = 503
@@ -773,9 +939,9 @@ def fetch_site_posts(url, user_agent):
                     'status': status
                 }
 
-            driver = SharedSeleniumDriver.get_driver(config.needs_tor, user_agent)
-            if not driver:
-                g_logger.error(f"Failed to get driver for {url}")
+            browser, context = SharedPlaywrightBrowser.get_browser_context(config.needs_tor, user_agent)
+            if not browser or not context:
+                g_logger.error(f"Failed to get browser for {url}")
                 status = 503
                 return {
                     'entries': [],
@@ -787,7 +953,8 @@ def fetch_site_posts(url, user_agent):
                 }
                 
             try:
-                driver.get(url)
+                page = context.new_page()
+                page.goto(url, timeout=PLAYWRIGHT_TIMEOUT)
                 # Server sees this GET request immediately - timing detection happens here
 
                 if base_domain == "reddit.com":
@@ -795,39 +962,40 @@ def fetch_site_posts(url, user_agent):
                 else:
                     try:
                         # Use random timeout to avoid predictable patterns
-                        random_timeout = random.uniform(15, 25)
-                        WebDriverWait(driver, random_timeout).until(EC.presence_of_element_located((By.CSS_SELECTOR, config.post_container)))
-                    except (TimeoutException, WebDriverException) as wait_error:
+                        random_timeout = random.uniform(15000, 25000)  # milliseconds
+                        page.wait_for_selector(config.post_container, timeout=random_timeout)
+                    except PlaywrightTimeoutError as wait_error:
                         g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
                         # Continue anyway, might still find some content
 
-                posts = driver.find_elements(By.CSS_SELECTOR, config.post_container)
+                posts = page.locator(config.post_container).all()
                 if not posts:
-                    snippet = driver.page_source[:500]
-                    g_logger.info(f"No posts found for {url}. Page source snippet: {snippet}")
+                    content = page.content()
+                    snippet = content[:500]
+                    g_logger.info(f"No posts found for {url}. Page content snippet: {snippet}")
                     status = 204  # No content
                 else:
                     for post in posts:
                         try:
-                            entry_data = extract_post_data(post, config, url, use_selenium=True)
+                            entry_data = extract_post_data(post, config, url, use_playwright=True)
                             if entry_data:
                                 # Handle both single entry and list of entries
                                 if isinstance(entry_data, list):
                                     entries.extend(entry_data)
                                 else:
                                     entries.append(entry_data)
-                        except WebDriverException as e:
+                        except Exception as e:
                             g_logger.error(f"Error extracting post data: {e}")
                             continue
                             
-            except WebDriverException as e:
+            except Exception as e:
                 g_logger.error(f"Error on {url}: {e}")
                 status = 500
                 
         finally:
             # Always release the fetch lock, even if an error occurs
             if lock_acquired:
-                SharedSeleniumDriver.release_fetch_lock()
+                SharedPlaywrightBrowser.release_fetch_lock()
     else:
 
         # Handle user agent for requests
@@ -856,7 +1024,7 @@ def fetch_site_posts(url, user_agent):
             # Extract post data with consolidated error handling
             for post in posts:
                 try:
-                    entry = extract_post_data(post, config, url, use_selenium=False)
+                    entry = extract_post_data(post, config, url, use_playwright=False)
                     if entry:
                         entries.append(entry)
                 except AttributeError as e:

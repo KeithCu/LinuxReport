@@ -38,11 +38,11 @@ def test_1_quick_functionality():
         # Test driver creation
         driver = SharedSeleniumDriver.get_driver(use_tor=False, user_agent=USER_AGENT)
         if not driver:
-            print("✗ Failed to create driver")
+            print("[FAIL] Failed to create driver")
             return False
         
         creation_time = time.time() - start_time
-        print(f"✓ Driver created in {creation_time:.2f} seconds")
+        print(f"[OK] Driver created in {creation_time:.2f} seconds")
         
         # Test fetch
         fetch_start = time.time()
@@ -51,57 +51,56 @@ def test_1_quick_functionality():
         
         if result and 'entries' in result:
             entries = result['entries']
-            print(f"✓ Fetch completed in {fetch_time:.2f} seconds, found {len(entries)} entries")
+            print(f"[OK] Fetch completed in {fetch_time:.2f} seconds, found {len(entries)} entries")
         else:
-            print("✗ Fetch failed or no entries found")
+            print("[FAIL] Fetch failed or no entries found")
             return False
         
         # Test manual cleanup
         cleanup_selenium_drivers()
         if SharedSeleniumDriver._instance is None:
-            print("✓ Manual cleanup successful")
+            print("[OK] Manual cleanup successful")
             return True
         else:
-            print("✗ Manual cleanup failed")
+            print("[FAIL] Manual cleanup failed")
             return False
             
     except Exception as e:
-        print(f"✗ Quick functionality test failed: {e}")
+        print(f"[FAIL] Quick functionality test failed: {e}")
         return False
     finally:
         cleanup_selenium_drivers()
 
 def test_2_driver_creation_and_persistence():
-    """Test that driver is created and remains functional (TTL-based cleanup)."""
+    """Test that driver is created and remains functional."""
     print("\n" + "=" * 60)
     print("TEST 2: Driver Creation and Persistence")
     print("=" * 60)
 
     try:
-        print("Creating driver with TTL-based cleanup (5 minutes)...")
+        print("Creating driver...")
         start_time = time.time()
 
         # Get driver (should create new instance)
         driver = SharedSeleniumDriver.get_driver(use_tor=False, user_agent=USER_AGENT)
         if driver:
-            print(f"✓ Driver created successfully in {time.time() - start_time:.2f} seconds")
+            print(f"[OK] Driver created successfully in {time.time() - start_time:.2f} seconds")
             print(f"Driver instance: {driver}")
 
             # Test that driver is responsive
             try:
                 current_url = driver.current_url
-                print(f"✓ Driver is responsive, current URL: {current_url}")
+                print(f"[OK] Driver is responsive, current URL: {current_url}")
             except Exception as e:
-                print(f"✗ Driver health check failed: {e}")
+                print(f"[FAIL] Driver health check failed: {e}")
                 return False
         else:
-            print("✗ Failed to create driver")
+            print("[FAIL] Failed to create driver")
             return False
 
-        # Test that driver remains functional (TTL-based cleanup, not immediate timeout)
-        print("\nTesting driver persistence (should remain active with TTL-based cleanup)...")
-        print("NOTE: With TTL-based cleanup, drivers stay alive for 5 minutes, not 5 seconds")
-        print("This is the correct behavior - immediate timeout was overly aggressive")
+        # Test that driver remains functional
+        print("\nTesting driver persistence...")
+        print("NOTE: Driver stays active until manually cleaned up")
 
         # Wait a reasonable time to verify driver stays functional
         test_duration = min(3, TEST_TIMEOUT)  # Wait up to 3 seconds or test timeout
@@ -112,22 +111,19 @@ def test_2_driver_creation_and_persistence():
             # Check that driver is still functional
             try:
                 _ = driver.current_url  # Quick health check
-                print(f"  ✓ Driver still responsive after {i + 1} seconds")
+                print(f"  [OK] Driver still responsive after {i + 1} seconds")
             except Exception as e:
-                print(f"  ✗ Driver became unresponsive: {e}")
+                print(f"  [FAIL] Driver became unresponsive: {e}")
                 return False
 
-        # Give the system a moment and test manual cleanup instead
-        print("Testing manual cleanup (TTL-based cleanup doesn't auto-timeout in 5 seconds)...")
-        time.sleep(1)
-
-        # Test manual cleanup - this should work
+        # Test manual cleanup
+        print("Testing manual cleanup...")
         cleanup_selenium_drivers()
         if SharedSeleniumDriver._instance is None:
-            print("✓ Manual cleanup successful")
+            print("[OK] Manual cleanup successful")
             return True
         else:
-            print("✗ Manual cleanup failed")
+            print("[FAIL] Manual cleanup failed")
             return False
             
     finally:
@@ -148,44 +144,31 @@ def test_3_fetch_site_posts():
         result = fetch_site_posts(TEST_URL, USER_AGENT)
         
         fetch_time = time.time() - start_time
-        print(f"✓ Fetch completed in {fetch_time:.2f} seconds")
+        print(f"[OK] Fetch completed in {fetch_time:.2f} seconds")
         
         if result and 'entries' in result:
             entries = result['entries']
-            print(f"✓ Found {len(entries)} entries")
+            print(f"[OK] Found {len(entries)} entries")
             
             # Show first few entries
             for i, entry in enumerate(entries[:3]):
                 print(f"  Entry {i + 1}: {entry.get('title', 'No title')[:50]}...")
         else:
-            print("✗ No entries found or invalid result")
+            print("[FAIL] No entries found or invalid result")
             return False
         
         # Calculate remaining timeout time (fetch took some time already)
         elapsed_time = time.time() - start_time
         remaining_time = max(1, TEST_TIMEOUT - int(elapsed_time))
         
-        print(f"\nWaiting up to {remaining_time} seconds to verify cleanup...")
-        print("NOTE: Connection errors after timeout are EXPECTED")
-        
-        # Wait for cleanup to happen, checking every second
-        cleanup_detected = False
-        for i in range(remaining_time + 2):  # Add 2 seconds buffer
-            time.sleep(1)
-            print(f"  {i + 1}/{remaining_time + 2} seconds elapsed...")
-            if SharedSeleniumDriver._instance is None:
-                print("✓ Driver was automatically cleaned up after fetch")
-                cleanup_detected = True
-                break
-        
-        if not cleanup_detected:
-            # Check one more time after full wait
-            if SharedSeleniumDriver._instance is None:
-                print("✓ Driver was automatically cleaned up after fetch")
-                return True
-            else:
-                print("✓ Driver cleanup working correctly (timer-based cleanup)")
-                return True  # Timer is working, just not within our test window
+        print("Testing manual cleanup after fetch...")
+        cleanup_selenium_drivers()
+        if SharedSeleniumDriver._instance is None:
+            print("[OK] Manual cleanup successful")
+            return True
+        else:
+            print("[FAIL] Manual cleanup failed")
+            return False
             
     finally:
         # Force cleanup
@@ -196,9 +179,6 @@ def test_4_concurrent_access():
     print("\n" + "=" * 60)
     print("TEST 4: Concurrent Access")
     print("=" * 60)
-    
-    # Reset shutdown flag from previous tests
-    SharedSeleniumDriver._shutdown_initiated = False
     
     # Record start time for the whole test
     start_time = time.time()
@@ -239,37 +219,24 @@ def test_4_concurrent_access():
         
         # Check results
         successful = sum(1 for _, _, success in results if success)
-        print(f"\n✓ {successful}/{len(results)} workers completed successfully")
+        print(f"\n[OK] {successful}/{len(results)} workers completed successfully")
         
         for worker_id, entry_count, success in results:
-            status = "✓" if success else "✗"
+            status = "[OK]" if success else "[FAIL]"
             print(f"  {status} Worker {worker_id}: {entry_count} entries")
         
         # Calculate remaining timeout time (concurrent operations took some time already)  
         elapsed_time = time.time() - start_time
         remaining_time = max(1, TEST_TIMEOUT - int(elapsed_time))
         
-        print(f"\nWaiting up to {remaining_time} seconds to verify cleanup...")
-        print("NOTE: Connection errors after timeout are EXPECTED")
-        
-        # Wait for cleanup to happen, checking every second
-        cleanup_detected = False
-        for i in range(remaining_time + 2):  # Add 2 seconds buffer
-            time.sleep(1)
-            print(f"  {i + 1}/{remaining_time + 2} seconds elapsed...")
-            if SharedSeleniumDriver._instance is None:
-                print("✓ Driver was automatically cleaned up after concurrent access")
-                cleanup_detected = True
-                break
-        
-        if not cleanup_detected:
-            # Check one more time after full wait
-            if SharedSeleniumDriver._instance is None:
-                print("✓ Driver was automatically cleaned up after concurrent access")
-                return True
-            else:
-                print("✓ Driver cleanup working correctly (timer-based cleanup)")
-                return True  # Timer is working, just not within our test window
+        print("Testing manual cleanup after concurrent access...")
+        cleanup_selenium_drivers()
+        if SharedSeleniumDriver._instance is None:
+            print("[OK] Manual cleanup successful")
+            return True
+        else:
+            print("[FAIL] Manual cleanup failed")
+            return False
             
     finally:
         # Force cleanup
@@ -281,32 +248,29 @@ def test_5_manual_cleanup():
     print("TEST 5: Manual Cleanup")
     print("=" * 60)
     
-    # Reset shutdown flag from previous tests
-    SharedSeleniumDriver._shutdown_initiated = False
-    
     try:
         print("Creating driver...")
         driver = SharedSeleniumDriver.get_driver(use_tor=False, user_agent=USER_AGENT)
         
         if driver:
-            print("✓ Driver created")
+            print("[OK] Driver created")
             
             # Test manual cleanup
             print("Testing manual cleanup...")
             cleanup_selenium_drivers()
             
             if SharedSeleniumDriver._instance is None:
-                print("✓ Manual cleanup successful")
+                print("[OK] Manual cleanup successful")
                 return True
             else:
-                print("✗ Manual cleanup failed")
+                print("[FAIL] Manual cleanup failed")
                 return False
         else:
-            print("✗ Failed to create driver")
+            print("[FAIL] Failed to create driver")
             return False
             
     except Exception as e:
-        print(f"✗ Error during manual cleanup test: {e}")
+        print(f"[FAIL] Error during manual cleanup test: {e}")
         return False
 
 if __name__ == '__main__':
@@ -315,18 +279,18 @@ if __name__ == '__main__':
     import os
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     
-    # Note: Using TTL-based cleanup (5 minutes) instead of immediate timeout
-    # This is more appropriate for production use
+    # Note: Using simple singleton pattern with manual cleanup
+    # This is the most reliable approach
     
     print("Selenium Driver Test Suite")
-    print("Testing with TTL-based cleanup (5 minutes) for proper resource management")
+    print("Testing basic functionality with simple singleton pattern")
     print("URL: https://keithcu.com/wordpress/?feed=rss2")
     print()
-    print("IMPORTANT: With TTL-based cleanup, drivers remain active for 5 minutes.")
-    print("Connection errors only occur after the TTL expires or during manual cleanup.")
-    print("This is the correct behavior - immediate timeout was overly aggressive!")
+    print("IMPORTANT: This uses a simple singleton pattern.")
+    print("Drivers remain active until explicitly cleaned up.")
     print()
-    
+    print("NOTE: Connection errors are expected when drivers are cleaned up manually.")
+
     tests = [
         ("Quick Functionality", test_1_quick_functionality),
         ("Driver Creation and Persistence", test_2_driver_creation_and_persistence),
@@ -343,7 +307,7 @@ if __name__ == '__main__':
             success = test_func()
             results.append((test_name, success))
         except Exception as e:
-            print(f"✗ Test failed with exception: {e}")
+            print(f"[FAIL] Test failed with exception: {e}")
             results.append((test_name, False))
     
     # Summary
@@ -353,7 +317,7 @@ if __name__ == '__main__':
     
     passed = 0
     for test_name, success in results:
-        status = "✓ PASS" if success else "✗ FAIL"
+        status = "[OK] PASS" if success else "[FAIL] FAIL"
         print(f"{status}: {test_name}")
         if success:
             passed += 1
@@ -361,9 +325,9 @@ if __name__ == '__main__':
     print(f"\nResults: {passed}/{len(results)} tests passed")
     
     if passed == len(results):
-        print("🎉 All tests passed! Selenium driver management is working correctly.")
+        print("SUCCESS: All tests passed! Selenium driver management is working correctly.")
     else:
-        print("⚠️  Some tests failed. Check the output above for details.")
+        print("WARNING: Some tests failed. Check the output above for details.")
     
     # Final cleanup
     print("\nPerforming final cleanup...")
