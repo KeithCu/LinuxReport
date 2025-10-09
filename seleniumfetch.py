@@ -50,9 +50,6 @@ from shared import g_cs, CUSTOM_FETCH_CONFIG, g_logger, WORKER_PROXYING, PROXY_S
 # FEATURE FLAGS
 # =============================================================================
 
-# Global flag to enable/disable date extraction feature
-# Set to True to enable date extraction, False to disable
-ENABLE_DATE_EXTRACTION = False
 
 # =============================================================================
 # TIMEOUT CONSTANTS
@@ -67,38 +64,13 @@ NETWORK_TIMEOUT = 20  # 20 seconds for HTTP requests and WebDriverWait operation
 # Thread synchronization timeout - for coordinating fetch operations
 FETCH_LOCK_TIMEOUT = 30  # 30 seconds for acquiring fetch lock (longer due to thread coordination)
 
-# Driver lifecycle timeout - for resource management
-DRIVER_RECYCLE_TIMEOUT = 300  # 5 minutes - timeout for driver recycling
-
 
 # =============================================================================
 # SPECIAL SITE CONFIGURATIONS
 # =============================================================================
 
-# Configuration for keithcu.com RSS feed
+# Import the FetchConfig for creating configurations
 from app_config import FetchConfig
-
-class KeithcuRssFetchConfig(FetchConfig):
-    """
-    Keithcu.com RSS-specific fetch configuration.
-    
-    Inherits from FetchConfig with Keithcu RSS-specific settings.
-    """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=True,  # Using Selenium for testing purposes
-            needs_tor=False,
-            post_container="pre",  # RSS feeds in browser are wrapped in <pre> tags
-            title_selector="title",
-            link_selector="link", 
-            link_attr="text",  # RSS links are text content, not href attributes
-            filter_pattern="",
-            use_random_user_agent=False,
-            published_selector=None
-        )
-
-KEITHCU_RSS_CONFIG = KeithcuRssFetchConfig()
 
 # =============================================================================
 # WEBDRIVER CONFIGURATION AND CREATION
@@ -385,101 +357,323 @@ atexit.register(_atexit_handler)
 # signal.signal(signal.SIGINT, _signal_handler)
 
 # =============================================================================
-# COMPATIBILITY AND UTILITY CLASSES
+# UTILITY FUNCTIONS
 # =============================================================================
 
-class FeedParserDict(dict):
+def extract_base_domain(url):
     """
-    Mimic feedparser's FeedParserDict for compatibility.
-    
-    Provides attribute-style access to dictionary keys to maintain
-    compatibility with feedparser's data structure expectations.
+    Extract the base domain from a URL for configuration lookup.
+
+    Handles subdomains by extracting the main domain (e.g., example.com from sub.example.com).
+
+    Args:
+        url (str): The URL to parse
+
+    Returns:
+        str: Base domain for configuration lookup
     """
-    
-    def __getattr__(self, key):
-        """
-        Get dictionary value using attribute syntax.
-        
-        Args:
-            key (str): Dictionary key to access
-            
-        Returns:
-            The value associated with the key
-            
-        Raises:
-            AttributeError: If the key doesn't exist
-        """
-        if key in self:
-            return self[key]
-        raise AttributeError(f"No attribute '{key}'")
+    parsed = urlparse(url)
+    # Extract base domain (e.g., bandcamp.com from rocksteadydisco.bandcamp.com)
+    domain_parts = parsed.netloc.split('.')
+    if len(domain_parts) > 2:
+        # Handle subdomains like www.example.com or sub.example.co.uk
+        # This logic might need adjustment for complex TLDs like .co.uk
+        # For now, assume simple cases like example.com or sub.example.com
+        base_domain = '.'.join(domain_parts[-2:])
+    else:
+        base_domain = parsed.netloc
+    return base_domain
+
+
+def get_site_config(url):
+    """
+    Get the configuration for a given URL.
+
+    Looks up configuration in CUSTOM_FETCH_CONFIG using both base domain and full netloc.
+
+    Args:
+        url (str): URL to get configuration for
+
+    Returns:
+        config or FetchConfig: Site-specific configuration, or None if not found
+    """
+    base_domain = extract_base_domain(url)
+    parsed = urlparse(url)
+
+    # Always try base domain first, then fallback to netloc (for legacy configs)
+    config = CUSTOM_FETCH_CONFIG.get(base_domain)
+    if not config:
+        config = CUSTOM_FETCH_CONFIG.get(parsed.netloc)
+
+    # Special case for keithcu.com RSS feed
+    if not config and "keithcu.com" in base_domain:
+        config = FetchConfig(
+            needs_selenium=True,  # Using Selenium for testing purposes
+            needs_tor=False,
+            post_container="pre",  # RSS feeds in browser are wrapped in <pre> tags
+            title_selector="title",
+            link_selector="link",
+            link_attr="text",  # RSS links are text content, not href attributes
+            filter_pattern="",
+            use_random_user_agent=False,
+            published_selector=None
+        )
+
+    return config, base_domain
+
+
+def build_feed_result(entries, url, status=200, etag="", modified=None):
+    """
+    Build a standardized feed result dictionary.
+
+    Args:
+        entries (list): List of post entries
+        url (str): Source URL
+        status (int): HTTP status code
+        etag (str): ETag for caching
+        modified (datetime): Last modified timestamp
+
+    Returns:
+        dict: Standardized feed result
+    """
+    if modified is None:
+        modified = datetime.now(timezone.utc)
+
+    return {
+        'entries': entries,
+        'etag': etag,
+        'modified': modified,
+        'feed': {
+            'title': url,
+            'link': url,
+            'description': ''
+        },
+        'href': url,
+        'status': status
+    }
+
+
+def safe_find_element(post, selector, use_selenium, attr=None):
+    """
+    Safely extract an element or attribute from a post using either Selenium or BeautifulSoup.
+
+    Args:
+        post: WebElement (Selenium) or Tag (BeautifulSoup) containing post data
+        selector (str): CSS selector to find the element
+        use_selenium (bool): Whether using Selenium or BeautifulSoup
+        attr (str, optional): Attribute to extract instead of text content
+
+    Returns:
+        str or None: Extracted text/attribute value, or None if extraction fails
+    """
+    try:
+        if use_selenium:
+            element = post.find_element(By.CSS_SELECTOR, selector)
+            if attr:
+                return element.get_attribute(attr)
+            else:
+                return element.text.strip()
+        else:
+            element = post.select_one(selector)
+            if not element:
+                return None
+            if attr == "text":
+                return element.get_text().strip()
+            elif attr:
+                return element.get(attr)
+            else:
+                return element.text.strip()
+    except (WebDriverException, AttributeError):
+        return None
+
+
+def clean_patriots_title(title):
+    """
+    Clean patriots.win specific metadata from post titles.
+
+    Removes common patterns like timestamps, user info, action buttons, etc.
+    that appear at the end of patriots.win posts.
+
+    Args:
+        title (str): Raw title text to clean
+
+    Returns:
+        str: Cleaned title text
+    """
+    if not title:
+        return title
+
+    # Convert to string if needed
+    title = str(title)
+
+    # Clean up patriots.win metadata from the end of posts
+    # Remove patterns like "posted X ago by username X comments award share report block"
+    # Remove leading numbers/IDs like "546 "
+    title = re.sub(r'^\d+\s+', '', title)
+
+    # Remove "posted X ago by..." and everything after it
+    title = re.sub(r'\s*posted\s+\d+\s+(?:hour|minute|second|day)s?\s+ago\s+by\s+.*', '', title, flags=re.IGNORECASE)
+
+    # Remove remaining metadata patterns
+    title = re.sub(r'\s*\d+\s+comments?\s+.*', '', title, flags=re.IGNORECASE)
+
+    # Remove action buttons and user tags - remove known patterns from end
+    title = re.sub(r'\s+PRO\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+TRUMP\s+TRUTH\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+TRUMP\s+TRUTH\s*$', '', title, flags=re.IGNORECASE)  # Remove TRUMP TRUTH tags
+    title = re.sub(r'\s+PRO\s*$', '', title, flags=re.IGNORECASE)
+
+    # Remove any remaining trailing punctuation and whitespace
+    title = re.sub(r'[.\s]+$', '', title).strip()
+
+    return title
 
 # =============================================================================
 # CONTENT EXTRACTION FUNCTIONS
 # =============================================================================
 
-def parse_relative_time(time_text):
+
+def extract_rss_data(post, config):
     """
-    Parse relative time strings like "14 minutes ago", "2 hours ago", etc.
-    
+    Extract data from RSS feeds loaded through Selenium.
+
     Args:
-        time_text (str): Relative time string to parse
-        
+        post: Selenium WebElement containing RSS XML
+        config: Configuration object
+
     Returns:
-        tuple: (published_parsed, published) where published_parsed is time.struct_time
-               and published is formatted string, or (None, None) if parsing fails
+        list: List of post entries, or None if extraction fails
     """
-    import re
-    from datetime import datetime, timedelta
-    
     try:
-        # Convert to lowercase for easier matching
-        time_text = time_text.lower().strip()
-        
-        # Patterns for different time units
-        patterns = [
-            (r'(\d+)\s+minutes?\s+ago', 'minutes'),
-            (r'(\d+)\s+hours?\s+ago', 'hours'),
-            (r'(\d+)\s+days?\s+ago', 'days'),
-            (r'(\d+)\s+weeks?\s+ago', 'weeks'),
-            (r'(\d+)\s+months?\s+ago', 'months'),
-            (r'(\d+)\s+years?\s+ago', 'years'),
-        ]
-        
-        for pattern, unit in patterns:
-            match = re.search(pattern, time_text)
-            if match:
-                value = int(match.group(1))
-                
-                # Calculate the actual time
-                now = datetime.now()
-                
-                if unit == 'minutes':
-                    delta = timedelta(minutes=value)
-                elif unit == 'hours':
-                    delta = timedelta(hours=value)
-                elif unit == 'days':
-                    delta = timedelta(days=value)
-                elif unit == 'weeks':
-                    delta = timedelta(weeks=value)
-                elif unit == 'months':
-                    # Approximate months as 30 days
-                    delta = timedelta(days=value * 30)
-                elif unit == 'years':
-                    # Approximate years as 365 days
-                    delta = timedelta(days=value * 365)
-                
-                published_time = now - delta
-                published_parsed = published_time.timetuple()
-                published = published_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
-                
-                return published_parsed, published
-        
-        # If no pattern matches, return None
-        return None, None
-        
-    except (ValueError, AttributeError) as e:
-        g_logger.error(f"Error parsing relative time '{time_text}': {e}")
-        return None, None
+        # Get the raw XML content from the pre tag
+        xml_content = post.text
+
+        # Parse as XML using BeautifulSoup
+        xml_soup = BeautifulSoup(xml_content, 'xml')
+        items = xml_soup.find_all('item')
+
+        results = []
+        for item in items:
+            title_tag = item.find('title')
+            link_tag = item.find('link')
+
+            if title_tag and link_tag:
+                title = title_tag.get_text().strip()
+                link = link_tag.get_text().strip()
+
+                if len(title.split()) >= 2:
+                    # Use current time for new articles
+                    published_parsed = time.gmtime()
+                    published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
+
+                    results.append({
+                        "title": title,
+                        "link": link,
+                        "id": link,
+                        "summary": title,  # Use title as summary for RSS
+                        "published": published,
+                        "published_parsed": published_parsed
+                    })
+
+        return results if results else None
+
+    except (WebDriverException, AttributeError) as e:
+        g_logger.error(f"Error parsing RSS content: {e}")
+        return None
+
+
+def extract_title(post, config, url, use_selenium):
+    """
+    Extract title from a post element.
+
+    Args:
+        post: WebElement (Selenium) or Tag (BeautifulSoup) containing post data
+        config: Configuration object
+        url: Base URL for context
+        use_selenium: Whether using Selenium or BeautifulSoup
+
+    Returns:
+        str: Extracted title, or None if extraction fails
+    """
+    # Special case: if title_selector equals post_container, use the post element itself
+    if config.title_selector == config.post_container:
+        g_logger.info(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
+        title = post.text.strip()
+        # Fallbacks for anchors or elements with empty visible text
+        if not title:
+            try:
+                # Selenium WebElement path
+                get_attr = getattr(post, 'get_attribute', None)
+                if callable(get_attr):
+                    title = get_attr('title') or get_attr('innerText') or ''
+                    title = (title or '').strip()
+            except Exception:
+                pass
+        g_logger.debug(f"Raw post text: {repr(title)}")
+        title = clean_patriots_title(title)
+        g_logger.debug(f"Cleaned post title: {repr(title)}")
+    else:
+        title = safe_find_element(post, config.title_selector, use_selenium)
+        if not title:
+            g_logger.debug(f"No title element found with selector '{config.title_selector}'")
+            _log_debugging_info(post, use_selenium, "title")
+            return None
+
+    return title
+
+
+def extract_link(post, config, url, use_selenium):
+    """
+    Extract link from a post element.
+
+    Args:
+        post: WebElement (Selenium) or Tag (BeautifulSoup) containing post data
+        config: Configuration object
+        url: Base URL for resolving relative links
+        use_selenium: Whether using Selenium or BeautifulSoup
+
+    Returns:
+        str: Extracted link, or None if extraction fails
+    """
+    link = safe_find_element(post, config.link_selector, use_selenium, config.link_attr)
+    if not link:
+        g_logger.info(f"No link element found with selector '{config.link_selector}'")
+        _log_debugging_info(post, use_selenium, "link")
+        return None
+
+    # Resolve relative URLs
+    if link and link.startswith('/'):
+        link = urljoin(url, link)
+
+    return link
+
+
+def create_post_entry(title, link, summary):
+    """
+    Create a standardized post entry dictionary.
+
+    Args:
+        title: Post title
+        link: Post link
+        summary: Post summary text
+
+    Returns:
+        dict: Standardized post entry
+    """
+    published_parsed = time.gmtime()
+    published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
+
+    return {
+        "title": title,
+        "link": link,
+        "id": link,
+        "summary": summary,
+        "published": published,
+        "published_parsed": published_parsed
+    }
+
 
 def _log_debugging_info(post, use_selenium, context):
     """
@@ -515,187 +709,38 @@ def _log_debugging_info(post, use_selenium, context):
 def extract_post_data(post, config, url, use_selenium):
     """
     Extract post data from a web element using the provided configuration.
-    
+
     Parses title, link, and other metadata from a post element using either
     Selenium WebElement or BeautifulSoup object depending on the extraction method.
-    
+
     Args:
         post: WebElement (Selenium) or Tag (BeautifulSoup) containing post data
-        config (dict): Configuration dictionary with selectors and settings
+        config: Configuration object with selectors and settings
         url (str): Base URL for resolving relative links
         use_selenium (bool): Whether using Selenium or BeautifulSoup for extraction
-        
+
     Returns:
-        dict: Extracted post data with title, link, id, summary, and timestamps, or None if extraction fails
+        dict or list: Extracted post data with title, link, id, summary, and timestamps,
+                     or None if extraction fails. For RSS feeds, returns a list of entries.
     """
     # Special handling for RSS feeds loaded through Selenium
     if use_selenium and config.post_container == "pre":
-        try:
-            # Get the raw XML content from the pre tag
-            xml_content = post.text
-            
-            # Parse as XML using BeautifulSoup
-            xml_soup = BeautifulSoup(xml_content, 'xml')
-            items = xml_soup.find_all('item')
-            
-            results = []
-            for item in items:
-                title_tag = item.find('title')
-                link_tag = item.find('link')
-                
-                if title_tag and link_tag:
-                    title = title_tag.get_text().strip()
-                    link = link_tag.get_text().strip()
-                    
-                    if len(title.split()) >= 2:
-                        # Use current time for new articles
-                        published_parsed = time.gmtime()
-                        published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
-                        
-                        results.append({
-                            "title": title, 
-                            "link": link, 
-                            "id": link, 
-                            "summary": title,  # Use title as summary for RSS
-                            "published": published,
-                            "published_parsed": published_parsed
-                        })
-            
-            return results if results else None
-            
-        except (WebDriverException, AttributeError) as e:
-            g_logger.error(f"Error parsing RSS content: {e}")
-            return None
-    
+        return extract_rss_data(post, config)
+
     # Regular processing for non-RSS content
-    try:
-        # Special case: if title_selector equals post_container, use the post element itself
-        if config.title_selector == config.post_container:
-            g_logger.info(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
-            title = post.text.strip()
-            # Fallbacks for anchors or elements with empty visible text
-            if not title:
-                try:
-                    # Selenium WebElement path
-                    get_attr = getattr(post, 'get_attribute', None)
-                    if callable(get_attr):
-                        title = get_attr('title') or get_attr('innerText') or ''
-                        title = (title or '').strip()
-                except Exception:
-                    pass
-            g_logger.debug(f"Raw post text: {repr(title)}")
-            # Clean up patriots.win metadata from the end of posts
-            # Remove patterns like "posted X ago by username X comments award share report block"
-            # Remove leading numbers/IDs like "546 "
-            title = re.sub(r'^\d+\s+', '', title)
-            # Remove "posted X ago by..." and everything after it
-            title = re.sub(r'\s*posted\s+\d+\s+(?:hour|minute|second|day)s?\s+ago\s+by\s+.*', '', title, flags=re.IGNORECASE)
-            # Remove remaining metadata patterns
-            title = re.sub(r'\s*\d+\s+comments?\s+.*', '', title, flags=re.IGNORECASE)
-            # Remove action buttons and user tags - remove known patterns from end
-            title = re.sub(r'\s+PRO\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-            title = re.sub(r'\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-            title = re.sub(r'\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-            title = re.sub(r'\s+TRUMP\s+TRUTH\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-            title = re.sub(r'\s+TRUMP\s+TRUTH\s*$', '', title, flags=re.IGNORECASE)  # Remove TRUMP TRUTH tags
-            title = re.sub(r'\s+PRO\s*$', '', title, flags=re.IGNORECASE)
-            # Remove any remaining trailing punctuation and whitespace
-            title = re.sub(r'[.\s]+$', '', title).strip()
-            title = title.strip()
-            g_logger.debug(f"Cleaned post title: {repr(title)}")
-        elif use_selenium:
-            title_element = post.find_element(By.CSS_SELECTOR, config.title_selector)
-            title = title_element.text.strip()
-        else:
-            title_element = post.select_one(config.title_selector)
-            if not title_element:
-                g_logger.debug(f"No title element found with selector '{config.title_selector}'")
-                _log_debugging_info(post, use_selenium, "title")
-                return None
-            title = title_element.text.strip()
-    except (WebDriverException, AttributeError) as e:
-        g_logger.error(f"Error extracting title with selector '{config.title_selector}': {e}")
-        _log_debugging_info(post, use_selenium, "title")
+    title = extract_title(post, config, url, use_selenium)
+    if not title or len(title.split()) < 2:
         return None
-    
-    if len(title.split()) < 2:
+
+    link = extract_link(post, config, url, use_selenium)
+    if not link:
         return None
-    
-    try:
-        if use_selenium:
-            link_element = post.find_element(By.CSS_SELECTOR, config.link_selector)
-            link = link_element.get_attribute(config.link_attr)
-        else:
-            link_element = post.select_one(config.link_selector)
-            if not link_element:
-                g_logger.info(f"No link element found with selector '{config.link_selector}'")
-                _log_debugging_info(post, use_selenium, "link")
-                return None
-            # Handle RSS feeds where links are text content, not href attributes
-            if config.link_attr == "text":
-                link = link_element.get_text().strip()
-            else:
-                link = link_element.get(config.link_attr)
-            if link and link.startswith('/'):
-                link = urljoin(url, link)
-    except (WebDriverException, AttributeError) as e:
-        g_logger.error(f"Error extracting link with selector '{config.link_selector}': {e}")
-        _log_debugging_info(post, use_selenium, "link")
-        return None
-    
+
     filter_pattern = config.filter_pattern
     if filter_pattern and filter_pattern not in link:
         return None
-    
-    # Extract published date if feature is enabled and selector is provided
-    published_parsed = None
-    published = None
-    
-    if ENABLE_DATE_EXTRACTION and "published_selector" in config:
-        try:
-            if use_selenium:
-                # Handle XPath selectors (starting with .// or //)
-                if config.published_selector.startswith(('.//', '//')):
-                    date_element = post.find_element(By.XPATH, config.published_selector)
-                    date_text = date_element.text.strip()
-                else:
-                    # Handle CSS selectors
-                    date_element = post.find_element(By.CSS_SELECTOR, config.published_selector)
-                    date_text = date_element.text.strip()
-            else:
-                # BeautifulSoup extraction
-                if config.published_selector.startswith(('.//', '//')):
-                    # Convert XPath to CSS if possible, or use lxml
-                    from lxml import html
-                    import lxml.etree
-                    # For now, fallback to current time for XPath with BeautifulSoup
-                    date_text = None
-                else:
-                    date_element = post.select_one(config.published_selector)
-                    date_text = date_element.text.strip() if date_element else None
-            
-            if date_text:
-                published_parsed, published = parse_relative_time(date_text)
-                
-        except (WebDriverException, AttributeError) as e:
-            g_logger.warning(f"Failed to extract date for {url}: {e}")
-            # Fallback to current time
-            published_parsed = None
-            published = None
-    
-    # Use current time if date extraction failed or is disabled
-    if not published_parsed:
-        published_parsed = time.gmtime()
-        published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
-    
-    return {
-        "title": title, 
-        "link": link, 
-        "id": link, 
-        "summary": post.text.strip(),
-        "published": published,
-        "published_parsed": published_parsed
-    }
+
+    return create_post_entry(title, link, post.text.strip())
 
 # =============================================================================
 # MAIN SITE FETCHING FUNCTION
@@ -716,39 +761,12 @@ def fetch_site_posts(url, user_agent):
     Returns:
         dict: Feed-like structure with entries, metadata, and status information
     """
-    parsed = urlparse(url)
-    # Extract base domain (e.g., bandcamp.com from rocksteadydisco.bandcamp.com)
-    domain_parts = parsed.netloc.split('.')
-    if len(domain_parts) > 2:
-        # Handle subdomains like www.example.com or sub.example.co.uk
-        # This logic might need adjustment for complex TLDs like .co.uk
-        # For now, assume simple cases like example.com or sub.example.com
-        base_domain = '.'.join(domain_parts[-2:])
-    else:
-        base_domain = parsed.netloc
+    config, base_domain = get_site_config(url)
 
-    # Always try base domain first, then fallback to netloc (for legacy configs)
-    config = CUSTOM_FETCH_CONFIG.get(base_domain)
-    if not config:
-        config = CUSTOM_FETCH_CONFIG.get(parsed.netloc)
-    
-    # Special case for keithcu.com RSS feed
-    if not config and "keithcu.com" in base_domain:
-        config = KEITHCU_RSS_CONFIG
-    
     if not config:
         g_logger.info(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
-        return {
-            'entries': [],
-            'etag': "",
-            'modified': datetime.now(timezone.utc),
-            'feed': {'title': url, 'link': url, 'description': ''},
-            'href': url,
-            'status': 404
-        }
+        return build_feed_result([], url, status=404)
 
-    etag = ""
-    modified = datetime.now(timezone.utc)
     entries = []
     status = 200
 
@@ -763,28 +781,12 @@ def fetch_site_posts(url, user_agent):
             lock_acquired = SharedSeleniumDriver.acquire_fetch_lock()
             if not lock_acquired:
                 g_logger.warning(f"Failed to acquire fetch lock for {url}, skipping...")
-                status = 503
-                return {
-                    'entries': [],
-                    'etag': etag,
-                    'modified': modified,
-                    'feed': {'title': url, 'link': url, 'description': ''},
-                    'href': url,
-                    'status': status
-                }
+                return build_feed_result([], url, status=503)
 
             driver = SharedSeleniumDriver.get_driver(config.needs_tor, user_agent)
             if not driver:
                 g_logger.error(f"Failed to get driver for {url}")
-                status = 503
-                return {
-                    'entries': [],
-                    'etag': etag,
-                    'modified': modified,
-                    'feed': {'title': url, 'link': url, 'description': ''},
-                    'href': url,
-                    'status': status
-                }
+                return build_feed_result([], url, status=503)
                 
             try:
                 driver.get(url)
@@ -870,18 +872,4 @@ def fetch_site_posts(url, user_agent):
             status = 500
 
     g_logger.info(f"Fetched {len(entries)} entries from {url}")
-
-    result = {
-        'entries': entries,
-        'etag': etag,
-        'modified': modified,
-        'feed': {
-            'title': url,
-            'link': url,
-            'description': ''
-        },
-        'href': url,
-        'status': status
-    }
-
-    return result
+    return build_feed_result(entries, url, status)
