@@ -239,10 +239,6 @@ class SharedSeleniumDriver:
         with cls._lock:
             # Clean up expired instances periodically
             cls._cleanup_expired_instances(now)
-            # Also clean up any lingering chromedriver processes (only every 5 minutes)
-            if not hasattr(cls, '_last_cleanup_time') or (now - cls._last_cleanup_time) > 300:
-                cls._cleanup_lingering_processes()
-                cls._last_cleanup_time = now
 
             # Check if we have a valid instance for this configuration
             if key in cls._instances:
@@ -353,166 +349,58 @@ class SharedSeleniumDriver:
         """
         Clean up a driver instance safely.
 
-        Uses a two-tier approach: first tries quit(), then close() if quit() fails.
-        As a final fallback, if the driver service process is still alive,
-        attempts to terminate/kill it to avoid lingering Chromium processes.
-
-        Args:
-            instance: The SharedSeleniumDriver instance to clean up
+        Attempts to gracefully quit the driver. As a fallback, it uses psutil
+        to forcefully terminate the entire process tree associated with the driver service,
+        ensuring no lingering chromedriver or browser processes are left behind.
         """
         if not instance or not hasattr(instance, 'driver'):
             return
 
         driver = instance.driver
 
-        did_cleanup_call = False
-
+        # Try to get the service process PID before we quit
+        service_pid = None
         try:
-            # Primary cleanup: quit the driver with proper timeout handling
-            if hasattr(driver, 'quit'):
-                try:
-                    driver.set_page_load_timeout(5)
-                    driver.set_script_timeout(5)
-                except (WebDriverException, OSError):
-                    pass
+            service_pid = driver.service.process.pid
+        except Exception: # Broad exception to catch AttributeError, psutil.NoSuchProcess, etc.
+            pass
 
-                driver.quit()
-                did_cleanup_call = True
-                g_logger.debug("WebDriver quit successfully")
-                time.sleep(0.5)
+        # 1. First, try the graceful shutdown
+        try:
+            driver.quit()
+            g_logger.debug("WebDriver quit successfully.")
+            # Give it a moment to shut down
+            time.sleep(1.0)
         except (WebDriverException, OSError) as e:
-            g_logger.warning(f"Primary cleanup failed: {e}")
+            g_logger.warning(f"Graceful driver.quit() failed: {e}. Proceeding with forceful cleanup.")
 
-        # Fallback: try to close the driver if quit failed
-        if not did_cleanup_call:
+        # 2. As a fallback, forcefully terminate the process tree
+        if service_pid:
             try:
-                if hasattr(driver, 'close'):
-                    driver.close()
-                    did_cleanup_call = True
-                    g_logger.debug("WebDriver closed successfully")
-                    time.sleep(0.5)
-            except (WebDriverException, OSError) as e:
-                g_logger.warning(f"Secondary cleanup failed: {e}")
-
-        # Final safeguard: ALWAYS check if chromedriver process is still alive
-        # This runs regardless of whether quit/close succeeded or failed
-        try:
-            service = getattr(driver, 'service', None)
-            proc = getattr(service, 'process', None)
-            pid = getattr(proc, 'pid', None) if proc else None
-            if proc and hasattr(proc, 'poll') and proc.poll() is None:
-                g_logger.info(f"Cleanup: chromedriver pid {pid} still alive after quit/close; terminating...")
+                import psutil
+                parent = psutil.Process(service_pid)
+                # Kill all children (recursive) and then the parent
+                children = parent.children(recursive=True)
+                for child in children:
+                    try:
+                        child.kill()
+                    except psutil.NoSuchProcess:
+                        pass # Child might have already died
+                
                 try:
-                    proc.terminate()
-                    time.sleep(1.0)
-                    if proc.poll() is None:
-                        proc.kill()
-                    g_logger.info(f"Cleanup: chromedriver pid {pid} terminated")
-                except (OSError, ProcessLookupError) as kill_e:
-                    g_logger.warning(f"Cleanup: failed to terminate chromedriver pid {pid}: {kill_e}")
-            
-        except (AttributeError, TypeError) as e:
-            g_logger.debug(f"Cleanup: unable to inspect/terminate driver service process: {e}")
+                    parent.kill()
+                    g_logger.info(f"Forcefully terminated chromedriver process tree for PID {service_pid}.")
+                except psutil.NoSuchProcess:
+                    g_logger.debug(f"Chromedriver process {service_pid} was already gone.")
 
-        if not did_cleanup_call:
-            g_logger.warning("All cleanup methods failed - driver may be in an inconsistent state")
-
-    @classmethod
-    def _cleanup_lingering_processes(cls):
-        """
-        Clean up only truly orphaned chromedriver and Chrome processes.
-        Only kill processes that are very old (>5 minutes) and appear to be orphans.
-        This is called periodically to prevent accumulation without being too aggressive.
-        """
-        try:
-            import subprocess
-            import os
-            import time as time_module
-
-            current_time = time_module.time()
-
-            # Find chromedriver processes and check their age
-            chromedriver_result = subprocess.run(['pgrep', '-f', 'chromedriver'], capture_output=True, text=True, timeout=5)
-            chromedriver_count = 0
-            if chromedriver_result.returncode == 0 and chromedriver_result.stdout.strip():
-                chromedriver_pids = chromedriver_result.stdout.strip().split('\n')
-
-                for chromedriver_pid in chromedriver_pids:
-                    try:
-                        # Check if this process belongs to our current process tree
-                        # by checking if it's a child of our process group
-                        our_pgid = os.getpgid(os.getpid())
-                        try:
-                            process_pgid = os.getpgid(int(chromedriver_pid))
-                            # If it's not in our process group, it might be from another request/session
-                            # Be more conservative - only kill processes that are very old
-                            if process_pgid != our_pgid:
-                                # Check process age using /proc filesystem
-                                try:
-                                    with open(f'/proc/{chromedriver_pid}/stat', 'r') as f:
-                                        stat_data = f.read().split()
-                                        start_time_ticks = int(stat_data[21])
-                                        # Convert jiffies to seconds (rough approximation)
-                                        start_time_seconds = start_time_ticks / 100.0
-                                        process_age = current_time - start_time_seconds
-
-                                        # Only kill if process is older than 5 minutes (300 seconds)
-                                        if process_age > 300:
-                                            g_logger.warning(f"Cleanup: killing old orphaned chromedriver process {chromedriver_pid} (age: {process_age:.1f}s)")
-                                            try:
-                                                os.kill(int(chromedriver_pid), 9)  # SIGKILL
-                                                chromedriver_count += 1
-                                                time.sleep(0.1)
-                                            except (OSError, ProcessLookupError):
-                                                pass  # Process might have already died
-                                except (FileNotFoundError, ValueError):
-                                    # Process might have died, skip it
-                                    pass
-                        except (OSError, ProcessLookupError):
-                            # Process might have died, skip it
-                            pass
-                    except (OSError, ValueError):
-                        # Process might have died, skip it
-                        pass
-
-            # For Chrome processes, be even more conservative
-            # Only clean up orphaned Chrome processes that are very old
-            chrome_result = subprocess.run(['pgrep', '-f', 'chrome.*--'], capture_output=True, text=True, timeout=5)
-            chrome_count = 0
-            if chrome_result.returncode == 0 and chrome_result.stdout.strip():
-                chrome_pids = chrome_result.stdout.strip().split('\n')
-
-                for chrome_pid in chrome_pids:
-                    try:
-                        # Check process age
-                        try:
-                            with open(f'/proc/{chrome_pid}/stat', 'r') as f:
-                                stat_data = f.read().split()
-                                start_time_ticks = int(stat_data[21])
-                                start_time_seconds = start_time_ticks / 100.0
-                                process_age = current_time - start_time_seconds
-
-                                # Only kill Chrome processes older than 10 minutes (600 seconds)
-                                if process_age > 600:
-                                    g_logger.warning(f"Cleanup: killing old orphaned Chrome process {chrome_pid} (age: {process_age:.1f}s)")
-                                    try:
-                                        os.kill(int(chrome_pid), 9)  # SIGKILL
-                                        chrome_count += 1
-                                        time.sleep(0.1)
-                                    except (OSError, ProcessLookupError):
-                                        pass
-                        except (FileNotFoundError, ValueError):
-                            pass
-                    except (OSError, ValueError):
-                        pass
-
-            if chromedriver_count > 0 or chrome_count > 0:
-                g_logger.info(f"Cleanup: killed {chromedriver_count} old chromedriver and {chrome_count} old Chrome processes")
-            else:
-                g_logger.debug("Cleanup: no old orphaned browser processes found")
-
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as e:
-            g_logger.debug(f"Cleanup: unable to check for orphaned browser processes: {e}")
+            except ImportError:
+                g_logger.warning("`psutil` is not installed. Cannot perform forceful cleanup of process tree. "
+                                 "Please run `pip install psutil`.")
+            except psutil.NoSuchProcess:
+                # This is expected if driver.quit() was successful
+                g_logger.debug(f"Chromedriver process {service_pid} was already cleaned up.")
+            except Exception as e:
+                g_logger.error(f"An unexpected error occurred during forceful cleanup: {e}")
 
     @classmethod
     def force_cleanup(cls):
