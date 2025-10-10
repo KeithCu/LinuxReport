@@ -53,6 +53,8 @@ settings:
     - "https://www.pvreport.org"
     - "https://trumpreport.info"
     - "https://www.trumpreport.info"
+    - "https://robotreport.keithcu.com"
+    - "https://www.robotreport.keithcu.com"
     - "https://news.thedetroitilove.com"
     - "https://news.spaceelevatorwiki.com"
     - "http://127.0.0.1:5000"
@@ -68,6 +70,8 @@ settings:
     - "https://www.pvreport.org"
     - "https://trumpreport.info"
     - "https://www.trumpreport.info"
+    - "https://robotreport.keithcu.com"
+    - "https://www.robotreport.keithcu.com"
     - "https://news.thedetroitilove.com"
     - "https://linuxreport.net"
     - "https://www.linuxreport.net"
@@ -90,5 +94,5 @@ settings:
     <font size="4">(Displays instantly, refreshes hourly) - Fork me on <a target="_blank"
     href = "https://github.com/KeithCu/LinuxReport">GitHub</a> or <a target="_blank"
     href = "https://gitlab.com/keithcu/linuxreport">GitLab. </a></font>
-    <br/>Check out the <a href="https://deepwiki.com/KeithCu/LinuxReport" target="_blank">DeepWiki</a> with analysis, pictures, graphs, and more! 
-    <br/>Or try <a href="#" onclick="document.getElementById('view-mode-toggle').click(); return false;">Infinite View</a> to see all the latest articles in one shared list!
+    <br/>Check out the <a href="https://deepwiki.com/KeithCu/LinuxReport" target="_blank">DeepWiki</a> with analysis, pictures, graphs, and more. 
+    <br/>Or try <a href="#" onclick="document.getElementById('view-mode-toggle').click(); return false;">Infinite View</a> to see all the latest articles in one shared list.
