@@ -45,7 +45,9 @@ def test_basic_browser_creation():
         
         # Test manual cleanup
         cleanup_playwright_browsers()
-        if SharedPlaywrightBrowser._instance is None:
+        # Check if all instances are None (cleanup sets them to None but doesn't remove keys)
+        all_cleaned = all(instance is None for instance in SharedPlaywrightBrowser._instances.values())
+        if all_cleaned:
             print("SUCCESS: Manual cleanup successful")
             return True
         else:
