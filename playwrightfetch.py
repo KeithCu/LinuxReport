@@ -37,6 +37,11 @@ except ImportError:
 # =============================================================================
 from shared import g_cs, CUSTOM_FETCH_CONFIG, g_logger, WORKER_PROXYING, PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
 from app_config import FetchConfig
+from browser_fetch import (
+    NETWORK_TIMEOUT, FETCH_LOCK_TIMEOUT,
+    extract_base_domain, get_site_config, build_feed_result, clean_patriots_title, create_post_entry,
+    extract_rss_data, safe_find_element, extract_title, extract_link, extract_post_data as shared_extract_post_data
+)
 
 # =============================================================================
 # TIMEOUT CONSTANTS
@@ -47,12 +52,6 @@ PLAYWRIGHT_TIMEOUT = 30000  # 30 seconds for page load and script execution
 
 # WebDriver timeouts - for backward compatibility with seleniumfetch.py
 WEBDRIVER_TIMEOUT = 30  # 30 seconds for page load and script execution
-
-# Network operation timeouts - for HTTP requests and element waiting
-NETWORK_TIMEOUT = 20  # 20 seconds for HTTP requests and PlaywrightWait operations
-
-# Thread synchronization timeout - for coordinating fetch operations
-FETCH_LOCK_TIMEOUT = 30  # 30 seconds for acquiring fetch lock (longer due to thread coordination)
 
 # =============================================================================
 # SPECIAL SITE CONFIGURATIONS
@@ -358,205 +357,20 @@ atexit.register(_atexit_handler)
 # signal.signal(signal.SIGINT, _signal_handler)
 
 # =============================================================================
-# UTILITY FUNCTIONS
+# PLAYWRIGHT-SPECIFIC UTILITY FUNCTIONS
 # =============================================================================
 
-def extract_base_domain(url):
-    """
-    Extract the base domain from a URL for configuration lookup.
+def _playwright_find_element(post, selector):
+    """Playwright-specific element finder."""
+    return post.locator(selector).first
 
-    Handles subdomains by extracting the main domain (e.g., example.com from sub.example.com).
+def _playwright_get_attribute(element, attr):
+    """Playwright-specific attribute getter."""
+    return element.get_attribute(attr)
 
-    Args:
-        url (str): The URL to parse
-
-    Returns:
-        str: Base domain for configuration lookup
-    """
-    parsed = urlparse(url)
-    # Extract base domain (e.g., bandcamp.com from rocksteadydisco.bandcamp.com)
-    domain_parts = parsed.netloc.split('.')
-    if len(domain_parts) > 2:
-        # Handle subdomains like www.example.com or sub.example.co.uk
-        # This logic might need adjustment for complex TLDs like .co.uk
-        # For now, assume simple cases like example.com or sub.example.com
-        base_domain = '.'.join(domain_parts[-2:])
-    else:
-        base_domain = parsed.netloc
-    return base_domain
-
-
-def get_site_config(url):
-    """
-    Get the configuration for a given URL.
-
-    Looks up configuration in CUSTOM_FETCH_CONFIG using both base domain and full netloc.
-
-    Args:
-        url (str): URL to get configuration for
-
-    Returns:
-        tuple: (config, base_domain) - Site-specific configuration and base domain
-    """
-    base_domain = extract_base_domain(url)
-    parsed = urlparse(url)
-
-    # Always try base domain first, then fallback to netloc (for legacy configs)
-    config = CUSTOM_FETCH_CONFIG.get(base_domain)
-    if not config:
-        config = CUSTOM_FETCH_CONFIG.get(parsed.netloc)
-
-    # Special case for keithcu.com RSS feed
-    if not config and "keithcu.com" in base_domain:
-        config = FetchConfig(
-            needs_selenium=True,  # Using Playwright for testing purposes
-            needs_tor=False,
-            post_container="pre",  # RSS feeds in browser are wrapped in <pre> tags
-            title_selector="title",
-            link_selector="link",
-            link_attr="text",  # RSS links are text content, not href attributes
-            filter_pattern="",
-            use_random_user_agent=False,
-            published_selector=None
-        )
-
-    return config, base_domain
-
-
-def build_feed_result(entries, url, status=200, etag="", modified=None):
-    """
-    Build a standardized feed result dictionary.
-
-    Args:
-        entries (list): List of post entries
-        url (str): Source URL
-        status (int): HTTP status code
-        etag (str): ETag for caching
-        modified (datetime): Last modified timestamp
-
-    Returns:
-        dict: Standardized feed result
-    """
-    if modified is None:
-        modified = datetime.now(timezone.utc)
-
-    return {
-        'entries': entries,
-        'etag': etag,
-        'modified': modified,
-        'feed': {
-            'title': url,
-            'link': url,
-            'description': ''
-        },
-        'href': url,
-        'status': status
-    }
-
-
-def safe_find_element(post, selector, use_playwright, attr=None):
-    """
-    Safely extract an element or attribute from a post using either Playwright or BeautifulSoup.
-
-    Args:
-        post: Playwright Locator/Element or BeautifulSoup Tag containing post data
-        selector (str): CSS selector to find the element
-        use_playwright (bool): Whether using Playwright or BeautifulSoup
-        attr (str, optional): Attribute to extract instead of text content
-
-    Returns:
-        str or None: Extracted text/attribute value, or None if extraction fails
-    """
-    try:
-        if use_playwright:
-            element = post.locator(selector).first
-            if not element:
-                return None
-            if attr:
-                return element.get_attribute(attr)
-            else:
-                return element.text_content().strip()
-        else:
-            element = post.select_one(selector)
-            if not element:
-                return None
-            if attr == "text":
-                return element.get_text().strip()
-            elif attr:
-                return element.get(attr)
-            else:
-                return element.text.strip()
-    except Exception:
-        return None
-
-
-def clean_patriots_title(title):
-    """
-    Clean patriots.win specific metadata from post titles.
-
-    Removes common patterns like timestamps, user info, action buttons, etc.
-    that appear at the end of patriots.win posts.
-
-    Args:
-        title (str): Raw title text to clean
-
-    Returns:
-        str: Cleaned title text
-    """
-    if not title:
-        return title
-
-    # Convert to string if needed
-    title = str(title)
-
-    # Clean up patriots.win metadata from the end of posts
-    # Remove patterns like "posted X ago by username X comments award share report block"
-    # Remove leading numbers/IDs like "546 "
-    title = re.sub(r'^\d+\s+', '', title)
-
-    # Remove "posted X ago by..." and everything after it
-    title = re.sub(r'\s*posted\s+\d+\s+(?:hour|minute|second|day)s?\s+ago\s+by\s+.*', '', title, flags=re.IGNORECASE)
-
-    # Remove remaining metadata patterns
-    title = re.sub(r'\s*\d+\s+comments?\s+.*', '', title, flags=re.IGNORECASE)
-
-    # Remove action buttons and user tags - remove known patterns from end
-    title = re.sub(r'\s+PRO\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'\s+TRUMP\s+TRUTH\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
-    title = re.sub(r'\s+TRUMP\s+TRUTH\s*$', '', title, flags=re.IGNORECASE)  # Remove TRUMP TRUTH tags
-    title = re.sub(r'\s+PRO\s*$', '', title, flags=re.IGNORECASE)
-
-    # Remove any remaining trailing punctuation and whitespace
-    title = re.sub(r'[.\s]+$', '', title).strip()
-
-    return title
-
-
-def create_post_entry(title, link, summary):
-    """
-    Create a standardized post entry dictionary.
-
-    Args:
-        title: Post title
-        link: Post link
-        summary: Post summary text
-
-    Returns:
-        dict: Standardized post entry
-    """
-    published_parsed = time.gmtime()
-    published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
-
-    return {
-        "title": title,
-        "link": link,
-        "id": link,
-        "summary": summary,
-        "published": published,
-        "published_parsed": published_parsed
-    }
+def _playwright_get_text(element):
+    """Playwright-specific text getter."""
+    return element.text_content()
 
 
 def _log_debugging_info(post, use_playwright, context):
@@ -599,126 +413,19 @@ def _log_debugging_info(post, use_playwright, context):
 
 
 # =============================================================================
-# CONTENT EXTRACTION FUNCTIONS
+# PLAYWRIGHT-SPECIFIC EXTRACTION WRAPPERS
 # =============================================================================
 
-def extract_rss_data(post, config):
+def extract_post_data_playwright(post, config, url, use_playwright):
     """
-    Extract data from RSS feeds loaded through Playwright.
-
-    Args:
-        post: Playwright Locator containing RSS XML
-        config: Configuration object
-
-    Returns:
-        list: List of post entries, or None if extraction fails
+    Playwright-specific wrapper for extract_post_data.
     """
-    try:
-        # Get the raw XML content from the pre tag
-        xml_content = post.text_content()
-
-        # Parse as XML using BeautifulSoup
-        xml_soup = BeautifulSoup(xml_content, 'xml')
-        items = xml_soup.find_all('item')
-
-        results = []
-        for item in items:
-            title_tag = item.find('title')
-            link_tag = item.find('link')
-
-            if title_tag and link_tag:
-                title = title_tag.get_text().strip()
-                link = link_tag.get_text().strip()
-
-                if len(title.split()) >= 2:
-                    # Use current time for new articles
-                    published_parsed = time.gmtime()
-                    published = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
-
-                    results.append({
-                        "title": title,
-                        "link": link,
-                        "id": link,
-                        "summary": title,  # Use title as summary for RSS
-                        "published": published,
-                        "published_parsed": published_parsed
-                    })
-
-        return results if results else None
-
-    except Exception as e:
-            g_logger.error(f"Error parsing RSS content: {e}")
-            return None
-
-
-def extract_title(post, config, url, use_playwright):
-    """
-    Extract title from a post element.
-
-    Args:
-        post: Playwright Locator or BeautifulSoup Tag containing post data
-        config: Configuration object
-        url: Base URL for context
-        use_playwright: Whether using Playwright or BeautifulSoup
-
-    Returns:
-        str: Extracted title, or None if extraction fails
-    """
-    # Special case: if title_selector equals post_container, use the post element itself
-    if config.title_selector == config.post_container:
-        g_logger.info(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
-        if use_playwright:
-            title = post.text_content().strip()
-        else:
-            title = post.text.strip()
-        # Fallbacks for anchors or elements with empty visible text
-        if not title:
-            try:
-                if use_playwright:
-                    title = post.get_attribute('title') or post.get_attribute('innerText') or ''
-                else:
-                    # For BeautifulSoup, get_attribute might not work the same way
-                    title = post.get('title', '') or post.get_text() or ''
-                title = (title or '').strip()
-            except Exception:
-                pass
-        g_logger.debug(f"Raw post text: {repr(title)}")
-        title = clean_patriots_title(title)
-        g_logger.debug(f"Cleaned post title: {repr(title)}")
-    else:
-        title = safe_find_element(post, config.title_selector, use_playwright)
-        if not title:
-            g_logger.debug(f"No title element found with selector '{config.title_selector}'")
-            _log_debugging_info(post, use_playwright, "title")
-            return None
-
-    return title
-
-
-def extract_link(post, config, url, use_playwright):
-    """
-    Extract link from a post element.
-
-    Args:
-        post: Playwright Locator or BeautifulSoup Tag containing post data
-        config: Configuration object
-        url: Base URL for resolving relative links
-        use_playwright: Whether using Playwright or BeautifulSoup
-
-    Returns:
-        str: Extracted link, or None if extraction fails
-    """
-    link = safe_find_element(post, config.link_selector, use_playwright, config.link_attr)
-    if not link:
-        g_logger.info(f"No link element found with selector '{config.link_selector}'")
-        _log_debugging_info(post, use_playwright, "link")
-        return None
-
-    # Resolve relative URLs
-    if link and link.startswith('/'):
-        link = urljoin(url, link)
-
-    return link
+    return shared_extract_post_data(
+        post, config, url, use_playwright,
+        get_text_func=_playwright_get_text,
+        find_func=_playwright_find_element,
+        get_attr_func=_playwright_get_attribute
+    )
 
 
 def extract_post_data(post, config, url, use_playwright):
@@ -738,29 +445,16 @@ def extract_post_data(post, config, url, use_playwright):
         dict or list: Extracted post data with title, link, id, summary, and timestamps,
                      or None if extraction fails. For RSS feeds, returns a list of entries.
     """
-    # Special handling for RSS feeds loaded through Playwright
-    if use_playwright and config.post_container == "pre":
-        return extract_rss_data(post, config)
-
-    # Regular processing for non-RSS content
-    title = extract_title(post, config, url, use_playwright)
-    if not title or len(title.split()) < 2:
-        return None
-
-    link = extract_link(post, config, url, use_playwright)
-    if not link:
-        return None
-
-    filter_pattern = config.filter_pattern
-    if filter_pattern and filter_pattern not in link:
-        return None
-
     if use_playwright:
-        summary = post.text_content().strip()
+        return extract_post_data_playwright(post, config, url, use_playwright)
     else:
-        summary = post.text.strip()
-
-    return create_post_entry(title, link, summary)
+        # BeautifulSoup fallback - use shared function directly
+        return shared_extract_post_data(
+            post, config, url, use_playwright,
+            get_text_func=None,
+            find_func=None,
+            get_attr_func=None
+        )
 
 # =============================================================================
 # MAIN SITE FETCHING FUNCTION
