@@ -1684,7 +1684,7 @@ def _get_browser_module():
 
 def _get_browser_instance(use_tor, user_agent):
     """
-    Get a browser instance using the configured browser engine.
+    Get a browser instance using the configured browser engine with fallback support.
     
     Args:
         use_tor (bool): Whether to use Tor proxy
@@ -1700,8 +1700,12 @@ def _get_browser_instance(use_tor, user_agent):
             browser, context = browser_module.SharedPlaywrightBrowser.get_browser_context(use_tor, user_agent)
             if browser and context:
                 return PlaywrightBrowserWrapper(browser, context, use_tor, user_agent)
-        except AttributeError:
-            g_logger.error("Playwright SharedPlaywrightBrowser not available")
+            else:
+                g_logger.warning("Playwright browser/context creation returned None, falling back to Selenium")
+                return _fallback_to_selenium(use_tor, user_agent)
+        except (AttributeError, Exception) as e:
+            g_logger.warning(f"Playwright failed ({e}), falling back to Selenium")
+            return _fallback_to_selenium(use_tor, user_agent)
     else:
         try:
             driver = browser_module.SharedSeleniumDriver.get_driver(use_tor, user_agent)
@@ -1711,6 +1715,31 @@ def _get_browser_instance(use_tor, user_agent):
             g_logger.error("Selenium SharedSeleniumDriver not available")
     
     return None
+
+def _fallback_to_selenium(use_tor, user_agent):
+    """
+    Fallback to Selenium when Playwright fails.
+    
+    Args:
+        use_tor (bool): Whether to use Tor proxy
+        user_agent (str): User agent string for the browser
+        
+    Returns:
+        BrowserInterface: Selenium browser instance or None if fallback fails
+    """
+    try:
+        import seleniumfetch
+        g_logger.info("Attempting fallback to Selenium")
+        driver = seleniumfetch.SharedSeleniumDriver.get_driver(use_tor, user_agent)
+        if driver:
+            g_logger.info("Successfully fell back to Selenium")
+            return SeleniumBrowserWrapper(driver, use_tor, user_agent)
+        else:
+            g_logger.error("Selenium fallback failed - driver creation returned None")
+            return None
+    except Exception as e:
+        g_logger.error(f"Selenium fallback failed: {e}")
+        return None
 
 # =============================================================================
 # UNIFIED API FUNCTIONS

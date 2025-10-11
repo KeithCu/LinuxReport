@@ -44,6 +44,33 @@ from browser_fetch import (
 # PLAYWRIGHT BROWSER CONFIGURATION AND CREATION
 # =============================================================================
 
+def _safe_playwright_start():
+    """
+    Safely start Playwright with logging isolation to avoid Apache/mod_wsgi conflicts.
+    
+    Returns:
+        Playwright instance or None if initialization fails
+    """
+    try:
+        # Temporarily suppress Playwright's logging to avoid Apache/mod_wsgi conflicts
+        import logging
+        
+        # Suppress Playwright's internal logging
+        playwright_logger = logging.getLogger("playwright")
+        original_level = playwright_logger.level
+        playwright_logger.setLevel(logging.CRITICAL)
+        
+        try:
+            playwright_instance = sync_playwright().start()
+            return playwright_instance
+        finally:
+            # Restore original logging level
+            playwright_logger.setLevel(original_level)
+                
+    except Exception as e:
+        g_logger.error(f"Error starting Playwright safely: {e}")
+        return None
+
 def create_browser_context(playwright, use_tor, user_agent):
     """
     Create and configure a Playwright browser context using shared browser creation logic.
@@ -112,9 +139,14 @@ class SharedPlaywrightBrowser(SharedBrowserManager):
         super().__init__(use_tor, user_agent)
         g_logger.debug(f"Initializing SharedPlaywrightBrowser with Tor: {use_tor}")
         try:
-            self.playwright = sync_playwright().start()
+            # Use safe Playwright initialization to avoid Apache/mod_wsgi conflicts
+            self.playwright = _safe_playwright_start()
+            if not self.playwright:
+                raise Exception("Failed to start Playwright safely")
+                
             self.browser, self.context = create_browser_context(self.playwright, use_tor, user_agent)
             g_logger.debug("SharedPlaywrightBrowser initialized successfully")
+                
         except Exception as e:
             g_logger.error(f"Error in SharedPlaywrightBrowser.__init__: {e}")
             raise
