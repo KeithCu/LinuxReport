@@ -7,7 +7,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from seleniumfetch import fetch_site_posts
+from browser_fetch import fetch_site_posts
 from ai_report_settings import CONFIG
 from shared import g_cs
 

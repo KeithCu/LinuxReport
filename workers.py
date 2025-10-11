@@ -42,7 +42,7 @@ from selenium.common.exceptions import WebDriverException
 
 # Local application imports
 from feedfilter import merge_entries
-from seleniumfetch import fetch_site_posts
+from browser_fetch import fetch_site_posts
 from shared import (
     ALL_URLS, EXPIRE_WEEK, EXPIRE_YEARS, MAX_ITEMS, TZ,
     USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,

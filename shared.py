@@ -53,6 +53,14 @@ from request_utils import get_rate_limit_key, dynamic_rate_limit, get_ip_prefix,
 FLASK_DASHBOARD = False
 
 # =============================================================================
+# BROWSER ENGINE CONFIGURATION
+# =============================================================================
+
+# Global flag to choose between Selenium and Playwright for web scraping
+# Set to True to use Playwright, False to use Selenium
+USE_PLAYWRIGHT = False
+
+# =============================================================================
 # CONFIGURATION LOADING AND SETTINGS
 # =============================================================================
 

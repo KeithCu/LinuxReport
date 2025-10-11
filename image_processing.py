@@ -16,7 +16,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import TimeoutException, WebDriverException
-from seleniumfetch import create_driver
+from browser_fetch import get_shared_driver
 
 # Import from new modules
 from image_utils import (
@@ -149,9 +149,9 @@ def fetch_largest_image_selenium(url): # Renamed request_url to url
     """Fetch largest image using Selenium for JavaScript-heavy sites."""
     driver = None
     try:
-        # Update create_driver call with required arguments
+        # Update get_shared_driver call with required arguments
         # Assuming no Tor needed for this fallback and use standard agent
-        driver = create_driver(use_tor=False, user_agent=HEADERS['User-Agent'])
+        driver = get_shared_driver(use_tor=False, user_agent=HEADERS['User-Agent'])
         driver.get(url) # Use url
 
         try:

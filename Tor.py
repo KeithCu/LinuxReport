@@ -32,7 +32,7 @@ from fake_useragent import UserAgent
 # =============================================================================
 
 from shared import g_cs, g_logger, EXPIRE_YEARS, WORKER_PROXYING, PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
-from seleniumfetch import fetch_site_posts
+from browser_fetch import fetch_site_posts
 from app_config import get_tor_password
 
 # =============================================================================
