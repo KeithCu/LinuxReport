@@ -47,6 +47,201 @@ NETWORK_TIMEOUT = 20  # 20 seconds for HTTP requests and browser operations
 # Thread synchronization timeout - for coordinating fetch operations
 FETCH_LOCK_TIMEOUT = 30  # 30 seconds for acquiring fetch lock (longer due to thread coordination)
 
+# Unified browser operation timeouts
+BROWSER_TIMEOUT = 30  # 30 seconds for browser operations (page load, script execution)
+BROWSER_WAIT_TIMEOUT = 25  # 25 seconds for waiting for elements
+
+# =============================================================================
+# UNIFIED BROWSER INTERFACE
+# =============================================================================
+
+class BrowserInterface:
+    """
+    Unified interface for browser operations that both Selenium and Playwright can implement.
+    This provides a consistent API regardless of the underlying browser engine.
+    """
+    
+    def __init__(self, use_tor, user_agent):
+        self.use_tor = use_tor
+        self.user_agent = user_agent
+        self.last_used = time.time()
+    
+    def get_page_content(self, url):
+        """
+        Navigate to URL and return page content.
+        
+        Args:
+            url (str): URL to navigate to
+            
+        Returns:
+            tuple: (page_content, status_code) where page_content is the HTML content
+                   and status_code is the HTTP status
+        """
+        raise NotImplementedError("Subclasses must implement get_page_content")
+    
+    def find_elements(self, selector):
+        """
+        Find elements matching the given CSS selector.
+        
+        Args:
+            selector (str): CSS selector to find elements
+            
+        Returns:
+            list: List of elements matching the selector
+        """
+        raise NotImplementedError("Subclasses must implement find_elements")
+    
+    def wait_for_elements(self, selector, timeout=None):
+        """
+        Wait for elements matching the selector to appear.
+        
+        Args:
+            selector (str): CSS selector to wait for
+            timeout (float, optional): Timeout in seconds
+            
+        Returns:
+            bool: True if elements found, False if timeout
+        """
+        raise NotImplementedError("Subclasses must implement wait_for_elements")
+    
+    def close(self):
+        """Close the browser instance."""
+        raise NotImplementedError("Subclasses must implement close")
+    
+    def is_valid(self):
+        """
+        Check if the browser instance is still valid and responsive.
+        
+        Returns:
+            bool: True if browser is valid, False otherwise
+        """
+        raise NotImplementedError("Subclasses must implement is_valid")
+
+class SeleniumBrowserWrapper(BrowserInterface):
+    """
+    Wrapper for Selenium WebDriver that implements the unified BrowserInterface.
+    """
+    
+    def __init__(self, driver, use_tor, user_agent):
+        super().__init__(use_tor, user_agent)
+        self.driver = driver
+    
+    def get_page_content(self, url):
+        """Navigate to URL and return page content using Selenium."""
+        try:
+            self.driver.get(url)
+            return self.driver.page_source, 200
+        except Exception as e:
+            g_logger.error(f"Selenium navigation error: {e}")
+            return "", 500
+    
+    def find_elements(self, selector):
+        """Find elements using Selenium."""
+        try:
+            from selenium.webdriver.common.by import By
+            return self.driver.find_elements(By.CSS_SELECTOR, selector)
+        except Exception as e:
+            g_logger.error(f"Selenium find elements error: {e}")
+            return []
+    
+    def wait_for_elements(self, selector, timeout=None):
+        """Wait for elements using Selenium."""
+        try:
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support import expected_conditions as EC
+            from selenium.webdriver.support.ui import WebDriverWait
+            
+            if timeout is None:
+                timeout = BROWSER_WAIT_TIMEOUT
+            
+            WebDriverWait(self.driver, timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+            )
+            return True
+        except Exception as e:
+            g_logger.debug(f"Selenium wait for elements timeout: {e}")
+            return False
+    
+    def close(self):
+        """Close Selenium driver."""
+        try:
+            self.driver.quit()
+        except Exception as e:
+            g_logger.error(f"Error closing Selenium driver: {e}")
+    
+    def is_valid(self):
+        """Check if Selenium driver is valid."""
+        try:
+            self.driver.execute_script("return document.readyState;")
+            return True
+        except Exception:
+            return False
+
+class PlaywrightBrowserWrapper(BrowserInterface):
+    """
+    Wrapper for Playwright browser that implements the unified BrowserInterface.
+    """
+    
+    def __init__(self, browser, context, use_tor, user_agent):
+        super().__init__(use_tor, user_agent)
+        self.browser = browser
+        self.context = context
+        self.page = None
+    
+    def get_page_content(self, url):
+        """Navigate to URL and return page content using Playwright."""
+        try:
+            self.page = self.context.new_page()
+            self.page.goto(url, timeout=BROWSER_TIMEOUT * 1000)  # Playwright uses milliseconds
+            return self.page.content(), 200
+        except Exception as e:
+            g_logger.error(f"Playwright navigation error: {e}")
+            return "", 500
+    
+    def find_elements(self, selector):
+        """Find elements using Playwright."""
+        try:
+            if self.page:
+                return self.page.locator(selector).all()
+            return []
+        except Exception as e:
+            g_logger.error(f"Playwright find elements error: {e}")
+            return []
+    
+    def wait_for_elements(self, selector, timeout=None):
+        """Wait for elements using Playwright."""
+        try:
+            if timeout is None:
+                timeout = BROWSER_WAIT_TIMEOUT
+            
+            if self.page:
+                self.page.wait_for_selector(selector, timeout=int(timeout * 1000))  # Playwright uses milliseconds
+                return True
+            return False
+        except Exception as e:
+            g_logger.debug(f"Playwright wait for elements timeout: {e}")
+            return False
+    
+    def close(self):
+        """Close Playwright page and context."""
+        try:
+            if self.page:
+                self.page.close()
+            if self.context:
+                self.context.close()
+        except Exception as e:
+            g_logger.error(f"Error closing Playwright browser: {e}")
+    
+    def is_valid(self):
+        """Check if Playwright context is valid."""
+        try:
+            if self.context:
+                pages = self.context.pages
+                return True
+            return False
+        except Exception:
+            return False
+
 # =============================================================================
 # SHARED UTILITY FUNCTIONS
 # =============================================================================
@@ -421,6 +616,156 @@ def extract_post_data(post, config, url, use_browser, get_text_func=None, find_f
     return create_post_entry(title, link, summary)
 
 # =============================================================================
+# COMMON FETCH LOGIC
+# =============================================================================
+
+def _prepare_request_headers(config, user_agent):
+    """
+    Prepare HTTP request headers for non-browser requests.
+    
+    Args:
+        config: Configuration object
+        user_agent (str): User agent string
+        
+    Returns:
+        dict: Request headers
+    """
+    request_headers = {}
+    
+    if config.use_random_user_agent:
+        request_headers['User-Agent'] = g_cs.get("REDDIT_USER_AGENT")
+    else:
+        request_headers['User-Agent'] = user_agent
+
+    # Add proxy headers if proxying is enabled
+    if WORKER_PROXYING and PROXY_SERVER:
+        request_headers['X-Forwarded-For'] = PROXY_SERVER.split(':')[0]
+        if PROXY_USERNAME and PROXY_PASSWORD:
+            import base64
+            auth_string = f"{PROXY_USERNAME}:{PROXY_PASSWORD}"
+            auth_bytes = auth_string.encode('ascii')
+            auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
+            request_headers['Proxy-Authorization'] = f'Basic {auth_b64}'
+    
+    return request_headers
+
+def _fetch_with_requests(url, config, user_agent):
+    """
+    Fetch content using requests library for non-JavaScript sites.
+    
+    Args:
+        url (str): URL to fetch
+        config: Configuration object
+        user_agent (str): User agent string
+        
+    Returns:
+        tuple: (entries, status) where entries is list of post entries and status is HTTP status
+    """
+    entries = []
+    status = 200
+    
+    try:
+        request_headers = _prepare_request_headers(config, user_agent)
+        response = requests.get(url, timeout=NETWORK_TIMEOUT, headers=request_headers)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        posts = soup.select(config.post_container)
+
+        # Extract post data with consolidated error handling
+        for post in posts:
+            try:
+                entry = extract_post_data(post, config, url, use_browser=False)
+                if entry:
+                    entries.append(entry)
+            except Exception as e:
+                g_logger.error(f"Error extracting post data: {e}")
+
+    except requests.exceptions.RequestException as e:
+        g_logger.error(f"Request error for {url}: {e}")
+        status = 500
+    except Exception as e:
+        g_logger.error(f"Error fetching {url} with requests: {e}")
+        status = 500
+    
+    return entries, status
+
+def _fetch_with_browser(url, config, user_agent, browser_instance):
+    """
+    Fetch content using browser automation for JavaScript sites.
+    
+    Args:
+        url (str): URL to fetch
+        config: Configuration object
+        user_agent (str): User agent string
+        browser_instance: Browser instance implementing BrowserInterface
+        
+    Returns:
+        tuple: (entries, status) where entries is list of post entries and status is HTTP status
+    """
+    entries = []
+    status = 200
+    
+    try:
+        # Navigate to the page
+        page_content, nav_status = browser_instance.get_page_content(url)
+        if nav_status != 200:
+            return [], nav_status
+        
+        # Wait for elements if not Reddit (Reddit has special handling)
+        base_domain = extract_base_domain(url)
+        if base_domain != "reddit.com":
+            try:
+                # Use random timeout to avoid predictable patterns
+                random_timeout = random.uniform(15, BROWSER_WAIT_TIMEOUT)
+                browser_instance.wait_for_elements(config.post_container, timeout=random_timeout)
+            except Exception as wait_error:
+                g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
+                # Continue anyway, might still find some content
+
+        posts = browser_instance.find_elements(config.post_container)
+        if not posts:
+            g_logger.info(f"No posts found for {url}. Page content snippet: {page_content[:500]}")
+            status = 204  # No content
+        else:
+            for post in posts:
+                try:
+                    # Use browser-specific extraction
+                    entry_data = _extract_post_data_browser(post, config, url, browser_instance)
+                    if entry_data:
+                        # Handle both single entry and list of entries
+                        if isinstance(entry_data, list):
+                            entries.extend(entry_data)
+                        else:
+                            entries.append(entry_data)
+                except Exception as e:
+                    g_logger.error(f"Error extracting post data: {e}")
+                    continue
+                    
+    except Exception as e:
+        g_logger.error(f"Error on {url}: {e}")
+        status = 500
+    
+    return entries, status
+
+def _extract_post_data_browser(post, config, url, browser_instance):
+    """
+    Extract post data using browser-specific methods.
+    
+    Args:
+        post: Browser element
+        config: Configuration object
+        url (str): Base URL
+        browser_instance: Browser instance
+        
+    Returns:
+        dict or list: Extracted post data
+    """
+    # This will be implemented by the specific browser modules
+    # For now, delegate to the existing extract_post_data function
+    # The browser modules will provide the appropriate get_text_func, find_func, get_attr_func
+    return extract_post_data(post, config, url, use_browser=True)
+
+# =============================================================================
 # BROWSER ENGINE SELECTION
 # =============================================================================
 
@@ -463,6 +808,36 @@ def _get_browser_module():
                 g_logger.error(f"Both Selenium and Playwright are unavailable. Selenium error: {e}, Playwright error: {e2}")
                 raise ImportError("Neither Selenium nor Playwright browser modules are available")
 
+def _get_browser_instance(use_tor, user_agent):
+    """
+    Get a browser instance using the configured browser engine.
+    
+    Args:
+        use_tor (bool): Whether to use Tor proxy
+        user_agent (str): User agent string for the browser
+        
+    Returns:
+        BrowserInterface: Browser instance implementing the unified interface
+    """
+    browser_module = _get_browser_module()
+    
+    if USE_PLAYWRIGHT:
+        try:
+            browser, context = browser_module.SharedPlaywrightBrowser.get_browser_context(use_tor, user_agent)
+            if browser and context:
+                return PlaywrightBrowserWrapper(browser, context, use_tor, user_agent)
+        except AttributeError:
+            g_logger.error("Playwright SharedPlaywrightBrowser not available")
+    else:
+        try:
+            driver = browser_module.SharedSeleniumDriver.get_driver(use_tor, user_agent)
+            if driver:
+                return SeleniumBrowserWrapper(driver, use_tor, user_agent)
+        except AttributeError:
+            g_logger.error("Selenium SharedSeleniumDriver not available")
+    
+    return None
+
 # =============================================================================
 # UNIFIED API FUNCTIONS
 # =============================================================================
@@ -485,15 +860,46 @@ def fetch_site_posts(url, user_agent):
         ImportError: If neither browser module is available
         Exception: If the underlying browser module raises an exception
     """
-    try:
-        browser_module = _get_browser_module()
-        return browser_module.fetch_site_posts(url, user_agent)
-    except ImportError:
-        # Re-raise ImportError as-is
-        raise
-    except Exception as e:
-        g_logger.error(f"Error in fetch_site_posts: {e}")
-        raise
+    config, base_domain = get_site_config(url)
+
+    if not config:
+        g_logger.info(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
+        return build_feed_result([], url, status=404)
+
+    entries = []
+    status = 200
+
+    if config.needs_selenium:
+        # Use browser automation
+        if config.use_random_user_agent:
+            # Use random user agent to avoid detection (reuse existing REDDIT_USER_AGENT)
+            user_agent = g_cs.get("REDDIT_USER_AGENT")
+
+        # Acquire the fetch lock before starting the fetch operation
+        lock_acquired = False
+        try:
+            lock_acquired = acquire_fetch_lock()
+            if not lock_acquired:
+                g_logger.warning(f"Failed to acquire fetch lock for {url}, skipping...")
+                return build_feed_result([], url, status=503)
+
+            browser_instance = _get_browser_instance(config.needs_tor, user_agent)
+            if not browser_instance:
+                g_logger.error(f"Failed to get browser instance for {url}")
+                return build_feed_result([], url, status=503)
+                
+            entries, status = _fetch_with_browser(url, config, user_agent, browser_instance)
+                
+        finally:
+            # Always release the fetch lock, even if an error occurs
+            if lock_acquired:
+                release_fetch_lock()
+    else:
+        # Use requests for non-JavaScript sites
+        entries, status = _fetch_with_requests(url, config, user_agent)
+
+    g_logger.info(f"Fetched {len(entries)} entries from {url}")
+    return build_feed_result(entries, url, status)
 
 def cleanup_browsers():
     """
@@ -627,7 +1033,13 @@ __all__ = [
     'extract_title',
     'extract_link',
     'extract_post_data',
+    # Unified browser interface
+    'BrowserInterface',
+    'SeleniumBrowserWrapper',
+    'PlaywrightBrowserWrapper',
     # Shared constants
     'NETWORK_TIMEOUT',
-    'FETCH_LOCK_TIMEOUT'
+    'FETCH_LOCK_TIMEOUT',
+    'BROWSER_TIMEOUT',
+    'BROWSER_WAIT_TIMEOUT'
 ]

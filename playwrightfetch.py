@@ -38,7 +38,7 @@ except ImportError:
 from shared import g_cs, CUSTOM_FETCH_CONFIG, g_logger, WORKER_PROXYING, PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
 from app_config import FetchConfig
 from browser_fetch import (
-    NETWORK_TIMEOUT, FETCH_LOCK_TIMEOUT,
+    NETWORK_TIMEOUT, FETCH_LOCK_TIMEOUT, BROWSER_TIMEOUT, BROWSER_WAIT_TIMEOUT,
     extract_base_domain, get_site_config, build_feed_result, clean_patriots_title, create_post_entry,
     extract_rss_data, safe_find_element, extract_title, extract_link, extract_post_data as shared_extract_post_data
 )
@@ -47,11 +47,8 @@ from browser_fetch import (
 # TIMEOUT CONSTANTS
 # =============================================================================
 
-# Playwright timeouts - for browser operations
-PLAYWRIGHT_TIMEOUT = 30000  # 30 seconds for page load and script execution
-
-# WebDriver timeouts - for backward compatibility with seleniumfetch.py
-WEBDRIVER_TIMEOUT = 30  # 30 seconds for page load and script execution
+# Note: PLAYWRIGHT_TIMEOUT, WEBDRIVER_TIMEOUT, and BROWSER_WAIT_TIMEOUT are now imported from browser_fetch
+# to maintain consistency across all browser modules
 
 # =============================================================================
 # SPECIAL SITE CONFIGURATIONS
@@ -462,130 +459,18 @@ def extract_post_data(post, config, url, use_playwright):
 
 def fetch_site_posts(url, user_agent):
     """
-    Fetch posts from a website using appropriate method based on configuration.
-
-    Determines the best method to fetch content (Playwright vs requests) based on
-    site configuration and domain analysis. Handles JavaScript-rendered content
-    and provides fallback mechanisms for different site types.
-
+    Fetch posts from a website using Playwright browser automation.
+    
+    This function now delegates to the unified browser_fetch implementation
+    to eliminate code duplication while maintaining Playwright-specific functionality.
+    
     Args:
         url (str): URL of the site to fetch posts from
         user_agent (str): User agent string for HTTP requests
-
+        
     Returns:
         dict: Feed-like structure with entries, metadata, and status information
     """
-    config, base_domain = get_site_config(url)
-    
-    if not config:
-        g_logger.info(f"Configuration for base domain '{base_domain}' (from URL '{url}') not found.")
-        return build_feed_result([], url, status=404)
-
-    entries = []
-    status = 200
-
-    if config.needs_selenium:
-        if config.use_random_user_agent:
-            # Use random user agent to avoid detection (reuse existing REDDIT_USER_AGENT)
-            user_agent = g_cs.get("REDDIT_USER_AGENT")
-
-        # Acquire the fetch lock before starting the fetch operation
-        lock_acquired = False
-        try:
-            lock_acquired = SharedPlaywrightBrowser.acquire_fetch_lock()
-            if not lock_acquired:
-                g_logger.warning(f"Failed to acquire fetch lock for {url}, skipping...")
-                return build_feed_result([], url, status=503)
-
-            browser, context = SharedPlaywrightBrowser.get_browser_context(config.needs_tor, user_agent)
-            if not browser or not context:
-                g_logger.error(f"Failed to get browser context for {url}")
-                return build_feed_result([], url, status=503)
-
-            try:
-                page = context.new_page()
-                page.goto(url, timeout=PLAYWRIGHT_TIMEOUT)
-                # Server sees this GET request immediately - timing detection happens here
-
-                if base_domain == "reddit.com":
-                    pass
-                else:
-                    try:
-                        # Use random timeout to avoid predictable patterns
-                        random_timeout = random.uniform(15, 25)
-                        page.wait_for_selector(config.post_container, timeout=int(random_timeout * 1000))
-                    except PlaywrightTimeoutError as wait_error:
-                        g_logger.warning(f"Timeout waiting for elements on {url}: {wait_error}")
-                        # Continue anyway, might still find some content
-
-                posts = page.locator(config.post_container).all()
-                if not posts:
-                    snippet = page.content()[:500]
-                    g_logger.info(f"No posts found for {url}. Page source snippet: {snippet}")
-                    status = 204  # No content
-                else:
-                    for post in posts:
-                        try:
-                            entry_data = extract_post_data(post, config, url, use_playwright=True)
-                            if entry_data:
-                                # Handle both single entry and list of entries
-                                if isinstance(entry_data, list):
-                                    entries.extend(entry_data)
-                                else:
-                                    entries.append(entry_data)
-                        except Exception as e:
-                            g_logger.error(f"Error extracting post data: {e}")
-                            continue
-
-                page.close()
-
-            except Exception as e:
-                g_logger.error(f"Error on {url}: {e}")
-                status = 500
-
-        finally:
-            # Always release the fetch lock, even if an error occurs
-            if lock_acquired:
-                SharedPlaywrightBrowser.release_fetch_lock()
-    else:
-        # Handle user agent for requests
-        request_headers = {}
-        if config.use_random_user_agent:
-            request_headers['User-Agent'] = g_cs.get("REDDIT_USER_AGENT")
-        else:
-            request_headers['User-Agent'] = user_agent
-
-        try:
-            # Add proxy headers if proxying is enabled
-            if WORKER_PROXYING and PROXY_SERVER:
-                request_headers['X-Forwarded-For'] = PROXY_SERVER.split(':')[0]
-                if PROXY_USERNAME and PROXY_PASSWORD:
-                    import base64
-                    auth_string = f"{PROXY_USERNAME}:{PROXY_PASSWORD}"
-                    auth_bytes = auth_string.encode('ascii')
-                    auth_b64 = base64.b64encode(auth_bytes).decode('ascii')
-                    request_headers['Proxy-Authorization'] = f'Basic {auth_b64}'
-
-            response = requests.get(url, timeout=NETWORK_TIMEOUT, headers=request_headers)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            posts = soup.select(config.post_container)
-
-            # Extract post data with consolidated error handling
-            for post in posts:
-                try:
-                    entry = extract_post_data(post, config, url, use_playwright=False)
-                    if entry:
-                        entries.append(entry)
-                except Exception as e:
-                    g_logger.error(f"Error extracting post data: {e}")
-
-        except requests.exceptions.RequestException as e:
-            g_logger.error(f"Request error for {base_domain}: {e}")
-            status = 500
-        except AttributeError as e:
-            g_logger.error(f"Error fetching {base_domain} with requests: {e}")
-            status = 500
-
-    g_logger.info(f"Fetched {len(entries)} entries from {url}")
-    return build_feed_result(entries, url, status)
+    # Import here to avoid circular imports
+    from browser_fetch import fetch_site_posts as unified_fetch_site_posts
+    return unified_fetch_site_posts(url, user_agent)
