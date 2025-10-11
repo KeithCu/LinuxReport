@@ -52,6 +52,110 @@ BROWSER_TIMEOUT = 30  # 30 seconds for browser operations (page load, script exe
 BROWSER_WAIT_TIMEOUT = 25  # 25 seconds for waiting for elements
 
 # =============================================================================
+# SHARED BROWSER MANAGEMENT
+# =============================================================================
+
+class SharedBrowserManager:
+    """
+    Base class for managing browser instances with common patterns.
+    
+    Provides shared functionality for both Selenium and Playwright browser management,
+    including lock management, instance validation, and cleanup operations.
+    """
+    
+    _instances = {}  # Will be overridden by subclasses
+    _lock = threading.Lock()
+    _fetch_lock = threading.Lock()
+    
+    def __init__(self, use_tor, user_agent):
+        """
+        Initialize a new browser manager instance.
+        
+        Args:
+            use_tor (bool): Whether to use Tor proxy
+            user_agent (str): User agent string for the browser
+        """
+        self.use_tor = use_tor
+        self.user_agent = user_agent
+        self.last_used = time.time()
+    
+    @classmethod
+    def acquire_fetch_lock(cls):
+        """
+        Acquire the fetch lock to synchronize fetch operations.
+        
+        Ensures only one fetch operation can run at a time to prevent
+        resource conflicts and rate limiting issues.
+        
+        Returns:
+            bool: True if lock was acquired successfully
+        """
+        try:
+            return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)
+        except Exception as e:
+            g_logger.error(f"Error acquiring fetch lock: {e}")
+            return False
+    
+    @classmethod
+    def release_fetch_lock(cls):
+        """
+        Release the fetch lock after fetch operation is complete.
+        
+        Safely releases the fetch lock, handling cases where the lock
+        may not have been acquired.
+        """
+        try:
+            cls._fetch_lock.release()
+        except RuntimeError:
+            # Lock was not acquired, ignore
+            pass
+    
+    @classmethod
+    def force_cleanup(cls):
+        """
+        Force shutdown and cleanup of all browser instances.
+        """
+        g_logger.info("Forcing browser cleanup...")
+        with cls._lock:
+            cls._cleanup_all_instances()
+            g_logger.info("Force cleanup completed")
+    
+    @classmethod
+    def _cleanup_all_instances(cls):
+        """
+        Clean up all browser instances safely.
+        Must be implemented by subclasses.
+        """
+        raise NotImplementedError("Subclasses must implement _cleanup_all_instances")
+    
+    @classmethod
+    def _is_instance_valid(cls, instance, use_tor, user_agent):
+        """
+        Check if the current browser instance is valid for the given configuration.
+        
+        Args:
+            instance: Browser instance to validate
+            use_tor (bool): Required Tor configuration
+            user_agent (str): Required user agent string
+            
+        Returns:
+            bool: True if current instance matches configuration
+        """
+        try:
+            # Only reuse if config matches
+            if not (instance and
+                    instance.use_tor == use_tor and
+                    instance.user_agent == user_agent):
+                return False
+            
+            # Check if instance is still responsive
+            return instance.is_valid()
+            
+        except Exception as e:
+            g_logger.error(f"Error during instance validation: {e}")
+            return False
+
+# =============================================================================
 # UNIFIED BROWSER INTERFACE
 # =============================================================================
 
@@ -243,6 +347,304 @@ class PlaywrightBrowserWrapper(BrowserInterface):
             return False
 
 # =============================================================================
+# UNIFIED BROWSER CREATION
+# =============================================================================
+
+def get_common_browser_args(use_tor, user_agent):
+    """
+    Get common browser arguments for both Selenium and Playwright.
+    
+    Args:
+        use_tor (bool): Whether to use Tor proxy
+        user_agent (str): User agent string
+        
+    Returns:
+        dict: Common browser configuration arguments
+    """
+    return {
+        'anti_detection': [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-extensions",
+            "--disable-plugins",
+            "--disable-images",  # Speed up loading
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--disable-features=TranslateUI",
+            "--disable-ipc-flooding-protection",
+            "--memory-pressure-off",
+            "--max-old-space-size=4096",  # Limit memory usage
+            "--window-size=1920,1080",  # Consistent window size
+        ],
+        'performance': [
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+        ],
+        'proxy': get_proxy_config(use_tor),
+        'user_agent': user_agent,
+        'viewport': {"width": 1920, "height": 1080},
+        'locale': "en-US",
+        'timezone_id': "America/New_York",
+        'geolocation': None,
+        'permissions': [],
+    }
+
+def get_proxy_config(use_tor):
+    """
+    Get proxy configuration for browser.
+    
+    Args:
+        use_tor (bool): Whether to use Tor proxy
+        
+    Returns:
+        dict or None: Proxy configuration
+    """
+    if use_tor:
+        return {"server": "socks5://127.0.0.1:9050"}
+    return None
+
+def get_common_context_options(use_tor, user_agent):
+    """
+    Get common context options for Playwright.
+    
+    Args:
+        use_tor (bool): Whether to use Tor proxy
+        user_agent (str): User agent string
+        
+    Returns:
+        dict: Common context options
+    """
+    args = get_common_browser_args(use_tor, user_agent)
+    
+    return {
+        "user_agent": args['user_agent'],
+        "viewport": args['viewport'],
+        "ignore_https_errors": True,
+        "java_script_enabled": True,
+        "locale": args['locale'],
+        "timezone_id": args['timezone_id'],
+        "geolocation": args['geolocation'],
+        "permissions": args['permissions'],
+        "proxy": args['proxy'],
+    }
+
+def get_common_chrome_options(use_tor, user_agent):
+    """
+    Get common Chrome options for Selenium.
+    
+    Args:
+        use_tor (bool): Whether to use Tor proxy
+        user_agent (str): User agent string
+        
+    Returns:
+        list: Chrome arguments
+    """
+    args = get_common_browser_args(use_tor, user_agent)
+    
+    chrome_args = [
+        "--headless",
+        f"--user-agent={args['user_agent']}",
+    ]
+    
+    # Add all anti-detection and performance arguments
+    chrome_args.extend(args['anti_detection'])
+    chrome_args.extend(args['performance'])
+    
+    # Add proxy if needed
+    if args['proxy']:
+        chrome_args.append(f"--proxy-server={args['proxy']['server']}")
+    
+    return chrome_args
+
+# =============================================================================
+# UNIFIED ELEMENT EXTRACTION
+# =============================================================================
+
+class ElementExtractor:
+    """
+    Unified element extraction interface for different browser engines.
+    
+    Provides a consistent API for finding elements, getting attributes,
+    and extracting text content regardless of the underlying browser engine.
+    """
+    
+    def find_element(self, parent, selector):
+        """
+        Find a single element matching the selector.
+        
+        Args:
+            parent: Parent element to search within
+            selector (str): CSS selector to find
+            
+        Returns:
+            Element or None: Found element or None if not found
+        """
+        raise NotImplementedError("Subclasses must implement find_element")
+    
+    def find_elements(self, parent, selector):
+        """
+        Find all elements matching the selector.
+        
+        Args:
+            parent: Parent element to search within
+            selector (str): CSS selector to find
+            
+        Returns:
+            list: List of found elements
+        """
+        raise NotImplementedError("Subclasses must implement find_elements")
+    
+    def get_attribute(self, element, attr):
+        """
+        Get an attribute value from an element.
+        
+        Args:
+            element: Element to get attribute from
+            attr (str): Attribute name
+            
+        Returns:
+            str or None: Attribute value or None if not found
+        """
+        raise NotImplementedError("Subclasses must implement get_attribute")
+    
+    def get_text(self, element):
+        """
+        Get text content from an element.
+        
+        Args:
+            element: Element to get text from
+            
+        Returns:
+            str: Text content
+        """
+        raise NotImplementedError("Subclasses must implement get_text")
+    
+    def log_debugging_info(self, element, context):
+        """
+        Log debugging information for failed element extraction.
+        
+        Args:
+            element: The element being processed
+            context (str): Context for the debugging info
+        """
+        try:
+            # Show what text content is available for debugging
+            all_text = self.get_text(element)
+            all_text = all_text[:200] + "..." if len(all_text) > 200 else all_text
+            g_logger.info(f"Available text content for {context}: {all_text}")
+
+            # Show available links for debugging
+            try:
+                links = self.find_elements(element, 'a')
+                links_info = []
+                for link in links[:3]:
+                    href = self.get_attribute(link, 'href')
+                    links_info.append(href or 'NO_HREF')
+                g_logger.info(f"Available links for {context}: {links_info}")
+            except Exception as link_error:
+                g_logger.debug(f"Error getting link info for {context}: {link_error}")
+        except Exception as debug_e:
+            g_logger.debug(f"Error during debug output for {context}: {debug_e}")
+
+class SeleniumElementExtractor(ElementExtractor):
+    """Selenium-specific element extractor implementation."""
+    
+    def find_element(self, parent, selector):
+        """Find element using Selenium."""
+        try:
+            from selenium.webdriver.common.by import By
+            return parent.find_element(By.CSS_SELECTOR, selector)
+        except Exception:
+            return None
+    
+    def find_elements(self, parent, selector):
+        """Find elements using Selenium."""
+        try:
+            from selenium.webdriver.common.by import By
+            return parent.find_elements(By.CSS_SELECTOR, selector)
+        except Exception:
+            return []
+    
+    def get_attribute(self, element, attr):
+        """Get attribute using Selenium."""
+        try:
+            return element.get_attribute(attr)
+        except Exception:
+            return None
+    
+    def get_text(self, element):
+        """Get text using Selenium."""
+        try:
+            return element.text
+        except Exception:
+            return ""
+
+class PlaywrightElementExtractor(ElementExtractor):
+    """Playwright-specific element extractor implementation."""
+    
+    def find_element(self, parent, selector):
+        """Find element using Playwright."""
+        try:
+            return parent.locator(selector).first
+        except Exception:
+            return None
+    
+    def find_elements(self, parent, selector):
+        """Find elements using Playwright."""
+        try:
+            return parent.locator(selector).all()
+        except Exception:
+            return []
+    
+    def get_attribute(self, element, attr):
+        """Get attribute using Playwright."""
+        try:
+            return element.get_attribute(attr)
+        except Exception:
+            return None
+    
+    def get_text(self, element):
+        """Get text using Playwright."""
+        try:
+            return element.text_content()
+        except Exception:
+            return ""
+
+class BeautifulSoupElementExtractor(ElementExtractor):
+    """BeautifulSoup-specific element extractor implementation."""
+    
+    def find_element(self, parent, selector):
+        """Find element using BeautifulSoup."""
+        try:
+            return parent.select_one(selector)
+        except Exception:
+            return None
+    
+    def find_elements(self, parent, selector):
+        """Find elements using BeautifulSoup."""
+        try:
+            return parent.select(selector)
+        except Exception:
+            return []
+    
+    def get_attribute(self, element, attr):
+        """Get attribute using BeautifulSoup."""
+        try:
+            if attr == "text":
+                return element.get_text().strip()
+            return element.get(attr)
+        except Exception:
+            return None
+    
+    def get_text(self, element):
+        """Get text using BeautifulSoup."""
+        try:
+            return element.get_text().strip()
+        except Exception:
+            return ""
+
+# =============================================================================
 # SHARED UTILITY FUNCTIONS
 # =============================================================================
 
@@ -307,6 +709,478 @@ def get_site_config(url):
 
     return config, base_domain
 
+# =============================================================================
+# CENTRALIZED SITE CONFIGURATION MANAGEMENT
+# =============================================================================
+
+class SiteConfigManager:
+    """
+    Centralized site configuration management.
+    
+    Provides a single place to manage all site-specific configurations,
+    including special cases and custom configurations.
+    """
+    
+    @staticmethod
+    def get_keithcu_rss_config():
+        """
+        Get configuration for keithcu.com RSS feed.
+        
+        Returns:
+            FetchConfig: Configuration for keithcu.com RSS feed
+        """
+        return FetchConfig(
+            needs_selenium=True,  # Using browser for testing purposes
+            needs_tor=False,
+            post_container="pre",  # RSS feeds in browser are wrapped in <pre> tags
+            title_selector="title",
+            link_selector="link",
+            link_attr="text",  # RSS links are text content, not href attributes
+            filter_pattern="",
+            use_random_user_agent=False,
+            published_selector=None
+        )
+    
+    @staticmethod
+    def get_enhanced_site_config(url):
+        """
+        Get enhanced site configuration with better caching and special cases.
+        
+        Args:
+            url (str): URL to get configuration for
+            
+        Returns:
+            tuple: (config, base_domain) where config is site-specific configuration or None
+        """
+        base_domain = extract_base_domain(url)
+        parsed = urlparse(url)
+
+        # Always try base domain first, then fallback to netloc (for legacy configs)
+        config = CUSTOM_FETCH_CONFIG.get(base_domain)
+        if not config:
+            config = CUSTOM_FETCH_CONFIG.get(parsed.netloc)
+
+        # Special case for keithcu.com RSS feed
+        if not config and "keithcu.com" in base_domain:
+            config = SiteConfigManager.get_keithcu_rss_config()
+
+        return config, base_domain
+    
+    @staticmethod
+    def validate_config(config):
+        """
+        Validate a site configuration.
+        
+        Args:
+            config: Configuration to validate
+            
+        Returns:
+            bool: True if configuration is valid
+        """
+        if not config:
+            return False
+        
+        required_fields = ['post_container', 'title_selector', 'link_selector']
+        for field in required_fields:
+            if not hasattr(config, field) or not getattr(config, field):
+                g_logger.warning(f"Configuration missing required field: {field}")
+                return False
+        
+        return True
+
+# =============================================================================
+# UNIFIED ERROR HANDLING
+# =============================================================================
+
+class BrowserErrorHandler:
+    """
+    Centralized error handling for browser operations.
+    
+    Provides consistent error handling, logging, and recovery strategies
+    across all browser automation operations.
+    """
+    
+    @staticmethod
+    def handle_navigation_error(e, url):
+        """
+        Handle navigation errors with consistent logging and recovery.
+        
+        Args:
+            e (Exception): The navigation error
+            url (str): URL that failed to navigate to
+            
+        Returns:
+            tuple: (status_code, error_message)
+        """
+        error_msg = f"Navigation error for {url}: {e}"
+        g_logger.error(error_msg)
+        
+        # Determine appropriate status code based on error type
+        if "timeout" in str(e).lower():
+            return 408, "Navigation timeout"
+        elif "connection" in str(e).lower():
+            return 503, "Connection error"
+        elif "not found" in str(e).lower():
+            return 404, "Page not found"
+        else:
+            return 500, "Navigation failed"
+    
+    @staticmethod
+    def handle_element_error(e, context):
+        """
+        Handle element extraction errors with consistent logging.
+        
+        Args:
+            e (Exception): The element extraction error
+            context (str): Context where the error occurred
+            
+        Returns:
+            str: Error message for logging
+        """
+        error_msg = f"Element extraction error in {context}: {e}"
+        g_logger.error(error_msg)
+        return error_msg
+    
+    @staticmethod
+    def handle_timeout_error(e, operation):
+        """
+        Handle timeout errors with consistent logging.
+        
+        Args:
+            e (Exception): The timeout error
+            operation (str): Operation that timed out
+            
+        Returns:
+            str: Error message for logging
+        """
+        error_msg = f"Timeout during {operation}: {e}"
+        g_logger.warning(error_msg)
+        return error_msg
+    
+    @staticmethod
+    def handle_request_error(e, url):
+        """
+        Handle HTTP request errors with consistent logging.
+        
+        Args:
+            e (Exception): The request error
+            url (str): URL that failed
+            
+        Returns:
+            tuple: (status_code, error_message)
+        """
+        error_msg = f"Request error for {url}: {e}"
+        g_logger.error(error_msg)
+        
+        # Determine appropriate status code based on error type
+        if hasattr(e, 'response') and e.response is not None:
+            return e.response.status_code, f"HTTP {e.response.status_code}"
+        elif "timeout" in str(e).lower():
+            return 408, "Request timeout"
+        elif "connection" in str(e).lower():
+            return 503, "Connection error"
+        else:
+            return 500, "Request failed"
+    
+    @staticmethod
+    def log_operation_result(operation, url, success, details=None):
+        """
+        Log operation results consistently.
+        
+        Args:
+            operation (str): Operation performed
+            url (str): URL operated on
+            success (bool): Whether operation succeeded
+            details (str, optional): Additional details
+        """
+        status = "SUCCESS" if success else "FAILED"
+        message = f"{operation} {status} for {url}"
+        if details:
+            message += f": {details}"
+        
+        if success:
+            g_logger.info(message)
+        else:
+            g_logger.error(message)
+
+# =============================================================================
+# CENTRALIZED CLEANUP MANAGEMENT
+# =============================================================================
+
+class BrowserCleanupManager:
+    """
+    Centralized cleanup management for all browser instances.
+    
+    Provides unified cleanup handling for both Selenium and Playwright browsers,
+    including signal handling and graceful shutdown procedures.
+    """
+    
+    _cleanup_registered = False
+    
+    @classmethod
+    def register_cleanup_handlers(cls):
+        """
+        Register cleanup handlers for graceful shutdown.
+        
+        This method should be called once during application initialization.
+        """
+        if cls._cleanup_registered:
+            return
+        
+        try:
+            # Register atexit handler for normal program termination
+            atexit.register(cls._atexit_handler)
+            g_logger.debug("Registered atexit cleanup handler")
+            
+            # Note: Signal handlers are commented out since code runs under Apache/mod_wsgi
+            # mod_wsgi already handles SIGTERM and SIGINT, so registration is ignored
+            # signal.signal(signal.SIGTERM, cls._signal_handler)
+            # signal.signal(signal.SIGINT, cls._signal_handler)
+            
+            cls._cleanup_registered = True
+            g_logger.info("Browser cleanup handlers registered successfully")
+            
+        except Exception as e:
+            g_logger.error(f"Error registering cleanup handlers: {e}")
+    
+    @classmethod
+    def cleanup_all_browsers(cls):
+        """
+        Clean up all browser instances from both Selenium and Playwright.
+        
+        This method ensures all browser resources are properly released.
+        """
+        g_logger.info("Starting cleanup of all browser instances...")
+        
+        try:
+            # Clean up Selenium drivers
+            try:
+                import seleniumfetch
+                seleniumfetch.SharedSeleniumDriver.force_cleanup()
+                g_logger.debug("Selenium drivers cleaned up")
+            except (ImportError, AttributeError) as e:
+                g_logger.debug(f"Selenium cleanup skipped: {e}")
+            
+            # Clean up Playwright browsers
+            try:
+                import playwrightfetch
+                playwrightfetch.SharedPlaywrightBrowser.force_cleanup()
+                g_logger.debug("Playwright browsers cleaned up")
+            except (ImportError, AttributeError) as e:
+                g_logger.debug(f"Playwright cleanup skipped: {e}")
+            
+            g_logger.info("All browser instances cleaned up successfully")
+            
+        except Exception as e:
+            g_logger.error(f"Error during browser cleanup: {e}")
+    
+    @classmethod
+    def _atexit_handler(cls):
+        """
+        Atexit handler for cleanup on normal program termination.
+        """
+        g_logger.info("Program exiting, cleaning up all browsers...")
+        cls.cleanup_all_browsers()
+    
+    @classmethod
+    def _signal_handler(cls, signum, frame):
+        """
+        Signal handler for graceful shutdown.
+        """
+        g_logger.info(f"Received signal {signum}, cleaning up browsers...")
+        cls.cleanup_all_browsers()
+        sys.exit(0)
+
+# =============================================================================
+# COMMON UTILITY FUNCTIONS
+# =============================================================================
+
+class BrowserUtils:
+    """
+    Common browser utility functions.
+    
+    Provides shared utility functions that are useful across different
+    browser engines and operations.
+    """
+    
+    @staticmethod
+    def parse_relative_time(time_text):
+        """
+        Parse relative time strings like "14 minutes ago", "2 hours ago", etc.
+        
+        Args:
+            time_text (str): Relative time string to parse
+            
+        Returns:
+            tuple: (published_parsed, published) where published_parsed is time.struct_time
+                   and published is formatted string, or (None, None) if parsing fails
+        """
+        import re
+        from datetime import datetime, timedelta
+        
+        try:
+            # Convert to lowercase for easier matching
+            time_text = time_text.lower().strip()
+            
+            # Patterns for different time units
+            patterns = [
+                (r'(\d+)\s+minutes?\s+ago', 'minutes'),
+                (r'(\d+)\s+hours?\s+ago', 'hours'),
+                (r'(\d+)\s+days?\s+ago', 'days'),
+                (r'(\d+)\s+weeks?\s+ago', 'weeks'),
+                (r'(\d+)\s+months?\s+ago', 'months'),
+                (r'(\d+)\s+years?\s+ago', 'years'),
+            ]
+            
+            for pattern, unit in patterns:
+                match = re.search(pattern, time_text)
+                if match:
+                    value = int(match.group(1))
+                    
+                    # Calculate the actual time
+                    now = datetime.now()
+                    
+                    if unit == 'minutes':
+                        delta = timedelta(minutes=value)
+                    elif unit == 'hours':
+                        delta = timedelta(hours=value)
+                    elif unit == 'days':
+                        delta = timedelta(days=value)
+                    elif unit == 'weeks':
+                        delta = timedelta(weeks=value)
+                    elif unit == 'months':
+                        # Approximate months as 30 days
+                        delta = timedelta(days=value * 30)
+                    elif unit == 'years':
+                        # Approximate years as 365 days
+                        delta = timedelta(days=value * 365)
+                    
+                    published_time = now - delta
+                    published_parsed = published_time.timetuple()
+                    published = published_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
+                    
+                    return published_parsed, published
+            
+            # If no pattern matches, return None
+            return None, None
+            
+        except (ValueError, AttributeError) as e:
+            g_logger.error(f"Error parsing relative time '{time_text}': {e}")
+            return None, None
+    
+    @staticmethod
+    def validate_browser_config(config):
+        """
+        Validate browser configuration for completeness and correctness.
+        
+        Args:
+            config: Browser configuration to validate
+            
+        Returns:
+            bool: True if configuration is valid
+        """
+        if not config:
+            g_logger.warning("Browser configuration is None")
+            return False
+        
+        # Check required fields
+        required_fields = ['needs_selenium', 'needs_tor', 'post_container', 'title_selector', 'link_selector']
+        for field in required_fields:
+            if not hasattr(config, field):
+                g_logger.warning(f"Browser configuration missing required field: {field}")
+                return False
+        
+        # Validate selectors are not empty
+        if not config.post_container or not config.title_selector or not config.link_selector:
+            g_logger.warning("Browser configuration has empty selectors")
+            return False
+        
+        return True
+    
+    @staticmethod
+    def format_debug_info(element, context, extractor=None):
+        """
+        Format debugging information for element extraction failures.
+        
+        Args:
+            element: The element being processed
+            context (str): Context for the debugging info
+            extractor (ElementExtractor, optional): Element extractor to use
+        """
+        try:
+            if extractor:
+                # Use provided extractor
+                all_text = extractor.get_text(element)
+                all_text = all_text[:200] + "..." if len(all_text) > 200 else all_text
+                g_logger.info(f"Available text content for {context}: {all_text}")
+                
+                # Show available links
+                try:
+                    links = extractor.find_elements(element, 'a')
+                    links_info = []
+                    for link in links[:3]:
+                        href = extractor.get_attribute(link, 'href')
+                        links_info.append(href or 'NO_HREF')
+                    g_logger.info(f"Available links for {context}: {links_info}")
+                except Exception as link_error:
+                    g_logger.debug(f"Error getting link info for {context}: {link_error}")
+            else:
+                # Fallback to basic debugging
+                g_logger.info(f"Element debugging for {context}: element type = {type(element)}")
+                
+        except Exception as debug_e:
+            g_logger.debug(f"Error during debug output for {context}: {debug_e}")
+    
+    @staticmethod
+    def get_random_timeout(min_time=15, max_time=None):
+        """
+        Get a random timeout value to avoid predictable patterns.
+        
+        Args:
+            min_time (float): Minimum timeout in seconds
+            max_time (float, optional): Maximum timeout in seconds
+            
+        Returns:
+            float: Random timeout value
+        """
+        if max_time is None:
+            max_time = BROWSER_WAIT_TIMEOUT
+        
+        return random.uniform(min_time, max_time)
+    
+    @staticmethod
+    def sanitize_url(url):
+        """
+        Sanitize URL for safe logging and processing.
+        
+        Args:
+            url (str): URL to sanitize
+            
+        Returns:
+            str: Sanitized URL
+        """
+        try:
+            parsed = urlparse(url)
+            # Remove sensitive query parameters
+            if parsed.query:
+                # Keep only safe query parameters
+                safe_params = []
+                for param in parsed.query.split('&'):
+                    if param and not any(sensitive in param.lower() for sensitive in ['password', 'token', 'key', 'secret']):
+                        safe_params.append(param)
+                safe_query = '&'.join(safe_params) if safe_params else ''
+            else:
+                safe_query = ''
+            
+            # Reconstruct URL
+            if safe_query:
+                return f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{safe_query}"
+            else:
+                return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                
+        except Exception as e:
+            g_logger.debug(f"Error sanitizing URL: {e}")
+            return url[:100] + "..." if len(url) > 100 else url
 
 def build_feed_result(entries, url, status=200, etag="", modified=None):
     """
@@ -1037,6 +1911,26 @@ __all__ = [
     'BrowserInterface',
     'SeleniumBrowserWrapper',
     'PlaywrightBrowserWrapper',
+    # Shared browser management
+    'SharedBrowserManager',
+    # Unified browser creation
+    'get_common_browser_args',
+    'get_proxy_config',
+    'get_common_context_options',
+    'get_common_chrome_options',
+    # Unified element extraction
+    'ElementExtractor',
+    'SeleniumElementExtractor',
+    'PlaywrightElementExtractor',
+    'BeautifulSoupElementExtractor',
+    # Centralized configuration management
+    'SiteConfigManager',
+    # Unified error handling
+    'BrowserErrorHandler',
+    # Centralized cleanup management
+    'BrowserCleanupManager',
+    # Common utility functions
+    'BrowserUtils',
     # Shared constants
     'NETWORK_TIMEOUT',
     'FETCH_LOCK_TIMEOUT',

@@ -15,16 +15,10 @@ import threading
 import atexit
 import signal
 import sys
-from datetime import datetime, timezone
-from urllib.parse import urljoin, urlparse
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
-import random
-import re
-import requests
-from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
@@ -40,24 +34,15 @@ try:
 except ImportError:
     psutil = None
 
-
 # =============================================================================
 # LOCAL IMPORTS
 # =============================================================================
-from shared import g_cs, CUSTOM_FETCH_CONFIG, g_logger, WORKER_PROXYING, PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
+from shared import g_logger
 from browser_fetch import (
-    NETWORK_TIMEOUT, FETCH_LOCK_TIMEOUT, BROWSER_TIMEOUT, BROWSER_WAIT_TIMEOUT,
-    extract_base_domain, get_site_config, build_feed_result, clean_patriots_title, create_post_entry,
-    extract_rss_data, safe_find_element, extract_title, extract_link, extract_post_data as shared_extract_post_data
+    BROWSER_TIMEOUT, BROWSER_WAIT_TIMEOUT,
+    SharedBrowserManager, get_common_chrome_options, BrowserErrorHandler,
+    SeleniumElementExtractor, BrowserUtils
 )
-
-# =============================================================================
-# FEATURE FLAGS
-# =============================================================================
-
-# Global flag to enable/disable date extraction feature
-# Set to True to enable date extraction, False to disable
-ENABLE_DATE_EXTRACTION = False
 
 # =============================================================================
 # TIMEOUT CONSTANTS
@@ -66,38 +51,8 @@ ENABLE_DATE_EXTRACTION = False
 # Driver lifecycle timeout - for resource management
 DRIVER_RECYCLE_TIMEOUT = 300  # 5 minutes - timeout for driver recycling
 
-# Note: WEBDRIVER_TIMEOUT and BROWSER_WAIT_TIMEOUT are now imported from browser_fetch
+# Note: All other timeout constants are now imported from browser_fetch
 # to maintain consistency across all browser modules
-
-
-# =============================================================================
-# SPECIAL SITE CONFIGURATIONS
-# =============================================================================
-
-# Configuration for keithcu.com RSS feed
-from app_config import FetchConfig
-
-class KeithcuRssFetchConfig(FetchConfig):
-    """
-    Keithcu.com RSS-specific fetch configuration.
-    
-    Inherits from FetchConfig with Keithcu RSS-specific settings.
-    """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=True,  # Using Selenium for testing purposes
-            needs_tor=False,
-            post_container="pre",  # RSS feeds in browser are wrapped in <pre> tags
-            title_selector="title",
-            link_selector="link", 
-            link_attr="text",  # RSS links are text content, not href attributes
-            filter_pattern="",
-            use_random_user_agent=False,
-            published_selector=None
-        )
-
-KEITHCU_RSS_CONFIG = KeithcuRssFetchConfig()
 
 # =============================================================================
 # WEBDRIVER CONFIGURATION AND CREATION
@@ -105,10 +60,7 @@ KEITHCU_RSS_CONFIG = KeithcuRssFetchConfig()
 
 def create_driver(use_tor, user_agent):
     """
-    Create and configure a Chrome WebDriver instance.
-    
-    Sets up a headless Chrome browser with appropriate options for web scraping,
-    including proxy configuration for Tor if enabled and custom user agent.
+    Create and configure a Chrome WebDriver instance using shared browser creation logic.
     
     Args:
         use_tor (bool): Whether to use Tor proxy for connections
@@ -120,34 +72,16 @@ def create_driver(use_tor, user_agent):
     try:
         g_logger.info(f"Creating Chrome driver with Tor: {use_tor}, User-Agent: {user_agent[:50]}...")
 
+        # Use shared browser creation logic
+        chrome_args = get_common_chrome_options(use_tor, user_agent)
+        
         options = Options()
-        options.add_argument("--headless")
-        options.add_argument("--disable-gpu")
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
-        options.add_argument(f"--user-agent={user_agent}")
-        # Anti-detection measures (these ARE detectable via JS)
-        options.add_argument("--disable-blink-features=AutomationControlled")
+        for arg in chrome_args:
+            options.add_argument(arg)
+        
+        # Add Selenium-specific options
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         # NOTE: We DON'T disable useAutomationExtension as that would break Selenium!
-        # Use a consistent, common window size to avoid detection patterns
-        # Random window sizes can actually make detection easier as servers look for unusual patterns
-        # Full HD (1920x1080) is the most common desktop resolution and appears natural
-        options.add_argument("--window-size=1920,1080")
-        # Keep performance optimizations - server can't see these!
-        options.add_argument("--disable-extensions")
-        options.add_argument("--disable-plugins")
-        options.add_argument("--disable-images")
-        options.add_argument("--disable-background-timer-throttling")
-        options.add_argument("--disable-backgrounding-occluded-windows")
-        options.add_argument("--disable-renderer-backgrounding")
-        options.add_argument("--disable-features=TranslateUI")
-        options.add_argument("--disable-ipc-flooding-protection")
-        options.add_argument("--memory-pressure-off")
-        options.add_argument("--max_old_space_size=4096")  # Limit memory usage
-
-        if use_tor:
-            options.add_argument("--proxy-server=socks5://127.0.0.1:9050")
 
         g_logger.debug("Installing ChromeDriver...")
         service = Service(ChromeDriverManager(
@@ -159,8 +93,8 @@ def create_driver(use_tor, user_agent):
         g_logger.debug("Chrome WebDriver created successfully")
 
         # Set timeouts to prevent hanging
-        driver.set_page_load_timeout(BROWSER_TIMEOUT)  # 30 second page load timeout
-        driver.set_script_timeout(BROWSER_TIMEOUT)     # 30 second script timeout
+        driver.set_page_load_timeout(BROWSER_TIMEOUT)
+        driver.set_script_timeout(BROWSER_TIMEOUT)
 
         g_logger.info("Chrome driver setup completed successfully")
         return driver
@@ -176,16 +110,16 @@ def create_driver(use_tor, user_agent):
 # SHARED SELENIUM DRIVER MANAGEMENT
 # =============================================================================
 
-class SharedSeleniumDriver:
+class SharedSeleniumDriver(SharedBrowserManager):
     """
     Thread-safe singleton manager for Selenium WebDriver instances.
-
-    Provides simple singleton pattern with thread synchronization.
+    
+    Inherits from SharedBrowserManager to use shared lock management,
+    instance validation, and cleanup operations.
     """
 
     _instance = None
     _lock = threading.Lock()
-    _fetch_lock = threading.Lock()
 
     def __init__(self, use_tor, user_agent):
         """
@@ -195,12 +129,10 @@ class SharedSeleniumDriver:
             use_tor (bool): Whether to use Tor proxy
             user_agent (str): User agent string for the driver
         """
+        super().__init__(use_tor, user_agent)
         g_logger.debug(f"Initializing SharedSeleniumDriver with Tor: {use_tor}")
         try:
             self.driver = create_driver(use_tor, user_agent)
-            self.last_used = time.time()
-            self.use_tor = use_tor
-            self.user_agent = user_agent
             g_logger.debug("SharedSeleniumDriver initialized successfully")
         except Exception as e:
             g_logger.error(f"Error in SharedSeleniumDriver.__init__: {e}")
@@ -236,70 +168,22 @@ class SharedSeleniumDriver:
             cls._instance.last_used = time.time()
             return cls._instance.driver
 
-    @classmethod
-    def acquire_fetch_lock(cls):
+    def is_valid(self):
         """
-        Acquire the fetch lock to synchronize fetch operations.
-        
-        Ensures only one fetch operation can run at a time to prevent
-        resource conflicts and rate limiting issues.
+        Check if the Selenium driver is still valid and responsive.
         
         Returns:
-            bool: True if lock was acquired successfully
+            bool: True if driver is valid, False otherwise
         """
         try:
-            return cls._fetch_lock.acquire(timeout=FETCH_LOCK_TIMEOUT)  # 30 second timeout
-        except Exception as e:
-            g_logger.error(f"Error acquiring fetch lock: {e}")
-            return False
-
-    @classmethod
-    def release_fetch_lock(cls):
-        """
-        Release the fetch lock after fetch operation is complete.
-        
-        Safely releases the fetch lock, handling cases where the lock
-        may not have been acquired.
-        """
-        try:
-            cls._fetch_lock.release()
-        except RuntimeError:
-            # Lock was not acquired, ignore
-            pass
-
-    @classmethod
-    def _is_instance_valid(cls, instance, use_tor, user_agent):
-        """
-        Check if the current driver instance is valid for the given configuration.
-        
-        Args:
-            use_tor (bool): Required Tor configuration
-            user_agent (str): Required user agent string
-            
-        Returns:
-            bool: True if current instance matches configuration
-        """
-        try:
-            # Only reuse if config matches
-            if not (instance and
-                    instance.use_tor == use_tor and
-                    instance.user_agent == user_agent and
-                    hasattr(instance, 'driver')):
-                return False
-            
-            # Check if driver is still responsive with timeout protection
-            try:
+            if hasattr(self, 'driver') and self.driver:
                 # Use a simple command with timeout to test if driver is alive
-                instance.driver.execute_script("return document.readyState;")
+                self.driver.execute_script("return document.readyState;")
                 return True
-            except Exception as e:
-                g_logger.debug(f"Driver health check failed: {e}")
-                return False
-
-        except Exception as e:
-            g_logger.error(f"Error during driver validation: {e}")
             return False
-
+        except Exception as e:
+            g_logger.debug(f"Driver health check failed: {e}")
+            return False
 
     @classmethod
     def _cleanup_instance(cls):
@@ -335,16 +219,12 @@ class SharedSeleniumDriver:
                 cls._instance = None
                 g_logger.debug("Instance set to None")
 
-
     @classmethod
-    def force_cleanup(cls):
+    def _cleanup_all_instances(cls):
         """
-        Force shutdown and cleanup of the WebDriver instance.
+        Clean up all driver instances safely.
         """
-        g_logger.info("Forcing WebDriver cleanup...")
-        with cls._lock:
-            cls._cleanup_instance()
-            g_logger.info("Force cleanup completed")
+        cls._cleanup_instance()
 
 # =============================================================================
 # GLOBAL CLEANUP FUNCTION
@@ -360,188 +240,24 @@ def cleanup_selenium_drivers():
     g_logger.info("Cleaning up all Selenium drivers...")
     SharedSeleniumDriver.force_cleanup()
 
-
-def _signal_handler(signum, frame):
-    """
-    Signal handler for graceful shutdown.
-    """
-    g_logger.info(f"Received signal {signum}, cleaning up Selenium drivers...")
-    cleanup_selenium_drivers()
-    sys.exit(0)
-
-def _atexit_handler():
-    """
-    Atexit handler for cleanup on normal program termination.
-    """
-    g_logger.info("Program exiting, cleaning up Selenium drivers...")
-    cleanup_selenium_drivers()
-
-# Register cleanup handlers
-atexit.register(_atexit_handler)
-# Signal handlers commented out since code always runs under Apache/mod_wsgi
-# mod_wsgi already handles SIGTERM and SIGINT, so registration is ignored
-# signal.signal(signal.SIGTERM, _signal_handler)
-# signal.signal(signal.SIGINT, _signal_handler)
-
 # =============================================================================
 # SELENIUM-SPECIFIC UTILITY FUNCTIONS
 # =============================================================================
 
-def _selenium_find_element(post, selector):
-    """Selenium-specific element finder."""
-    return post.find_element(By.CSS_SELECTOR, selector)
-
-def _selenium_get_attribute(element, attr):
-    """Selenium-specific attribute getter."""
-    return element.get_attribute(attr)
-
-def _selenium_get_text(element):
-    """Selenium-specific text getter."""
-    return element.text
-
-# =============================================================================
-# COMPATIBILITY AND UTILITY CLASSES
-# =============================================================================
-
-class FeedParserDict(dict):
-    """
-    Mimic feedparser's FeedParserDict for compatibility.
-    
-    Provides attribute-style access to dictionary keys to maintain
-    compatibility with feedparser's data structure expectations.
-    """
-    
-    def __getattr__(self, key):
-        """
-        Get dictionary value using attribute syntax.
-        
-        Args:
-            key (str): Dictionary key to access
-            
-        Returns:
-            The value associated with the key
-            
-        Raises:
-            AttributeError: If the key doesn't exist
-        """
-        if key in self:
-            return self[key]
-        raise AttributeError(f"No attribute '{key}'")
-
-# =============================================================================
-# CONTENT EXTRACTION FUNCTIONS
-# =============================================================================
-
-def parse_relative_time(time_text):
-    """
-    Parse relative time strings like "14 minutes ago", "2 hours ago", etc.
-    
-    Args:
-        time_text (str): Relative time string to parse
-        
-    Returns:
-        tuple: (published_parsed, published) where published_parsed is time.struct_time
-               and published is formatted string, or (None, None) if parsing fails
-    """
-    import re
-    from datetime import datetime, timedelta
-    
-    try:
-        # Convert to lowercase for easier matching
-        time_text = time_text.lower().strip()
-        
-        # Patterns for different time units
-        patterns = [
-            (r'(\d+)\s+minutes?\s+ago', 'minutes'),
-            (r'(\d+)\s+hours?\s+ago', 'hours'),
-            (r'(\d+)\s+days?\s+ago', 'days'),
-            (r'(\d+)\s+weeks?\s+ago', 'weeks'),
-            (r'(\d+)\s+months?\s+ago', 'months'),
-            (r'(\d+)\s+years?\s+ago', 'years'),
-        ]
-        
-        for pattern, unit in patterns:
-            match = re.search(pattern, time_text)
-            if match:
-                value = int(match.group(1))
-                
-                # Calculate the actual time
-                now = datetime.now()
-                
-                if unit == 'minutes':
-                    delta = timedelta(minutes=value)
-                elif unit == 'hours':
-                    delta = timedelta(hours=value)
-                elif unit == 'days':
-                    delta = timedelta(days=value)
-                elif unit == 'weeks':
-                    delta = timedelta(weeks=value)
-                elif unit == 'months':
-                    # Approximate months as 30 days
-                    delta = timedelta(days=value * 30)
-                elif unit == 'years':
-                    # Approximate years as 365 days
-                    delta = timedelta(days=value * 365)
-                
-                published_time = now - delta
-                published_parsed = published_time.timetuple()
-                published = published_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
-                
-                return published_parsed, published
-        
-        # If no pattern matches, return None
-        return None, None
-        
-    except (ValueError, AttributeError) as e:
-        g_logger.error(f"Error parsing relative time '{time_text}': {e}")
-        return None, None
-
-
-# =============================================================================
-# SELENIUM-SPECIFIC EXTRACTION WRAPPERS
-# =============================================================================
-
 def extract_post_data_selenium(post, config, url, use_selenium):
     """
-    Selenium-specific wrapper for extract_post_data.
+    Selenium-specific wrapper for extract_post_data using shared element extractor.
     """
+    # Import here to avoid circular imports
+    from browser_fetch import extract_post_data as shared_extract_post_data
+    
+    extractor = SeleniumElementExtractor()
     return shared_extract_post_data(
         post, config, url, use_selenium,
-        get_text_func=_selenium_get_text,
-        find_func=_selenium_find_element,
-        get_attr_func=_selenium_get_attribute
+        get_text_func=extractor.get_text,
+        find_func=extractor.find_element,
+        get_attr_func=extractor.get_attribute
     )
-
-def _log_debugging_info(post, use_selenium, context):
-    """
-    Log debugging information for failed element extraction.
-
-    Args:
-        post: The post element being processed
-        use_selenium (bool): Whether using Selenium or BeautifulSoup
-        context (str): Context for the debugging info (e.g., "title", "link")
-    """
-    try:
-        # Show what text content is available for debugging
-        if use_selenium:
-            all_text = post.text[:200] + "..." if len(post.text) > 200 else post.text
-        else:
-            all_text = post.get_text()[:200] + "..." if len(post.get_text()) > 200 else post.get_text()
-        g_logger.info(f"Available text content for {context}: {all_text}")
-
-        # Show available links and classes for debugging
-        try:
-            all_links = post.find_all('a') if not use_selenium else post.find_elements(By.TAG_NAME, "a")
-            links_info = [a.get('href', 'NO_HREF') for a in all_links[:3]]
-            g_logger.info(f"Available links for {context}: {links_info}")
-
-            if not use_selenium:
-                g_logger.info(f"Available classes for {context}: {post.get('class', [])}")
-        except (WebDriverException, AttributeError) as link_error:
-            g_logger.debug(f"Error getting link info for {context}: {link_error}")
-    except (WebDriverException, AttributeError) as debug_e:
-        g_logger.debug(f"Error during debug output for {context}: {debug_e}")
-
 
 def extract_post_data(post, config, url, use_selenium):
     """
@@ -564,6 +280,7 @@ def extract_post_data(post, config, url, use_selenium):
         return extract_post_data_selenium(post, config, url, use_selenium)
     else:
         # BeautifulSoup fallback - use shared function directly
+        from browser_fetch import extract_post_data as shared_extract_post_data
         return shared_extract_post_data(
             post, config, url, use_selenium,
             get_text_func=None,
