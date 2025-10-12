@@ -170,6 +170,26 @@ class LLMModelManager:
         g_c.put(self.failed_models_cache_key, failed_models_data, timeout=self.cache_duration)
         logger.info(f"Marked model as failed: {model}")
     
+    def clear_failed_models(self):
+        """Clear all failed models from cache by marking them as successful."""
+        try:
+            failed_models_data = g_c.get(self.failed_models_cache_key) or {}
+            if not failed_models_data:
+                logger.info("No failed models found in cache")
+                return False
+            
+            # Mark each failed model as successful to remove it from the failed list
+            cleared_count = 0
+            for model in list(failed_models_data.keys()):
+                self.mark_success(model)
+                cleared_count += 1
+            
+            logger.info(f"Cleared {cleared_count} failed models from cache by marking them as successful")
+            return True
+        except Exception as e:
+            logger.error(f"Error clearing failed models cache: {e}")
+            return False
+    
     def mark_success(self, model, forced_model=None):
         """Mark a model as successful and update cache."""
         if model not in FREE_MODELS:

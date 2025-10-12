@@ -721,6 +721,7 @@ def parse_arguments():
     parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
     parser.add_argument('--force-model', type=str, help='Force the use of a specific model (overrides random/cached selection)')
+    parser.add_argument('--clear-failed-models', action='store_true', help='Clear the list of failed models from cache')
     
     args = parser.parse_args()
     logger.info("Command line arguments parsed")
@@ -793,6 +794,15 @@ def configure_global_settings(args):
 if __name__ == "__main__":
     args = parse_arguments()
     
+    # Handle clear failed models case early
+    if args.clear_failed_models:
+        logger.info("Clearing failed models from cache...")
+        success = model_manager.clear_failed_models()
+        if success:
+            logger.info("Failed models cache cleared successfully")
+        else:
+            logger.info("No failed models to clear")
+        sys.exit(0)
     
     # Detect mode and load settings
     selected_mode_str, loaded_settings_module, loaded_settings_config = detect_mode()
