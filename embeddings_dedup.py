@@ -13,6 +13,7 @@ import os
 import re
 import warnings
 import math
+import logging
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -32,7 +33,7 @@ logger = g_logger
 # =============================================================================
 
 EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
-THRESHOLD = 0.75  # Similarity threshold for deduplication
+THRESHOLD = 0.65  # Similarity threshold for deduplication (lowered for AI-generated titles)
 
 # =============================================================================
 # GLOBAL VARIABLES AND CACHING
@@ -170,11 +171,13 @@ def get_best_matching_article(target_title, articles):
 
     # Keep the verbose logging for debugging when no match found
     if best_score < THRESHOLD:
-        logger.debug(f"No match found above threshold {THRESHOLD}. Scores:")
+        logger.warning(f"No match found above threshold {THRESHOLD} for title: '{target_title}'")
+        logger.warning(f"Best score was {best_score:.3f}")
+        logger.info("All available headlines and their similarity scores:")
         for article in articles:
             article_emb = get_embedding(article["title"])
             score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
-            logger.debug(f"Score for '{article['title']}': {score}")
+            logger.info(f"  {score:.3f} - '{article['title']}'")
 
     return best_match if best_score >= THRESHOLD else None
 
