@@ -482,20 +482,22 @@ def _prepare_articles_for_ai(articles):
     previous_selections = g_c.get("previously_selected_selections_2") or []
     previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
     previous_urls = [sel["url"] for sel in previous_selections]
+    logger.info(f"Found {len(previous_selections)} previous selections to exclude")
 
     # Filter by URL to avoid duplicates
-    articles = [article for article in articles if article["url"] not in previous_urls]
+    articles_after_url_filter = [article for article in articles if article["url"] not in previous_urls]
+    logger.info(f"After URL filtering: {len(articles)} -> {len(articles_after_url_filter)} articles")
 
     # Apply embedding-based deduplication
-    filtered_articles = deduplicate_articles_with_exclusions(articles, previous_embeddings)
+    filtered_articles = deduplicate_articles_with_exclusions(articles_after_url_filter, previous_embeddings)
+    logger.info(f"After embedding deduplication: {len(articles_after_url_filter)} -> {len(filtered_articles)} articles")
 
     # Filter by title length (10-200 characters)
     filtered_articles = [
         article for article in filtered_articles
         if len(article['title']) >= 10 and len(article['title']) <= 200 and not article['title'].startswith(('http://', 'https://', 'www.'))
     ]
-
-    logger.info(f"Filtered articles: {len(articles)} -> {len(filtered_articles)} articles")
+    logger.info(f"After title length filtering: {len(filtered_articles)} articles")
 
     if not filtered_articles:
         logger.warning("No new articles available after all filtering.")
