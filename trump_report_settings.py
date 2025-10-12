@@ -12,13 +12,13 @@ class PatriotsWinFetchConfig(FetchConfig):
             cls,
             needs_selenium=True,
             needs_tor=False,
-            post_container=".post-item",
-            title_selector=".post-item",  # Extract text content from post items
-            link_selector=".sc-1bet0vd-0.flLuNk",  # Links are on div elements
+            post_container="a[href^='/p/']",  # Post links start with /p/
+            title_selector="a[href^='/p/']",  # Title is the text content of post links
+            link_selector="a[href^='/p/']",   # Post links
             link_attr="href",
             filter_pattern="",
             use_random_user_agent=False,
-            published_selector=".//span[contains(text(), 'posted')]/following-sibling::span[1]"
+            published_selector="span:contains('ago')"  # Time elements contain "ago"
         )
 
 

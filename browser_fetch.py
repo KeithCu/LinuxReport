@@ -1244,12 +1244,22 @@ def clean_patriots_title(title):
     title = re.sub(r'\s*\d+\s+comments?\s+.*', '', title, flags=re.IGNORECASE)
 
     # Remove action buttons and user tags - remove known patterns from end
+    # Legacy patterns (keep for backward compatibility)
     title = re.sub(r'\s+PRO\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
     title = re.sub(r'\s+share\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
     title = re.sub(r'\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
     title = re.sub(r'\s+TRUMP\s+TRUTH\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
     title = re.sub(r'\s+TRUMP\s+TRUTH\s*$', '', title, flags=re.IGNORECASE)  # Remove TRUMP TRUTH tags
     title = re.sub(r'\s+PRO\s*$', '', title, flags=re.IGNORECASE)
+    
+    # Current patterns (2025 structure)
+    title = re.sub(r'\s+award\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+share\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+download\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+report\s+block\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+award\s+share\s+download\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+award\s+share\s*$', '', title, flags=re.IGNORECASE)
+    title = re.sub(r'\s+award\s*$', '', title, flags=re.IGNORECASE)
 
     # Remove any remaining trailing punctuation and whitespace
     title = re.sub(r'[.\s]+$', '', title).strip()
@@ -1398,11 +1408,11 @@ def extract_title(post, config, url, use_browser, get_text_func=None, get_attr_f
         # Fallbacks for anchors or elements with empty visible text
         if not title:
             try:
-                if use_browser and get_attr_func:
-                    title = get_attr_func(post, 'title') or get_attr_func(post, 'innerText') or ''
-                else:
+                if not use_browser:
                     # For BeautifulSoup, get_attribute might not work the same way
                     title = post.get('title', '') or post.get_text() or ''
+                elif use_browser and get_attr_func:
+                    title = get_attr_func(post, 'title') or get_attr_func(post, 'innerText') or ''
                 title = (title or '').strip()
             except Exception:
                 pass
@@ -1434,10 +1444,26 @@ def extract_link(post, config, url, use_browser, find_func=None, get_attr_func=N
     Returns:
         str: Extracted link, or None if extraction fails
     """
-    link = safe_find_element(post, config.link_selector, use_browser, config.link_attr, find_func=find_func, get_attr_func=get_attr_func, get_text_func=get_text_func)
-    if not link:
-        g_logger.info(f"No link element found with selector '{config.link_selector}'")
-        return None
+    # Special case: if link_selector equals post_container, the post element itself is the link
+    if config.link_selector == config.post_container:
+        g_logger.info(f"Using special case link extraction for {url}: link_selector='{config.link_selector}' == post_container='{config.post_container}'")
+        if not use_browser:
+            # For BeautifulSoup, get the attribute directly
+            link = post.get(config.link_attr)
+        elif use_browser and get_attr_func:
+            link = get_attr_func(post, config.link_attr)
+        else:
+            # Fallback for browser without get_attr_func
+            g_logger.warning(f"No get_attr_func available for browser extraction")
+            return None
+        if not link:
+            g_logger.info(f"No link attribute '{config.link_attr}' found on post element")
+            return None
+    else:
+        link = safe_find_element(post, config.link_selector, use_browser, config.link_attr, find_func=find_func, get_attr_func=get_attr_func, get_text_func=get_text_func)
+        if not link:
+            g_logger.info(f"No link element found with selector '{config.link_selector}'")
+            return None
 
     # Resolve relative URLs
     if link and link.startswith('/'):
@@ -1634,10 +1660,38 @@ def _extract_post_data_browser(post, config, url, browser_instance):
     Returns:
         dict or list: Extracted post data
     """
-    # This will be implemented by the specific browser modules
-    # For now, delegate to the existing extract_post_data function
-    # The browser modules will provide the appropriate get_text_func, find_func, get_attr_func
-    return extract_post_data(post, config, url, use_browser=True)
+    # Create browser-specific extractor based on the browser instance type
+    if hasattr(browser_instance, 'driver'):  # Selenium
+        from selenium.webdriver.common.by import By
+        def get_text_func(element):
+            return element.text
+        def find_func(parent, selector):
+            try:
+                return parent.find_element(By.CSS_SELECTOR, selector)
+            except:
+                return None
+        def get_attr_func(element, attr):
+            return element.get_attribute(attr)
+    elif hasattr(browser_instance, 'page'):  # Playwright
+        def get_text_func(element):
+            return element.text_content()
+        def find_func(parent, selector):
+            try:
+                return parent.locator(selector).first
+            except:
+                return None
+        def get_attr_func(element, attr):
+            return element.get_attribute(attr)
+    else:
+        # Fallback - no browser-specific functions
+        get_text_func = None
+        find_func = None
+        get_attr_func = None
+    
+    return extract_post_data(post, config, url, use_browser=True, 
+                           get_text_func=get_text_func, 
+                           find_func=find_func, 
+                           get_attr_func=get_attr_func)
 
 # =============================================================================
 # BROWSER ENGINE SELECTION
