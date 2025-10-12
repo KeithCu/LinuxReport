@@ -60,7 +60,7 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_TITLE="AI Report | Latest AI News",
 	REPORT_PROMPT="AI and robotics for both programmers / researchers and less technical people curious about the biggest news in AI / robots. Nothing about AI security.",
     PATH="/srv/http/aireport",
-    SCHEDULE=[7, 11, 15, 19, 23],
+    SCHEDULE=[7, 13, 19],
     CUSTOM_FETCH_CONFIG={
         "reddit.com": RedditFetchConfig(),
         "venturebeat.com": VentureBeatFetchConfig()

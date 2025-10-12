@@ -480,6 +480,12 @@ def _prepare_articles_for_ai(articles):
 
     # Get previous selections for deduplication
     previous_selections = g_c.get("previously_selected_selections_2") or []
+    
+    # Filter out old selections to keep only the most recent ones
+    if len(previous_selections) > MAX_PREVIOUS_HEADLINES:
+        previous_selections = previous_selections[-MAX_PREVIOUS_HEADLINES:]
+        logger.info(f"Trimmed previous selections to {len(previous_selections)} entries (max: {MAX_PREVIOUS_HEADLINES})")
+    
     previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
     previous_urls = [sel["url"] for sel in previous_selections]
     logger.info(f"Found {len(previous_selections)} previous selections to exclude")
