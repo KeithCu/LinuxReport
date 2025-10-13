@@ -1446,7 +1446,7 @@ def extract_link(post, config, url, use_browser, find_func=None, get_attr_func=N
     """
     # Special case: if link_selector equals post_container, the post element itself is the link
     if config.link_selector == config.post_container:
-        g_logger.info(f"Using special case link extraction for {url}: link_selector='{config.link_selector}' == post_container='{config.post_container}'")
+        g_logger.debug(f"Using special case link extraction for {url}: link_selector='{config.link_selector}' == post_container='{config.post_container}'")
         if not use_browser:
             # For BeautifulSoup, get the attribute directly
             link = post.get(config.link_attr)
