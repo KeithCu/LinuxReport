@@ -171,20 +171,18 @@ class LLMModelManager:
         logger.info(f"Marked model as failed: {model}")
     
     def clear_failed_models(self):
-        """Clear all failed models from cache by marking them as successful."""
+        """Clear all failed models from cache."""
         try:
             failed_models_data = g_c.get(self.failed_models_cache_key) or {}
             if not failed_models_data:
                 logger.info("No failed models found in cache")
                 return False
             
-            # Mark each failed model as successful to remove it from the failed list
-            cleared_count = 0
-            for model in list(failed_models_data.keys()):
-                self.mark_success(model)
-                cleared_count += 1
+            # Actually delete the failed models from cache
+            g_c.delete(self.failed_models_cache_key)
+            cleared_count = len(failed_models_data)
             
-            logger.info(f"Cleared {cleared_count} failed models from cache by marking them as successful")
+            logger.info(f"Cleared {cleared_count} failed models from cache")
             return True
         except Exception as e:
             logger.error(f"Error clearing failed models cache: {e}")
