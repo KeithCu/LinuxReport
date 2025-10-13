@@ -1846,7 +1846,29 @@ def fetch_site_posts(url, user_agent):
                 return build_feed_result([], url, status=503)
                 
             entries, status = _fetch_with_browser(url, config, user_agent, browser_instance)
+            
+            # Force cleanup after browser fetch to prevent zombie processes
+            if config.needs_selenium:
+                g_logger.info(f"Browser fetch completed for {url}, forcing Selenium cleanup")
+                try:
+                    import seleniumfetch
+                    seleniumfetch.SharedSeleniumDriver.force_cleanup_after_request()
+                    g_logger.info(f"Selenium cleanup completed for {url}")
+                except Exception as cleanup_error:
+                    g_logger.error(f"Error during Selenium cleanup for {url}: {cleanup_error}")
                 
+        except Exception as e:
+            g_logger.error(f"Error during browser fetch for {url}: {e}")
+            # Force cleanup on error as well
+            if config.needs_selenium:
+                g_logger.info(f"Browser fetch error for {url}, forcing Selenium cleanup")
+                try:
+                    import seleniumfetch
+                    seleniumfetch.SharedSeleniumDriver.force_cleanup_after_request()
+                    g_logger.info(f"Selenium cleanup after error completed for {url}")
+                except Exception as cleanup_error:
+                    g_logger.error(f"Error during Selenium cleanup after error for {url}: {cleanup_error}")
+            raise
         finally:
             # Always release the fetch lock, even if an error occurs
             if lock_acquired:

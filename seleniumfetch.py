@@ -472,11 +472,14 @@ def fetch_site_posts(url, user_agent):
     try:
         # Import here to avoid circular imports
         from browser_fetch import fetch_site_posts as unified_fetch_site_posts
+        g_logger.info(f"Calling unified fetch_site_posts for URL: {url}")
         result = unified_fetch_site_posts(url, user_agent)
+        g_logger.info(f"Unified fetch_site_posts completed for URL: {url}")
         
         # Force cleanup after each request to prevent zombie processes
         g_logger.info(f"Selenium fetch completed for URL: {url}, forcing cleanup")
         SharedSeleniumDriver.force_cleanup_after_request()
+        g_logger.info(f"Cleanup completed for URL: {url}")
         
         return result
         
@@ -484,7 +487,9 @@ def fetch_site_posts(url, user_agent):
         g_logger.error(f"Error during Selenium fetch for {url}: {e}")
         # Ensure cleanup even on error
         try:
+            g_logger.info(f"Attempting cleanup after error for URL: {url}")
             SharedSeleniumDriver.force_cleanup_after_request()
+            g_logger.info(f"Cleanup after error completed for URL: {url}")
         except Exception as cleanup_error:
             g_logger.error(f"Error during cleanup after fetch error: {cleanup_error}")
         
