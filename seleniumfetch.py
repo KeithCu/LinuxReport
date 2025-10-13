@@ -15,6 +15,7 @@ import threading
 import atexit
 import signal
 import sys
+import logging
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -43,6 +44,15 @@ from browser_fetch import (
     SharedBrowserManager, get_common_chrome_options, BrowserErrorHandler,
     SeleniumElementExtractor, BrowserUtils
 )
+
+# =============================================================================
+# SELENIUM LOGGING CONFIGURATION
+# =============================================================================
+
+# Disable Selenium's verbose HTTP logging to reduce log noise
+logging.getLogger('selenium').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('selenium.webdriver.remote.remote_connection').setLevel(logging.WARNING)
 
 # =============================================================================
 # TIMEOUT CONSTANTS
