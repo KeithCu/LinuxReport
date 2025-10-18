@@ -33,7 +33,7 @@ logger = g_logger
 # =============================================================================
 
 EMBEDDER_MODEL_NAME = 'all-MiniLM-L6-v2'
-THRESHOLD = 0.65  # Similarity threshold for deduplication (lowered for AI-generated titles)
+THRESHOLD = 0.75  # Similarity threshold for deduplication (lowered for AI-generated titles)
 
 # =============================================================================
 # GLOBAL VARIABLES AND CACHING

@@ -136,7 +136,11 @@ PATH: str = os.path.dirname(os.path.abspath(__file__))
 
 # Shared path for weather, etc.
 storage_config = get_storage_config()
-SPATH: str = storage_config['shared_path']
+# Use test-friendly path when running tests
+if 'pytest' in sys.modules or 'test' in sys.argv[0]:
+    SPATH: str = os.path.join(PATH, 'test_cache')
+else:
+    SPATH: str = storage_config['shared_path']
 TZ = FeedHistory.FeedConfig.TZ
 
 # =============================================================================
