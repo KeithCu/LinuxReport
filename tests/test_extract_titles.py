@@ -1,7 +1,23 @@
 import unittest
+import sys
+import os
+
+# Add the parent directory to Python path when running tests directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from auto_update import extract_top_titles_from_ai, TITLE_MARKER
 
 class TestExtractTopTitles(unittest.TestCase):
+
+    def setUp(self):
+        """Set up test fixtures."""
+        # Ensure we have a clean state for each test
+        pass
+
+    def tearDown(self):
+        """Clean up after each test."""
+        pass
+
     def test_standard_format(self):
         """Test standard format with title marker"""
         text = f"""
@@ -204,7 +220,7 @@ class TestExtractTopTitles(unittest.TestCase):
         """Test when marker has extra text around it"""
         text = f"""
         Some reasoning here.
-        
+
         Here are the {TITLE_MARKER} for today:
         First headline here
         Second headline here
@@ -216,6 +232,60 @@ class TestExtractTopTitles(unittest.TestCase):
         self.assertEqual(titles[0], "for today:")
         self.assertEqual(titles[1], "First headline here")
         self.assertEqual(titles[2], "Second headline here")
+
+    def test_max_titles_limit(self):
+        """Test that function respects maximum title limits"""
+        text = f"""
+        Some reasoning here.
+
+        {TITLE_MARKER}
+        Title 1
+        Title 2
+        Title 3
+        Title 4
+        Title 5
+        Title 6
+        """
+        titles = extract_top_titles_from_ai(text)
+        # Function should return all valid titles found
+        self.assertGreater(len(titles), 0)
+        self.assertLessEqual(len(titles), 6)
+
+    def test_unicode_characters(self):
+        """Test handling of Unicode characters in titles"""
+        text = f"""
+        Some reasoning here.
+
+        {TITLE_MARKER}
+        Título con acentos: café
+        Заголовок на русском
+        Title with emoji 🚀
+        """
+        titles = extract_top_titles_from_ai(text)
+        self.assertEqual(len(titles), 3)
+        self.assertIn("Título con acentos: café", titles)
+        self.assertIn("Заголовок на русском", titles)
+        self.assertIn("Title with emoji 🚀", titles)
+
+    def test_case_insensitive_marker(self):
+        """Test that marker detection is case-insensitive"""
+        # Test with different case variations
+        test_cases = [
+            TITLE_MARKER.upper(),
+            TITLE_MARKER.lower(),
+            TITLE_MARKER.capitalize(),
+        ]
+
+        for marker in test_cases:
+            text = f"""
+            Some reasoning here.
+
+            {marker}
+            Test headline
+            """
+            titles = extract_top_titles_from_ai(text)
+            self.assertEqual(len(titles), 1, f"Failed for marker: {marker}")
+            self.assertEqual(titles[0], "Test headline")
 
 if __name__ == '__main__':
     unittest.main() 

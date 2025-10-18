@@ -5,6 +5,12 @@ Tests for Flask-WTF form validation and CSRF protection.
 """
 
 import pytest
+import sys
+import os
+
+# Add the parent directory to Python path when running tests directly
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from flask import Flask
 from flask_wtf.csrf import CSRFProtect
 from forms import LoginForm, ConfigForm, CustomRSSForm, UrlForm
@@ -27,16 +33,26 @@ def client(app):
     return app.test_client()
 
 
-def test_login_form_validation():
+@pytest.fixture
+def csrf_disabled_app():
+    """Create a test Flask app with CSRF protection disabled for form testing."""
+    app = Flask(__name__)
+    app.config['SECRET_KEY'] = 'test-secret-key'
+    app.config['WTF_CSRF_ENABLED'] = False
+    return app
+
+
+def test_login_form_validation(csrf_disabled_app):
     """Test LoginForm validation."""
-    # Test valid form
-    form = LoginForm()
-    form.username.data = 'admin'
-    form.password.data = 'password123'
-    assert form.validate() is True
-    
-    # Test invalid form (empty username)
-    form = LoginForm()
+    with csrf_disabled_app.app_context():
+        # Test valid form
+        form = LoginForm()
+        form.username.data = 'admin'
+        form.password.data = 'password123'
+        assert form.validate() is True
+
+        # Test invalid form (empty username)
+        form = LoginForm()
     form.username.data = ''
     form.password.data = 'password123'
     assert form.validate() is False
@@ -50,16 +66,17 @@ def test_login_form_validation():
     assert 'Password is required' in str(form.password.errors)
 
 
-def test_custom_rss_form_validation():
+def test_custom_rss_form_validation(csrf_disabled_app):
     """Test CustomRSSForm validation."""
-    # Test valid form
-    form = CustomRSSForm()
-    form.url.data = 'https://example.com/feed.xml'
-    form.pri.data = 10
-    assert form.validate() is True
-    
-    # Test invalid URL
-    form = CustomRSSForm()
+    with csrf_disabled_app.app_context():
+        # Test valid form
+        form = CustomRSSForm()
+        form.url.data = 'https://example.com/feed.xml'
+        form.pri.data = 10
+        assert form.validate() is True
+
+        # Test invalid URL
+        form = CustomRSSForm()
     form.url.data = 'not-a-url'
     form.pri.data = 10
     assert form.validate() is False
@@ -73,16 +90,17 @@ def test_custom_rss_form_validation():
     assert 'URL must be between 10 and 120 characters' in str(form.url.errors)
 
 
-def test_config_form_validation():
+def test_config_form_validation(csrf_disabled_app):
     """Test ConfigForm validation."""
-    # Test valid form
-    form = ConfigForm()
-    form.headlines.data = '<h1>Test Headlines</h1>'
-    form.no_underlines.data = True
-    assert form.validate() is True
-    
-    # Test headlines too long
-    form = ConfigForm()
+    with csrf_disabled_app.app_context():
+        # Test valid form
+        form = ConfigForm()
+        form.headlines.data = '<h1>Test Headlines</h1>'
+        form.no_underlines.data = True
+        assert form.validate() is True
+
+        # Test headlines too long
+        form = ConfigForm()
     form.headlines.data = 'x' * 50001  # Over 50,000 character limit
     form.no_underlines.data = True
     assert form.validate() is False
@@ -98,10 +116,69 @@ def test_csrf_protection_enabled(app):
         assert form.csrf_token is not None
 
 
-def test_form_field_rendering():
+def test_form_field_rendering(csrf_disabled_app):
     """Test that form fields render properly."""
-    form = LoginForm()
+    with csrf_disabled_app.app_context():
+        form = LoginForm()
     # Test that fields have proper attributes
     assert form.username.label.text == 'Username'
     assert form.password.label.text == 'Password'
-    assert form.remember_me.label.text == 'Remember Me' 
+    assert form.remember_me.label.text == 'Remember Me'
+
+
+def test_url_form_validation(csrf_disabled_app):
+    """Test UrlForm validation."""
+    with csrf_disabled_app.app_context():
+        # Test valid form
+        form = UrlForm()
+        form.url.data = 'https://example.com'
+        assert form.validate() is True
+
+        # Test invalid URL
+        form = UrlForm()
+    form.url.data = 'not-a-url'
+    assert form.validate() is False
+    assert 'Please enter a valid URL' in str(form.url.errors)
+
+
+def test_form_data_persistence(csrf_disabled_app):
+    """Test that form data persists correctly."""
+    with csrf_disabled_app.app_context():
+        form = LoginForm()
+    form.username.data = 'testuser'
+    form.password.data = 'testpass'
+    form.remember_me.data = True
+
+    assert form.username.data == 'testuser'
+    assert form.password.data == 'testpass'
+    assert form.remember_me.data is True
+
+
+def test_config_form_boolean_fields(csrf_disabled_app):
+    """Test ConfigForm boolean field handling."""
+    with csrf_disabled_app.app_context():
+        form = ConfigForm()
+    form.headlines.data = '<h1>Test</h1>'
+    form.no_underlines.data = True
+    assert form.validate() is True
+
+    form.no_underlines.data = False
+    assert form.validate() is True
+
+    # Test with None (should work)
+    form.no_underlines.data = None
+    assert form.validate() is True
+
+
+def test_form_error_messages(csrf_disabled_app):
+    """Test that error messages are properly formatted."""
+    with csrf_disabled_app.app_context():
+        form = LoginForm()
+    form.username.data = ''  # Invalid
+    form.password.data = 'pass'
+    form.validate()
+
+    # Check that error messages exist and are strings
+    assert len(form.username.errors) > 0
+    assert isinstance(form.username.errors[0], str)
+    assert len(form.username.errors[0]) > 0

@@ -204,7 +204,7 @@ def run_all_tests():
     print("=" * 80)
     print("BROWSER SWITCHING FUNCTIONALITY TEST SUITE")
     print("=" * 80)
-    
+
     tests = [
         test_browser_engine_detection,
         test_fetch_functionality,
@@ -213,23 +213,35 @@ def run_all_tests():
         test_cleanup_functionality,
         test_engine_switching,
     ]
-    
+
     passed = 0
     total = len(tests)
-    
+    failed_tests = []
+
     for test in tests:
         try:
-            if test():
+            result = test()
+            if result:
                 passed += 1
+                print(f"PASS: {test.__name__}")
+            else:
+                failed_tests.append(test.__name__)
+                print(f"FAIL: {test.__name__}")
         except Exception as e:
+            failed_tests.append(test.__name__)
             print(f"FAIL: Test {test.__name__} crashed: {e}")
-    
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+
     print("\n" + "=" * 80)
     print("TEST RESULTS SUMMARY")
     print("=" * 80)
     print(f"Tests passed: {passed}/{total}")
     print(f"Success rate: {(passed/total)*100:.1f}%")
-    
+
+    if failed_tests:
+        print(f"Failed tests: {', '.join(failed_tests)}")
+
     if passed == total:
         print("SUCCESS: ALL TESTS PASSED! Browser switching functionality is working correctly.")
         return True
