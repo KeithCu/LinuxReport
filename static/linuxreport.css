@@ -592,7 +592,7 @@ img {
    ============================================================================= */
 
 .main-logo {
-  max-height: 250px;
+  max-height: 300px;
   display: block;
   margin: var(--spacing-sm) auto;
 }
