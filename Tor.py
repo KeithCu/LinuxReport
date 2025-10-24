@@ -60,12 +60,13 @@ tor_fetch_lock = threading.Lock()
 # TOR NETWORK OPERATIONS
 # =============================================================================
 
-def fetch_via_curl(url):
+def fetch_via_curl(url, user_agent):
     """
     Fetch Reddit RSS feeds using curl subprocess through Tor SOCKS proxy.
 
     Args:
         url (str): The URL to fetch via Tor network
+        user_agent (str): User agent string for the request
 
     Returns:
         feedparser.FeedParserDict or None: Parsed RSS feed data or None if failed
@@ -80,7 +81,7 @@ def fetch_via_curl(url):
         cmd = [
             "curl", "-s",
             "--socks5-hostname", "127.0.0.1:9050",
-            "-A", g_cs.get("REDDIT_USER_AGENT"),
+            "-A", user_agent,
             "-H", "Accept: */*",
         ]
         
@@ -204,6 +205,7 @@ def fetch_via_tor(url, site_url):
     This function attempts to fetch content using the last successful method first,
     then falls back to alternative methods. If all attempts fail, it renews the
     Tor IP address and retries. Supports both curl and selenium methods.
+    User agent management is handled internally with smart rotation on failures.
 
     Args:
         url (str): The RSS feed URL to fetch
@@ -214,6 +216,10 @@ def fetch_via_tor(url, site_url):
     """
     g_logger.info(f"=== FETCH_VIA_TOR START ===")
     g_logger.info(f"Function called with URL: {url}, site_url: {site_url}")
+
+    # Get current user agent from cache
+    user_agent = g_cs.get("REDDIT_USER_AGENT")
+    g_logger.info(f"Using user agent: {user_agent[:50]}...")
 
     try:
         last_success_method = g_cs.get("REDDIT_LAST_METHOD")
@@ -239,9 +245,9 @@ def fetch_via_tor(url, site_url):
             
             # Try default method
             if default_method == "curl":
-                result_default = fetch_via_curl(url)
+                result_default = fetch_via_curl(url, user_agent)
             else:
-                result_default = fetch_site_posts(site_url, None)
+                result_default = fetch_site_posts(site_url, user_agent)
                 
             if result_default is not None and len(result_default.get("entries", [])) > 0:
                 g_cs.put("REDDIT_METHOD", default_method, EXPIRE_YEARS)
@@ -251,9 +257,9 @@ def fetch_via_tor(url, site_url):
             # Try alternative method
             alternative_method = "selenium" if default_method == "curl" else "curl"
             if alternative_method == "curl":
-                result_alternative = fetch_via_curl(url)
+                result_alternative = fetch_via_curl(url, user_agent)
             else:
-                result_alternative = fetch_site_posts(site_url, None)
+                result_alternative = fetch_site_posts(site_url, user_agent)
                 
             if result_alternative is not None and len(result_alternative.get("entries", [])) > 0:
                 g_cs.put("REDDIT_METHOD", alternative_method, EXPIRE_YEARS)
@@ -262,6 +268,8 @@ def fetch_via_tor(url, site_url):
             
             g_logger.info(f"Attempt {attempt + 1} failed, renewing TOR and trying again...")
             renew_tor_ip()
+            # Update user_agent to use the newly generated one
+            user_agent = g_cs.get("REDDIT_USER_AGENT")
 
         if result is None:
             g_logger.error("All TOR methods failed, returning empty result")
