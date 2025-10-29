@@ -36,7 +36,8 @@ from shared import (
     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML, 
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
-    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION
+    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION,
+    FLASK_DASHBOARD
 )
 from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
@@ -238,12 +239,24 @@ def _register_authentication_routes(flask_app):
     @flask_app.route('/admin/dashboard')
     @login_required
     def admin_dashboard():
-        """Admin dashboard with comprehensive statistics."""
+        """
+        Admin dashboard with comprehensive statistics.
+        
+        This custom dashboard complements Flask-MonitoringDashboard (if enabled) by providing
+        application-specific metrics:
+        - Feed health monitoring (last fetch times, status)
+        - LLM model performance tracking
+        - Custom application statistics
+        
+        Flask-MonitoringDashboard (if enabled) provides endpoint-level performance monitoring
+        at /dashboard.
+        """
         stats = get_comprehensive_admin_stats()
         return render_template('admin_dashboard.html', 
                              stats=stats,
                              title=f'{WEB_TITLE} - Admin Dashboard',
-                             favicon=FAVICON)
+                             favicon=FAVICON,
+                             flask_dashboard_enabled=FLASK_DASHBOARD)
 
 # =============================================================================
 # MAIN APPLICATION ROUTES

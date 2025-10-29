@@ -194,6 +194,10 @@ def setup_monitoring_dashboard(app):
     """
     Set up Flask-MonitoringDashboard if enabled.
     
+    Flask-MonitoringDashboard provides automatic endpoint monitoring, performance metrics,
+    and error tracking. Our custom dashboard (/admin/dashboard) complements this with
+    application-specific metrics like feed health and LLM model performance.
+    
     Args:
         app (Flask): Flask application instance
     """
@@ -214,9 +218,11 @@ def setup_monitoring_dashboard(app):
         # Initialize with custom configuration
         dashboard.bind(app, config)
         g_logger.info("Flask-MonitoringDashboard initialized successfully")
+        g_logger.info("Access Flask-MonitoringDashboard at /dashboard")
+        g_logger.info("Access custom admin dashboard at /admin/dashboard")
         
     except ImportError:
-        g_logger.warning("Flask-MonitoringDashboard not available")
+        g_logger.warning("Flask-MonitoringDashboard not available - install with: pip install flask-monitoringdashboard")
     except (AttributeError, TypeError) as e:
         g_logger.warning(f"Failed to initialize Flask-MonitoringDashboard: {e}")
 

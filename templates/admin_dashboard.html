@@ -183,6 +183,12 @@
         <div class="dashboard-header">
             <a href="{{ url_for('index') }}" class="back-link">← Back to Home</a>
             <h1>Admin Dashboard</h1>
+            {% if flask_dashboard_enabled %}
+            <p style="color: var(--muted, #666); margin-top: 0.5em;">
+                <a href="/dashboard" style="color: var(--link, #1a0dab);">Flask-MonitoringDashboard</a> (endpoint monitoring) | 
+                This dashboard (application metrics)
+            </p>
+            {% endif %}
             <p style="color: var(--muted, #666); margin-top: 0.5em;">Last updated: {{ stats.timestamp }}</p>
         </div>
         
