@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search - {{ title }}</title>
+    <link rel="icon" type="image/png" href="{{ favicon }}">
+    <!-- Link external CSS using Flask-Assets -->
+    {% assets "css_all" %}
+    <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+    {% endassets %}
+    <style>
+        body {
+            background: var(--bg, #fff);
+            color: var(--text, #222);
+            margin: 0;
+            font-family: sans-serif;
+        }
+        .search-container {
+            max-width: 900px;
+            margin: 2em auto;
+            padding: 2em 1.5em;
+        }
+        .search-header {
+            text-align: center;
+            margin-bottom: 2em;
+        }
+        .search-form {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 2em;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .search-input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid var(--border, #ddd);
+            border-radius: 6px;
+            font-size: 16px;
+            background: var(--bg, #fff);
+            color: var(--text, #222);
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: var(--link, #1a0dab);
+        }
+        .search-btn {
+            padding: 12px 24px;
+            background: var(--link, #1a0dab);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .search-btn:hover {
+            background: var(--link-hover, #0d4dab);
+        }
+        .search-results-info {
+            margin-bottom: 1.5em;
+            color: var(--muted, #888);
+            font-size: 0.95em;
+        }
+        .search-result-item {
+            margin-bottom: 1.5em;
+            padding: 1em;
+            background: var(--btn-bg, #f6f6f6);
+            border-radius: 8px;
+            border-left: 3px solid var(--link, #1a0dab);
+        }
+        .search-result-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 0.5em;
+        }
+        .search-result-title a {
+            color: var(--link, #1a0dab);
+            text-decoration: none;
+        }
+        .search-result-title a:hover {
+            text-decoration: underline;
+        }
+        .search-result-description {
+            color: var(--muted, #666);
+            margin-bottom: 0.5em;
+            line-height: 1.5;
+        }
+        .search-result-meta {
+            font-size: 0.85em;
+            color: var(--muted, #888);
+        }
+        .search-result-source {
+            font-weight: 500;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1.5em;
+            color: var(--link, #1a0dab);
+            text-decoration: none;
+            font-size: 1em;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .no-results {
+            text-align: center;
+            padding: 3em 1em;
+            color: var(--muted, #888);
+        }
+        .no-results-icon {
+            font-size: 3em;
+            margin-bottom: 0.5em;
+        }
+    </style>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
+        var theme = match ? match[1] : 'light';
+        document.body.classList.add('theme-' + theme);
+        
+        // Focus search input on load
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) {
+          searchInput.focus();
+        }
+        
+        // Handle form submission
+        const searchForm = document.getElementById('search-form');
+        if (searchForm) {
+          searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const query = searchInput.value.trim();
+            if (query) {
+              window.location.href = '/search?q=' + encodeURIComponent(query);
+            }
+          });
+        }
+      });
+    </script>
+</head>
+<body>
+    <div class="search-container">
+        <div class="search-header">
+            <h1>Search Headlines</h1>
+            <a href="{{ url_for('index') }}" class="back-link">← Back to Home</a>
+        </div>
+        
+        <form id="search-form" class="search-form" method="GET" action="{{ url_for('search') }}">
+            <input 
+                type="text" 
+                id="search-input" 
+                name="q" 
+                class="search-input" 
+                placeholder="Search headlines..." 
+                value="{{ query }}"
+                autocomplete="off"
+            >
+            <button type="submit" class="search-btn">Search</button>
+        </form>
+        
+        {% if query %}
+        <div class="search-results-info">
+            {% if result_count > 0 %}
+                Found {{ result_count }} result{{ 's' if result_count != 1 else '' }} for "{{ query }}"
+            {% else %}
+                No results found for "{{ query }}"
+            {% endif %}
+        </div>
+        
+        {% if result_count > 0 %}
+            {% for result in results %}
+            <div class="search-result-item">
+                <div class="search-result-title">
+                    <a href="{{ result.link }}" target="_blank">{{ result.title }}</a>
+                </div>
+                {% if result.description %}
+                <div class="search-result-description">
+                    {{ result.description[:200] }}{% if result.description|length > 200 %}...{% endif %}
+                </div>
+                {% endif %}
+                <div class="search-result-meta">
+                    <span class="search-result-source">{{ result.source }}</span>
+                    {% if result.published %}
+                    <span> • {{ result.published[0] }}-{{ '%02d'|format(result.published[1]) }}-{{ '%02d'|format(result.published[2]) }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="no-results">
+                <div class="no-results-icon">🔍</div>
+                <p>No headlines found matching your search.</p>
+                <p>Try different keywords or check the spelling.</p>
+            </div>
+        {% endif %}
+        {% endif %}
+    </div>
+    
+    <!-- Link external JS using Flask-Assets -->
+    {% assets "js_all" %}
+    <script type="text/javascript" src="{{ ASSET_URL }}"></script>
+    {% endassets %}
+</body>
+</html>
+

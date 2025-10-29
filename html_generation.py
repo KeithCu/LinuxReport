@@ -28,7 +28,7 @@ from image_parser import custom_fetch_largest_image
 
 # Jinja2 template for rendering a single headline with an optional image.
 HEADLINE_TEMPLATE = Template("""
-<div class="linkclass">
+<div class="linkclass headline-with-feedback" data-headline-url="{{ url }}" data-headline-title="{{ title }}">
 <center>
 <a href="{{ url }}" target="_blank">
 <span class="main-headline">{{ title }}</span>
@@ -39,6 +39,11 @@ HEADLINE_TEMPLATE = Template("""
 <img src="{{ image_url }}" width="500" alt="headline: {{ title[:50] }}" loading="lazy" onerror="this.style.display='none'">
 </a>
 {% endif %}
+<div class="headline-feedback" style="margin-top: 8px; display: flex; gap: 8px; justify-content: center; align-items: center;">
+  <button class="feedback-btn feedback-up" data-feedback="up" title="Thumbs up" style="background: none; border: 1px solid var(--border, #ddd); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 14px;">👍</button>
+  <button class="feedback-btn feedback-down" data-feedback="down" title="Thumbs down" style="background: none; border: 1px solid var(--border, #ddd); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 14px;">👎</button>
+  <span class="feedback-count" style="font-size: 12px; color: var(--muted, #888); margin-left: 4px;"></span>
+</div>
 </center>
 </div>
 <br/>

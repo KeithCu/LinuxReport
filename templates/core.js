@@ -178,6 +178,128 @@
             });
             
             document.addEventListener('viewmodechange', () => this.reinitPagination());
+            
+            // Keyboard shortcut for search: press '/' to focus search input
+            document.addEventListener('keydown', (e) => {
+                // Only trigger if not typing in an input/textarea
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+                
+                // Press '/' to focus search
+                if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                    const searchInput = document.getElementById('main-search-input');
+                    if (searchInput) {
+                        e.preventDefault();
+                        searchInput.focus();
+                        searchInput.select();
+                    }
+                }
+            });
+            
+            // Initialize feedback buttons
+            this.initFeedbackButtons();
+        },
+        
+        initFeedbackButtons() {
+            // Load existing feedback counts for all headlines
+            this.loadFeedbackCounts();
+            
+            // Handle feedback button clicks using event delegation
+            document.addEventListener('click', async (e) => {
+                const feedbackBtn = e.target.closest('.feedback-btn');
+                if (!feedbackBtn) return;
+                
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const headlineContainer = feedbackBtn.closest('.headline-with-feedback');
+                if (!headlineContainer) return;
+                
+                const headlineUrl = headlineContainer.dataset.headlineUrl;
+                const headlineTitle = headlineContainer.dataset.headlineTitle;
+                const feedback = feedbackBtn.dataset.feedback;
+                
+                if (!headlineUrl || !headlineTitle || !feedback) return;
+                
+                // Disable button during request
+                feedbackBtn.disabled = true;
+                
+                try {
+                    const response = await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': window.csrf_token || ''
+                        },
+                        body: JSON.stringify({
+                            headline_url: headlineUrl,
+                            headline_title: headlineTitle,
+                            feedback: feedback
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        // Update feedback count display
+                        const feedbackCount = headlineContainer.querySelector('.feedback-count');
+                        if (feedbackCount && data.counts) {
+                            const up = data.counts.up || 0;
+                            const down = data.counts.down || 0;
+                            if (up > 0 || down > 0) {
+                                feedbackCount.textContent = `👍 ${up} 👎 ${down}`;
+                            } else {
+                                feedbackCount.textContent = '';
+                            }
+                        }
+                        // Visual feedback
+                        feedbackBtn.style.opacity = '0.6';
+                        setTimeout(() => {
+                            feedbackBtn.style.opacity = '1';
+                        }, 1000);
+                    } else {
+                        console.error('Failed to submit feedback');
+                    }
+                } catch (error) {
+                    console.error('Error submitting feedback:', error);
+                } finally {
+                    feedbackBtn.disabled = false;
+                }
+            });
+        },
+        
+        async loadFeedbackCounts() {
+            // Load feedback counts for all visible headlines
+            const headlines = document.querySelectorAll('.headline-with-feedback');
+            const headlinesArray = Array.from(headlines);
+            
+            // Load feedback for each headline
+            for (const headline of headlinesArray) {
+                const headlineUrl = headline.dataset.headlineUrl;
+                const headlineTitle = headline.dataset.headlineTitle;
+                
+                if (!headlineUrl || !headlineTitle) continue;
+                
+                try {
+                    const response = await fetch(
+                        `/api/feedback/headline?headline_url=${encodeURIComponent(headlineUrl)}&headline_title=${encodeURIComponent(headlineTitle)}`
+                    );
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        const feedbackCount = headline.querySelector('.feedback-count');
+                        if (feedbackCount && data.feedback) {
+                            const up = data.feedback.up || 0;
+                            const down = data.feedback.down || 0;
+                            if (up > 0 || down > 0) {
+                                feedbackCount.textContent = `👍 ${up} 👎 ${down}`;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    // Silently fail - feedback counts are optional
+                }
+            }
         },
 
         toggleViewMode() {

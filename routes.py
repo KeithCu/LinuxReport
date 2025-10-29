@@ -46,6 +46,7 @@ from admin_stats import update_performance_stats, get_admin_stats_html, track_ra
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
+from feedback import init_feedback_routes
 from shared import g_logger
 
 # =============================================================================
@@ -159,6 +160,7 @@ def init_app(flask_app):
     init_old_headlines_routes(flask_app)
     init_chat_routes(flask_app, limiter, dynamic_rate_limit)
     init_config_routes(flask_app)
+    init_feedback_routes(flask_app, limiter, dynamic_rate_limit)
     
     # Configure CORS and security headers only if enabled
     if ENABLE_CORS:
@@ -701,6 +703,67 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         response.headers['Content-Type'] = 'application/json; charset=utf-8'
         response.headers['Cache-Control'] = 'public, max-age=900'
         return response
+
+    @flask_app.route('/search')
+    @limiter.limit(dynamic_rate_limit)
+    def search():
+        """
+        Search headlines by keyword.
+        
+        Searches through cached headlines using case-insensitive text matching.
+        Supports searching in title, description, and source fields.
+        Results are cached for performance.
+        """
+        query = request.args.get('q', '').strip()
+        
+        if not query:
+            # Return empty results if no query
+            return render_template('search.html', 
+                                 query='',
+                                 results=[],
+                                 result_count=0,
+                                 title=WEB_TITLE,
+                                 favicon=FAVICON)
+        
+        # Check cache first (use query as-is for cache key, hash might vary across Python runs)
+        cache_key = f'search-results:{MODE.value}:{query.lower()}'
+        cached_results = g_cm.get(cache_key)
+        if cached_results:
+            return render_template('search.html',
+                                 query=query,
+                                 results=cached_results['results'],
+                                 result_count=cached_results['count'],
+                                 title=WEB_TITLE,
+                                 favicon=FAVICON)
+        
+        # Get headlines using shared function
+        headlines = _get_headlines_data()
+        
+        # Filter headlines by search query (case-insensitive)
+        query_lower = query.lower()
+        results = []
+        for headline in headlines:
+            # Search in title, description, and source
+            title_match = query_lower in headline.get('title', '').lower()
+            desc_match = query_lower in headline.get('description', '').lower()
+            source_match = query_lower in headline.get('source', '').lower()
+            
+            if title_match or desc_match or source_match:
+                results.append(headline)
+        
+        # Cache the results for 5 minutes
+        cached_data = {
+            'results': results,
+            'count': len(results)
+        }
+        g_cm.set(cache_key, cached_data, ttl=300)  # 5 minutes
+        
+        return render_template('search.html',
+                             query=query,
+                             results=results,
+                             result_count=len(results),
+                             title=WEB_TITLE,
+                             favicon=FAVICON)
 
     @flask_app.route('/api/force_refresh_feed', methods=['POST'])
     @login_required

@@ -9,7 +9,7 @@
     <button class="next-btn">&gt;</button>
   </div>  
   {%- for e in entries %}
-  <div class="linkclass" data-index="{{ e.published_parsed | timestamp_to_int if e.published_parsed else loop.index0 }}" data-published="{{ e.published if e.published else '' }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
+  <div class="linkclass headline-with-feedback" data-headline-url="{{ e.link }}" data-headline-title="{{ e.title | striptags }}" data-index="{{ e.published_parsed | timestamp_to_int if e.published_parsed else loop.index0 }}" data-published="{{ e.published if e.published else '' }}" style="{% if loop.index > 8 %} display: none; {% endif %}">
     {% if e.link in top_images %}
     <div class="image-container">
       <a target="_blank" href="{{ e.link }}">
@@ -25,6 +25,11 @@
          title="{{ tooltip if tooltip.split()|length >= 3 else '' }}">
         {{ e.title | striptags }}
       </a>
+    </div>
+    <div class="headline-feedback" style="margin-top: 8px; display: flex; gap: 8px; justify-content: center; align-items: center;">
+      <button class="feedback-btn feedback-up" data-feedback="up" title="Thumbs up" style="background: none; border: 1px solid var(--border, #ddd); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 14px;">👍</button>
+      <button class="feedback-btn feedback-down" data-feedback="down" title="Thumbs down" style="background: none; border: 1px solid var(--border, #ddd); border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 14px;">👎</button>
+      <span class="feedback-count" style="font-size: 12px; color: var(--muted, #888); margin-left: 4px;"></span>
     </div>
   </div>
   {%- endfor %}

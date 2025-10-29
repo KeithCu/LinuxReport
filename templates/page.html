@@ -56,6 +56,26 @@
         <span class="old-headlines-title">📰 Old Headlines Archive</span>
       </a>
 
+      <!-- Search Bar -->
+      <div style="text-align: center; width: 100%; margin: 1em 0;">
+        <form id="main-search-form" method="GET" action="/search" style="display: inline-flex; gap: 8px; max-width: 500px; width: 100%;">
+          <input 
+            type="text" 
+            id="main-search-input" 
+            name="q" 
+            placeholder="Search headlines..." 
+            style="flex: 1; padding: 10px; border: 2px solid var(--border, #ddd); border-radius: 6px; font-size: 14px; background: var(--bg, #fff); color: var(--text, #222);"
+            autocomplete="off"
+          >
+          <button 
+            type="submit" 
+            style="padding: 10px 20px; background: var(--link, #1a0dab); color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer;"
+          >
+            🔍 Search
+          </button>
+        </form>
+      </div>
+
       <!-- Navigation Links - Moved here from nav section -->
       <div style="text-align: center; width: 100%;">
         <div id="nav-controls-container" class="nav-controls">
