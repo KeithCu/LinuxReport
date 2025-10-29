@@ -42,7 +42,7 @@ from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content
-from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event
+from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event, get_comprehensive_admin_stats
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
@@ -234,6 +234,16 @@ def _register_authentication_routes(flask_app):
         """Handle user logout."""
         logout_user()
         return redirect(url_for('index'))
+
+    @flask_app.route('/admin/dashboard')
+    @login_required
+    def admin_dashboard():
+        """Admin dashboard with comprehensive statistics."""
+        stats = get_comprehensive_admin_stats()
+        return render_template('admin_dashboard.html', 
+                             stats=stats,
+                             title=f'{WEB_TITLE} - Admin Dashboard',
+                             favicon=FAVICON)
 
 # =============================================================================
 # MAIN APPLICATION ROUTES

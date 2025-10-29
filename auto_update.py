@@ -27,6 +27,7 @@ from html_generation import (
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 from LLMModelManager import LLMModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
 from Logging import _setup_logging, DEBUG
+from admin_stats import track_llm_model_usage
 
 from enum import Enum  # Ensure this is included if not already
 
@@ -418,20 +419,24 @@ def _try_ai_models(messages, filtered_articles):
             if not response_text:
                 logger.warning(f"Model {current_model} returned no response")
                 model_manager.mark_failed(current_model)
+                track_llm_model_usage(current_model, success=False)
                 continue
 
             top_articles = _process_ai_response(response_text, filtered_articles, f"model {current_model}")
             if top_articles and len(top_articles) >= 3:
                 logger.info(f"Successfully got {len(top_articles)} articles from model {current_model}")
                 model_manager.mark_success(current_model)
+                track_llm_model_usage(current_model, success=True)
                 return response_text, top_articles, current_model
             else:
                 logger.warning(f"Model {current_model} failed to produce enough articles")
                 model_manager.mark_failed(current_model)
+                track_llm_model_usage(current_model, success=False)
 
         except (RuntimeError, RateLimitError, APITimeoutError) as e:
             logger.error(f"Model {current_model} failed: {str(e)}")
             model_manager.mark_failed(current_model)
+            track_llm_model_usage(current_model, success=False)
 
     logger.error("All model attempts failed")
     return None, [], None

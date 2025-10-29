@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <link rel="icon" type="image/png" href="{{ favicon }}">
+    <!-- Link external CSS using Flask-Assets -->
+    {% assets "css_all" %}
+    <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+    {% endassets %}
+    <style>
+        body {
+            background: var(--bg, #fff);
+            color: var(--text, #222);
+            margin: 0;
+            font-family: sans-serif;
+            padding: 1em;
+        }
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .dashboard-header {
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+            border-bottom: 2px solid var(--border, #ddd);
+        }
+        .dashboard-header h1 {
+            margin: 0;
+            color: var(--text, #222);
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5em;
+            margin-bottom: 2em;
+        }
+        .stat-card {
+            background: var(--btn-bg, #f6f6f6);
+            border-radius: 8px;
+            padding: 1.5em;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .stat-card h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+            color: var(--text, #222);
+            border-bottom: 1px solid var(--border, #ddd);
+            padding-bottom: 0.5em;
+        }
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5em 0;
+            border-bottom: 1px solid var(--border, #ddd);
+        }
+        .stat-item:last-child {
+            border-bottom: none;
+        }
+        .stat-label {
+            color: var(--muted, #666);
+        }
+        .stat-value {
+            font-weight: bold;
+            color: var(--text, #222);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 0.25em 0.75em;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .status-healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-stale {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status-never-fetched {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+        .feed-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .feed-item {
+            padding: 0.75em;
+            margin-bottom: 0.5em;
+            background: var(--bg, #fff);
+            border-radius: 4px;
+            border-left: 3px solid var(--border, #ddd);
+        }
+        .feed-item.healthy {
+            border-left-color: #28a745;
+        }
+        .feed-item.stale {
+            border-left-color: #ffc107;
+        }
+        .feed-item.error {
+            border-left-color: #dc3545;
+        }
+        .feed-item.never-fetched {
+            border-left-color: #6c757d;
+        }
+        .feed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5em;
+        }
+        .feed-name {
+            font-weight: bold;
+            color: var(--text, #222);
+        }
+        .feed-meta {
+            font-size: 0.85em;
+            color: var(--muted, #666);
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 1em;
+            color: var(--link, #1a0dab);
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        .model-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .model-item {
+            padding: 0.75em;
+            margin-bottom: 0.5em;
+            background: var(--bg, #fff);
+            border-radius: 4px;
+            border-left: 3px solid var(--link, #1a0dab);
+        }
+        .success-rate {
+            display: inline-block;
+            padding: 0.25em 0.5em;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .success-rate-high {
+            background: #d4edda;
+            color: #155724;
+        }
+        .success-rate-medium {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .success-rate-low {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        var match = document.cookie.match(/(?:^|; )Theme=([^;]+)/);
+        var theme = match ? match[1] : 'light';
+        document.body.classList.add('theme-' + theme);
+        
+        // Auto-refresh every 30 seconds
+        setInterval(function() {
+          location.reload();
+        }, 30000);
+      });
+    </script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <a href="{{ url_for('index') }}" class="back-link">← Back to Home</a>
+            <h1>Admin Dashboard</h1>
+            <p style="color: var(--muted, #666); margin-top: 0.5em;">Last updated: {{ stats.timestamp }}</p>
+        </div>
+        
+        <div class="stats-grid">
+            <!-- Performance Stats -->
+            <div class="stat-card">
+                <h2>Performance</h2>
+                <div class="stat-item">
+                    <span class="stat-label">Total Requests</span>
+                    <span class="stat-value">{{ stats.performance.total_requests }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Avg Render Time</span>
+                    <span class="stat-value">{{ "%.3f"|format(stats.performance.avg_render_time) }}s</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Min Render Time</span>
+                    <span class="stat-value">{{ "%.3f"|format(stats.performance.min_render_time) }}s</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Max Render Time</span>
+                    <span class="stat-value">{{ "%.3f"|format(stats.performance.max_render_time) }}s</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Uptime</span>
+                    <span class="stat-value">{{ (stats.performance.uptime_seconds / 3600)|round(1) }}h</span>
+                </div>
+            </div>
+            
+            <!-- Feed Health Summary -->
+            <div class="stat-card">
+                <h2>Feed Health Summary</h2>
+                <div class="stat-item">
+                    <span class="stat-label">Total Feeds</span>
+                    <span class="stat-value">{{ stats.feed_health.total_feeds }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Healthy</span>
+                    <span class="stat-value" style="color: #28a745;">{{ stats.feed_health.healthy_count }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Stale</span>
+                    <span class="stat-value" style="color: #ffc107;">{{ stats.feed_health.stale_count }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Error</span>
+                    <span class="stat-value" style="color: #dc3545;">{{ stats.feed_health.error_count }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Never Fetched</span>
+                    <span class="stat-value" style="color: #6c757d;">{{ stats.feed_health.never_fetched_count }}</span>
+                </div>
+            </div>
+            
+            <!-- LLM Model Summary -->
+            <div class="stat-card">
+                <h2>LLM Models</h2>
+                <div class="stat-item">
+                    <span class="stat-label">Total Models</span>
+                    <span class="stat-value">{{ stats.llm_models.total_models }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Total Uses</span>
+                    <span class="stat-value">{{ stats.llm_models.total_uses }}</span>
+                </div>
+            </div>
+            
+            <!-- Rate Limits -->
+            <div class="stat-card">
+                <h2>Rate Limits</h2>
+                <div class="stat-item">
+                    <span class="stat-label">Unique IPs</span>
+                    <span class="stat-value">{{ stats.rate_limits.unique_ips }}</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Unique Endpoints</span>
+                    <span class="stat-value">{{ stats.rate_limits.unique_endpoints }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Feed Health Details -->
+        <div class="stat-card" style="margin-bottom: 2em;">
+            <h2>Feed Health Details</h2>
+            <div class="feed-list">
+                {% for feed in stats.feed_health.feeds %}
+                <div class="feed-item {{ feed.status }}">
+                    <div class="feed-header">
+                        <span class="feed-name">{{ feed.logo_alt }}</span>
+                        <span class="status-badge status-{{ feed.status }}">{{ feed.status }}</span>
+                    </div>
+                    <div class="feed-meta">
+                        <div>Last Fetch: {{ feed.age_formatted }} ago</div>
+                        <div>Entries: {{ feed.entry_count }}</div>
+                        {% if feed.site_url %}
+                        <div><a href="{{ feed.site_url }}" target="_blank" style="color: var(--link, #1a0dab);">{{ feed.site_url }}</a></div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- LLM Model Details -->
+        {% if stats.llm_models.models %}
+        <div class="stat-card">
+            <h2>LLM Model Performance</h2>
+            <div class="model-list">
+                {% for model in stats.llm_models.models %}
+                <div class="model-item">
+                    <div class="feed-header">
+                        <span class="feed-name">{{ model.model_name }}</span>
+                        <span class="success-rate {% if model.success_rate >= 0.8 %}success-rate-high{% elif model.success_rate >= 0.5 %}success-rate-medium{% else %}success-rate-low{% endif %}">
+                            {{ "%.1f"|format(model.success_rate * 100) }}% success
+                        </span>
+                    </div>
+                    <div class="feed-meta">
+                        <div>Total Uses: {{ model.total_uses }}</div>
+                        <div>Successful: {{ model.successful_uses }}</div>
+                        <div>Failed: {{ model.failed_uses }}</div>
+                        <div>Last Used: {% if model.last_used %}{{ (model.last_used|int) }}{% else %}Never{% endif %}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Link external JS using Flask-Assets -->
+    {% assets "js_all" %}
+    <script type="text/javascript" src="{{ ASSET_URL }}"></script>
+    {% endassets %}
+</body>
+</html>
+
