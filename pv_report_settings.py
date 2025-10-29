@@ -50,7 +50,7 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_TITLE="Photovoltaic Report",
     REPORT_PROMPT="Solar energy industry professionals and enthusiasts in the US. Focus on major solar and battery technology, policy, and market news. Avoid basic installation guides, generic green energy content, or unrelated renewables.",
     PATH="/srv/http/pvreport",
-    SCHEDULE=[1, 7, 13, 19],
+    SCHEDULE=[7, 12, 17],
     CUSTOM_FETCH_CONFIG={
         "solarmagazine.com": SolarMagazineFetchConfig(),
     },

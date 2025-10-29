@@ -38,7 +38,7 @@ CONFIG: SiteConfig = SiteConfig(
 	WEB_TITLE="Space Report",
 	REPORT_PROMPT="Latest top news in the space industry regarding space exploration, including space elevators",
     PATH="/srv/http/spacereport",
-    SCHEDULE=[0, 8, 12, 16, 20],
+    SCHEDULE=[0, 8, 16],
     CUSTOM_FETCH_CONFIG={
         "reddit.com": RedditFetchConfig(),
     }

@@ -40,7 +40,7 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_TITLE="Robot Report | Latest Robotics News",
     REPORT_PROMPT="Robotics and humanoid robotics news for both programmers / builders and less technical people curious about the biggest news in robotics / humanoids.",
     PATH="/srv/http/robotreport",
-    SCHEDULE=[7, 11, 15, 19, 23],
+    SCHEDULE=[0, 8, 12, 16],
     CUSTOM_FETCH_CONFIG={
         # Site-specific Selenium config for Unite.AI category page
         # Fallback heuristic: select anchors that look like permalinks (contain a year)

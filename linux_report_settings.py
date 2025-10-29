@@ -59,7 +59,7 @@ CONFIG: SiteConfig = SiteConfig(
     the following products:
     tmux, redox, java, Rust, PHP, javascript, mysql (but mariadb is fine) .""",
     PATH="/srv/http/LinuxReport2",
-    SCHEDULE=[0, 8, 12, 16, 20],  # Update schedule for Linux Report
+    SCHEDULE=[0, 8, 12, 17],  # Update schedule for Linux Report
     CUSTOM_FETCH_CONFIG={
         "reddit.com": RedditFetchConfig(),
         "breitbart.com": BreitbartTechFetchConfig()
