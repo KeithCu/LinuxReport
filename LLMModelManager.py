@@ -14,7 +14,7 @@ FREE_MODELS = [
     "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
     "cognitivecomputations/dolphin3.0-mistral-24b:free",
-    "cognitivecomputations/dolphin3.0-r1-mistral-24b:free",
+    # "cognitivecomputations/dolphin3.0-r1-mistral-24b:free", # Removed by openrouter.ai on: 2025-10-29
     "deepseek/deepseek-chat-v3-0324:free",
     "deepseek/deepseek-chat-v3.1:free",
     # "deepseek/deepseek-chat:free", # Removed by openrouter.ai on: 2025-08-01
@@ -45,6 +45,7 @@ FREE_MODELS = [
     "microsoft/mai-ds-r1:free",
   #  "microsoft/phi-4-reasoning-plus:free", very long answers, often fails to follow instructions
   #  "microsoft/phi-4-reasoning:free", 
+    "minimax/minimax-m2:free",
     "mistralai/devstral-small-2505:free",
     # "mistralai/devstral-small:free", # Removed by openrouter.ai on: 2025-08-01
     "mistralai/mistral-7b-instruct:free",
@@ -54,11 +55,13 @@ FREE_MODELS = [
     "mistralai/mistral-small-3.2-24b-instruct:free",
     "moonshotai/kimi-dev-72b:free",
     "moonshotai/kimi-k2:free",
-    "moonshotai/kimi-vl-a3b-thinking:free",
+    # "moonshotai/kimi-vl-a3b-thinking:free", # Removed by openrouter.ai on: 2025-10-29
     # "moonshotai/moonlight-16b-a3b-instruct:free", # Removed by openrouter.ai on: 2025-08-01
     "nousresearch/deephermes-3-llama-3-8b-preview:free",
+    "nousresearch/hermes-3-llama-3.1-405b:free",
     # "nvidia/llama-3.1-nemotron-ultra-253b-v1:free", # Removed by openrouter.ai on: 2025-09-21
     # "nvidia/llama-3.3-nemotron-super-49b-v1:free", # Removed by openrouter.ai on: 2025-08-01
+    "nvidia/nemotron-nano-12b-v2-vl:free",
     "nvidia/nemotron-nano-9b-v2:free",
    # "open-r1/olympiccoder-32b:free", Generates too many tokens
     # "openai/gpt-oss-120b:free", # Removed by openrouter.ai on: 2025-10-03
@@ -71,7 +74,7 @@ FREE_MODELS = [
     "qwen/qwen-2.5-72b-instruct:free",
     "qwen/qwen-2.5-coder-32b-instruct:free",
     "qwen/qwen2.5-vl-32b-instruct:free",
-    "qwen/qwen2.5-vl-72b-instruct:free",
+    # "qwen/qwen2.5-vl-72b-instruct:free", # Removed by openrouter.ai on: 2025-10-29
     "qwen/qwen3-14b:free",
     "qwen/qwen3-235b-a22b:free",
     "qwen/qwen3-30b-a3b:free",
@@ -83,7 +86,7 @@ FREE_MODELS = [
     # "rekaai/reka-flash-3:free", # Removed by openrouter.ai on: 2025-09-21
     # "sarvamai/sarvam-m:free", # Removed by openrouter.ai on: 2025-09-07
     "shisa-ai/shisa-v2-llama3.3-70b:free",
-    "tencent/hunyuan-a13b-instruct:free",
+    # "tencent/hunyuan-a13b-instruct:free", # Removed by openrouter.ai on: 2025-10-29
     # "thudm/glm-4-32b:free", # Removed by openrouter.ai on: 2025-08-10
     # "thudm/glm-z1-32b:free", # Removed by openrouter.ai on: 2025-09-07
     "tngtech/deepseek-r1t-chimera:free",
