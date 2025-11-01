@@ -3,9 +3,20 @@
 # Check if we want to rollback to a specific commit
 ROLLBACK_COMMIT=""
 FIX_HEAD_MODE=false
+FIX_CONFLICTS_MODE=false
+CONFLICT_FILES=()
 if [ "$1" = "--rollback" ] && [ -n "$2" ]; then
     ROLLBACK_COMMIT="$2"
     echo "🔄 ROLLBACK MODE: Will checkout commit $ROLLBACK_COMMIT"
+    echo ""
+elif [ "$1" = "--fix-conflicts" ]; then
+    FIX_CONFLICTS_MODE=true
+    shift
+    while [ $# -gt 0 ]; do
+        CONFLICT_FILES+=("$1")
+        shift
+    done
+    echo "🔧 FIX CONFLICTS MODE: Will restore --staged and re-add files: ${CONFLICT_FILES[*]}"
     echo ""
 elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "========================================"
@@ -16,6 +27,7 @@ elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo "  ./pulls.sh                    # Normal pull and status"
     echo "  ./pulls.sh --rollback <ref>   # Rollback to specific commit"
     echo "  ./pulls.sh --fix-head         # Fix detached HEAD state"
+    echo "  ./pulls.sh --fix-conflicts file1 file2 ... # Fix merge conflicts by restore --staged and re-add"
     echo "  ./pulls.sh --help             # Show this help"
     echo ""
     echo "========================================"
@@ -36,6 +48,9 @@ elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
     echo ""
     echo "Fix detached HEAD state:"
     echo "  ./pulls.sh --fix-head           # Return to main branch"
+    echo ""
+    echo "Fix merge conflicts:"
+    echo "  ./pulls.sh --fix-conflicts static/linuxreport.css static/linuxreport.js"
     echo ""
     echo "Return to latest version:"
     echo "  ./pulls.sh"
@@ -127,7 +142,7 @@ pull_and_status() {
     if [ -n "$ROLLBACK_COMMIT" ]; then
         echo "🔄 Rolling back to commit $ROLLBACK_COMMIT..."
         git checkout "$ROLLBACK_COMMIT" 2>&1
-        
+
         if [ $? -eq 0 ]; then
             echo "✅ Rollback successful"
             status_icon="🔄"
@@ -140,6 +155,39 @@ pull_and_status() {
             cd ..
             echo "----------------------------------------"
             return
+        fi
+    # Handle fix conflicts mode
+    elif [ "$FIX_CONFLICTS_MODE" = true ]; then
+        echo "🔧 Fixing conflicts for files: ${CONFLICT_FILES[*]}..."
+        for file in "${CONFLICT_FILES[@]}"; do
+            if [ -f "$file" ]; then
+                echo "Restoring --staged for $file..."
+                git restore --staged "$file" 2>&1
+                if [ $? -eq 0 ]; then
+                    echo "Re-adding $file..."
+                    git add "$file" 2>&1
+                    if [ $? -eq 0 ]; then
+                        echo "✅ Fixed conflict for $file"
+                    else
+                        echo "❌ Failed to re-add $file"
+                    fi
+                else
+                    echo "❌ Failed to restore --staged for $file"
+                fi
+            else
+                echo "⚠️  File $file not found"
+            fi
+        done
+
+        echo "Checking if conflicts are resolved..."
+        if git diff --cached --name-only | grep -q .; then
+            echo "✅ Conflicts resolved - ready to commit"
+            status_icon="🔧"
+            status_detail="Conflicts fixed for: ${CONFLICT_FILES[*]}"
+        else
+            echo "❌ No staged changes found"
+            status_icon="❌"
+            status_detail="Failed to fix conflicts"
         fi
     else
         # Normal pull with rebase
@@ -281,5 +329,16 @@ if [ -n "$ROLLBACK_COMMIT" ]; then
     echo ""
     echo "Find commits by author:"
     echo "  git log --oneline --author='Your Name'"
+    echo ""
+elif [ "$FIX_CONFLICTS_MODE" = true ]; then
+    echo ""
+    echo "========================================"
+    echo "CONFLICTS FIXED"
+    echo "========================================"
+    echo "To complete the merge, run:"
+    echo "  git commit"
+    echo ""
+    echo "To abort the merge instead:"
+    echo "  git merge --abort"
     echo ""
 fi
