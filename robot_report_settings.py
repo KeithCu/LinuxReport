@@ -7,7 +7,7 @@ from app_config import RedditFetchConfig, FetchConfig
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={
-        "https://www.therobotreport.com/feed/": RssInfo("RobotReport.svg", "The Robot Report", "https://www.therobotreport.com/"),
+        "https://www.therobotreport.com/feed/": RssInfo("therobotreport.webp", "The Robot Report", "https://www.therobotreport.com/"),
         "https://robohub.org/feed/": RssInfo("Robohub.webp", "Robohub", "https://robohub.org/"),
         "https://newatlas.com/robotics/index.rss": RssInfo("NewAtlas.svg", "New Atlas Robotics", "https://newatlas.com/robotics/"),
         "https://www.azorobotics.com/syndication.axd": RssInfo("AZoRobotics.webp", "AZoRobotics", "https://www.azorobotics.com/"),
