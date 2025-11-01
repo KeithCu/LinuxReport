@@ -136,15 +136,26 @@ LinuxReport/
 ├── auto_update.py            # AI headline generation
 ├── caching.py                # Multi-layer caching system
 ├── *_report_settings.py      # Report-specific configurations
-├── templates/                # Jinja2 templates + modular JavaScript
-├── static/                   # CSS, images, compiled assets
+├── templates/                # Jinja2 templates + modular JavaScript/CSS
+│   ├── *.html               # HTML templates
+│   ├── *.js                 # Modular JavaScript files (auto-bundled)
+│   ├── themes.css           # Design system, variables, themes, fonts
+│   ├── core.css             # Core UI, layout, responsive, enhancements
+│   ├── weather.css          # Weather widget styling
+│   ├── chat.css             # Chat system styling
+│   └── config.css           # Admin configuration styling
+├── static/                   # Compiled assets and images
+│   ├── linuxreport.css      # Auto-generated from modular CSS files
+│   ├── linuxreport.js       # Auto-generated from modular JS files
+│   └── images/              # Site logos and favicons
 ├── tests/                    # Test suite
 └── config.yaml               # Configuration file
 ```
 
 ### Key Features for Developers
 
-- **Modular JavaScript**: Source files in `templates/` auto-bundle to `static/`
+- **Modular Assets**: JavaScript and CSS source files in `templates/` auto-bundle to `static/`
+- **CSS Modularization**: 5 separate CSS modules (themes, core, weather, chat, config) for maintainability
 - **Hot Reload**: Development mode with unminified assets for debugging
 - **Type Safety**: Type hints throughout the codebase
 - **Comprehensive Caching**: See `Caching.md` for detailed documentation

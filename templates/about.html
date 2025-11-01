@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="icon" type="image/png" href="{{favicon}}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="{{description}}">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{{title}} - About</title>
+    <!-- Preload critical fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" as="style">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" as="style">
+    <!-- Load fonts with font-display: swap -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500&family=Open+Sans:wght@400;600&family=Source+Sans+Pro:wght@400;600&family=Ubuntu:wght@400;500&family=Noto+Sans:wght@400;500&family=Lato:wght@400;700&family=Raleway:wght@400;500&display=swap&font-display=swap">
+    <!-- Link external CSS using Flask-Assets -->
+    {% assets "css_all" %}
+    <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+    {% endassets %}
+  </head>
+  <body>
+
+    <header>
+      <!-- Logo -->
+      <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
+
+      <!-- Welcome Message -->
+      <small>About {{title}}</small>
+    </header>
+
+    <main>
+      <center>
+        <div class="config-border-box">
+          <div class="config-container">
+            <!-- Navigation Links -->
+            <div style="text-align: center; width: 100%; margin-bottom: 2em;">
+              <div id="nav-controls-container" class="nav-controls">
+                <div class="nav-links-desktop">
+                  <a href="/" class="nav-link-linux">Home</a>
+                  {% for report in all_reports %}
+                  <a href="{{report.url}}" target="_blank" class="nav-link-{{report.name.lower()}}">{{report.name}}</a>
+                  {% endfor %}
+                  <a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">Me</a>
+                </div>
+              </div>
+            </div>
+
+            <!-- About Content -->
+            <div class="about-content">
+              <h1>About {{title}}</h1>
+
+              <section class="about-section">
+                <h2>What is {{title}}?</h2>
+                <p>{{description}}</p>
+                <p>LinuxReport is a modern news aggregation platform built with Python/Flask that automatically aggregates and curates news from multiple categories, updated 24/7 with AI-powered headline generation.</p>
+              </section>
+
+              <section class="about-section">
+                <h2>Key Features</h2>
+                <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                  <ul style="padding-left: 1.5em;">
+                    <li><strong>🚀 High Performance</strong>: Thread pools and Apache process pools for scalability</li>
+                    <li><strong>🤖 AI-Powered Headlines</strong>: Automatic headline curation using 30+ LLM models via OpenRouter.ai</li>
+                    <li><strong>🎯 Multi-Platform</strong>: Support for multiple news categories in one codebase</li>
+                    <li><strong>🌙 Dark Mode</strong>: User-customizable themes and font sizes</li>
+                    <li><strong>📱 Mobile Responsive</strong>: Optimized for all devices</li>
+                    <li><strong>⚡ Advanced Caching</strong>: Multi-layer caching system for optimal performance</li>
+                    <li><strong>🌐 CDN Support</strong>: s3cmd integration with long cache expiration headers for optimal image delivery</li>
+                    <li><strong>🔒 Secure</strong>: Rate limiting, admin authentication, input validation</li>
+                    <li><strong>🛠️ Configurable</strong>: Easy RSS feed management and customization</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section class="about-section">
+                <h2>AI-Powered Intelligence</h2>
+                <p>The system uses sophisticated AI for headline generation through OpenRouter.ai, randomly selecting from over 30 free models including Llama, Qwen, Mistral variants, and more.</p>
+                <p>If a model fails, it automatically falls back to Mistral Small for reliability.</p>
+              </section>
+
+              <section class="about-section">
+                <h2>Technology Stack</h2>
+                <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                  <ul style="padding-left: 1.5em;">
+                    <li><strong>Backend</strong>: Python 3.x + Flask with extensions</li>
+                    <li><strong>Database</strong>: SQLite via Diskcache for high-performance persistent storage</li>
+                    <li><strong>Caching</strong>: Multi-layer system (disk, memory, file-based)</li>
+                    <li><strong>Frontend</strong>: Responsive HTML/CSS/JS with automatic bundling and minification</li>
+                    <li><strong>Scraping</strong>: BeautifulSoup4 + Selenium with Tor support for complex sites</li>
+                    <li><strong>Images</strong>: Automatic WebP conversion and optimization</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section class="about-section">
+                <h2>Explore Other Reports</h2>
+                <p>Check out our other specialized news aggregators:</p>
+                <div class="reports-grid">
+                  {% for report in all_reports %}
+                  <div class="report-card {% if report.is_current %}current-report{% endif %}">
+                    <h3><a href="{{report.url}}" target="_blank">{{report.name}} Report</a></h3>
+                    <p>{{report.description}}</p>
+                    {% if report.is_current %}
+                    <span class="current-badge">Current Site</span>
+                    {% endif %}
+                  </div>
+                  {% endfor %}
+                </div>
+              </section>
+
+              <section class="about-section">
+                <h2>Contributing</h2>
+                <p>This project is free and open source software released under the GNU Lesser General Public License v3.0 (LGPL v3).</p>
+                <p>We welcome contributions! Feel free to request new RSS feeds or suggest improvements.</p>
+                <p><a href="https://github.com/KeithCu/LinuxReport" target="_blank">View on GitHub</a></p>
+              </section>
+
+              <section class="about-section">
+                <h2>Contact</h2>
+                <p>Built with ❤️ for the free and open source community</p>
+                <p><a href="https://keithcu.com/wordpress/?page_id=407/" target="_blank">About the Author</a></p>
+              </section>
+            </div>
+          </div>
+        </div>
+      </center>
+
+    </main>
+
+    <!-- Link external JS using Flask-Assets -->
+    {% assets "js_all" %}
+    <script type="text/javascript" src="{{ ASSET_URL }}"></script>
+    {% endassets %}
+
+    <!-- Pass Flask variables to JavaScript -->
+    <script>
+      window.isAdmin = "{{ 'true' if current_user.is_authenticated else 'false' }}";
+      window.flaskDebug = "{{ 'true' if config.DEBUG else 'false' }}";
+      window.csrf_token = "{{ csrf_token() }}";
+    </script>
+  </body>
+</html>

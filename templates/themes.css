@@ -1,0 +1,338 @@
+/* =============================================================================
+    LINUXREPORT THEMES - Design System & Variables
+    ============================================================================= */
+
+/* =============================================================================
+    1. CSS CUSTOM PROPERTIES & THEMES
+    ============================================================================= */
+
+/* Base CSS Custom Properties */
+:root {
+  /* Default theme (silver) */
+  --bg: #C0C0C0;
+  --text: #000000;
+  --link: #1a0dab;
+  --btn-bg: #EFEFEF;
+  --btn-border: #888888;
+  --btn-text: #000000;
+  --btn-hover-bg: #C0C0C0;
+  --btn-hover-text: #FFFFFF;
+
+  /* Secondary text color */
+  --text-secondary: #666666;
+
+  /* Accent colors for enhanced visual hierarchy */
+  --accent-primary: #1a0dab;
+  --accent-secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --info: #17a2b8;
+
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+
+  /* Border radius */
+  --border-radius-sm: 4px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+
+  /* Transitions */
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 6px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Theme Definitions */
+[data-theme="light"] {
+  --bg: #ffffff;
+  --text: #000000;
+  --link: #1a0dab;
+  --btn-bg: #f6f6f6;
+  --btn-border: #092236;
+  --btn-text: #3b5971;
+  --btn-hover-bg: #0078D7;
+  --btn-hover-text: #ffffff;
+  --text-secondary: #666666;
+  --accent-primary: #0078D7;
+  --accent-secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --info: #17a2b8;
+}
+
+[data-theme="paper"] {
+  --bg: #f5f5f5;
+  --text: #333333;
+  --link: #1a0dab;
+  --btn-bg: #ffffff;
+  --btn-border: #cccccc;
+  --btn-text: #333333;
+  --btn-hover-bg: #e6e6e6;
+  --btn-hover-text: #333333;
+  --text-secondary: #666666;
+}
+
+[data-theme="silver"] {
+  --bg: #C0C0C0;
+  --text: #000000;
+  --link: #1a0dab;
+  --btn-bg: #EFEFEF;
+  --btn-border: #888888;
+  --btn-text: #000000;
+  --btn-hover-bg: #C0C0C0;
+  --btn-hover-text: #FFFFFF;
+  --text-secondary: #666666;
+}
+
+[data-theme="retro"] {
+  --bg: #000080;
+  --text: #90ee90;
+  --link: #ffff00;
+  --btn-bg: #0000cd;
+  --btn-border: #90ee90;
+  --btn-text: #90ee90;
+  --btn-hover-bg: #ff69b4;
+  --btn-hover-text: #000000;
+  --text-secondary: #90ee90;
+}
+
+[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --text: #d4d4d4;
+  --link: #8ab4f8;
+  --btn-bg: #333333;
+  --btn-border: #ffffff;
+  --btn-text: #d4d4d4;
+  --btn-hover-bg: #505050;
+  --btn-hover-text: #ffffff;
+  --text-secondary: #a0a0a0;
+  --accent-primary: #8ab4f8;
+  --accent-secondary: #8e9aaf;
+  --success: #40c057;
+  --warning: #fab005;
+  --danger: #fa5252;
+  --info: #339af0;
+}
+
+[data-theme="monokai"] {
+  --bg: #272822;
+  --text: #e2e8f0;
+  --link: #a6e22e;
+  --btn-bg: #3e3d32;
+  --btn-border: #a6e22e;
+  --btn-text: #e2e8f0;
+  --btn-hover-bg: #f92672;
+  --btn-hover-text: #272822;
+  --text-secondary: #a0a0a0;
+}
+
+[data-theme="futuristic"] {
+  --bg: #0f0f0f;
+  --text: #7fbfbf;
+  --link: #0f0;
+  --btn-bg: #111;
+  --btn-border: #0ff;
+  --btn-text: #7fbfbf;
+  --btn-hover-bg: #0f0;
+  --btn-hover-text: #000;
+  --text-secondary: #5f9f9f;
+}
+
+[data-theme="cyberpunk"] {
+  --bg: #1e001f;
+  --text: #c080c0;
+  --link: #00ffff;
+  --btn-bg: #330033;
+  --btn-border: #ff00ff;
+  --btn-text: #c080c0;
+  --btn-hover-bg: #00ffff;
+  --btn-hover-text: #1e001f;
+  --text-secondary: #a060a0;
+}
+
+[data-theme="midnight"] {
+  --bg: #0f172a;
+  --text: #cbd5e1;
+  --link: #818cf8;
+  --btn-bg: #1e293b;
+  --btn-border: #818cf8;
+  --btn-text: #cbd5e1;
+  --btn-hover-bg: #4f46e5;
+  --btn-hover-text: #ffffff;
+  --text-secondary: #94a3b8;
+}
+
+[data-theme="ocean"] {
+  --bg: #0a192f;
+  --text: #cbd5e1;
+  --link: #64ffda;
+  --btn-bg: #112240;
+  --btn-border: #64ffda;
+  --btn-text: #cbd5e1;
+  --btn-hover-bg: #1d4ed8;
+  --btn-hover-text: #ffffff;
+  --text-secondary: #94a3b8;
+}
+
+[data-theme="nord"] {
+  --bg: #2e3440;
+  --text: #d8dee9;
+  --link: #88c0d0;
+  --btn-bg: #3b4252;
+  --btn-border: #88c0d0;
+  --btn-text: #d8dee9;
+  --btn-hover-bg: #5e81ac;
+  --btn-hover-text: #2e3440;
+  --text-secondary: #a0a0a0;
+}
+
+[data-theme="forest"] {
+  --bg: #2E4A2E;
+  --text: #E0EBD8;
+  --link: #A3B18A;
+  --btn-bg: #4A6F4A;
+  --btn-border: #A3B18A;
+  --btn-text: #E0EBD8;
+  --btn-hover-bg: #A3B18A;
+  --btn-hover-text: #2E4A2E;
+  --text-secondary: #B8C5A8;
+}
+
+[data-theme="steampunk"] {
+  --bg: #2b1b0e;
+  --text: #d5c1a1;
+  --link: #a67c52;
+  --btn-bg: #3e2c1c;
+  --btn-border: #a67c52;
+  --btn-text: #d5c1a1;
+  --btn-hover-bg: #a67c52;
+  --btn-hover-text: #2b1b0e;
+  --text-secondary: #b8a890;
+}
+
+[data-theme="autumn"] {
+  --bg: #2c1810;
+  --text: #f5deb3;
+  --link: #d2691e;
+  --btn-bg: #3d2316;
+  --btn-border: #d2691e;
+  --btn-text: #f5deb3;
+  --btn-hover-bg: #cd853f;
+  --btn-hover-text: #2c1810;
+  --text-secondary: #deb887;
+}
+
+[data-theme="sepia"] {
+  --bg: #704214;
+  --text: #FFF8E7;
+  --link: #B8860B;
+  --btn-bg: #C19A6B;
+  --btn-border: #8B4513;
+  --btn-text: #FFF8E7;
+  --btn-hover-bg: #8B4513;
+  --btn-hover-text: #FFF8E7;
+  --text-secondary: #D2B48C;
+}
+
+[data-theme="solarized"] {
+  --bg: #fdf6e3;
+  --text: #657b83;
+  --link: #268bd2;
+  --btn-bg: #eee8d5;
+  --btn-border: #586e75;
+  --btn-text: #586e75;
+  --btn-hover-bg: #b58900;
+  --btn-hover-text: #fdf6e3;
+  --text-secondary: #839496;
+}
+
+[data-theme="pastelle"] {
+  --bg: #FFEFD5;
+  --text: #4B3621;
+  --link: #FFB6C1;
+  --btn-bg: #FFDAB9;
+  --btn-border: #DEB887;
+  --btn-text: #4B3621;
+  --btn-hover-bg: #FFA07A;
+  --btn-hover-text: #FFFFFF;
+  --text-secondary: #8B7355;
+}
+
+[data-theme="neon"] {
+  --bg: #000000;
+  --text: #90ee90;
+  --link: #ff69b4;
+  --btn-bg: #1a1a1a;
+  --btn-border: #00ffff;
+  --btn-text: #90ee90;
+  --btn-hover-bg: #ff69b4;
+  --btn-hover-text: #000000;
+  --text-secondary: #70ce70;
+}
+
+[data-theme="terminal"] {
+  --bg: #000000;
+  --text: #90ee90;
+  --link: #90ee90;
+  --btn-bg: #001100;
+  --btn-border: #90ee90;
+  --btn-text: #90ee90;
+  --btn-hover-bg: #003300;
+  --btn-hover-text: #90ee90;
+  --text-secondary: #70ce70;
+}
+
+/* =============================================================================
+    2. FONT DEFINITIONS
+    ============================================================================= */
+
+body[data-font="system"] {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif !important;
+}
+
+body[data-font="monospace"] {
+  font-family: 'Courier New', Courier, monospace !important;
+}
+
+body[data-font="inter"] {
+  font-family: 'Inter', sans-serif !important;
+}
+
+body[data-font="roboto"] {
+  font-family: 'Roboto', sans-serif !important;
+}
+
+body[data-font="open-sans"] {
+  font-family: 'Open Sans', sans-serif !important;
+}
+
+body[data-font="source-sans"] {
+  font-family: 'Source Sans Pro', sans-serif !important;
+}
+
+body[data-font="noto-sans"] {
+  font-family: 'Noto Sans', sans-serif !important;
+}
+
+body[data-font="lato"] {
+  font-family: 'Lato', sans-serif !important;
+}
+
+body[data-font="raleway"] {
+  font-family: 'Raleway', sans-serif !important;
+}
+
+body[data-font="sans-serif"] {
+  font-family: Arial, Helvetica, 'Liberation Sans', 'Nimbus Sans', 'DejaVu Sans', 'Segoe UI', 'sans-serif' !important;
+}

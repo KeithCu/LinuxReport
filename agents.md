@@ -68,7 +68,7 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 ├── generate_dependency_graph.py # Dependency graph generation
 ├── generate_docs.py          # Documentation generation utilities
 ├── *_report_settings.py      # Site-specific configurations (ai_, linux_, covid_, space_, trump_, pv_, techno_)
-├── templates/                # Jinja2 templates and modular JavaScript
+├── templates/                # Jinja2 templates and modular JavaScript/CSS
 │   ├── *.html               # HTML templates
 │   ├── app.js               # Main application JavaScript
 │   ├── core.js              # Core JavaScript (themes, auto-refresh, scroll)
@@ -76,10 +76,15 @@ LinuxReport is a Python/Flask-based news aggregation platform that provides real
 │   ├── chat.js              # Chat interface functionality
 │   ├── weather.js           # Weather widget functionality
 │   ├── infinitescroll.js    # Infinite scroll functionality
+│   ├── themes.css           # Design system, variables, themes, fonts
+│   ├── core.css             # Core UI, layout, responsive, enhancements
+│   ├── weather.css          # Weather widget styling
+│   ├── chat.css             # Chat system styling
+│   └── config.css           # Admin configuration styling
 ├── static/                   # Static assets and compiled JavaScript/CSS
 │   ├── images/              # Site logos and favicons
-│   ├── linuxreport.css      # Main stylesheet
-│   └── linuxreport.js       # Compiled/bundled JavaScript (auto-generated)
+│   ├── linuxreport.css      # Auto-generated from modular CSS files
+│   └── linuxreport.js       # Auto-generated from modular JS files
 ├── tests/                    # Test directory with pytest tests
 │   ├── __init__.py          # Test package initialization
 │   ├── test_article_deduplication.py # Article deduplication tests
@@ -295,13 +300,14 @@ The image processing system has been refactored to consolidate functionality int
 - **Security Headers**: CSP, XSS protection, frame options
 - **IP Blocking**: Persistent banned IP storage in disk cache
 
-## JavaScript Architecture
+## JavaScript and CSS Architecture
 
 1. **Modular System**:
-   - Source files in `templates/`: `app.js`, `core.js`, `config.js`, `chat.js`, `weather.js`, `infinitescroll.js`
-   - Automatic bundling into `static/linuxreport.js` via Flask-Assets
-   - Development mode: unminified for debugging
-   - Production mode: minified with source file headers
+    - **JavaScript**: Source files in `templates/`: `app.js`, `core.js`, `config.js`, `chat.js`, `weather.js`, `infinitescroll.js`
+    - **CSS**: Modular files in `templates/`: `themes.css`, `core.css`, `weather.css`, `chat.css`, `config.css`
+    - Automatic bundling into `static/linuxreport.js` and `static/linuxreport.css` via Flask-Assets
+    - Development mode: unminified for debugging
+    - Production mode: minified with source file headers and compilation metadata
 
 2. **Core Functionality**:
    - Theme management (dark/light mode persistence)
@@ -391,9 +397,10 @@ The image processing system has been refactored to consolidate functionality int
    ```
 
 3. **Asset Development**:
-   - Edit JavaScript in `templates/` directory
-   - Flask-Assets automatically rebuilds on startup
-   - Debug mode serves unminified assets
+    - Edit JavaScript and CSS in `templates/` directory
+    - Flask-Assets automatically rebuilds on startup
+    - Debug mode serves unminified assets
+    - CSS modules: themes.css (design system), core.css (main UI), weather.css/chat.css/config.css (features)
 
 ## Performance Considerations
 

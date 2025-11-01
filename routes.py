@@ -31,12 +31,12 @@ from forms import LoginForm
 from models import RssInfo, User
 from app_config import DEBUG
 from shared import (
-    limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES, 
+    limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
     EXPIRE_DAY, EXPIRE_YEARS, FAVICON, LOGO_URL, STANDARD_ORDER_STR,
-    URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML, 
-    g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS, 
-    ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL, 
-    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION
+    URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML,
+    g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS,
+    ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL,
+    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION, Mode
 )
 from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
@@ -746,6 +746,41 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
             g_logger.error(f"Error in force refresh for {feed_url}: {e}")
             return jsonify({'error': 'Internal server error'}), 500
 
+    @flask_app.route('/about')
+    @limiter.limit(dynamic_rate_limit)
+    def about():
+        """
+        About page for the current report type.
+
+        Displays information about the site, its features, and links to other reports.
+        Uses existing template structure and styling.
+        """
+        # Get all available report modes for cross-navigation
+        all_reports = []
+        for mode in Mode:
+            # Import the config module for each mode to get its settings
+            try:
+                config_module = __import__(f"{mode.value}_report_settings", fromlist=["CONFIG"])
+                config = config_module.CONFIG
+                all_reports.append({
+                    'name': mode.value.title(),
+                    'url': f"https://{mode.value}report.keithcu.com" if mode.value != "robot" else "https://robotreport.keithcu.com",
+                    'description': config.WEB_DESCRIPTION,
+                    'is_current': mode == MODE
+                })
+            except ImportError:
+                # Skip modes without config files
+                continue
+
+        # Render the about page template
+        return render_template('about.html',
+                             title=WEB_TITLE,
+                             description=WEB_DESCRIPTION,
+                             logo_url=LOGO_URL,
+                             favicon=FAVICON,
+                             all_reports=all_reports,
+                             current_mode=MODE.value)
+
     # Rate limit error handler
     @flask_app.errorhandler(429)
     def ratelimit_handler(e):
@@ -754,7 +789,7 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         ip = get_remote_address()
         endpoint = request.endpoint or request.path
         track_rate_limit_event(ip, endpoint)
-        
+
         return jsonify({
             "error": "Rate limit exceeded",
             "message": "Too many requests. Please try again later.",

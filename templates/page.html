@@ -104,6 +104,7 @@
             </select>
           </div>
           <div class="nav-section-right">
+            <button id="about-btn" class="btn">About</button>
             <button id="chat-toggle-btn" class="btn">Chat</button>
             <button id="config-btn" class="btn">Config...</button>
             {% if (g.is_mobile and INFINITE_SCROLL_MOBILE) or INFINITE_SCROLL_DEBUG %}
@@ -164,8 +165,8 @@
     
     <!-- Pass Flask variables to JavaScript -->
     <script>
-      window.isAdmin = {{ 'true' if current_user.is_authenticated else 'false' }};
-      window.flaskDebug = {{ 'true' if config.DEBUG else 'false' }};
+      window.isAdmin = "{{ 'true' if current_user.is_authenticated else 'false' }}";
+      window.flaskDebug = "{{ 'true' if config.DEBUG else 'false' }}";
       window.csrf_token = "{{ csrf_token() }}";
     </script>
   </body>

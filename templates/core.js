@@ -163,12 +163,13 @@
 
         setupEventListeners() {
             const { themeSelect, fontSelect, configBtn, viewModeToggle } = this.getElements();
-            
+
             const handlers = [
                 { element: themeSelect, event: 'change', handler: (e) => app.setTheme(e.target.value) },
                 { element: fontSelect, event: 'change', handler: (e) => app.setFont(e.target.value) },
                 { element: configBtn, event: 'click', handler: () => app.redirect() },
-                { element: viewModeToggle, event: 'click', handler: () => this.toggleViewMode() }
+                { element: viewModeToggle, event: 'click', handler: () => this.toggleViewMode() },
+                { element: document.getElementById('about-btn'), event: 'click', handler: () => window.location.href = '/about' }
             ];
 
             handlers.forEach(({ element, event, handler }) => {
@@ -176,7 +177,7 @@
                     element.addEventListener(event, handler);
                 }
             });
-            
+
             document.addEventListener('viewmodechange', () => this.reinitPagination());
         },
 

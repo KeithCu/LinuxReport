@@ -48,6 +48,15 @@ JS_MODULES = [
     'config.js',
 ]
 
+# Define the order of CSS modules for loading
+CSS_MODULES = [
+    'themes.css',
+    'core.css',
+    'weather.css',
+    'chat.css',
+    'config.css',
+]
+
 # URLS_COOKIE_VERSION is now imported from shared.py
 
 # =============================================================================
@@ -243,19 +252,25 @@ def setup_asset_bundles(app):
     
     # Create JS bundle from individual modules
     js_files = [
-        os.path.join(os.path.dirname(__file__), 'templates', module) 
+        os.path.join(os.path.dirname(__file__), 'templates', module)
         for module in JS_MODULES
     ]
-    
+
     # Register JavaScript bundle
     g_js_bundle = g_assets.register('js_all', Bundle(
         *js_files,
         output='linuxreport.js'
     ))
-    
+
+    # Create CSS bundle from individual modules
+    css_files = [
+        os.path.join(os.path.dirname(__file__), 'templates', module)
+        for module in CSS_MODULES
+    ]
+
     # Register CSS bundle for cache busting
     g_css_bundle = g_assets.register('css_all', Bundle(
-        'linuxreport.css',
+        *css_files,
         output='linuxreport.css'
     ))
     
@@ -274,7 +289,7 @@ g_assets, g_js_bundle, g_css_bundle = setup_asset_bundles(g_app)
 def perform_startup_tasks(app, js_bundle, css_bundle):
     """
     Perform necessary startup tasks like building assets and running migrations.
-    
+
     Args:
         app (Flask): Flask application instance
         js_bundle: JavaScript asset bundle
@@ -283,14 +298,14 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
     with app.app_context():
         try:
             js_output_path = os.path.join(app.static_folder, 'linuxreport.js')
-            
+
             # Check if existing file exists and get its hash
             existing_hash = None
             if os.path.exists(js_output_path):
                 try:
                     with open(js_output_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                    
+
                     # Extract existing hash from header
                     for line in content.split('\n')[:5]:
                         if line.startswith('// Hash: '):
@@ -298,21 +313,21 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
                             break
                 except IOError as e:
                     g_logger.warning(f"Could not read existing JS file: {e}")
-            
+
             # Calculate hash of source files to see if they changed
             source_files = [
-                os.path.join(os.path.dirname(__file__), 'templates', module) 
+                os.path.join(os.path.dirname(__file__), 'templates', module)
                 for module in JS_MODULES
             ]
-            
+
             source_content = ""
             for file_path in source_files:
                 if os.path.exists(file_path):
                     with open(file_path, 'r', encoding='utf-8') as f:
                         source_content += f.read()
-            
+
             new_hash = hashlib.md5(source_content.encode('utf-8')).hexdigest()[:8]
-            
+
             # Only rebuild if hash changed or file doesn't exist
             if not existing_hash or existing_hash != new_hash:
                 # Clear existing file and rebuild
@@ -322,32 +337,90 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
 
                 js_bundle.build()
                 g_logger.info("JavaScript bundle built successfully")
-                
+
                 # Add header information
                 if os.path.exists(js_output_path):
                     with open(js_output_path, 'r', encoding='utf-8') as f:
                         content = f.read()
-                    
+
                     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     header = f'// Compiled: {timestamp}\n'
                     header += f'// Hash: {new_hash}\n'
                     header += f'// Source files: {", ".join(JS_MODULES)}\n\n'
-                    
+
                     with open(js_output_path, 'w', encoding='utf-8') as f:
                         f.write(header + content)
-                    
+
                     g_logger.info(f"JavaScript content changed (new hash: {new_hash}), updated with new header")
                 else:
                     g_logger.warning("JavaScript bundle was not created after build")
             else:
                 g_logger.info(f"JavaScript content unchanged (hash: {new_hash}), reusing existing file")
 
-            css_bundle.build()
-            g_logger.info("CSS cache busting configured successfully")
-            
+            # Handle CSS bundling with similar logic
+            css_output_path = os.path.join(app.static_folder, 'linuxreport.css')
+
+            # Check if existing CSS file exists and get its hash
+            existing_css_hash = None
+            if os.path.exists(css_output_path):
+                try:
+                    with open(css_output_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+
+                    # Extract existing hash from header
+                    for line in content.split('\n')[:5]:
+                        if line.startswith('/* Hash: '):
+                            existing_css_hash = line.split('/* Hash: ')[1].strip().rstrip(' */')
+                            break
+                except IOError as e:
+                    g_logger.warning(f"Could not read existing CSS file: {e}")
+
+            # Calculate hash of CSS source files to see if they changed
+            css_source_files = [
+                os.path.join(os.path.dirname(__file__), 'templates', module)
+                for module in CSS_MODULES
+            ]
+
+            css_source_content = ""
+            for file_path in css_source_files:
+                if os.path.exists(file_path):
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        css_source_content += f.read()
+
+            new_css_hash = hashlib.md5(css_source_content.encode('utf-8')).hexdigest()[:8]
+
+            # Only rebuild CSS if hash changed or file doesn't exist
+            if not existing_css_hash or existing_css_hash != new_css_hash:
+                # Clear existing file and rebuild
+                if os.path.exists(css_output_path):
+                    os.remove(css_output_path)
+                    g_logger.info("Removed existing CSS bundle for fresh build")
+
+                css_bundle.build()
+                g_logger.info("CSS bundle built successfully")
+
+                # Add header information
+                if os.path.exists(css_output_path):
+                    with open(css_output_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+
+                    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    header = f'/* Compiled: {timestamp} */\n'
+                    header += f'/* Hash: {new_css_hash} */\n'
+                    header += f'/* Source files: {", ".join(CSS_MODULES)} */\n\n'
+
+                    with open(css_output_path, 'w', encoding='utf-8') as f:
+                        f.write(header + content)
+
+                    g_logger.info(f"CSS content changed (new hash: {new_css_hash}), updated with new header")
+                else:
+                    g_logger.warning("CSS bundle was not created after build")
+            else:
+                g_logger.info(f"CSS content unchanged (hash: {new_css_hash}), reusing existing file")
+
             # Run one-time migration of last_fetch times
             run_one_time_last_fetch_migration(ALL_URLS.keys())
-            
+
         except (IOError, OSError, RuntimeError) as e:
             g_logger.warning(f"Failed to complete startup tasks: {e}")
 
