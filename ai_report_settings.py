@@ -25,14 +25,14 @@ class VentureBeatFetchConfig(FetchConfig):
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={
-		"https://www.reddit.com/r/LocalLlama/.rss": RssInfo("LocalLlama.webp", "Machine Learning sub", "https://www.reddit.com/r/LocalLlama/"),
+		"https://www.reddit.com/r/LocalLlama/rising/.rss": RssInfo("LocalLlama.webp", "Machine Learning sub", "https://www.reddit.com/r/LocalLlama/"),
 #		"https://venturebeat.com/category/ai/fakefeed": RssInfo("VentureBeat_logo.webp", "VentureBeat AI", "https://venturebeat.com/category/ai/"),
 		"https://www.theregister.com/software/ai_ml/headlines.atom": RssInfo("RegisterLogo.webp", "The Register AI News", "https://www.theregister.com/software/ai_ml/"),
         "https://news.smol.ai/rss.xml": RssInfo("smol.webp", "Smol.ai News", "https://news.smol.ai/"),
 		"https://hnrss.org/newest?tags=ai": RssInfo("hackernews.webp", "YCombinator", "https://news.ycombinator.com/"),
 		"https://www.reddit.com/r/Python/rising/.rss": RssInfo("redditlogosmall.webp", "Reddit Python", "https://www.reddit.com/r/Python/"),
 		"https://planetpython.org/rss20.xml": RssInfo("Python-logo-notext.svg", "Planet Python", "https://planetpython.org/"),
-		"https://www.reddit.com/r/Grok/.rss": RssInfo("Grok.gif", "Reddit Grok", "https://www.reddit.com/r/Grok/"),
+		"https://www.reddit.com/r/Grok/rising/.rss": RssInfo("Grok.gif", "Reddit Grok", "https://www.reddit.com/r/Grok/"),
 		"https://huggingface.co/blog/feed.xml": RssInfo("hf-logo.svg", "HuggingFace Blog", "https://huggingface.co/blog/"),
 		"https://feed.infoq.com/ai-ml-data-eng/": RssInfo("infoq.png", "InfoQ AI", "https://www.infoq.com/ai-ml-data-eng/"),
 		"https://futurism.com/categories/ai-artificial-intelligence/feed": RssInfo("futurism.svg", "Futurism", "https://futurism.com/categories/ai-artificial-intelligence"),
@@ -40,10 +40,10 @@ CONFIG: SiteConfig = SiteConfig(
 	},
 	USER_AGENT="AI Report -- https://aireport.keithcu.com",
 	SITE_URLS=[
-		"https://www.reddit.com/r/LocalLlama/.rss",
+		"https://www.reddit.com/r/LocalLlama/rising/.rss",
 		"https://hnrss.org/newest?tags=ai",
         "https://www.google.com/alerts/feeds/12151242449143161443/8656080270874628454",
-		"https://www.reddit.com/r/Grok/.rss",
+		"https://www.reddit.com/r/Grok/rising/.rss",
 		"https://huggingface.co/blog/feed.xml",
 		"https://futurism.com/categories/ai-artificial-intelligence/feed",
         "https://news.smol.ai/rss.xml",
