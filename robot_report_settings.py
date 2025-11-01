@@ -11,7 +11,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://robohub.org/feed/": RssInfo("Robohub.webp", "Robohub", "https://robohub.org/"),
         "https://newatlas.com/robotics/index.rss": RssInfo("NewAtlas.svg", "New Atlas Robotics", "https://newatlas.com/robotics/"),
         "https://www.azorobotics.com/syndication.axd": RssInfo("AZoRobotics.webp", "AZoRobotics", "https://www.azorobotics.com/"),
-        "https://www.unite.ai/category/robotics/fakefeed": RssInfo("UniteAI.svg", "Unite.AI Robotics", "https://www.unite.ai/category/robotics/"),
+        "https://www.unite.ai/fakefeed": RssInfo("UniteAI.svg", "Unite.AI Robotics", "https://www.unite.ai"),
         "https://arxiv.org/rss/cs.RO": RssInfo("arXiv.svg", "arXiv Robotics", "https://arxiv.org/list/cs.RO/recent"),
         "https://news.mit.edu/topic/mitrobotics-rss.xml": RssInfo("MIT.svg", "MIT News Robotics", "https://news.mit.edu/topic/robotics"),
         "https://spectrum.ieee.org/feeds/topic/robotics.rss": RssInfo("IEEESpectrum.svg", "IEEE Spectrum Robotics", "https://spectrum.ieee.org/topic/robotics/"),
@@ -24,7 +24,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://robohub.org/feed/",
         "https://newatlas.com/robotics/index.rss",
         "https://www.azorobotics.com/syndication.axd",
-        "https://www.unite.ai/category/robotics/fakefeed",
+        "https://www.unite.ai/fakefeed",
         "https://arxiv.org/rss/cs.RO",
         "https://news.mit.edu/topic/mitrobotics-rss.xml",
         "https://spectrum.ieee.org/feeds/topic/robotics.rss",
@@ -42,19 +42,18 @@ CONFIG: SiteConfig = SiteConfig(
     PATH="/srv/http/robotreport",
     SCHEDULE=[0, 8, 12, 16],
     CUSTOM_FETCH_CONFIG={
-        # Site-specific Selenium config for Unite.AI category page
-        # Fallback heuristic: select anchors that look like permalinks (contain a year)
-        # Special-case in seleniumfetch: when title_selector==post_container, use element text
+        # Site-specific Selenium config for Unite.AI main page
+        # Updated to match actual site structure
         "unite.ai": FetchConfig(
             needs_selenium=True,
             needs_tor=False,
-            post_container="a[href*='/20']",
-            title_selector="a[href*='/20']",
-            link_selector="a[href*='/20']",
+            post_container="li.mvp-blog-story-wrap",
+            title_selector="h2",
+            link_selector=".mvp-blog-story-text a[rel='bookmark']",
             link_attr="href",
-            filter_pattern="/20",
+            filter_pattern=None,
             use_random_user_agent=False,
-            published_selector=None,
+            published_selector="span.mvp-cd-date",
         ),
     }
 )

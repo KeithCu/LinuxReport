@@ -71,26 +71,43 @@ def test_uniteai_selenium():
     """Test Unite.AI Robotics using Selenium debugging."""
     
     def custom_analysis(driver):
-        """Custom analysis for Unite.AI - find article links with year in URL."""
+        """Custom analysis for Unite.AI - verify post structure matches config."""
         from selenium.webdriver.common.by import By
-        anchors = driver.find_elements(By.CSS_SELECTOR, "a[href*='/20']")
-        titles = []
-        for el in anchors[:30]:
+        # Check for post containers matching the config
+        post_containers = driver.find_elements(By.CSS_SELECTOR, "li.mvp-blog-story-wrap")
+        articles = []
+        for container in post_containers[:10]:
             try:
-                text = el.text.strip()
-                href = el.get_attribute('href')
-                if text and href and "/category/" not in href and "/tag/" not in href:
-                    titles.append({'text': text, 'href': href})
-            except Exception:
+                # Find title
+                title_elem = container.find_element(By.CSS_SELECTOR, "h2")
+                title = title_elem.text.strip() if title_elem else None
+                
+                # Find link using the actual config selector
+                link_elem = container.find_element(By.CSS_SELECTOR, ".mvp-blog-story-text a[rel='bookmark']")
+                link = link_elem.get_attribute('href') if link_elem else None
+                
+                # Find published date
+                date_elem = container.find_element(By.CSS_SELECTOR, "span.mvp-cd-date")
+                date = date_elem.text.strip() if date_elem else None
+                
+                if title and link:
+                    articles.append({
+                        'title': title,
+                        'link': link,
+                        'date': date
+                    })
+            except Exception as e:
                 continue
-        return {'candidate_articles': titles[:20]}
+        return {'found_articles': articles, 'total_containers': len(post_containers)}
     
     config = DebugConfig(
-        url="https://www.unite.ai/category/robotics/",
-        site_name="uniteai_robotics",
+        url="https://www.unite.ai/",
+        site_name="uniteai_main",
         user_agent="Robot Report -- https://robotreport.keithcu.com",
         wait_time=5,
-        link_selectors=["a[href*='/20']"],
+        post_selectors=["li.mvp-blog-story-wrap"],
+        title_selectors=["h2"],
+        link_selectors=[".mvp-blog-story-text a[rel='bookmark']"],
         custom_analysis=custom_analysis,
     )
     
@@ -100,11 +117,28 @@ def test_uniteai_selenium():
     if result:
         print(f"\n[SUCCESS] Unite.AI debug completed!")
         print(f"Files created: {', '.join(result.get('files', {}).values())}")
+        
+        # Show post items found
+        if result.get('post_items'):
+            print(f"\nPost containers found:")
+            for item in result['post_items']:
+                print(f"  - {item['selector']}: {item['count']} items")
+        
+        # Show custom analysis results
         if result.get('custom_analysis'):
-            articles = result['custom_analysis'].get('candidate_articles', [])
-            print(f"\nFound {len(articles)} candidate articles")
-            for article in articles[:5]:
-                print(f"  * {article['text'][:60]}... -> {article['href']}")
+            analysis = result['custom_analysis']
+            total = analysis.get('total_containers', 0)
+            articles = analysis.get('found_articles', [])
+            print(f"\nCustom analysis results:")
+            print(f"  - Total post containers: {total}")
+            print(f"  - Successfully parsed articles: {len(articles)}")
+            if articles:
+                print(f"\nFirst 5 articles:")
+                for i, article in enumerate(articles[:5]):
+                    print(f"    {i+1}. {article['title'][:60]}...")
+                    print(f"       Link: {article['link']}")
+                    print(f"       Date: {article['date']}")
+        
         return True
     else:
         print("\n[FAILED] Unite.AI debug failed!")

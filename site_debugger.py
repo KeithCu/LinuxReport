@@ -29,23 +29,15 @@ from datetime import datetime
 from typing import Dict, List, Optional, Any, Callable, Tuple
 from dataclasses import dataclass, field
 
-try:
-    from selenium import webdriver
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.chrome.service import Service
-    from selenium.webdriver.common.by import By
-    from webdriver_manager.chrome import ChromeDriverManager
-    from webdriver_manager.core.os_manager import ChromeType
-    SELENIUM_AVAILABLE = True
-except ImportError:
-    SELENIUM_AVAILABLE = False
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.core.os_manager import ChromeType
 
-try:
-    import requests
-    from bs4 import BeautifulSoup
-    REQUESTS_AVAILABLE = True
-except ImportError:
-    REQUESTS_AVAILABLE = False
+import requests
+from bs4 import BeautifulSoup
 
 
 @dataclass
@@ -92,10 +84,6 @@ class SiteDebugger:
         
         Returns dict with debug results and file paths, or None on error.
         """
-        if not SELENIUM_AVAILABLE:
-            print("ERROR: Selenium not available. Install selenium and webdriver-manager.")
-            return None
-            
         print(f"Starting Selenium debug for {self.config.url}...")
         
         # Setup Chrome options
@@ -380,10 +368,6 @@ class SiteDebugger:
         
         Returns dict with debug results and file paths, or None on error.
         """
-        if not REQUESTS_AVAILABLE:
-            print("ERROR: Requests/BeautifulSoup not available.")
-            return None
-        
         print(f"Starting requests debug for {self.config.url}...")
         
         try:
