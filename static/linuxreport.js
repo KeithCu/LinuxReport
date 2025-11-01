@@ -1,1 +1,0 @@
-// This file is now compiled from templates/app.js, templates/infinitescroll.js, templates/core.js, templates/weather.js, templates/chat.js, and templates/config.js
