@@ -396,11 +396,11 @@
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
             const container = this.elements.get('weather-container');
-            
+
             app.utils.logger.debug('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
             app.utils.logger.debug('[Weather] Forecast element:', forecast);
             app.utils.logger.debug('[Weather] Forecast element ID:', forecast?.id);
-            
+
             if (!forecast || !header) return;
 
             // Store current weather data for unit toggle re-rendering
@@ -419,24 +419,29 @@
             const dayElements = await Promise.all(
                 data.daily.map(day => this.createDayHTML(day))
             );
-            
+
             forecast.innerHTML = dayElements.join('');
             this.hideElement(loading);
             this.showElement(forecast);
-            
+
             // The weather container should already be visible if we're rendering data
             // Only ensure it's visible if it was hidden for some reason
             if (container && container.style.display === 'none') {
                 container.style.display = 'block';
                 container.style.visibility = 'visible';
             }
-            
+
             // Apply horizontal layout using CSS class
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
                 app.utils.logger.debug('[Weather] Applied CSS class for horizontal layout');
                 app.utils.logger.debug('[Weather] Forecast element classes:', forecast.className);
                 app.utils.logger.debug('[Weather] Forecast computed style:', getComputedStyle(forecast).display);
+            }
+
+            // Mark container as loaded to make it visible
+            if (container) {
+                container.classList.add('loaded');
             }
         }
 

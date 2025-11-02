@@ -1,3 +1,4 @@
+/* =============================================================================
    7. WEATHER WIDGET
    ============================================================================= */
 
@@ -29,6 +30,7 @@
   background-color: transparent;
   padding: 1px 2px;
   border-radius: 1px;
+  z-index: 2; /* Ensure attribution appears above forecast content */
 }
 
 .weather-collapsed-label {
@@ -120,6 +122,7 @@
   border-radius: var(--border-radius-md);
   text-align: center;
   box-shadow: var(--shadow-sm);
+  position: relative; /* Ensure attribution can be positioned relative to this container */
 }
 
 .weather-container h3 {
