@@ -522,21 +522,35 @@
             // THEORY 6C: The HTML works when appended to body, so the issue is CSS positioning
             console.log('[Weather] THEORY 6C: HTML works when appended to body - issue is CSS positioning');
 
-            // THEORY 6D: Try moving the forecast element to be a direct child of body
-            console.log('[Weather] THEORY 6D: Moving forecast to be direct child of body...');
-            if (forecast && forecast.innerHTML) {
-                // Remove from current parent
-                const originalParent = forecast.parentElement;
-                if (originalParent) {
-                    originalParent.removeChild(forecast);
-                    console.log('  Removed forecast from original parent');
-                }
+            // THEORY 6D: The forecast is now visible when moved to body - the issue is in the original DOM position
+            console.log('[Weather] THEORY 6D: Forecast is visible when moved to body - issue is original DOM position');
 
-                // Reset all styles and make it visible
-                forecast.style.cssText = 'position: fixed; top: 200px; left: 100px; background: lightblue; border: 2px solid blue; z-index: 9999; padding: 20px; max-width: 600px; display: flex !important; visibility: visible !important; opacity: 1 !important;';
-                forecast.className = ''; // Remove all classes
-                document.body.appendChild(forecast);
-                console.log('  Moved forecast to body with forced positioning');
+            // THEORY 6E: Check what happens if we put it back in the original position but with forced styles
+            console.log('[Weather] THEORY 6E: Putting forecast back in original position with forced styles...');
+            if (forecast) {
+                // Remove from body
+                document.body.removeChild(forecast);
+                console.log('  Removed forecast from body');
+
+                // Put it back in the original container
+                const container = this.elements.get('weather-container');
+                if (container) {
+                    // Clear all styles first
+                    forecast.style.cssText = '';
+                    forecast.className = 'weather-forecast-horizontal';
+
+                    // Force visibility with extreme measures
+                    forecast.style.setProperty('display', 'flex', 'important');
+                    forecast.style.setProperty('visibility', 'visible', 'important');
+                    forecast.style.setProperty('opacity', '1', 'important');
+                    forecast.style.setProperty('position', 'relative', 'important');
+                    forecast.style.setProperty('width', '100%', 'important');
+                    forecast.style.setProperty('height', 'auto', 'important');
+                    forecast.style.setProperty('background', 'lightgreen', 'important'); // Make it obvious if visible
+
+                    container.appendChild(forecast);
+                    console.log('  Put forecast back in container with extreme forced styles');
+                }
             }
 
             // THEORY 7: Check final computed styles
