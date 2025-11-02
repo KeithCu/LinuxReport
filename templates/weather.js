@@ -501,6 +501,9 @@
                 }
 
                 console.log('  Elements containing "Loading weather":', loadingElements);
+                loadingElements.forEach((item, index) => {
+                    console.log(`    [${index}] ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className : ''}: "${item.text}"`);
+                });
 
                 // Check if there are any elements with "Finding location" that are visible
                 let findingElements = [];
@@ -517,6 +520,24 @@
                 }
 
                 console.log('  Elements containing "Finding location":', findingElements);
+                findingElements.forEach((item, index) => {
+                    console.log(`    [${index}] ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className : ''}: "${item.text}"`);
+                });
+
+                // Force hide ALL elements containing loading text
+                console.log('  Force hiding all loading elements...');
+                for (let item of loadingElements) {
+                    if (item.element && item.element !== this.elements.get('weather-loading')) {
+                        item.element.style.display = 'none';
+                        console.log('    Hid element:', item.path);
+                    }
+                }
+                for (let item of findingElements) {
+                    if (item.element && item.element !== this.elements.get('contentInner')) {
+                        item.element.style.display = 'none';
+                        console.log('    Hid finding element:', item.path);
+                    }
+                }
             }, 100);
         }
 
