@@ -481,28 +481,41 @@
 
             console.log('[Weather] Render complete');
 
-            // Debug: Check if loading element is actually hidden
+            // Debug: Check what the user is actually seeing
             setTimeout(() => {
-                const loading = this.elements.get('weather-loading');
+                console.log('[Weather] What user sees check:');
+
+                // Check the weather-content-inner element specifically
                 const contentInner = this.elements.get('contentInner');
-                console.log('[Weather] Checking loading/content visibility:');
-                if (loading) {
-                    console.log('  Loading display:', getComputedStyle(loading).display);
-                    console.log('  Loading visibility:', getComputedStyle(loading).visibility);
-                    console.log('  Loading textContent:', loading.textContent);
-                }
                 if (contentInner) {
-                    console.log('  ContentInner display:', getComputedStyle(contentInner).display);
-                    console.log('  ContentInner visibility:', getComputedStyle(contentInner).visibility);
-                    console.log('  ContentInner textContent length:', contentInner.textContent.length);
+                    console.log('  ContentInner element details:');
+                    console.log('    Display:', getComputedStyle(contentInner).display);
+                    console.log('    Visibility:', getComputedStyle(contentInner).visibility);
+                    console.log('    Text content preview:', contentInner.textContent.substring(0, 100) + '...');
+                    console.log('    Inner HTML preview:', contentInner.innerHTML.substring(0, 100) + '...');
                 }
 
-                // Check the entire weather widget container
-                const widgetContainer = this.elements.get('weather-widget-container');
-                if (widgetContainer) {
-                    console.log('  Widget container display:', getComputedStyle(widgetContainer).display);
-                    console.log('  Widget container visibility:', getComputedStyle(widgetContainer).visibility);
+                // Check if the weather_html template variable contains "Loading weather..."
+                console.log('  Checking if template weather_html contains loading text...');
+                // This would be set by Flask, so we can't check it directly from JS
+                // But we can check what contentInner contains
+
+                // Check all elements that might contain "Loading weather..."
+                const allElements = document.querySelectorAll('*');
+                let loadingElements = [];
+                for (let el of allElements) {
+                    if (el.textContent && el.textContent.includes('Loading weather') && getComputedStyle(el).display !== 'none') {
+                        loadingElements.push({
+                            element: el,
+                            tagName: el.tagName,
+                            id: el.id,
+                            className: el.className,
+                            text: el.textContent.trim()
+                        });
+                    }
                 }
+
+                console.log('  Elements containing "Loading weather":', loadingElements);
             }, 100);
         }
 
