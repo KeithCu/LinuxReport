@@ -525,32 +525,117 @@
             // THEORY 6D: The forecast is now visible when moved to body - the issue is in the original DOM position
             console.log('[Weather] THEORY 6D: Forecast is visible when moved to body - issue is original DOM position');
 
-            // THEORY 6E: Check what happens if we put it back in the original position but with forced styles
-            console.log('[Weather] THEORY 6E: Putting forecast back in original position with forced styles...');
-            if (forecast) {
-                // Remove from body
-                document.body.removeChild(forecast);
-                console.log('  Removed forecast from body');
+            // THEORY 6E: Even extreme !important styles don't work - there must be a CSS rule with higher specificity
+            console.log('[Weather] THEORY 6E: Even extreme !important styles don\'t work - higher specificity CSS rule');
 
-                // Put it back in the original container
-                const container = this.elements.get('weather-container');
-                if (container) {
-                    // Clear all styles first
-                    forecast.style.cssText = '';
-                    forecast.className = 'weather-forecast-horizontal';
+            // THEORY 6F: Check for CSS rules that might be hiding elements with higher specificity
+            console.log('[Weather] THEORY 6F: Checking for higher specificity CSS rules...');
+            const checkCSSRules = () => {
+                const results = {
+                    displayNone: [],
+                    visibilityHidden: [],
+                    opacityZero: [],
+                    positionAbsoluteOffscreen: [],
+                    clipPath: [],
+                    transform: []
+                };
 
-                    // Force visibility with extreme measures
-                    forecast.style.setProperty('display', 'flex', 'important');
-                    forecast.style.setProperty('visibility', 'visible', 'important');
-                    forecast.style.setProperty('opacity', '1', 'important');
-                    forecast.style.setProperty('position', 'relative', 'important');
-                    forecast.style.setProperty('width', '100%', 'important');
-                    forecast.style.setProperty('height', 'auto', 'important');
-                    forecast.style.setProperty('background', 'lightgreen', 'important'); // Make it obvious if visible
+                try {
+                    for (let sheet of document.styleSheets) {
+                        try {
+                            for (let rule of sheet.cssRules) {
+                                if (rule.selectorText) {
+                                    const selector = rule.selectorText;
+                                    const cssText = rule.cssText;
 
-                    container.appendChild(forecast);
-                    console.log('  Put forecast back in container with extreme forced styles');
+                                    // Check for rules that might affect weather elements
+                                    if (selector.includes('weather') || selector.includes('#weather') ||
+                                        selector.includes('.weather') || selector.includes('forecast')) {
+
+                                        if (cssText.includes('display: none') || cssText.includes('display:none')) {
+                                            results.displayNone.push({ selector, cssText });
+                                        }
+                                        if (cssText.includes('visibility: hidden') || cssText.includes('visibility:hidden')) {
+                                            results.visibilityHidden.push({ selector, cssText });
+                                        }
+                                        if (cssText.includes('opacity: 0') || cssText.includes('opacity:0')) {
+                                            results.opacityZero.push({ selector, cssText });
+                                        }
+                                        if (cssText.includes('position: absolute') && cssText.includes('left: -9999')) {
+                                            results.positionAbsoluteOffscreen.push({ selector, cssText });
+                                        }
+                                        if (cssText.includes('clip-path') || cssText.includes('clip')) {
+                                            results.clipPath.push({ selector, cssText });
+                                        }
+                                        if (cssText.includes('transform')) {
+                                            results.transform.push({ selector, cssText });
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            // Cross-origin stylesheet, skip
+                        }
+                    }
+                } catch (e) {
+                    console.log('  Could not check CSS rules:', e.message);
                 }
+
+                console.log('  CSS rules that might hide weather elements:', results);
+                return results;
+            };
+
+            const cssResults = checkCSSRules();
+
+            // THEORY 6G: Try using setTimeout to apply styles after DOM updates
+            console.log('[Weather] THEORY 6G: Applying styles with setTimeout...');
+            setTimeout(() => {
+                if (forecast) {
+                    forecast.style.display = 'flex !important';
+                    forecast.style.visibility = 'visible !important';
+                    forecast.style.opacity = '1 !important';
+                    forecast.style.background = 'red !important'; // Make it really obvious
+                    forecast.style.border = '5px solid yellow !important';
+                    forecast.style.padding = '20px !important';
+                    forecast.style.position = 'relative !important';
+                    forecast.style.zIndex = '9999 !important';
+                    console.log('  Applied styles with setTimeout - check if red background appears');
+                }
+            }, 100);
+
+            // THEORY 6H: Check if the element is being removed or replaced by another script
+            console.log('[Weather] THEORY 6H: Setting up mutation observer...');
+            if (forecast && forecast.parentElement) {
+                const observer = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        if (mutation.type === 'childList') {
+                            mutation.removedNodes.forEach((node) => {
+                                if (node === forecast) {
+                                    console.log('  FORECAST ELEMENT WAS REMOVED FROM DOM!');
+                                }
+                            });
+                        }
+                        if (mutation.type === 'attributes') {
+                            if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
+                                console.log('  Forecast element attributes changed:', mutation.attributeName);
+                            }
+                        }
+                    });
+                });
+
+                observer.observe(forecast.parentElement, {
+                    childList: true,
+                    attributes: true,
+                    attributeFilter: ['style', 'class']
+                });
+
+                // Also observe the forecast element itself
+                observer.observe(forecast, {
+                    attributes: true,
+                    attributeFilter: ['style', 'class']
+                });
+
+                console.log('  Mutation observer set up');
             }
 
             // THEORY 7: Check final computed styles
