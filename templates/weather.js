@@ -469,6 +469,35 @@
             this.showElement(forecast);
             console.log('[Weather] THEORY 6: showElement called on forecast');
 
+            // THEORY 6B: Check if showElement actually attaches to DOM
+            console.log('[Weather] THEORY 6B: Checking showElement implementation');
+            console.log('  showElement set display to:', forecast.style.display);
+            console.log('  Forecast parent before showElement:', forecast.parentElement?.tagName);
+
+            // THEORY 6C: Manually ensure forecast is in the right container
+            console.log('[Weather] THEORY 6C: Manually attaching forecast to container');
+            const weatherContent = this.elements.get('weather-content');
+            if (weatherContent && !weatherContent.contains(forecast)) {
+                weatherContent.appendChild(forecast);
+                console.log('  THEORY 6C: Attached forecast to weather-content');
+            } else if (container && !container.contains(forecast)) {
+                container.appendChild(forecast);
+                console.log('  THEORY 6C: Attached forecast to weather-container');
+            } else {
+                console.log('  THEORY 6C: Forecast already attached or no suitable parent found');
+            }
+
+            // THEORY 6D: Force visibility with extreme measures
+            forecast.style.setProperty('display', 'flex', 'important');
+            forecast.style.setProperty('visibility', 'visible', 'important');
+            forecast.style.setProperty('opacity', '1', 'important');
+            forecast.style.setProperty('width', '100%', 'important');
+            forecast.style.setProperty('height', 'auto', 'important');
+            forecast.style.setProperty('background-color', 'red', 'important'); // Make it obvious
+            forecast.style.setProperty('border', '3px solid yellow', 'important');
+            forecast.style.setProperty('padding', '10px', 'important');
+            console.log('  THEORY 6D: Applied extreme inline styles with !important');
+
             console.log('[Weather] THEORY 7: Add CSS classes');
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
@@ -509,6 +538,31 @@
                 console.log('  Forecast is in document:', document.contains(forecast));
                 console.log('  Forecast offsetWidth:', forecast.offsetWidth);
                 console.log('  Forecast offsetHeight:', forecast.offsetHeight);
+
+                // THEORY 9B: Check if element was removed and re-add if necessary
+                console.log('[Weather] THEORY 9B: Checking if element needs re-attachment');
+                if (!document.contains(forecast)) {
+                    console.log('  THEORY 9B: Forecast not in document, re-attaching...');
+                    const weatherContent = this.elements.get('weather-content');
+                    if (weatherContent) {
+                        weatherContent.appendChild(forecast);
+                        console.log('  THEORY 9B: Re-attached to weather-content');
+                    } else if (container) {
+                        container.appendChild(forecast);
+                        console.log('  THEORY 9B: Re-attached to weather-container');
+                    }
+                } else {
+                    console.log('  THEORY 9B: Forecast is still in document');
+                }
+
+                // THEORY 9C: Final force visibility attempt
+                console.log('[Weather] THEORY 9C: Final force visibility');
+                forecast.style.display = 'flex !important';
+                forecast.style.visibility = 'visible !important';
+                forecast.style.opacity = '1 !important';
+                forecast.style.backgroundColor = 'blue !important';
+                forecast.style.border = '5px solid green !important';
+                console.log('  THEORY 9C: Applied final force visibility styles');
             }, 200);
 
             console.log('[Weather] THEORY 10: Set header text');
