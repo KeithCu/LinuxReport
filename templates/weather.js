@@ -421,7 +421,7 @@
             const contentInner = this.elements.get('contentInner');
 
             console.log('[Weather] Render called with data:', data);
-            app.utils.logger.debug('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
+            console.log('[Weather] Elements check - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading, 'container:', !!container, 'contentInner:', !!contentInner);
             app.utils.logger.debug('[Weather] Forecast element:', forecast);
             app.utils.logger.debug('[Weather] Forecast element ID:', forecast?.id);
 
@@ -488,9 +488,16 @@
             if (container) {
                 container.classList.add('loaded');
                 console.log('[Weather] Added loaded class to container');
+                console.log('[Weather] Container classes:', container.className);
+                console.log('[Weather] Container style.display:', container.style.display);
+                console.log('[Weather] Container style.visibility:', container.style.visibility);
             }
 
-            console.log('[Weather] Render complete');
+            console.log('[Weather] Render complete - checking final state');
+            console.log('[Weather] Final forecast display:', getComputedStyle(forecast).display);
+            console.log('[Weather] Final forecast visibility:', getComputedStyle(forecast).visibility);
+            console.log('[Weather] Final container display:', container ? getComputedStyle(container).display : 'no container');
+            console.log('[Weather] Final container visibility:', container ? getComputedStyle(container).visibility : 'no container');
         }
 
         async createDayHTML(day) {
