@@ -519,15 +519,24 @@
                 });
             }
 
-            // THEORY 6C: Try a completely different approach - append to body temporarily
-            console.log('[Weather] THEORY 6C: Trying to append forecast to body...');
+            // THEORY 6C: The HTML works when appended to body, so the issue is CSS positioning
+            console.log('[Weather] THEORY 6C: HTML works when appended to body - issue is CSS positioning');
+
+            // THEORY 6D: Try moving the forecast element to be a direct child of body
+            console.log('[Weather] THEORY 6D: Moving forecast to be direct child of body...');
             if (forecast && forecast.innerHTML) {
-                const testDiv = document.createElement('div');
-                testDiv.id = 'weather-test-div';
-                testDiv.innerHTML = '<h2>WEATHER TEST - If you can see this, the HTML is working</h2>' + forecast.innerHTML;
-                testDiv.style.cssText = 'position: fixed; top: 100px; left: 100px; background: yellow; border: 2px solid red; z-index: 9999; padding: 20px; max-width: 400px;';
-                document.body.appendChild(testDiv);
-                console.log('  Appended test div to body with forecast HTML');
+                // Remove from current parent
+                const originalParent = forecast.parentElement;
+                if (originalParent) {
+                    originalParent.removeChild(forecast);
+                    console.log('  Removed forecast from original parent');
+                }
+
+                // Reset all styles and make it visible
+                forecast.style.cssText = 'position: fixed; top: 200px; left: 100px; background: lightblue; border: 2px solid blue; z-index: 9999; padding: 20px; max-width: 600px; display: flex !important; visibility: visible !important; opacity: 1 !important;';
+                forecast.className = ''; // Remove all classes
+                document.body.appendChild(forecast);
+                console.log('  Moved forecast to body with forced positioning');
             }
 
             // THEORY 7: Check final computed styles
