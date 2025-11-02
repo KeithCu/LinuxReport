@@ -23,17 +23,18 @@
         getElements() {
             const elements = new Map();
             const ids = [
-                'weather-container', 'weather-widget-container', 'weather-content', 
-                'weather-toggle-btn', 'weather-collapsed-label', 'weather-forecast', 
+                'weather-container', 'weather-widget-container', 'weather-content',
+                'weather-toggle-btn', 'weather-collapsed-label', 'weather-forecast',
                 'weather-loading', 'weather-error', 'weather-unit-toggle'
             ];
             ids.forEach(id => elements.set(id, document.getElementById(id)));
             elements.set('header', document.querySelector('#weather-container h3'));
-            
+            elements.set('contentInner', document.querySelector('.weather-content-inner'));
+
             // Cache meta elements for location data
             elements.set('latMeta', document.querySelector('meta[name="weather-lat"]'));
             elements.set('lonMeta', document.querySelector('meta[name="weather-lon"]'));
-            
+
             return elements;
         }
 
@@ -396,6 +397,7 @@
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
             const container = this.elements.get('weather-container');
+            const contentInner = this.elements.get('contentInner');
 
             app.utils.logger.debug('[Weather] Render - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading);
             app.utils.logger.debug('[Weather] Forecast element:', forecast);
@@ -422,6 +424,7 @@
 
             forecast.innerHTML = dayElements.join('');
             this.hideElement(loading);
+            this.hideElement(contentInner); // Hide the initial content
             this.showElement(forecast);
 
             // The weather container should already be visible if we're rendering data
