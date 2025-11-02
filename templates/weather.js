@@ -414,316 +414,48 @@
         }
 
         async render(data) {
-            console.log('[Weather] ===== RENDER START =====');
-            console.log('[Weather] Data received:', data);
-
+            console.log('[Weather] Set forecast innerHTML');
             const forecast = this.elements.get('weather-forecast');
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
             const container = this.elements.get('weather-container');
             const contentInner = this.elements.get('contentInner');
-            const content = this.elements.get('weather-content');
-
-            console.log('[Weather] Elements found:', {
-                forecast: !!forecast,
-                header: !!header,
-                loading: !!loading,
-                container: !!container,
-                contentInner: !!contentInner,
-                content: !!content
-            });
 
             if (!forecast || !header) {
-                console.error('[Weather] Missing required elements - aborting render');
+                console.error('[Weather] Missing required elements');
                 return;
             }
 
-            // THEORY 1: Check if data.daily exists and has content
-            if (!data.daily || !Array.isArray(data.daily) || data.daily.length === 0) {
-                console.log('[Weather] THEORY 1: No daily data available');
+            if (!data.daily?.length) {
                 this.showError('No weather data available.');
                 return;
             }
-            console.log('[Weather] THEORY 1: Daily data OK, length:', data.daily.length);
 
-            // THEORY 2: Check if createDayHTML is working
-            console.log('[Weather] THEORY 2: Creating day elements...');
-            let dayElements;
-            try {
-                dayElements = await Promise.all(
-                    data.daily.map(day => this.createDayHTML(day))
-                );
-                console.log('[Weather] THEORY 2: Day elements created successfully, count:', dayElements.length);
-            } catch (error) {
-                console.error('[Weather] THEORY 2: Error creating day elements:', error);
-                return;
-            }
+            // Create day HTML elements
+            const dayElements = await Promise.all(
+                data.daily.map(day => this.createDayHTML(day))
+            );
 
-            // THEORY 3: Check if forecast.innerHTML is being set
-            console.log('[Weather] THEORY 3: Setting forecast HTML...');
             forecast.innerHTML = dayElements.join('');
-            console.log('[Weather] THEORY 3: Forecast HTML set, length:', forecast.innerHTML.length);
-
-            // THEORY 4: Check element visibility manipulation
-            console.log('[Weather] THEORY 4: Manipulating element visibility...');
             this.hideElement(loading);
-            console.log('[Weather] THEORY 4: Loading hidden, display:', getComputedStyle(loading).display);
 
             if (contentInner) {
                 contentInner.textContent = '';
                 contentInner.style.display = 'none';
-                console.log('[Weather] THEORY 4: ContentInner cleared and hidden');
             }
 
             this.showElement(forecast);
-            console.log('[Weather] THEORY 4: Forecast shown, display:', getComputedStyle(forecast).display);
 
-            // THEORY 5: Check CSS class application
-            console.log('[Weather] THEORY 5: Applying CSS classes...');
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
-                console.log('[Weather] THEORY 5: Horizontal class added');
             }
 
             if (container) {
                 container.classList.add('loaded');
-                console.log('[Weather] THEORY 5: Loaded class added to container');
+                console.log('[Weather] Container classes:', container.className);
+                console.log('[Weather] Container style.display:', container.style.display);
+                console.log('[Weather] Container style.visibility:', container.style.visibility);
             }
-
-            // THEORY 6: Check forced styling
-            console.log('[Weather] THEORY 6: Applying forced styles...');
-            if (forecast) {
-                forecast.style.setProperty('visibility', 'visible', 'important');
-                forecast.style.setProperty('display', 'flex', 'important');
-                forecast.style.setProperty('opacity', '1', 'important');
-                console.log('[Weather] THEORY 6: Forecast forced visible with !important');
-            }
-
-            if (content) {
-                content.style.setProperty('display', 'block', 'important');
-                content.style.setProperty('visibility', 'visible', 'important');
-                console.log('[Weather] THEORY 6: Content wrapper forced visible with !important');
-            }
-
-            // THEORY 6B: Try removing CSS classes that might be hiding it
-            console.log('[Weather] THEORY 6B: Checking and removing problematic classes...');
-            if (forecast) {
-                const classes = Array.from(forecast.classList);
-                console.log('  Forecast classes:', classes);
-                // Remove any classes that might contain 'hide' or similar
-                classes.forEach(cls => {
-                    if (cls.includes('hide') || cls.includes('hidden')) {
-                        forecast.classList.remove(cls);
-                        console.log('  Removed class:', cls);
-                    }
-                });
-            }
-
-            // THEORY 6C: The HTML works when appended to body, so the issue is CSS positioning
-            console.log('[Weather] THEORY 6C: HTML works when appended to body - issue is CSS positioning');
-
-            // THEORY 6D: The forecast is now visible when moved to body - the issue is in the original DOM position
-            console.log('[Weather] THEORY 6D: Forecast is visible when moved to body - issue is original DOM position');
-
-            // THEORY 6E: Even extreme !important styles don't work - there must be a CSS rule with higher specificity
-            console.log('[Weather] THEORY 6E: Even extreme !important styles don\'t work - higher specificity CSS rule');
-
-            // THEORY 6F: Check for CSS rules that might be hiding elements with higher specificity
-            console.log('[Weather] THEORY 6F: Checking for higher specificity CSS rules...');
-            const checkCSSRules = () => {
-                const results = {
-                    displayNone: [],
-                    visibilityHidden: [],
-                    opacityZero: [],
-                    positionAbsoluteOffscreen: [],
-                    clipPath: [],
-                    transform: []
-                };
-
-                try {
-                    for (let sheet of document.styleSheets) {
-                        try {
-                            for (let rule of sheet.cssRules) {
-                                if (rule.selectorText) {
-                                    const selector = rule.selectorText;
-                                    const cssText = rule.cssText;
-
-                                    // Check for rules that might affect weather elements
-                                    if (selector.includes('weather') || selector.includes('#weather') ||
-                                        selector.includes('.weather') || selector.includes('forecast')) {
-
-                                        if (cssText.includes('display: none') || cssText.includes('display:none')) {
-                                            results.displayNone.push({ selector, cssText });
-                                        }
-                                        if (cssText.includes('visibility: hidden') || cssText.includes('visibility:hidden')) {
-                                            results.visibilityHidden.push({ selector, cssText });
-                                        }
-                                        if (cssText.includes('opacity: 0') || cssText.includes('opacity:0')) {
-                                            results.opacityZero.push({ selector, cssText });
-                                        }
-                                        if (cssText.includes('position: absolute') && cssText.includes('left: -9999')) {
-                                            results.positionAbsoluteOffscreen.push({ selector, cssText });
-                                        }
-                                        if (cssText.includes('clip-path') || cssText.includes('clip')) {
-                                            results.clipPath.push({ selector, cssText });
-                                        }
-                                        if (cssText.includes('transform')) {
-                                            results.transform.push({ selector, cssText });
-                                        }
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            // Cross-origin stylesheet, skip
-                        }
-                    }
-                } catch (e) {
-                    console.log('  Could not check CSS rules:', e.message);
-                }
-
-                console.log('  CSS rules that might hide weather elements:', results);
-                return results;
-            };
-
-            const cssResults = checkCSSRules();
-
-            // THEORY 6G: Try using setTimeout to apply styles after DOM updates
-            console.log('[Weather] THEORY 6G: Applying styles with setTimeout...');
-            setTimeout(() => {
-                if (forecast) {
-                    forecast.style.display = 'flex !important';
-                    forecast.style.visibility = 'visible !important';
-                    forecast.style.opacity = '1 !important';
-                    forecast.style.background = 'red !important'; // Make it really obvious
-                    forecast.style.border = '5px solid yellow !important';
-                    forecast.style.padding = '20px !important';
-                    forecast.style.position = 'relative !important';
-                    forecast.style.zIndex = '9999 !important';
-                    console.log('  Applied styles with setTimeout - check if red background appears');
-                }
-            }, 100);
-
-            // THEORY 6H: Check if the element is being removed or replaced by another script
-            console.log('[Weather] THEORY 6H: Setting up mutation observer...');
-            if (forecast && forecast.parentElement) {
-                const observer = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                        if (mutation.type === 'childList') {
-                            mutation.removedNodes.forEach((node) => {
-                                if (node === forecast) {
-                                    console.log('  FORECAST ELEMENT WAS REMOVED FROM DOM!');
-                                }
-                            });
-                        }
-                        if (mutation.type === 'attributes') {
-                            if (mutation.attributeName === 'style' || mutation.attributeName === 'class') {
-                                console.log('  Forecast element attributes changed:', mutation.attributeName);
-                            }
-                        }
-                    });
-                });
-
-                observer.observe(forecast.parentElement, {
-                    childList: true,
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-
-                // Also observe the forecast element itself
-                observer.observe(forecast, {
-                    attributes: true,
-                    attributeFilter: ['style', 'class']
-                });
-
-                console.log('  Mutation observer set up');
-            }
-
-            // THEORY 7: Check final computed styles
-            console.log('[Weather] THEORY 7: Final computed styles check');
-            setTimeout(() => {
-                console.log('[Weather] Final styles:');
-                console.log('  Forecast display:', getComputedStyle(forecast).display);
-                console.log('  Forecast visibility:', getComputedStyle(forecast).visibility);
-                console.log('  Forecast opacity:', getComputedStyle(forecast).opacity);
-                console.log('  Container display:', getComputedStyle(container).display);
-                console.log('  Container visibility:', getComputedStyle(container).visibility);
-                console.log('  Content display:', getComputedStyle(content).display);
-                console.log('  Content visibility:', getComputedStyle(content).visibility);
-                console.log('  Loading display:', getComputedStyle(loading).display);
-                console.log('  ContentInner display:', contentInner ? getComputedStyle(contentInner).display : 'N/A');
-
-                // THEORY 8: Check if CSS is overriding our inline styles
-                    console.log('[Weather] THEORY 8: Checking for CSS overrides...');
-                    const forecastStyles = window.getComputedStyle(forecast);
-                    console.log('  Forecast all styles:', {
-                        display: forecastStyles.display,
-                        visibility: forecastStyles.visibility,
-                        opacity: forecastStyles.opacity,
-                        position: forecastStyles.position,
-                        zIndex: forecastStyles.zIndex,
-                        width: forecastStyles.width,
-                        height: forecastStyles.height
-                    });
-    
-                    // Check inline styles vs computed styles
-                    console.log('  Forecast inline styles:', {
-                        display: forecast.style.display,
-                        visibility: forecast.style.visibility,
-                        opacity: forecast.style.opacity
-                    });
-    
-                    // Check if parent elements are hiding it
-                    let parent = forecast.parentElement;
-                    let depth = 0;
-                    while (parent && depth < 5) {
-                        console.log(`  Parent ${depth} (${parent.tagName}${parent.id ? '#' + parent.id : ''}): display=${getComputedStyle(parent).display}, visibility=${getComputedStyle(parent).visibility}`);
-                        parent = parent.parentElement;
-                        depth++;
-                    }
-    
-                    // THEORY 9: Check if the element is actually in the DOM and visible to user
-                    console.log('[Weather] THEORY 9: Checking element position and dimensions...');
-                    const rect = forecast.getBoundingClientRect();
-                    console.log('  Forecast bounding rect:', {
-                        top: rect.top,
-                        left: rect.left,
-                        width: rect.width,
-                        height: rect.height,
-                        bottom: rect.bottom,
-                        right: rect.right
-                    });
-    
-                    // Check if element is within viewport
-                    const inViewport = rect.top >= 0 && rect.left >= 0 &&
-                        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-                        rect.right <= (window.innerWidth || document.documentElement.clientWidth);
-                    console.log('  Forecast in viewport:', inViewport);
-    
-                    // THEORY 10: Check for CSS rules that might be hiding it
-                    console.log('[Weather] THEORY 10: Checking CSS rules...');
-                    try {
-                        const rules = [];
-                        for (let sheet of document.styleSheets) {
-                            try {
-                                for (let rule of sheet.cssRules) {
-                                    if (rule.selectorText && rule.selectorText.includes('#weather-forecast')) {
-                                        rules.push({
-                                            selector: rule.selectorText,
-                                            cssText: rule.cssText
-                                        });
-                                    }
-                                }
-                            } catch (e) {
-                                // Cross-origin stylesheet, skip
-                            }
-                        }
-                        console.log('  CSS rules for #weather-forecast:', rules);
-                    } catch (e) {
-                        console.log('  Could not check CSS rules:', e.message);
-                    }
-
-                console.log('[Weather] ===== RENDER END =====');
-            }, 100);
 
             // Store current weather data for unit toggle re-rendering
             this.currentWeatherData = data;
@@ -731,6 +463,8 @@
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
             }
+
+            console.log('[Weather] Render complete');
         }
 
         async createDayHTML(day) {
