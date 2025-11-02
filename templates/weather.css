@@ -60,6 +60,10 @@
 #weather-container.loaded {
   visibility: visible;
 }
+
+.weather-forecast {
+  visibility: inherit;
+}
 #weather-widget-container.collapsed #weather-content {
   display: none;
 }
