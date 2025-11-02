@@ -519,6 +519,17 @@
                 });
             }
 
+            // THEORY 6C: Try a completely different approach - append to body temporarily
+            console.log('[Weather] THEORY 6C: Trying to append forecast to body...');
+            if (forecast && forecast.innerHTML) {
+                const testDiv = document.createElement('div');
+                testDiv.id = 'weather-test-div';
+                testDiv.innerHTML = '<h2>WEATHER TEST - If you can see this, the HTML is working</h2>' + forecast.innerHTML;
+                testDiv.style.cssText = 'position: fixed; top: 100px; left: 100px; background: yellow; border: 2px solid red; z-index: 9999; padding: 20px; max-width: 400px;';
+                document.body.appendChild(testDiv);
+                console.log('  Appended test div to body with forecast HTML');
+            }
+
             // THEORY 7: Check final computed styles
             console.log('[Weather] THEORY 7: Final computed styles check');
             setTimeout(() => {
