@@ -61,9 +61,10 @@
   visibility: visible;
 }
 
-.weather-forecast {
-  visibility: inherit;
+#weather-container.loaded .weather-forecast {
+  visibility: visible;
 }
+
 #weather-widget-container.collapsed #weather-content {
   display: none;
 }

@@ -493,11 +493,7 @@
                 console.log('[Weather] Container style.visibility:', container.style.visibility);
             }
 
-            console.log('[Weather] Render complete - checking final state');
-            console.log('[Weather] Final forecast display:', getComputedStyle(forecast).display);
-            console.log('[Weather] Final forecast visibility:', getComputedStyle(forecast).visibility);
-            console.log('[Weather] Final container display:', container ? getComputedStyle(container).display : 'no container');
-            console.log('[Weather] Final container visibility:', container ? getComputedStyle(container).visibility : 'no container');
+            console.log('[Weather] Render complete');
         }
 
         async createDayHTML(day) {
