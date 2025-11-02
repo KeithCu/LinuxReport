@@ -518,6 +518,29 @@
                 console.log('  Content visibility:', getComputedStyle(content).visibility);
                 console.log('  Loading display:', getComputedStyle(loading).display);
                 console.log('  ContentInner display:', contentInner ? getComputedStyle(contentInner).display : 'N/A');
+
+                // THEORY 8: Check if CSS is overriding our inline styles
+                console.log('[Weather] THEORY 8: Checking for CSS overrides...');
+                const forecastStyles = window.getComputedStyle(forecast);
+                console.log('  Forecast all styles:', {
+                    display: forecastStyles.display,
+                    visibility: forecastStyles.visibility,
+                    opacity: forecastStyles.opacity,
+                    position: forecastStyles.position,
+                    zIndex: forecastStyles.zIndex,
+                    width: forecastStyles.width,
+                    height: forecastStyles.height
+                });
+
+                // Check if parent elements are hiding it
+                let parent = forecast.parentElement;
+                let depth = 0;
+                while (parent && depth < 5) {
+                    console.log(`  Parent ${depth} (${parent.tagName}${parent.id ? '#' + parent.id : ''}): display=${getComputedStyle(parent).display}, visibility=${getComputedStyle(parent).visibility}`);
+                    parent = parent.parentElement;
+                    depth++;
+                }
+
                 console.log('[Weather] ===== RENDER END =====');
             }, 100);
 
