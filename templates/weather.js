@@ -493,16 +493,30 @@
             // THEORY 6: Check forced styling
             console.log('[Weather] THEORY 6: Applying forced styles...');
             if (forecast) {
-                forecast.style.visibility = 'visible';
-                forecast.style.display = 'flex';
-                forecast.style.opacity = '1';
-                console.log('[Weather] THEORY 6: Forecast forced visible');
+                forecast.style.setProperty('visibility', 'visible', 'important');
+                forecast.style.setProperty('display', 'flex', 'important');
+                forecast.style.setProperty('opacity', '1', 'important');
+                console.log('[Weather] THEORY 6: Forecast forced visible with !important');
             }
 
             if (content) {
-                content.style.display = 'block';
-                content.style.visibility = 'visible';
-                console.log('[Weather] THEORY 6: Content wrapper forced visible');
+                content.style.setProperty('display', 'block', 'important');
+                content.style.setProperty('visibility', 'visible', 'important');
+                console.log('[Weather] THEORY 6: Content wrapper forced visible with !important');
+            }
+
+            // THEORY 6B: Try removing CSS classes that might be hiding it
+            console.log('[Weather] THEORY 6B: Checking and removing problematic classes...');
+            if (forecast) {
+                const classes = Array.from(forecast.classList);
+                console.log('  Forecast classes:', classes);
+                // Remove any classes that might contain 'hide' or similar
+                classes.forEach(cls => {
+                    if (cls.includes('hide') || cls.includes('hidden')) {
+                        forecast.classList.remove(cls);
+                        console.log('  Removed class:', cls);
+                    }
+                });
             }
 
             // THEORY 7: Check final computed styles
@@ -520,26 +534,74 @@
                 console.log('  ContentInner display:', contentInner ? getComputedStyle(contentInner).display : 'N/A');
 
                 // THEORY 8: Check if CSS is overriding our inline styles
-                console.log('[Weather] THEORY 8: Checking for CSS overrides...');
-                const forecastStyles = window.getComputedStyle(forecast);
-                console.log('  Forecast all styles:', {
-                    display: forecastStyles.display,
-                    visibility: forecastStyles.visibility,
-                    opacity: forecastStyles.opacity,
-                    position: forecastStyles.position,
-                    zIndex: forecastStyles.zIndex,
-                    width: forecastStyles.width,
-                    height: forecastStyles.height
-                });
-
-                // Check if parent elements are hiding it
-                let parent = forecast.parentElement;
-                let depth = 0;
-                while (parent && depth < 5) {
-                    console.log(`  Parent ${depth} (${parent.tagName}${parent.id ? '#' + parent.id : ''}): display=${getComputedStyle(parent).display}, visibility=${getComputedStyle(parent).visibility}`);
-                    parent = parent.parentElement;
-                    depth++;
-                }
+                    console.log('[Weather] THEORY 8: Checking for CSS overrides...');
+                    const forecastStyles = window.getComputedStyle(forecast);
+                    console.log('  Forecast all styles:', {
+                        display: forecastStyles.display,
+                        visibility: forecastStyles.visibility,
+                        opacity: forecastStyles.opacity,
+                        position: forecastStyles.position,
+                        zIndex: forecastStyles.zIndex,
+                        width: forecastStyles.width,
+                        height: forecastStyles.height
+                    });
+    
+                    // Check inline styles vs computed styles
+                    console.log('  Forecast inline styles:', {
+                        display: forecast.style.display,
+                        visibility: forecast.style.visibility,
+                        opacity: forecast.style.opacity
+                    });
+    
+                    // Check if parent elements are hiding it
+                    let parent = forecast.parentElement;
+                    let depth = 0;
+                    while (parent && depth < 5) {
+                        console.log(`  Parent ${depth} (${parent.tagName}${parent.id ? '#' + parent.id : ''}): display=${getComputedStyle(parent).display}, visibility=${getComputedStyle(parent).visibility}`);
+                        parent = parent.parentElement;
+                        depth++;
+                    }
+    
+                    // THEORY 9: Check if the element is actually in the DOM and visible to user
+                    console.log('[Weather] THEORY 9: Checking element position and dimensions...');
+                    const rect = forecast.getBoundingClientRect();
+                    console.log('  Forecast bounding rect:', {
+                        top: rect.top,
+                        left: rect.left,
+                        width: rect.width,
+                        height: rect.height,
+                        bottom: rect.bottom,
+                        right: rect.right
+                    });
+    
+                    // Check if element is within viewport
+                    const inViewport = rect.top >= 0 && rect.left >= 0 &&
+                        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+                        rect.right <= (window.innerWidth || document.documentElement.clientWidth);
+                    console.log('  Forecast in viewport:', inViewport);
+    
+                    // THEORY 10: Check for CSS rules that might be hiding it
+                    console.log('[Weather] THEORY 10: Checking CSS rules...');
+                    try {
+                        const rules = [];
+                        for (let sheet of document.styleSheets) {
+                            try {
+                                for (let rule of sheet.cssRules) {
+                                    if (rule.selectorText && rule.selectorText.includes('#weather-forecast')) {
+                                        rules.push({
+                                            selector: rule.selectorText,
+                                            cssText: rule.cssText
+                                        });
+                                    }
+                                }
+                            } catch (e) {
+                                // Cross-origin stylesheet, skip
+                            }
+                        }
+                        console.log('  CSS rules for #weather-forecast:', rules);
+                    } catch (e) {
+                        console.log('  Could not check CSS rules:', e.message);
+                    }
 
                 console.log('[Weather] ===== RENDER END =====');
             }, 100);
