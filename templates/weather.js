@@ -529,13 +529,13 @@
                 for (let item of loadingElements) {
                     if (item.element && item.element !== this.elements.get('weather-loading')) {
                         item.element.style.display = 'none';
-                        console.log('    Hid element:', item.path);
+                        console.log('    Hid loading element:', item.element.tagName + (item.element.id ? '#' + item.element.id : '') + (item.element.className ? '.' + item.element.className : ''));
                     }
                 }
                 for (let item of findingElements) {
                     if (item.element && item.element !== this.elements.get('contentInner')) {
                         item.element.style.display = 'none';
-                        console.log('    Hid finding element:', item.path);
+                        console.log('    Hid finding element:', item.element.tagName + (item.element.id ? '#' + item.element.id : '') + (item.element.className ? '.' + item.element.className : ''));
                     }
                 }
             }, 100);
