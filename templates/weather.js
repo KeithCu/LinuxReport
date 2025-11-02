@@ -480,6 +480,30 @@
             forecast.innerHTML = dayElements.join('');
             
             // ====================================================================
+            // EXTRACT HEADER FROM contentInner BEFORE HIDING IT
+            // The header (h3) is inside contentInner from server HTML, so we need to move it out
+            // ====================================================================
+            if (contentInner) {
+                const headerInContentInner = contentInner.querySelector('h3');
+                if (headerInContentInner) {
+                    console.log('[Weather] City info - Found header inside contentInner, moving it out');
+                    // Move header out of contentInner and into container (before contentInner)
+                    container.insertBefore(headerInContentInner, contentInner);
+                    // Update our header reference to point to the moved element
+                    // Note: header variable might already point to this element, but update it to be sure
+                    if (header !== headerInContentInner) {
+                        console.log('[Weather] City info - Header reference was different, updating it');
+                    }
+                    // Use the extracted header as our reference
+                    const extractedHeader = headerInContentInner;
+                    // Update the stored element reference
+                    this.elements.set('header', extractedHeader);
+                    header = extractedHeader;
+                    console.log('[Weather] City info - Header moved and reference updated');
+                }
+            }
+            
+            // ====================================================================
             // THEORY TESTING: Log during hiding attempts
             // ====================================================================
             if (loading) {
@@ -509,11 +533,10 @@
             }
 
             // Always hide contentInner - it's just the initial server-rendered HTML
-            // The forecast should be in #weather-forecast, not contentInner
-            // The header (h3) is separate and will be updated with city name
+            // Header should already be extracted above
             if (contentInner) {
                 console.log('[Weather] City info - contentInner content before clearing:', contentInner.textContent);
-                console.log('[Weather] City info - Hiding contentInner (it contains server-rendered HTML, not needed after JS render)');
+                console.log('[Weather] City info - Hiding contentInner (header should already be extracted)');
                 contentInner.textContent = '';
                 contentInner.style.display = 'none';
             }
@@ -654,25 +677,32 @@
 
             // Set city info in header and ensure it's visible
             // The header might be hidden due to container visibility: hidden initially
+            // IMPORTANT: Set header visibility BEFORE hiding contentInner, or extract header from contentInner first
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
                 console.log('[Weather] City info - Set header textContent to:', header.textContent);
-                // Make sure header is visible (container's visibility: hidden might hide it)
-                header.style.display = 'block';
-                header.style.visibility = 'visible';
-                console.log('[Weather] City info - Header display:', getComputedStyle(header).display);
-                console.log('[Weather] City info - Header visibility:', getComputedStyle(header).visibility);
             } else {
+                // Keep default text if no city name
+                if (!header.textContent || header.textContent.trim() === '') {
+                    header.textContent = '5-Day Weather';
+                }
                 console.log('[Weather] City info - No city_name in data, header textContent:', header.textContent);
-                // Still make header visible even without city name
-                header.style.display = 'block';
-                header.style.visibility = 'visible';
             }
+            
+            // Make sure header is visible (must be done after setting textContent)
+            // Use important to override any CSS that might hide it
+            header.style.setProperty('display', 'block', 'important');
+            header.style.setProperty('visibility', 'visible', 'important');
+            console.log('[Weather] City info - Header display:', getComputedStyle(header).display);
+            console.log('[Weather] City info - Header visibility:', getComputedStyle(header).visibility);
+            console.log('[Weather] City info - Header offsetHeight:', header.offsetHeight);
+            console.log('[Weather] City info - Header offsetWidth:', header.offsetWidth);
             
             // Ensure container and its children are visible after render
             if (container) {
                 container.style.visibility = 'visible';
                 console.log('[Weather] Container visibility set to visible');
+                console.log('[Weather] Container computed visibility:', getComputedStyle(container).visibility);
             }
         }
 
