@@ -419,7 +419,6 @@
             const loading = this.elements.get('weather-loading');
             const container = this.elements.get('weather-container');
             const contentInner = this.elements.get('contentInner');
-            const content = this.elements.get('weather-content');
 
             if (!forecast || !header) {
                 console.error('[Weather] Missing required elements');
@@ -431,47 +430,6 @@
                 return;
             }
 
-            // ====================================================================
-            // THEORY TESTING: Comprehensive logging for loading element debugging
-            // ====================================================================
-            console.log('[Weather] ===== RENDER START - Loading Element Debug =====');
-            
-            if (loading) {
-                // Theory 1 & 4: Log element state and computed styles BEFORE hiding
-                console.log('[Weather] [THEORY 1/4] Loading element exists:', !!loading);
-                console.log('[Weather] [THEORY 1/4] Loading element in DOM:', document.body.contains(loading));
-                console.log('[Weather] [THEORY 1/4] Loading element parent:', loading.parentElement?.id || loading.parentElement?.className || 'none');
-                console.log('[Weather] [THEORY 1/4] Loading element textContent BEFORE:', loading.textContent);
-                console.log('[Weather] [THEORY 1/4] Loading inline display BEFORE:', loading.style.display);
-                console.log('[Weather] [THEORY 1/4] Loading computed display BEFORE:', getComputedStyle(loading).display);
-                console.log('[Weather] [THEORY 1/4] Loading computed visibility BEFORE:', getComputedStyle(loading).visibility);
-                console.log('[Weather] [THEORY 1/4] Loading computed opacity BEFORE:', getComputedStyle(loading).opacity);
-                console.log('[Weather] [THEORY 1/4] Loading offsetWidth BEFORE:', loading.offsetWidth);
-                console.log('[Weather] [THEORY 1/4] Loading offsetHeight BEFORE:', loading.offsetHeight);
-                
-                // Theory 3: Check container visibility state
-                if (container) {
-                    console.log('[Weather] [THEORY 3] Container visibility:', getComputedStyle(container).visibility);
-                    console.log('[Weather] [THEORY 3] Container display:', getComputedStyle(container).display);
-                    console.log('[Weather] [THEORY 3] Container has .loaded class:', container.classList.contains('loaded'));
-                }
-            } else {
-                console.log('[Weather] [THEORY 1] Loading element is NULL!');
-            }
-            
-            // Log city info state
-            console.log('[Weather] City info - data.city_name:', data.city_name);
-            console.log('[Weather] City info - header exists:', !!header);
-            if (header) {
-                console.log('[Weather] City info - header textContent BEFORE:', header.textContent);
-                console.log('[Weather] City info - header computed display:', getComputedStyle(header).display);
-                console.log('[Weather] City info - header computed visibility:', getComputedStyle(header).visibility);
-            }
-            if (contentInner) {
-                console.log('[Weather] City info - contentInner textContent BEFORE:', contentInner.textContent);
-                console.log('[Weather] City info - contentInner computed display:', getComputedStyle(contentInner).display);
-            }
-
             // Create day HTML elements
             const dayElements = await Promise.all(
                 data.daily.map(day => this.createDayHTML(day))
@@ -479,124 +437,42 @@
 
             forecast.innerHTML = dayElements.join('');
             
-            // ====================================================================
-            // EXTRACT HEADER FROM contentInner BEFORE HIDING IT
-            // The header (h3) is inside contentInner from server HTML, so we need to move it out
-            // ====================================================================
+            // Extract header from contentInner before hiding it
+            // The header (h3) is inside contentInner from server-rendered HTML, so we need to move it out
+            // Otherwise, hiding contentInner will also hide the header
             if (contentInner) {
                 const headerInContentInner = contentInner.querySelector('h3');
                 if (headerInContentInner) {
-                    console.log('[Weather] City info - Found header inside contentInner, moving it out');
                     // Move header out of contentInner and into container (before contentInner)
                     container.insertBefore(headerInContentInner, contentInner);
                     // Update our header reference to point to the moved element
-                    // Note: header variable might already point to this element, but update it to be sure
-                    if (header !== headerInContentInner) {
-                        console.log('[Weather] City info - Header reference was different, updating it');
-                    }
-                    // Use the extracted header as our reference
-                    const extractedHeader = headerInContentInner;
-                    // Update the stored element reference
-                    this.elements.set('header', extractedHeader);
-                    header = extractedHeader;
-                    console.log('[Weather] City info - Header moved and reference updated');
-                }
-            }
-            
-            // ====================================================================
-            // THEORY TESTING: Log during hiding attempts
-            // ====================================================================
-            if (loading) {
-                console.log('[Weather] [THEORY 2] About to hide loading - FIRST ATTEMPT');
-                
-                // First hiding attempt
-                try {
-                    loading.style.display = 'none';
-                    console.log('[Weather] [THEORY 2] Set display = "none"');
-                    console.log('[Weather] [THEORY 2] Computed display AFTER first set:', getComputedStyle(loading).display);
-                } catch (error) {
-                    console.error('[Weather] [THEORY 2] Error setting display:', error);
+                    this.elements.set('header', headerInContentInner);
+                    header = headerInContentInner;
                 }
                 
-                try {
-                    loading.textContent = '';
-                    console.log('[Weather] [THEORY 5] Set textContent = "" (first time)');
-                    console.log('[Weather] [THEORY 5] textContent AFTER first clear:', loading.textContent);
-                } catch (error) {
-                    console.error('[Weather] [THEORY 5] Error clearing textContent:', error);
-                }
-                
-                // Wait a tick to see if styles stick
-                await new Promise(resolve => setTimeout(resolve, 0));
-                console.log('[Weather] [THEORY 6] After setTimeout(0) - computed display:', getComputedStyle(loading).display);
-                console.log('[Weather] [THEORY 6] After setTimeout(0) - textContent:', loading.textContent);
-            }
-
-            // Always hide contentInner - it's just the initial server-rendered HTML
-            // Header should already be extracted above
-            if (contentInner) {
-                console.log('[Weather] City info - contentInner content before clearing:', contentInner.textContent);
-                console.log('[Weather] City info - Hiding contentInner (header should already be extracted)');
+                // Hide contentInner - it's just the initial server-rendered HTML
+                // Header should already be extracted above
                 contentInner.textContent = '';
                 contentInner.style.display = 'none';
             }
 
-            // Second hiding attempt (the problematic one with invalid syntax)
+            // Hide loading element properly
+            // Use setProperty with 'important' parameter (correct way to apply !important in JavaScript)
             if (loading) {
-                console.log('[Weather] [THEORY 2] About to hide loading - SECOND ATTEMPT (with invalid syntax)');
-                
-                // Theory 1: Test invalid !important syntax
-                try {
-                    // This line has invalid syntax - JavaScript doesn't support !important in inline styles
-                    loading.style.display = 'none !important';
-                    console.log('[Weather] [THEORY 1] Set display = "none !important" (INVALID SYNTAX)');
-                    console.log('[Weather] [THEORY 1] Inline style.display value:', loading.style.display);
-                    console.log('[Weather] [THEORY 1] Computed display:', getComputedStyle(loading).display);
-                } catch (error) {
-                    console.error('[Weather] [THEORY 1] Error with invalid !important syntax:', error);
-                }
-                
-                try {
-                    loading.textContent = '';
-                    console.log('[Weather] [THEORY 5] Set textContent = "" (second time)');
-                } catch (error) {
-                    console.error('[Weather] [THEORY 5] Error clearing textContent second time:', error);
-                }
-                
-                try {
-                    loading.style.visibility = 'hidden';
-                    console.log('[Weather] [THEORY 4] Set visibility = "hidden"');
-                    console.log('[Weather] [THEORY 4] Computed visibility:', getComputedStyle(loading).visibility);
-                } catch (error) {
-                    console.error('[Weather] [THEORY 4] Error setting visibility:', error);
-                }
-                
-                try {
-                    loading.style.opacity = '0';
-                    console.log('[Weather] [THEORY 4] Set opacity = "0"');
-                    console.log('[Weather] [THEORY 4] Computed opacity:', getComputedStyle(loading).opacity);
-                } catch (error) {
-                    console.error('[Weather] [THEORY 4] Error setting opacity:', error);
-                }
-                
-                // Final state check
-                console.log('[Weather] [THEORY 4] Final computed display:', getComputedStyle(loading).display);
-                console.log('[Weather] [THEORY 4] Final computed visibility:', getComputedStyle(loading).visibility);
-                console.log('[Weather] [THEORY 4] Final computed opacity:', getComputedStyle(loading).opacity);
-                console.log('[Weather] [THEORY 4] Final offsetWidth:', loading.offsetWidth);
-                console.log('[Weather] [THEORY 4] Final offsetHeight:', loading.offsetHeight);
-                console.log('[Weather] [THEORY 5] Final textContent:', loading.textContent);
-                console.log('[Weather] [THEORY 5] Final innerHTML:', loading.innerHTML);
+                loading.style.setProperty('display', 'none', 'important');
+                loading.style.setProperty('visibility', 'hidden', 'important');
+                loading.style.setProperty('opacity', '0', 'important');
+                loading.textContent = '';
             }
 
             this.showElement(forecast);
 
-            // CRITICAL FIX: Ensure forecast is properly attached to weather-container
+            // Ensure forecast is properly attached to weather-container
             if (container && !container.contains(forecast)) {
                 container.appendChild(forecast);
             }
 
-            // Apply proper styling (remove debug colors)
+            // Apply proper styling
             forecast.style.display = 'flex';
             forecast.style.visibility = 'visible';
             forecast.style.opacity = '1';
@@ -605,9 +481,9 @@
             forecast.style.justifyContent = 'space-between';
             forecast.style.gap = 'var(--spacing-xs)';
             forecast.style.overflowX = 'auto';
-            forecast.style.backgroundColor = ''; // Remove debug color
-            forecast.style.border = ''; // Remove debug border
-            forecast.style.padding = ''; // Remove debug padding
+            forecast.style.backgroundColor = '';
+            forecast.style.border = '';
+            forecast.style.padding = '';
 
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
@@ -615,94 +491,28 @@
 
             if (container) {
                 container.classList.add('loaded');
-                console.log('[Weather] [THEORY 3] Added .loaded class to container');
-            }
-
-            // ====================================================================
-            // THEORY TESTING: Final state check after all operations
-            // ====================================================================
-            if (loading) {
-                console.log('[Weather] [THEORY 3] Container has .loaded class:', container?.classList.contains('loaded'));
-                console.log('[Weather] [THEORY 3] Container visibility AFTER .loaded:', container ? getComputedStyle(container).visibility : 'N/A');
-                console.log('[Weather] ===== FINAL STATE CHECK =====');
-                console.log('[Weather] Loading element still in DOM:', document.body.contains(loading));
-                console.log('[Weather] Loading inline display:', loading.style.display);
-                console.log('[Weather] Loading computed display:', getComputedStyle(loading).display);
-                console.log('[Weather] Loading computed visibility:', getComputedStyle(loading).visibility);
-                console.log('[Weather] Loading computed opacity:', getComputedStyle(loading).opacity);
-                console.log('[Weather] Loading offsetWidth:', loading.offsetWidth);
-                console.log('[Weather] Loading offsetHeight:', loading.offsetHeight);
-                console.log('[Weather] Loading textContent:', loading.textContent);
-                console.log('[Weather] Loading innerHTML:', loading.innerHTML);
-                console.log('[Weather] Loading getBoundingClientRect:', JSON.stringify(loading.getBoundingClientRect()));
-                
-                // Check all CSS rules affecting this element
-                const allRules = [];
-                for (let sheet of document.styleSheets) {
-                    try {
-                        for (let rule of sheet.cssRules || sheet.rules || []) {
-                            if (rule.selectorText && loading.matches(rule.selectorText)) {
-                                allRules.push(rule.selectorText + ' { ' + rule.style.cssText + ' }');
-                            }
-                        }
-                    } catch (e) {
-                        // Cross-origin stylesheets may throw
-                    }
-                }
-                console.log('[Weather] [THEORY 4] CSS rules matching loading element:', allRules.length, allRules);
-                console.log('[Weather] ===== RENDER END - Loading Element Debug =====');
-                
-                // ====================================================================
-                // FIX: Properly hide loading element after logging
-                // Remove invalid !important syntax and consolidate hiding logic
-                // ====================================================================
-                // Clear any invalid style values first
-                loading.style.removeProperty('display');
-                loading.style.removeProperty('visibility');
-                loading.style.removeProperty('opacity');
-                
-                // Apply proper hiding with highest priority methods
-                loading.style.setProperty('display', 'none', 'important');
-                loading.style.setProperty('visibility', 'hidden', 'important');
-                loading.style.setProperty('opacity', '0', 'important');
-                loading.textContent = '';
-                
-                console.log('[Weather] [FIX] Applied proper hiding with setProperty("important")');
-                console.log('[Weather] [FIX] Final computed display after fix:', getComputedStyle(loading).display);
-                console.log('[Weather] [FIX] Final textContent after fix:', loading.textContent);
             }
 
             // Store current weather data for unit toggle re-rendering
             this.currentWeatherData = data;
 
             // Set city info in header and ensure it's visible
-            // The header might be hidden due to container visibility: hidden initially
-            // IMPORTANT: Set header visibility BEFORE hiding contentInner, or extract header from contentInner first
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
-                console.log('[Weather] City info - Set header textContent to:', header.textContent);
             } else {
                 // Keep default text if no city name
                 if (!header.textContent || header.textContent.trim() === '') {
                     header.textContent = '5-Day Weather';
                 }
-                console.log('[Weather] City info - No city_name in data, header textContent:', header.textContent);
             }
             
-            // Make sure header is visible (must be done after setting textContent)
-            // Use important to override any CSS that might hide it
+            // Make sure header is visible (use important to override any CSS that might hide it)
             header.style.setProperty('display', 'block', 'important');
             header.style.setProperty('visibility', 'visible', 'important');
-            console.log('[Weather] City info - Header display:', getComputedStyle(header).display);
-            console.log('[Weather] City info - Header visibility:', getComputedStyle(header).visibility);
-            console.log('[Weather] City info - Header offsetHeight:', header.offsetHeight);
-            console.log('[Weather] City info - Header offsetWidth:', header.offsetWidth);
             
-            // Ensure container and its children are visible after render
+            // Ensure container is visible after render
             if (container) {
                 container.style.visibility = 'visible';
-                console.log('[Weather] Container visibility set to visible');
-                console.log('[Weather] Container computed visibility:', getComputedStyle(container).visibility);
             }
         }
 
