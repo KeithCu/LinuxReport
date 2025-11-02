@@ -485,21 +485,6 @@
             setTimeout(() => {
                 console.log('[Weather] What user sees check:');
 
-                // Check the weather-content-inner element specifically
-                const contentInner = this.elements.get('contentInner');
-                if (contentInner) {
-                    console.log('  ContentInner element details:');
-                    console.log('    Display:', getComputedStyle(contentInner).display);
-                    console.log('    Visibility:', getComputedStyle(contentInner).visibility);
-                    console.log('    Text content preview:', contentInner.textContent.substring(0, 100) + '...');
-                    console.log('    Inner HTML preview:', contentInner.innerHTML.substring(0, 100) + '...');
-                }
-
-                // Check if the weather_html template variable contains "Loading weather..."
-                console.log('  Checking if template weather_html contains loading text...');
-                // This would be set by Flask, so we can't check it directly from JS
-                // But we can check what contentInner contains
-
                 // Check all elements that might contain "Loading weather..."
                 const allElements = document.querySelectorAll('*');
                 let loadingElements = [];
@@ -516,6 +501,22 @@
                 }
 
                 console.log('  Elements containing "Loading weather":', loadingElements);
+
+                // Check if there are any elements with "Finding location" that are visible
+                let findingElements = [];
+                for (let el of allElements) {
+                    if (el.textContent && el.textContent.includes('Finding location') && getComputedStyle(el).display !== 'none') {
+                        findingElements.push({
+                            element: el,
+                            tagName: el.tagName,
+                            id: el.id,
+                            className: el.className,
+                            text: el.textContent.trim()
+                        });
+                    }
+                }
+
+                console.log('  Elements containing "Finding location":', findingElements);
             }, 100);
         }
 
