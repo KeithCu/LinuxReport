@@ -508,18 +508,14 @@
                 console.log('[Weather] [THEORY 6] After setTimeout(0) - textContent:', loading.textContent);
             }
 
-            // Don't hide contentInner - it might be needed for city info display
-            // Instead, clear it only if it doesn't contain useful info
+            // Always hide contentInner - it's just the initial server-rendered HTML
+            // The forecast should be in #weather-forecast, not contentInner
+            // The header (h3) is separate and will be updated with city name
             if (contentInner) {
                 console.log('[Weather] City info - contentInner content before clearing:', contentInner.textContent);
-                // Only clear if it's just default loading text
-                if (contentInner.textContent.trim() === '' || contentInner.textContent.includes('Loading') || contentInner.textContent.includes('Finding location')) {
-                    contentInner.textContent = '';
-                    contentInner.style.display = 'none';
-                    console.log('[Weather] City info - Hid contentInner (contained loading text)');
-                } else {
-                    console.log('[Weather] City info - Keeping contentInner visible (may contain city info)');
-                }
+                console.log('[Weather] City info - Hiding contentInner (it contains server-rendered HTML, not needed after JS render)');
+                contentInner.textContent = '';
+                contentInner.style.display = 'none';
             }
 
             // Second hiding attempt (the problematic one with invalid syntax)
@@ -656,17 +652,27 @@
             // Store current weather data for unit toggle re-rendering
             this.currentWeatherData = data;
 
-            // Set city info in header
+            // Set city info in header and ensure it's visible
+            // The header might be hidden due to container visibility: hidden initially
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
                 console.log('[Weather] City info - Set header textContent to:', header.textContent);
-                // Make sure header is visible
+                // Make sure header is visible (container's visibility: hidden might hide it)
                 header.style.display = 'block';
                 header.style.visibility = 'visible';
                 console.log('[Weather] City info - Header display:', getComputedStyle(header).display);
                 console.log('[Weather] City info - Header visibility:', getComputedStyle(header).visibility);
             } else {
                 console.log('[Weather] City info - No city_name in data, header textContent:', header.textContent);
+                // Still make header visible even without city name
+                header.style.display = 'block';
+                header.style.visibility = 'visible';
+            }
+            
+            // Ensure container and its children are visible after render
+            if (container) {
+                container.style.visibility = 'visible';
+                console.log('[Weather] Container visibility set to visible');
             }
         }
 
