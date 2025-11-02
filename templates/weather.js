@@ -448,6 +448,14 @@
                 contentInner.style.display = 'none';
             }
 
+            // Clear the loading text and show city info
+            if (loading) {
+                loading.style.display = 'none !important';
+                loading.textContent = '';
+                loading.style.visibility = 'hidden';
+                loading.style.opacity = '0';
+            }
+
             this.showElement(forecast);
 
             // CRITICAL FIX: Ensure forecast is properly attached to weather-container
