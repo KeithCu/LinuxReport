@@ -62,6 +62,7 @@
 }
 
 #weather-container.loaded .weather-forecast {
+  display: flex;
   visibility: visible;
 }
 
