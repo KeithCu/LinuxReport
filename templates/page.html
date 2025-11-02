@@ -25,11 +25,11 @@
 
     <!-- Weather Widget - Positioned at top of page -->
     <div style="text-align: center; width: 100%;">
-      <div id="weather-widget-container" class="weather-widget">
+      <div id="weather-outer" class="weather-widget">
         <div id="weather-content">
           <a href="https://openweathermap.org" target="_blank" class="weather-link">
-            <div id="weather-container" class="weather-container">
-              <div class="weather-content-inner">{{ weather_html }}</div>
+            <div id="weather-inner" class="weather-container">
+              <div class="weather-initial">{{ weather_html }}</div>
               <div id="weather-forecast" class="weather-forecast"></div>
               <div id="weather-loading" class="weather-loading">Loading weather...</div>
               <div id="weather-error" class="weather-error"></div>

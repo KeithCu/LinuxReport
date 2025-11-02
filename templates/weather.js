@@ -23,13 +23,13 @@
         getElements() {
             const elements = new Map();
             const ids = [
-                'weather-container', 'weather-widget-container', 'weather-content',
+                'weather-inner', 'weather-outer', 'weather-content',
                 'weather-toggle-btn', 'weather-collapsed-label', 'weather-forecast',
                 'weather-loading', 'weather-error', 'weather-unit-toggle'
             ];
             ids.forEach(id => elements.set(id, document.getElementById(id)));
-            elements.set('header', document.querySelector('#weather-container h3'));
-            elements.set('contentInner', document.querySelector('.weather-content-inner'));
+            elements.set('header', document.querySelector('#weather-inner h3'));
+            elements.set('initial', document.querySelector('.weather-initial'));
 
             // Cache meta elements for location data
             elements.set('latMeta', document.querySelector('meta[name="weather-lat"]'));
@@ -51,8 +51,8 @@
             }
 
             // Apply collapsed state first, then make visible to prevent flash
-            const container = this.elements.get('weather-container');
-            const widgetWrapper = this.elements.get('weather-widget-container');
+            const container = this.elements.get('weather-inner');
+            const widgetWrapper = this.elements.get('weather-outer');
             if (container && widgetWrapper && app.config.WEATHER_WIDGET_TOGGLE_ENABLED) {
                 const isCollapsed = (app.utils.CookieManager.get('weatherCollapsed') ?? String(app.config.WEATHER_DEFAULT_COLLAPSED)) === 'true';
                 if (isCollapsed) {
@@ -87,7 +87,7 @@
                 return;
             }
 
-            const widgetWrapper = this.elements.get('weather-widget-container');
+            const widgetWrapper = this.elements.get('weather-outer');
             const toggleBtn = this.elements.get('weather-toggle-btn');
             if (!widgetWrapper || !toggleBtn) return;
 
@@ -102,7 +102,7 @@
         }
 
         disableToggle() {
-            const widgetWrapper = this.elements.get('weather-widget-container');
+            const widgetWrapper = this.elements.get('weather-outer');
             const content = this.elements.get('weather-content');
             const toggleBtn = this.elements.get('weather-toggle-btn');
             const collapsedLabel = this.elements.get('weather-collapsed-label');
@@ -147,8 +147,8 @@
 
         load() {
             app.utils.logger.debug('[Weather] load() called');
-            const container = this.elements.get('weather-container');
-            const widgetWrapper = this.elements.get('weather-widget-container');
+            const container = this.elements.get('weather-inner');
+            const widgetWrapper = this.elements.get('weather-outer');
             
             if (!container) {
                 app.utils.logger.debug('[Weather] No container found, returning');
@@ -417,8 +417,7 @@
             const forecast = this.elements.get('weather-forecast');
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
-            const container = this.elements.get('weather-container');
-            const contentInner = this.elements.get('contentInner');
+            const container = this.elements.get('weather-inner');
 
             if (!forecast || !header) {
                 console.error('[Weather] Missing required elements');
@@ -437,23 +436,24 @@
 
             forecast.innerHTML = dayElements.join('');
             
-            // Extract header from contentInner before hiding it
-            // The header (h3) is inside contentInner from server-rendered HTML, so we need to move it out
-            // Otherwise, hiding contentInner will also hide the header
-            if (contentInner) {
-                const headerInContentInner = contentInner.querySelector('h3');
-                if (headerInContentInner) {
-                    // Move header out of contentInner and into container (before contentInner)
-                    container.insertBefore(headerInContentInner, contentInner);
+            // Extract header from initial before hiding it
+            // The header (h3) is inside initial from server-rendered HTML, so we need to move it out
+            // Otherwise, hiding initial will also hide the header
+            const initial = this.elements.get('initial');
+            if (initial) {
+                const headerInInitial = initial.querySelector('h3');
+                if (headerInInitial) {
+                    // Move header out of initial and into container (before initial)
+                    container.insertBefore(headerInInitial, initial);
                     // Update our header reference to point to the moved element
-                    this.elements.set('header', headerInContentInner);
-                    header = headerInContentInner;
+                    this.elements.set('header', headerInInitial);
+                    header = headerInInitial;
                 }
                 
-                // Hide contentInner - it's just the initial server-rendered HTML
+                // Hide initial - it's just the initial server-rendered HTML
                 // Header should already be extracted above
-                contentInner.textContent = '';
-                contentInner.style.display = 'none';
+                initial.textContent = '';
+                initial.style.display = 'none';
             }
 
             // Hide loading element properly
@@ -467,7 +467,7 @@
 
             this.showElement(forecast);
 
-            // Ensure forecast is properly attached to weather-container
+            // Ensure forecast is properly attached to weather-inner
             if (container && !container.contains(forecast)) {
                 container.appendChild(forecast);
             }
@@ -556,9 +556,9 @@
         }
 
         setCollapsed(isCollapsed, saveCookie = false) {
-            const widgetWrapper = this.elements.get('weather-widget-container');
+            const widgetWrapper = this.elements.get('weather-outer');
             const toggleBtn = this.elements.get('weather-toggle-btn');
-            const container = this.elements.get('weather-container');
+            const container = this.elements.get('weather-inner');
             
             if (widgetWrapper) {
                 widgetWrapper.classList.toggle('collapsed', isCollapsed);
