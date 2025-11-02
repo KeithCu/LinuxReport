@@ -420,125 +420,56 @@
             const container = this.elements.get('weather-container');
             const contentInner = this.elements.get('contentInner');
 
-            console.log('[Weather] Render called with data:', data);
+            app.utils.logger.debug('[Weather] Render called with data:', data);
 
             if (!forecast || !header) {
-                console.error('[Weather] Missing required elements');
+                app.utils.logger.error('[Weather] Missing required elements');
                 return;
             }
-
-            console.log('[Weather] Starting render process');
 
             // Store current weather data for unit toggle re-rendering
             this.currentWeatherData = data;
 
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
-                console.log('[Weather] Header set');
             }
 
             if (!data.daily?.length) {
-                console.log('[Weather] No daily data');
                 this.showError('No weather data available.');
                 return;
             }
-
-            console.log('[Weather] Creating day elements');
 
             // Create day HTML elements with cached icons
             const dayElements = await Promise.all(
                 data.daily.map(day => this.createDayHTML(day))
             );
 
-            console.log('[Weather] Setting forecast HTML');
             forecast.innerHTML = dayElements.join('');
-
-            console.log('[Weather] Hiding loading and contentInner');
             this.hideElement(loading);
-            this.hideElement(contentInner); // Hide the initial content
 
-            console.log('[Weather] Showing forecast');
+            // Clear the contentInner instead of just hiding it, since it contains server-generated loading text
+            if (contentInner) {
+                contentInner.textContent = '';
+                contentInner.style.display = 'none';
+            }
+
             this.showElement(forecast);
 
             // Apply horizontal layout using CSS class
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
-                console.log('[Weather] Added horizontal class');
             }
 
             // Mark container as loaded to make it visible
             if (container) {
                 container.classList.add('loaded');
-                console.log('[Weather] Added loaded class to container');
             }
 
             // Force visibility for the forecast element as a fallback
             if (forecast) {
                 forecast.style.visibility = 'visible';
                 forecast.style.display = 'flex';
-                console.log('[Weather] Forced forecast visibility and display');
             }
-
-            console.log('[Weather] Render complete');
-
-            // Debug: Check what the user is actually seeing
-            setTimeout(() => {
-                console.log('[Weather] What user sees check:');
-
-                // Check all elements that might contain "Loading weather..."
-                const allElements = document.querySelectorAll('*');
-                let loadingElements = [];
-                for (let el of allElements) {
-                    if (el.textContent && el.textContent.includes('Loading weather') && getComputedStyle(el).display !== 'none') {
-                        loadingElements.push({
-                            element: el,
-                            tagName: el.tagName,
-                            id: el.id,
-                            className: el.className,
-                            text: el.textContent.trim()
-                        });
-                    }
-                }
-
-                console.log('  Elements containing "Loading weather":', loadingElements);
-                loadingElements.forEach((item, index) => {
-                    console.log(`    [${index}] ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className : ''}: "${item.text}"`);
-                });
-
-                // Check if there are any elements with "Finding location" that are visible
-                let findingElements = [];
-                for (let el of allElements) {
-                    if (el.textContent && el.textContent.includes('Finding location') && getComputedStyle(el).display !== 'none') {
-                        findingElements.push({
-                            element: el,
-                            tagName: el.tagName,
-                            id: el.id,
-                            className: el.className,
-                            text: el.textContent.trim()
-                        });
-                    }
-                }
-
-                console.log('  Elements containing "Finding location":', findingElements);
-                findingElements.forEach((item, index) => {
-                    console.log(`    [${index}] ${item.tagName}${item.id ? '#' + item.id : ''}${item.className ? '.' + item.className : ''}: "${item.text}"`);
-                });
-
-                // Force hide ALL elements containing loading text
-                console.log('  Force hiding all loading elements...');
-                for (let item of loadingElements) {
-                    if (item.element && item.element !== this.elements.get('weather-loading')) {
-                        item.element.style.display = 'none';
-                        console.log('    Hid loading element:', item.element.tagName + (item.element.id ? '#' + item.element.id : '') + (item.element.className ? '.' + item.element.className : ''));
-                    }
-                }
-                for (let item of findingElements) {
-                    if (item.element && item.element !== this.elements.get('contentInner')) {
-                        item.element.style.display = 'none';
-                        console.log('    Hid finding element:', item.element.tagName + (item.element.id ? '#' + item.element.id : '') + (item.element.className ? '.' + item.element.className : ''));
-                    }
-                }
-            }, 100);
         }
 
         async createDayHTML(day) {
