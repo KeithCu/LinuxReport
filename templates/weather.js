@@ -457,10 +457,12 @@
             // Mark container as loaded to make it visible
             if (container) {
                 container.classList.add('loaded');
-                // Force visibility for the forecast element
-                if (forecast) {
-                    forecast.style.visibility = 'visible';
-                }
+            }
+
+            // Force visibility for the forecast element as a fallback
+            if (forecast) {
+                forecast.style.visibility = 'visible';
+                forecast.style.display = 'flex';
             }
         }
 
