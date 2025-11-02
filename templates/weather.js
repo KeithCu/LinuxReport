@@ -469,6 +469,14 @@
             if (forecast) {
                 forecast.style.visibility = 'visible';
                 forecast.style.display = 'flex';
+                forecast.style.opacity = '1';
+            }
+
+            // Also ensure the weather-content wrapper is visible
+            const content = this.elements.get('weather-content');
+            if (content) {
+                content.style.display = 'block';
+                content.style.visibility = 'visible';
             }
         }
 
