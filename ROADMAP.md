@@ -246,8 +246,8 @@ I'll group them into categories for clarity, with rationale and rough implementa
 
 2. **Generate RSS/Atom Feeds for Aggregated Content**  
    Export the aggregated headlines as an RSS feed per report type (e.g., linuxreport.net/rss/linux).  
-   - Why: Allows users to subscribe via feed readers, boosting retention and SEO. It's a natural extension of feedparser usage.  
-   - How: Use a library like feedgen (add to requirements.txt if needed) in a new route in routes.py. Cache outputs with g_cm from shared.py to keep it performant.
+   - Status: ✅ **IMPLEMENTED** - RSS feed endpoint exists at `/rss` route in routes.py (lines 565-635), uses existing `_get_headlines_data()` function, cached with g_cm
+   - Why: Allows users to subscribe via feed readers, boosting retention and SEO. It's a natural extension of feedparser usage.
 
 3. **User Feedback Loop for LLM Headlines**  
    Add thumbs-up/down buttons on headlines to collect data for fine-tuning the REPORT_PROMPT in *_report_settings.py.  

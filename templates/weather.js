@@ -480,6 +480,26 @@
             }
 
             console.log('[Weather] Render complete');
+
+            // Debug: Check final state after a short delay
+            setTimeout(() => {
+                const forecast = this.elements.get('weather-forecast');
+                const container = this.elements.get('weather-container');
+                console.log('[Weather] Final state check:');
+                console.log('  Forecast exists:', !!forecast);
+                console.log('  Container exists:', !!container);
+                if (forecast) {
+                    console.log('  Forecast display:', getComputedStyle(forecast).display);
+                    console.log('  Forecast visibility:', getComputedStyle(forecast).visibility);
+                    console.log('  Forecast innerHTML length:', forecast.innerHTML.length);
+                    console.log('  Forecast classes:', forecast.className);
+                }
+                if (container) {
+                    console.log('  Container display:', getComputedStyle(container).display);
+                    console.log('  Container visibility:', getComputedStyle(container).visibility);
+                    console.log('  Container classes:', container.className);
+                }
+            }, 100);
         }
 
         async createDayHTML(day) {
