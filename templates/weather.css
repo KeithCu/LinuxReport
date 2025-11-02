@@ -66,6 +66,14 @@
   visibility: visible;
 }
 
+/* Hide loading element when container is loaded */
+#weather-container.loaded #weather-loading,
+#weather-container.loaded .weather-loading {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
 #weather-widget-container.collapsed #weather-content {
   display: none;
 }

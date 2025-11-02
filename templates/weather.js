@@ -431,16 +431,68 @@
                 return;
             }
 
+            // ====================================================================
+            // THEORY TESTING: Comprehensive logging for loading element debugging
+            // ====================================================================
+            app.utils.logger.debug('[Weather] ===== RENDER START - Loading Element Debug =====');
+            
+            if (loading) {
+                // Theory 1 & 4: Log element state and computed styles BEFORE hiding
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading element exists:', !!loading);
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading element in DOM:', document.body.contains(loading));
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading element parent:', loading.parentElement?.id || loading.parentElement?.className || 'none');
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading element textContent BEFORE:', loading.textContent);
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading inline display BEFORE:', loading.style.display);
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading computed display BEFORE:', getComputedStyle(loading).display);
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading computed visibility BEFORE:', getComputedStyle(loading).visibility);
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading computed opacity BEFORE:', getComputedStyle(loading).opacity);
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading offsetWidth BEFORE:', loading.offsetWidth);
+                app.utils.logger.debug('[Weather] [THEORY 1/4] Loading offsetHeight BEFORE:', loading.offsetHeight);
+                
+                // Theory 3: Check container visibility state
+                if (container) {
+                    app.utils.logger.debug('[Weather] [THEORY 3] Container visibility:', getComputedStyle(container).visibility);
+                    app.utils.logger.debug('[Weather] [THEORY 3] Container display:', getComputedStyle(container).display);
+                    app.utils.logger.debug('[Weather] [THEORY 3] Container has .loaded class:', container.classList.contains('loaded'));
+                }
+            } else {
+                app.utils.logger.debug('[Weather] [THEORY 1] Loading element is NULL!');
+            }
+
             // Create day HTML elements
             const dayElements = await Promise.all(
                 data.daily.map(day => this.createDayHTML(day))
             );
 
             forecast.innerHTML = dayElements.join('');
-            // Hide the loading element completely
+            
+            // ====================================================================
+            // THEORY TESTING: Log during hiding attempts
+            // ====================================================================
             if (loading) {
-                loading.style.display = 'none';
-                loading.textContent = '';
+                app.utils.logger.debug('[Weather] [THEORY 2] About to hide loading - FIRST ATTEMPT');
+                
+                // First hiding attempt
+                try {
+                    loading.style.display = 'none';
+                    app.utils.logger.debug('[Weather] [THEORY 2] Set display = "none"');
+                    app.utils.logger.debug('[Weather] [THEORY 2] Computed display AFTER first set:', getComputedStyle(loading).display);
+                } catch (error) {
+                    app.utils.logger.error('[Weather] [THEORY 2] Error setting display:', error);
+                }
+                
+                try {
+                    loading.textContent = '';
+                    app.utils.logger.debug('[Weather] [THEORY 5] Set textContent = "" (first time)');
+                    app.utils.logger.debug('[Weather] [THEORY 5] textContent AFTER first clear:', loading.textContent);
+                } catch (error) {
+                    app.utils.logger.error('[Weather] [THEORY 5] Error clearing textContent:', error);
+                }
+                
+                // Wait a tick to see if styles stick
+                await new Promise(resolve => setTimeout(resolve, 0));
+                app.utils.logger.debug('[Weather] [THEORY 6] After setTimeout(0) - computed display:', getComputedStyle(loading).display);
+                app.utils.logger.debug('[Weather] [THEORY 6] After setTimeout(0) - textContent:', loading.textContent);
             }
 
             if (contentInner) {
@@ -448,12 +500,52 @@
                 contentInner.style.display = 'none';
             }
 
-            // Clear the loading text and show city info
+            // Second hiding attempt (the problematic one with invalid syntax)
             if (loading) {
-                loading.style.display = 'none !important';
-                loading.textContent = '';
-                loading.style.visibility = 'hidden';
-                loading.style.opacity = '0';
+                app.utils.logger.debug('[Weather] [THEORY 2] About to hide loading - SECOND ATTEMPT (with invalid syntax)');
+                
+                // Theory 1: Test invalid !important syntax
+                try {
+                    // This line has invalid syntax - JavaScript doesn't support !important in inline styles
+                    loading.style.display = 'none !important';
+                    app.utils.logger.debug('[Weather] [THEORY 1] Set display = "none !important" (INVALID SYNTAX)');
+                    app.utils.logger.debug('[Weather] [THEORY 1] Inline style.display value:', loading.style.display);
+                    app.utils.logger.debug('[Weather] [THEORY 1] Computed display:', getComputedStyle(loading).display);
+                } catch (error) {
+                    app.utils.logger.error('[Weather] [THEORY 1] Error with invalid !important syntax:', error);
+                }
+                
+                try {
+                    loading.textContent = '';
+                    app.utils.logger.debug('[Weather] [THEORY 5] Set textContent = "" (second time)');
+                } catch (error) {
+                    app.utils.logger.error('[Weather] [THEORY 5] Error clearing textContent second time:', error);
+                }
+                
+                try {
+                    loading.style.visibility = 'hidden';
+                    app.utils.logger.debug('[Weather] [THEORY 4] Set visibility = "hidden"');
+                    app.utils.logger.debug('[Weather] [THEORY 4] Computed visibility:', getComputedStyle(loading).visibility);
+                } catch (error) {
+                    app.utils.logger.error('[Weather] [THEORY 4] Error setting visibility:', error);
+                }
+                
+                try {
+                    loading.style.opacity = '0';
+                    app.utils.logger.debug('[Weather] [THEORY 4] Set opacity = "0"');
+                    app.utils.logger.debug('[Weather] [THEORY 4] Computed opacity:', getComputedStyle(loading).opacity);
+                } catch (error) {
+                    app.utils.logger.error('[Weather] [THEORY 4] Error setting opacity:', error);
+                }
+                
+                // Final state check
+                app.utils.logger.debug('[Weather] [THEORY 4] Final computed display:', getComputedStyle(loading).display);
+                app.utils.logger.debug('[Weather] [THEORY 4] Final computed visibility:', getComputedStyle(loading).visibility);
+                app.utils.logger.debug('[Weather] [THEORY 4] Final computed opacity:', getComputedStyle(loading).opacity);
+                app.utils.logger.debug('[Weather] [THEORY 4] Final offsetWidth:', loading.offsetWidth);
+                app.utils.logger.debug('[Weather] [THEORY 4] Final offsetHeight:', loading.offsetHeight);
+                app.utils.logger.debug('[Weather] [THEORY 5] Final textContent:', loading.textContent);
+                app.utils.logger.debug('[Weather] [THEORY 5] Final innerHTML:', loading.innerHTML);
             }
 
             this.showElement(forecast);
@@ -482,6 +574,61 @@
 
             if (container) {
                 container.classList.add('loaded');
+                app.utils.logger.debug('[Weather] [THEORY 3] Added .loaded class to container');
+            }
+
+            // ====================================================================
+            // THEORY TESTING: Final state check after all operations
+            // ====================================================================
+            if (loading) {
+                app.utils.logger.debug('[Weather] [THEORY 3] Container has .loaded class:', container?.classList.contains('loaded'));
+                app.utils.logger.debug('[Weather] [THEORY 3] Container visibility AFTER .loaded:', container ? getComputedStyle(container).visibility : 'N/A');
+                app.utils.logger.debug('[Weather] ===== FINAL STATE CHECK =====');
+                app.utils.logger.debug('[Weather] Loading element still in DOM:', document.body.contains(loading));
+                app.utils.logger.debug('[Weather] Loading inline display:', loading.style.display);
+                app.utils.logger.debug('[Weather] Loading computed display:', getComputedStyle(loading).display);
+                app.utils.logger.debug('[Weather] Loading computed visibility:', getComputedStyle(loading).visibility);
+                app.utils.logger.debug('[Weather] Loading computed opacity:', getComputedStyle(loading).opacity);
+                app.utils.logger.debug('[Weather] Loading offsetWidth:', loading.offsetWidth);
+                app.utils.logger.debug('[Weather] Loading offsetHeight:', loading.offsetHeight);
+                app.utils.logger.debug('[Weather] Loading textContent:', loading.textContent);
+                app.utils.logger.debug('[Weather] Loading innerHTML:', loading.innerHTML);
+                app.utils.logger.debug('[Weather] Loading getBoundingClientRect:', JSON.stringify(loading.getBoundingClientRect()));
+                
+                // Check all CSS rules affecting this element
+                const allRules = [];
+                for (let sheet of document.styleSheets) {
+                    try {
+                        for (let rule of sheet.cssRules || sheet.rules || []) {
+                            if (rule.selectorText && loading.matches(rule.selectorText)) {
+                                allRules.push(rule.selectorText + ' { ' + rule.style.cssText + ' }');
+                            }
+                        }
+                    } catch (e) {
+                        // Cross-origin stylesheets may throw
+                    }
+                }
+                app.utils.logger.debug('[Weather] [THEORY 4] CSS rules matching loading element:', allRules.length, allRules);
+                app.utils.logger.debug('[Weather] ===== RENDER END - Loading Element Debug =====');
+                
+                // ====================================================================
+                // FIX: Properly hide loading element after logging
+                // Remove invalid !important syntax and consolidate hiding logic
+                // ====================================================================
+                // Clear any invalid style values first
+                loading.style.removeProperty('display');
+                loading.style.removeProperty('visibility');
+                loading.style.removeProperty('opacity');
+                
+                // Apply proper hiding with highest priority methods
+                loading.style.setProperty('display', 'none', 'important');
+                loading.style.setProperty('visibility', 'hidden', 'important');
+                loading.style.setProperty('opacity', '0', 'important');
+                loading.textContent = '';
+                
+                app.utils.logger.debug('[Weather] [FIX] Applied proper hiding with setProperty("important")');
+                app.utils.logger.debug('[Weather] [FIX] Final computed display after fix:', getComputedStyle(loading).display);
+                app.utils.logger.debug('[Weather] [FIX] Final textContent after fix:', loading.textContent);
             }
 
             // Store current weather data for unit toggle re-rendering
