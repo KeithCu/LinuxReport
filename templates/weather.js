@@ -420,80 +420,48 @@
             const container = this.elements.get('weather-container');
             const contentInner = this.elements.get('contentInner');
 
-            console.log('[Weather] Render called with data:', data);
-            console.log('[Weather] Elements check - forecast:', !!forecast, 'header:', !!header, 'loading:', !!loading, 'container:', !!container, 'contentInner:', !!contentInner);
-            app.utils.logger.debug('[Weather] Forecast element:', forecast);
-            app.utils.logger.debug('[Weather] Forecast element ID:', forecast?.id);
+            app.utils.logger.debug('[Weather] Render called with data:', data);
 
             if (!forecast || !header) {
-                console.error('[Weather] Missing required elements:', { forecast: !!forecast, header: !!header });
+                app.utils.logger.error('[Weather] Missing required elements');
                 return;
             }
-
-            console.log('[Weather] Processing weather data:', data);
 
             // Store current weather data for unit toggle re-rendering
             this.currentWeatherData = data;
 
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
-                console.log('[Weather] Set header to:', header.textContent);
             }
 
             if (!data.daily?.length) {
-                console.log('[Weather] No daily data, showing error');
                 this.showError('No weather data available.');
                 return;
             }
-
-            console.log('[Weather] Creating day elements for', data.daily.length, 'days');
 
             // Create day HTML elements with cached icons
             const dayElements = await Promise.all(
                 data.daily.map(day => this.createDayHTML(day))
             );
 
-            console.log('[Weather] Generated HTML for days:', dayElements);
-
             forecast.innerHTML = dayElements.join('');
-            console.log('[Weather] Set forecast innerHTML');
-
             this.hideElement(loading);
-            console.log('[Weather] Hid loading element');
-
             this.hideElement(contentInner); // Hide the initial content
-            console.log('[Weather] Hid contentInner element');
-
             this.showElement(forecast);
-            console.log('[Weather] Showed forecast element');
-
-            // The weather container should already be visible if we're rendering data
-            // Only ensure it's visible if it was hidden for some reason
-            if (container && container.style.display === 'none') {
-                container.style.display = 'block';
-                container.style.visibility = 'visible';
-                console.log('[Weather] Made container visible');
-            }
 
             // Apply horizontal layout using CSS class
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
-                app.utils.logger.debug('[Weather] Applied CSS class for horizontal layout');
-                app.utils.logger.debug('[Weather] Forecast element classes:', forecast.className);
-                app.utils.logger.debug('[Weather] Forecast computed style:', getComputedStyle(forecast).display);
-                console.log('[Weather] Applied horizontal layout class');
             }
 
             // Mark container as loaded to make it visible
             if (container) {
                 container.classList.add('loaded');
-                console.log('[Weather] Added loaded class to container');
-                console.log('[Weather] Container classes:', container.className);
-                console.log('[Weather] Container style.display:', container.style.display);
-                console.log('[Weather] Container style.visibility:', container.style.visibility);
+                // Force visibility for the forecast element
+                if (forecast) {
+                    forecast.style.visibility = 'visible';
+                }
             }
-
-            console.log('[Weather] Render complete');
         }
 
         async createDayHTML(day) {
