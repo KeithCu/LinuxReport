@@ -420,50 +420,66 @@
             const container = this.elements.get('weather-container');
             const contentInner = this.elements.get('contentInner');
 
-            app.utils.logger.debug('[Weather] Render called with data:', data);
+            console.log('[Weather] Render called with data:', data);
 
             if (!forecast || !header) {
-                app.utils.logger.error('[Weather] Missing required elements');
+                console.error('[Weather] Missing required elements');
                 return;
             }
+
+            console.log('[Weather] Starting render process');
 
             // Store current weather data for unit toggle re-rendering
             this.currentWeatherData = data;
 
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
+                console.log('[Weather] Header set');
             }
 
             if (!data.daily?.length) {
+                console.log('[Weather] No daily data');
                 this.showError('No weather data available.');
                 return;
             }
+
+            console.log('[Weather] Creating day elements');
 
             // Create day HTML elements with cached icons
             const dayElements = await Promise.all(
                 data.daily.map(day => this.createDayHTML(day))
             );
 
+            console.log('[Weather] Setting forecast HTML');
             forecast.innerHTML = dayElements.join('');
+
+            console.log('[Weather] Hiding loading and contentInner');
             this.hideElement(loading);
             this.hideElement(contentInner); // Hide the initial content
+
+            console.log('[Weather] Showing forecast');
             this.showElement(forecast);
 
             // Apply horizontal layout using CSS class
             if (forecast) {
                 forecast.classList.add('weather-forecast-horizontal');
+                console.log('[Weather] Added horizontal class');
             }
 
             // Mark container as loaded to make it visible
             if (container) {
                 container.classList.add('loaded');
+                console.log('[Weather] Added loaded class to container');
             }
 
             // Force visibility for the forecast element as a fallback
             if (forecast) {
                 forecast.style.visibility = 'visible';
                 forecast.style.display = 'flex';
+                console.log('[Weather] Forced forecast visibility and display');
             }
+
+            console.log('[Weather] Render complete');
         }
 
         async createDayHTML(day) {
