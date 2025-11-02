@@ -414,69 +414,118 @@
         }
 
         async render(data) {
+            console.log('[Weather] ===== RENDER START =====');
+            console.log('[Weather] Data received:', data);
+
             const forecast = this.elements.get('weather-forecast');
             const header = this.elements.get('header');
             const loading = this.elements.get('weather-loading');
             const container = this.elements.get('weather-container');
             const contentInner = this.elements.get('contentInner');
+            const content = this.elements.get('weather-content');
 
-            app.utils.logger.debug('[Weather] Render called with data:', data);
+            console.log('[Weather] Elements found:', {
+                forecast: !!forecast,
+                header: !!header,
+                loading: !!loading,
+                container: !!container,
+                contentInner: !!contentInner,
+                content: !!content
+            });
 
             if (!forecast || !header) {
-                app.utils.logger.error('[Weather] Missing required elements');
+                console.error('[Weather] Missing required elements - aborting render');
                 return;
             }
+
+            // THEORY 1: Check if data.daily exists and has content
+            if (!data.daily || !Array.isArray(data.daily) || data.daily.length === 0) {
+                console.log('[Weather] THEORY 1: No daily data available');
+                this.showError('No weather data available.');
+                return;
+            }
+            console.log('[Weather] THEORY 1: Daily data OK, length:', data.daily.length);
+
+            // THEORY 2: Check if createDayHTML is working
+            console.log('[Weather] THEORY 2: Creating day elements...');
+            let dayElements;
+            try {
+                dayElements = await Promise.all(
+                    data.daily.map(day => this.createDayHTML(day))
+                );
+                console.log('[Weather] THEORY 2: Day elements created successfully, count:', dayElements.length);
+            } catch (error) {
+                console.error('[Weather] THEORY 2: Error creating day elements:', error);
+                return;
+            }
+
+            // THEORY 3: Check if forecast.innerHTML is being set
+            console.log('[Weather] THEORY 3: Setting forecast HTML...');
+            forecast.innerHTML = dayElements.join('');
+            console.log('[Weather] THEORY 3: Forecast HTML set, length:', forecast.innerHTML.length);
+
+            // THEORY 4: Check element visibility manipulation
+            console.log('[Weather] THEORY 4: Manipulating element visibility...');
+            this.hideElement(loading);
+            console.log('[Weather] THEORY 4: Loading hidden, display:', getComputedStyle(loading).display);
+
+            if (contentInner) {
+                contentInner.textContent = '';
+                contentInner.style.display = 'none';
+                console.log('[Weather] THEORY 4: ContentInner cleared and hidden');
+            }
+
+            this.showElement(forecast);
+            console.log('[Weather] THEORY 4: Forecast shown, display:', getComputedStyle(forecast).display);
+
+            // THEORY 5: Check CSS class application
+            console.log('[Weather] THEORY 5: Applying CSS classes...');
+            if (forecast) {
+                forecast.classList.add('weather-forecast-horizontal');
+                console.log('[Weather] THEORY 5: Horizontal class added');
+            }
+
+            if (container) {
+                container.classList.add('loaded');
+                console.log('[Weather] THEORY 5: Loaded class added to container');
+            }
+
+            // THEORY 6: Check forced styling
+            console.log('[Weather] THEORY 6: Applying forced styles...');
+            if (forecast) {
+                forecast.style.visibility = 'visible';
+                forecast.style.display = 'flex';
+                forecast.style.opacity = '1';
+                console.log('[Weather] THEORY 6: Forecast forced visible');
+            }
+
+            if (content) {
+                content.style.display = 'block';
+                content.style.visibility = 'visible';
+                console.log('[Weather] THEORY 6: Content wrapper forced visible');
+            }
+
+            // THEORY 7: Check final computed styles
+            console.log('[Weather] THEORY 7: Final computed styles check');
+            setTimeout(() => {
+                console.log('[Weather] Final styles:');
+                console.log('  Forecast display:', getComputedStyle(forecast).display);
+                console.log('  Forecast visibility:', getComputedStyle(forecast).visibility);
+                console.log('  Forecast opacity:', getComputedStyle(forecast).opacity);
+                console.log('  Container display:', getComputedStyle(container).display);
+                console.log('  Container visibility:', getComputedStyle(container).visibility);
+                console.log('  Content display:', getComputedStyle(content).display);
+                console.log('  Content visibility:', getComputedStyle(content).visibility);
+                console.log('  Loading display:', getComputedStyle(loading).display);
+                console.log('  ContentInner display:', contentInner ? getComputedStyle(contentInner).display : 'N/A');
+                console.log('[Weather] ===== RENDER END =====');
+            }, 100);
 
             // Store current weather data for unit toggle re-rendering
             this.currentWeatherData = data;
 
             if (data.city_name) {
                 header.textContent = `5-Day Weather (${data.city_name})`;
-            }
-
-            if (!data.daily?.length) {
-                this.showError('No weather data available.');
-                return;
-            }
-
-            // Create day HTML elements with cached icons
-            const dayElements = await Promise.all(
-                data.daily.map(day => this.createDayHTML(day))
-            );
-
-            forecast.innerHTML = dayElements.join('');
-            this.hideElement(loading);
-
-            // Clear the contentInner instead of just hiding it, since it contains server-generated loading text
-            if (contentInner) {
-                contentInner.textContent = '';
-                contentInner.style.display = 'none';
-            }
-
-            this.showElement(forecast);
-
-            // Apply horizontal layout using CSS class
-            if (forecast) {
-                forecast.classList.add('weather-forecast-horizontal');
-            }
-
-            // Mark container as loaded to make it visible
-            if (container) {
-                container.classList.add('loaded');
-            }
-
-            // Force visibility for the forecast element as a fallback
-            if (forecast) {
-                forecast.style.visibility = 'visible';
-                forecast.style.display = 'flex';
-                forecast.style.opacity = '1';
-            }
-
-            // Also ensure the weather-content wrapper is visible
-            const content = this.elements.get('weather-content');
-            if (content) {
-                content.style.display = 'block';
-                content.style.visibility = 'visible';
             }
         }
 
