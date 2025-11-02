@@ -437,7 +437,11 @@
             );
 
             forecast.innerHTML = dayElements.join('');
-            this.hideElement(loading);
+            // Hide the loading element completely
+            if (loading) {
+                loading.style.display = 'none';
+                loading.textContent = '';
+            }
 
             if (contentInner) {
                 contentInner.textContent = '';
@@ -446,9 +450,9 @@
 
             this.showElement(forecast);
 
-            // CRITICAL FIX: Ensure forecast is properly attached to weather-content
-            if (content && !content.contains(forecast)) {
-                content.appendChild(forecast);
+            // CRITICAL FIX: Ensure forecast is properly attached to weather-container
+            if (container && !container.contains(forecast)) {
+                container.appendChild(forecast);
             }
 
             // Apply proper styling (remove debug colors)
