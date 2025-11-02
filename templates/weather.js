@@ -481,25 +481,27 @@
 
             console.log('[Weather] Render complete');
 
-            // Debug: Check if the forecast content is actually rendered
+            // Debug: Check if loading element is actually hidden
             setTimeout(() => {
-                const forecast = this.elements.get('weather-forecast');
-                console.log('[Weather] Checking forecast content:');
-                if (forecast) {
-                    console.log('  Forecast children count:', forecast.children.length);
-                    console.log('  First child exists:', !!forecast.children[0]);
-                    if (forecast.children[0]) {
-                        console.log('  First child display:', getComputedStyle(forecast.children[0]).display);
-                        console.log('  First child visibility:', getComputedStyle(forecast.children[0]).visibility);
-                    }
-                    console.log('  Forecast HTML preview:', forecast.innerHTML.substring(0, 200) + '...');
+                const loading = this.elements.get('weather-loading');
+                const contentInner = this.elements.get('contentInner');
+                console.log('[Weather] Checking loading/content visibility:');
+                if (loading) {
+                    console.log('  Loading display:', getComputedStyle(loading).display);
+                    console.log('  Loading visibility:', getComputedStyle(loading).visibility);
+                    console.log('  Loading textContent:', loading.textContent);
+                }
+                if (contentInner) {
+                    console.log('  ContentInner display:', getComputedStyle(contentInner).display);
+                    console.log('  ContentInner visibility:', getComputedStyle(contentInner).visibility);
+                    console.log('  ContentInner textContent length:', contentInner.textContent.length);
                 }
 
-                // Check if weather-content wrapper is hiding it
-                const contentWrapper = this.elements.get('weather-content');
-                if (contentWrapper) {
-                    console.log('  Content wrapper display:', getComputedStyle(contentWrapper).display);
-                    console.log('  Content wrapper visibility:', getComputedStyle(contentWrapper).visibility);
+                // Check the entire weather widget container
+                const widgetContainer = this.elements.get('weather-widget-container');
+                if (widgetContainer) {
+                    console.log('  Widget container display:', getComputedStyle(widgetContainer).display);
+                    console.log('  Widget container visibility:', getComputedStyle(widgetContainer).visibility);
                 }
             }, 100);
         }
