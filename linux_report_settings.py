@@ -49,7 +49,7 @@ CONFIG: SiteConfig = SiteConfig(
     ],
     URL_IMAGES="https://linuxreport.net/static/images/",
     FAVICON="linuxreport192.ico",
-    LOGO_URL="LinuxReportSpooky.webp",   
+    LOGO_URL="LinuxReportFallharvesttheme.webp",   
     WEB_DESCRIPTION="Top Linux news: updates, distros, and open-source tech. Hourly briefs for geeks, no fluff.",
     WEB_TITLE="Linux Report | Latest Linux News",
     REPORT_PROMPT="""Arch and Debian Linux programmers and experienced users.
