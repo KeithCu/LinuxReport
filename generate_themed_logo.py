@@ -11,12 +11,11 @@ Setup:
        OR pass it via --api-key argument
 
 Usage:
-    # Using predefined theme
-    python generate_themed_logo.py --theme halloween --report linux
-    
-    # Using custom prompt (recommended - you can use any text)
-    python generate_themed_logo.py --report linux --custom-prompt "Halloween"
-    python generate_themed_logo.py --report ai --custom-prompt "space theme with stars and planets"
+    # Just pass the theme string - the prompt is formatted automatically
+    python generate_themed_logo.py --theme "Halloween" --report linux
+    python generate_themed_logo.py --theme "Christmas" --report ai
+    python generate_themed_logo.py --theme "cyberpunk style" --report linux
+    python generate_themed_logo.py --theme "space theme with stars" --report space
     
 Note:
     Images are generated at 1920x1080 (1080p) resolution. The API will automatically
@@ -48,15 +47,7 @@ DEFAULT_LOGOS = {
     "space": "SpaceReport.webp",
     "trump": "TrumpReport.webp",
     "pv": "pvreport.webp",
-}
-
-# Theme prompts for different holidays/seasons
-THEME_PROMPTS = {
-    "halloween": "Transform this logo to have a Halloween theme. Add spooky elements like jack-o-lanterns, bats, ghosts, cobwebs, orange and black colors, and a spooky atmosphere while maintaining the original logo design and readability.",
-    "christmas": "Transform this logo to have a Christmas theme. Add festive elements like snowflakes, ornaments, holly, red and green colors, twinkling lights, and a cheerful holiday atmosphere while maintaining the original logo design and readability.",
-    "fall": "Transform this logo to have a Fall/Autumn theme. Add seasonal elements like autumn leaves, pumpkins, acorns, warm oranges, reds, and browns, and a cozy autumn atmosphere while maintaining the original logo design and readability.",
-    "winter": "Transform this logo to have a Winter theme. Add elements like snowflakes, icicles, cool blues and whites, and a crisp winter atmosphere while maintaining the original logo design and readability.",
-    "spring": "Transform this logo to have a Spring theme. Add elements like flowers, butterflies, pastel colors, and a fresh spring atmosphere while maintaining the original logo design and readability.",
+    "robot": "RobotReport.webp",
 }
 
 
@@ -291,20 +282,24 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Using predefined theme
-  python generate_themed_logo.py --theme halloween --report linux
+  # Using relaxed prompt (default - works well for most logos)
+  python generate_themed_logo.py --theme "Halloween" --report linux
+  python generate_themed_logo.py --theme "Christmas" --report ai
   
-  # Using custom prompt (recommended)
-  python generate_themed_logo.py --report linux --custom-prompt "Halloween"
-  python generate_themed_logo.py --report ai --custom-prompt "space theme with stars"
+  # Using strict prompt (preserves logo better - use when logo disappears)
+  python generate_themed_logo.py --theme "Fall harvest theme" --report robot --preserve-logo
+  
+  # Custom themes
+  python generate_themed_logo.py --theme "cyberpunk style with neon colors" --report linux
+  python generate_themed_logo.py --theme "space theme with stars and planets" --report space
   
 Note: Images are generated at 1920x1080 (1080p) resolution.
         """
     )
     parser.add_argument(
         "--theme",
-        choices=list(THEME_PROMPTS.keys()),
-        help="Predefined theme to apply (optional if --custom-prompt is provided)"
+        required=True,
+        help='Theme or custom text describing how to alter the image. Can be any string (e.g., "Halloween", "Christmas", "cyberpunk style", etc.). By default uses a relaxed prompt that works well for most logos. Use --preserve-logo for stricter preservation when needed.'
     )
     parser.add_argument(
         "--report",
@@ -314,7 +309,7 @@ Note: Images are generated at 1920x1080 (1080p) resolution.
     )
     parser.add_argument(
         "--custom-prompt",
-        help='Custom text describing how to alter the image. Will be formatted as: "Please take this image, and alter it to be more like \"YOUR_TEXT\"". You can provide any description here.'
+        help='[DEPRECATED] Use --theme instead. Custom text describing how to alter the image.'
     )
     parser.add_argument(
         "--default-logo",
@@ -330,6 +325,11 @@ Note: Images are generated at 1920x1080 (1080p) resolution.
         help="OpenRouter model to use (default: google/gemini-2.5-flash-image)"
     )
     parser.add_argument(
+        "--preserve-logo",
+        action="store_true",
+        help="Use strict prompt that emphasizes preserving the original logo (recommended for logos that tend to disappear). Default: use relaxed prompt that works well for most logos."
+    )
+    parser.add_argument(
         "--output-filename",
         help="Custom output filename (defaults to {ReportType}{Theme}.webp)"
     )
@@ -341,11 +341,8 @@ Note: Images are generated at 1920x1080 (1080p) resolution.
     
     args = parser.parse_args()
     
-    # Validate that either theme or custom-prompt is provided
-    if not args.theme and not args.custom_prompt:
-        print("Error: Either --theme or --custom-prompt must be provided.")
-        parser.print_help()
-        sys.exit(1)
+    # Use custom-prompt if provided (for backward compatibility), otherwise use theme
+    theme_input = args.custom_prompt if args.custom_prompt else args.theme
     
     # Get API key
     api_key = args.api_key or os.getenv("OPENROUTER_API_KEY")
@@ -365,17 +362,17 @@ Note: Images are generated at 1920x1080 (1080p) resolution.
         print(f"Error: Default logo not found: {default_logo_path}")
         sys.exit(1)
     
-    # Determine prompt text
-    if args.custom_prompt:
-        # Format as requested: "Please take this image, and alter it to be more like "YYY""
-        prompt_text = f'Please take this image, and alter it to be more like "{args.custom_prompt}".'
-        # Sanitize theme name for filename: remove spaces, special chars, capitalize first letter
-        theme_name = "".join(c for c in args.custom_prompt.title() if c.isalnum())
-        if not theme_name:
-            theme_name = "Custom"
-    elif args.theme:
-        prompt_text = THEME_PROMPTS[args.theme]
-        theme_name = args.theme
+    # Format prompt based on preserve-logo flag
+    if args.preserve_logo:
+        # Strict prompt: emphasizes preserving the original logo
+        prompt_text = f'Please take this logo image, and alter it to have a {theme_input} theme while keeping the original logo design and central subject clearly visible and recognizable. Add thematic elements around or integrated with the logo, but maintain the logo itself as the main focus.'
+    else:
+        # Relaxed prompt: simpler, works well for most logos
+        prompt_text = f'Please take this image, and alter it to be more like "{theme_input}".'
+    # Sanitize theme name for filename: remove spaces, special chars, capitalize first letter
+    theme_name = "".join(c for c in theme_input.title() if c.isalnum())
+    if not theme_name:
+        theme_name = "Custom"
     
     # Generate output filename
     if args.output_filename:
@@ -414,10 +411,7 @@ Note: Images are generated at 1920x1080 (1080p) resolution.
             update_logo_url_in_settings(args.report, output_filename)
         
         print(f"\n✓ Successfully generated themed logo!")
-        if args.custom_prompt:
-            print(f"  Custom prompt: {args.custom_prompt}")
-        else:
-            print(f"  Theme: {args.theme}")
+        print(f"  Theme: {theme_input}")
         print(f"  Output: {output_path}")
         print(f"  Filename: {output_filename}")
         

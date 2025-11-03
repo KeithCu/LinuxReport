@@ -5,6 +5,8 @@
 # Usage: ./update_all_logos.sh "Halloween"
 #        ./update_all_logos.sh "Christmas"
 #        ./update_all_logos.sh "Fall"
+#        ./update_all_logos.sh "Fall" "robot"  # Use --preserve-logo only for robot report
+#        PRESERVE_LOGO_REPORTS="robot,ai" ./update_all_logos.sh "Theme"  # Use --preserve-logo for multiple reports
 
 # Don't use set -e, we want to continue processing even if one fails
 
@@ -37,6 +39,9 @@ if [ -f "/etc/update_headlines.conf" ]; then
     source /etc/update_headlines.conf
 fi
 
+# Check if second argument is provided for preserve-logo flag
+PRESERVE_LOGO_FLAG="$2"
+
 # Map directories to report types
 # Format: "directory:report_type"
 declare -A DIR_REPORT_MAP=(
@@ -48,6 +53,13 @@ declare -A DIR_REPORT_MAP=(
     ["/srv/http/pvreport"]="pv"
     ["/srv/http/robotreport"]="robot"
 )
+
+# Reports that benefit from --preserve-logo flag (logos that tend to disappear)
+# Set PRESERVE_LOGO_REPORTS env var or pass as second argument to override
+PRESERVE_LOGO_REPORTS="${PRESERVE_LOGO_REPORTS:-robot}"  # Default: robot report
+if [ -n "$PRESERVE_LOGO_FLAG" ]; then
+    PRESERVE_LOGO_REPORTS="$PRESERVE_LOGO_FLAG"  # Override with second argument
+fi
 
 echo "=========================================="
 echo "Updating themed logos for all reports"
@@ -94,8 +106,15 @@ for dir in "${!DIR_REPORT_MAP[@]}"; do
         continue
     }
     
+    # Determine if we should use --preserve-logo flag for this report
+    PRESERVE_FLAG=""
+    if [[ "$PRESERVE_LOGO_REPORTS" == *"$report_type"* ]]; then
+        PRESERVE_FLAG="--preserve-logo"
+        echo "Using --preserve-logo flag for this report"
+    fi
+    
     # Run the logo generation script from base directory
-    if python "$BASE_DIR/$SCRIPT_NAME" --report "$report_type" --custom-prompt "$THEME"; then
+    if python "$BASE_DIR/$SCRIPT_NAME" --theme "$THEME" --report "$report_type" $PRESERVE_FLAG; then
         echo "✓ Successfully updated $report_type logo"
         SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
     else
