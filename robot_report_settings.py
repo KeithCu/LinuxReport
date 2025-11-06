@@ -20,7 +20,6 @@ CONFIG: SiteConfig = SiteConfig(
         "https://blogs.nvidia.com/blog/tag/robotics/feed/": RssInfo("NVIDIA.webp", "NVIDIA Robotics", "https://blogs.nvidia.com/blog/tag/robotics/"),
     },
     SITE_URLS=[
-        "https://arxiv.org/rss/cs.RO",
         "https://www.therobotreport.com/feed/",
         "https://www.azorobotics.com/syndication.axd",
         "https://techxplore.com/rss-feed/robotics-news/",
@@ -31,6 +30,7 @@ CONFIG: SiteConfig = SiteConfig(
         "https://blogs.nvidia.com/blog/tag/robotics/feed/",
         "https://newatlas.com/robotics/index.rss",
         "https://news.mit.edu/topic/mitrobotics-rss.xml",
+        "https://arxiv.org/rss/cs.RO",
     ],
     USER_AGENT="Robot Report -- https://robotreport.keithcu.com",
     URL_IMAGES="https://robotreport.keithcu.com/static/images/",
