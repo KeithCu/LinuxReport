@@ -89,39 +89,41 @@ USE_RANDOM_MODELS = True  # Set to True to always try random models, False to us
 # PROMPT TEMPLATES
 # =============================================================================
 
-# O3-suggested alternate prompt for reasoning models
+# O3-style prompt for reasoning models selecting top headlines
 PROMPT_O3_SYSTEM = f"""
-INSTRUCTIONS:
-1. Write exactly ONE paragraph (40 words or less) explaining your choices
-2. Write {TITLE_MARKER} on its own line.
-3. List exactly 3 best titles for the listed audience from the list of titles below, one per line
-4. Do NOT include any extra text on the title lines, put your comments and disclaimers above or below the list of titles.
-5. IMPORTANT: You must select ONLY from the provided list of titles - do not make up new titles
-6. Order the titles by importance - most important/interesting first
-7. CRITICAL: Each selected title must cover a completely distinct topic - ensure there is no similarity in topics between your selections
+You are selecting the top 3 headlines from a provided list for a specific target audience.
+You will be told the audience and the candidate headlines in the user message.
 
-The example below shows the structure, but you must write your own reasoning and select actual titles:
+Follow these rules EXACTLY:
 
-TEMPLATE START
-[Reasoning paragraph above titles]
+1. Choose exactly 3 headlines from the provided list. Do NOT invent or rewrite headlines.
+2. Each chosen headline must be about a different topic (no overlap in subject).
+3. Order the 3 headlines by importance/interest for the specified audience (most important first).
+4. Before the headlines, write your reasoning (for example, a short paragraph) explaining your choices. You may include multiple sentences, but ALL reasoning and commentary must appear BEFORE the marker line.
+5. On a new line after all reasoning, write exactly: {TITLE_MARKER}
+6. On the next 3 lines, output ONLY the 3 chosen headlines, one per line, with no extra text, bullets, or numbering on those lines.
+7. After the {TITLE_MARKER} line, do not include any other text or lists. The 3 lines immediately following {TITLE_MARKER} are the ONLY lines that will be parsed as selected headlines.
+
+Example of correct output format (use your own reasoning and real headlines):
+
+Short explanation of why these 3 headlines were chosen for the audience.
 
 {TITLE_MARKER}
-[Select and paste the MOST important/interesting title from the list]
-[Select and paste the SECOND most important/interesting title from the list]
-[Select and paste the THIRD most important/interesting title from the list]
-TEMPLATE END
+First chosen headline from the provided list
+Second chosen headline from the provided list
+Third chosen headline from the provided list
 """
 
 PROMPT_O3_USER_TEMPLATE = """
 <scratchpad>
-Think step-by-step, de-duplicate, choose three best. Some headlines are irrelevant—discard them.
+Think step-by-step. Remove duplicates, discard irrelevant or off-topic items, then choose the best 3 for the audience.
+Keep this reasoning internal and follow the output format rules from the system message.
 </scratchpad>
 
-Find the top 3 articles most interesting to:
+Audience:
 {mode_instructions}
 
-
-INPUT TITLES:
+Candidate headlines:
 """
 
 # =============================================================================
