@@ -2,6 +2,34 @@
 Reddit.py
 
 Handles Reddit API authentication, token management, and fetching Reddit feeds in a feedparser-compatible format for the LinuxReport project.
+
+USAGE & CONFIG SUMMARY (READ THIS FIRST):
+
+- Do NOT put Reddit client_id, client_secret, username, or password into config.yaml or any tracked file.
+- Do NOT commit reddit_token.json to git.
+
+Bootstrap (one-time, interactive, on the server):
+
+1. On the deployment server, from the LinuxReport project directory, run this module directly:
+   python Reddit.py
+
+2. When prompted, enter:
+   - Reddit Client ID
+   - Reddit Client Secret
+   - Reddit Username
+   - Reddit Password (used once to obtain tokens)
+
+3. This script will:
+   - Call Reddit's API to obtain access and refresh tokens.
+   - Write them plus client_id/client_secret/username into "reddit_token.json" next to this file.
+   - Set permissions on reddit_token.json to 0600 (owner read/write only).
+
+Runtime behavior:
+
+- At runtime, get_valid_token() reads from reddit_token.json.
+- workers.py uses fetch_reddit_feed_as_feedparser() (when ENABLE_REDDIT_API_FETCH is True)
+  to fetch Reddit data via the API using those stored tokens.
+- No secrets are loaded from config.yaml by default.
 """
 
 import getpass

@@ -259,9 +259,10 @@ The system includes CDN support for optimal image delivery:
 - **Reddit Integration**:
   - Controlled by global flag `ENABLE_REDDIT_API_FETCH` in [`shared.py`](shared.py:202).
   - When `ENABLE_REDDIT_API_FETCH = False` (default):
-    - Reddit URLs are fetched via the legacy `RedditFetcher` in [`workers.py`](workers.py:161) using Tor and/or standard RSS/feedparser logic.
+    - Reddit URLs are fetched via the legacy `RedditFetcher` in [`workers.py`](workers.py:163) using Tor and/or standard RSS/feedparser logic.
   - When `ENABLE_REDDIT_API_FETCH = True`:
-    - Reddit URLs are fetched via `fetch_reddit_feed_as_feedparser()` in [`Reddit.py`](Reddit.py:346) through `RedditFetcher` in [`workers.py`](workers.py:161), which adapts the Reddit API response into the internal feed structure.
+    - Reddit URLs are fetched via `fetch_reddit_feed_as_feedparser()` in [`Reddit.py`](Reddit.py:346) through `RedditFetcher` in [`workers.py`](workers.py:163).
+    - `fetch_reddit_feed_as_feedparser()` returns feedparser-like entries; no extra normalization is needed in `workers.py`.
   - This switch is reversible and only affects how Reddit feeds are fetched; other feeds are unaffected.
 
 ## Image Processing System
