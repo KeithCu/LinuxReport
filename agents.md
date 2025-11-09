@@ -1,512 +1,335 @@
 # AI Agent Guide for LinuxReport
 
-This document provides guidance for AI agents (like Codex, GitHub Copilot, or other LLMs) working with the LinuxReport codebase.
+Concise guide for AI agents and humans working on LinuxReport. Focus: correct mental model, key files, critical toggles, and non-obvious rules.
 
 ## Project Overview
 
-LinuxReport is a Python/Flask-based news aggregation platform that provides real-time updates across multiple report types including Linux, COVID-19, AI, Solar/PV, Space, Trump, and Detroit Techno news. The project uses thread pools and process pools for high performance and includes automatic headline updates using LLMs.
+LinuxReport is a Python/Flask-based news aggregation platform that builds multiple reports (Linux, AI, COVID-19, PV/Solar, Space, Trump, Detroit Techno, etc.) from RSS/HTML sources. It uses:
 
-**License**: This project is free and open source software released under the GNU Lesser General Public License v3.0 (LGPL v3).
+- Multi-layer caching (memory + SQLite + file) for performance.
+- Background workers for feed fetching and processing.
+- Optional Selenium/Tor for complex or sensitive sites.
+- LLMs for automatic headlines and summaries.
 
-## Key Technologies
+License: GNU LGPL v3.
 
-- **Primary Language**: Python 3.x
-- **Web Framework**: Flask with extensions
-- **Database**: SQLite via Diskcache for persistent storage
-- **Template Engine**: Jinja2
-- **Asset Management**: Flask-Assets for bundling/minification
-- **Key Dependencies**:
-  - Flask, Flask-Mobility, Flask-Login, Flask-Limiter for web framework
-  - Flask-WTF for CSRF protection and form validation
-  - BeautifulSoup4 for HTML parsing
-  - Feedparser for RSS feed handling
-  - Selenium for web scraping (with Tor support)
-  - Pillow for image processing and WebP conversion
-  - OpenAI and sentence_transformers for LLM integration
-  - Diskcache for high-performance SQLite caching
-  - Cacheout for in-memory TTL caching
+## Key Technologies (what matters to your code)
 
-## Project Structure
+- Python 3.x, Flask.
+- Diskcache (SQLite-backed) and Cacheout for caching.
+- Feedparser, BeautifulSoup4 for feeds/HTML.
+- Selenium (+ optional Tor) for JS-heavy sites.
+- LLMs: OpenAI, sentence_transformers.
+- Jinja2 templates; Flask-Assets bundles JS/CSS from templates/ into static/.
 
-```
-.
-├── app.py                    # Main Flask application entry point and setup
-├── shared.py                 # Shared utilities, constants, and configuration
-├── routes.py                 # Main routing file and route module initializer
-├── models.py                 # Data models, configurations, and user management
-├── config.py                 # Configuration page routes and logic
-├── weather.py                # Weather API routes and functionality
-├── chat.py                   # Chat/comments system routes
-├── admin_stats.py            # Admin statistics and performance monitoring
-├── workers.py                # Background worker processes for feed fetching
-├── auto_update.py            # Automatic headline updates using LLMs
-├── caching.py                # Core caching functionality and utilities
-├── html_generation.py        # AI headline generation and HTML rendering
-├── app_config.py             # Application configuration and setup utilities
-├── request_utils.py          # HTTP request utilities and helpers
-├── seleniumfetch.py          # Selenium-based web scraping functionality
-├── Tor.py                    # Tor network integration and utilities
-├── SqliteLock.py             # SQLite locking mechanisms for concurrency
-├── ObjectStorageLock.py      # Object storage locking for distributed systems
-├── embeddings_dedup.py  # Article deduplication algorithms
-├── FeedHistory.py            # Feed history tracking and management
-├── Reddit.py                 # Reddit-specific fetching and processing
-├── custom_site_handlers.py   # Custom site-specific handlers
-├── image_processing.py       # Main entry points for image extraction and processing
-├── image_parser.py           # HTML parsing, image candidate extraction and selection
-├── image_utils.py            # Core utility functions, constants, and image dimension logic
-├── combinefiles.py           # File combination utilities
-├── convert_png_to_webp.py    # PNG to WebP conversion utilities
-├── feedfilter.py             # RSS feed filtering and processing
-├── old_headlines.py          # Legacy headlines processing
-├── stats.py                  # Statistics and analytics
-├── forms.py                  # Flask-WTF forms for user input with CSRF protection
-├── object_storage_config.py  # Object storage configuration
-├── object_storage_sync.py    # Object storage synchronization
-├── migrate_to_sqlite.py      # Database migration utilities
-├── sync_static.py            # Static file synchronization
-├── generate_dependency_graph.py # Dependency graph generation
-├── generate_docs.py          # Documentation generation utilities
-├── *_report_settings.py      # Site-specific configurations (ai_, linux_, covid_, space_, trump_, pv_, techno_)
-├── templates/                # Jinja2 templates and modular JavaScript/CSS
-│   ├── *.html               # HTML templates
-│   ├── app.js               # Main application JavaScript
-│   ├── core.js              # Core JavaScript (themes, auto-refresh, scroll)
-│   ├── config.js            # Configuration UI logic
-│   ├── chat.js              # Chat interface functionality
-│   ├── weather.js           # Weather widget functionality
-│   ├── infinitescroll.js    # Infinite scroll functionality
-│   ├── themes.css           # Design system, variables, themes, fonts
-│   ├── core.css             # Core UI, layout, responsive, enhancements
-│   ├── weather.css          # Weather widget styling
-│   ├── chat.css             # Chat system styling
-│   └── config.css           # Admin configuration styling
-├── static/                   # Static assets and compiled JavaScript/CSS
-│   ├── images/              # Site logos and favicons
-│   ├── linuxreport.css      # Auto-generated from modular CSS files
-│   └── linuxreport.js       # Auto-generated from modular JS files
-├── tests/                    # Test directory with pytest tests
-│   ├── __init__.py          # Test package initialization
-│   ├── test_article_deduplication.py # Article deduplication tests
-│   ├── test_extract_titles.py # Title extraction tests
-│   ├── test_sqlitelock.py   # SQLite lock tests
-│   └── selenium_test.py     # Selenium integration tests
-├── config.yaml              # Main configuration file
-├── requirements.txt          # Python dependencies
-├── pyproject.toml           # Project configuration
-└── LICENSE                  # GNU LGPL v3 license
-```
+## Key Files and Layout (mental map)
 
-## Core Application Files
+Only the most relevant files for contributors/agents:
 
-1. **app.py**:
-   - Flask application initialization and configuration
-   - Flask-Login setup for authentication
-   - Flask-Assets configuration for JavaScript/CSS bundling
-   - Flask-Compress for response compression
-   - Conditional Flask-MonitoringDashboard integration
-   - Security headers and CORS configuration
+- app.py:
+  - Creates Flask app and core extensions.
+  - Registers routes and assets, configures compression and security headers.
 
-2. **shared.py**:
-   - Mode enumeration for different report types (Linux, AI, COVID, etc.)
-   - Global cache instances (g_c for disk cache, g_cm for memory cache)
-   - Rate limiting configuration and utilities
-   - Shared constants and configuration loading
-   - Cross-module utility functions
+- shared.py:
+  - Mode enums for report types.
+  - Global caches (g_c = diskcache, g_cm = memory).
+  - Important feature flags and rate limiting configuration.
+  - Common utilities used across the project.
 
-3. **routes.py**:
-   - Primary route definitions (index, login, logout)
-   - Route module initialization for weather, chat, config, etc.
-   - Error handling (429 Rate Limit, 404, 500)
-   - Security headers and CORS configuration
-   - Full page caching and performance optimization
+- routes.py:
+  - Main routes and blueprint-style initialization for feature modules.
+  - Error handlers, security headers, CORS.
+  - Page-level caching patterns.
 
-4. **models.py**:
-   - SiteConfig and RssInfo data structures
-   - User authentication model for Flask-Login
-   - Reddit fetch configuration templates
-   - Configuration loading utilities
+- workers.py:
+  - Threaded feed fetching and processing pipeline.
+  - Integrates report settings, caching, image selection, and deduplication.
 
-5. **app_config.py**:
-   - Application configuration utilities
-   - Environment-specific setup functions
-   - Configuration validation and loading
+- *_report_settings.py:
+  - Per-report CONFIG definitions (feeds, schedule, titles, prompts, special handling).
+  - Adding or changing a report type starts here.
 
-6. **request_utils.py**:
-   - HTTP request utilities and helpers
-   - Request retry logic and error handling
-   - User agent management and request headers
+- Reddit.py:
+  - Reddit API client integration and helpers.
 
-7. **seleniumfetch.py**:
-   - Selenium-based web scraping functionality
-   - Browser automation for complex sites
-   - JavaScript rendering support
+- custom_site_handlers.py:
+  - Site-specific scraping/normalization for tricky domains.
 
-8. **Tor.py**:
-   - Tor network integration and utilities
-   - Anonymous browsing capabilities
-   - Tor circuit management
+- image_parser.py / image_utils.py / image_processing.py:
+  - Image candidate extraction, scoring, and JS-heavy site handling.
 
-9. **SqliteLock.py**:
-   - SQLite locking mechanisms for concurrency
-   - Database-level locking utilities
-   - Thread-safe database operations
+- templates/:
+  - *.html Jinja templates.
+  - app.js, core.js, config.js, chat.js, weather.js, infinitescroll.js.
+  - themes.css, core.css, weather.css, chat.css, config.css.
+  - These are the source of truth for front-end; they are bundled into static/.
 
-10. **ObjectStorageLock.py**:
-    - Object storage locking for distributed systems
-    - Cloud storage synchronization
-    - Distributed lock management
+- static/:
+  - Generated/bundled JS/CSS and static assets.
+  - Do not hand-edit generated linuxreport.js / linuxreport.css.
 
-11. **image_parser.py**:
-    - Main entry point for image fetching via `custom_fetch_largest_image`
-    - HTML parsing and image candidate extraction
-    - Image selection and scoring algorithms
-    - Integration with custom site handlers
+- tests/:
+  - Pytest tests for core behavior (locking, dedup, extraction, etc.).
 
-12. **image_processing.py**:
-    - Selenium-based image extraction for JavaScript-heavy sites
-    - Orchestration of image processing pipeline
-    - Browser automation for complex image extraction scenarios
+- config.yaml:
+  - Runtime configuration (domains, credentials, feature toggles). Never hardcode sensitive values.
 
-13. **image_utils.py**:
-    - Core utility functions for image processing
-    - Image dimension extraction and scoring
-    - SVG image handling and srcset parsing
-    - Shared constants and configuration
 
 ## Report Type System
 
-LinuxReport supports multiple report types, each with its own configuration:
+Each report type is driven by a dedicated settings file:
 
-- **Report Settings Files**: `*_report_settings.py` (e.g., `ai_report_settings.py`, `linux_report_settings.py`, `covid_report_settings.py`, `space_report_settings.py`, `trump_report_settings.py`, `pv_report_settings.py`, `techno_report_settings.py`)
-- **Configuration Structure**: Each file contains a `CONFIG` object with:
-  - `ALL_URLS`: Dictionary mapping RSS feeds to RssInfo objects
-  - `SITE_URLS`: Ordered list of feeds to process
-  - `CUSTOM_FETCH_CONFIG`: Special handling for sites requiring Selenium/Tor
-  - `SCHEDULE`: Hours when automatic updates should occur
-  - `WEB_TITLE`, `WEB_DESCRIPTION`: SEO and display information
-  - `REPORT_PROMPT`: LLM prompt for generating headlines
+- Files: *_report_settings.py (ai_, linux_, covid_, space_, trump_, pv_, techno_, etc.).
+- Each defines a CONFIG object specifying:
+  - ALL_URLS: map of feed URL → RssInfo.
+  - SITE_URLS: ordered list of feeds to process.
+  - CUSTOM_FETCH_CONFIG: special cases (Selenium/Tor/custom handlers).
+  - SCHEDULE: hours to auto-update.
+  - WEB_TITLE / WEB_DESCRIPTION, REPORT_PROMPT, and related metadata.
 
-## Weather System
+Agents:
+- When adding/editing a report, adjust CONFIG here instead of scattering constants.
+- Keep schedules, feeds, and prompts consistent and centralized.
 
-The project includes a comprehensive weather system with caching and geolocation support.
+## Weather System (short)
 
-### Geolocation Logic
+- Core endpoint: /api/weather.
+- Takes lat/lon; otherwise uses backend logic to infer/fallback.
+- Behavior is controlled by flags:
+  - DISABLE_CLIENT_GEOLOCATION (front-end): when True, do not ask the browser for location.
+  - DISABLE_IP_GEOLOCATION (shared.py): when True, fallback is Detroit; when False, use IP geolocation.
+- Results are cached to avoid repeated lookups.
+- Agents modifying weather behavior must:
+  - Respect these flags.
+  - Preserve caching to avoid hammering external APIs.
 
-The weather system implements intelligent geolocation handling:
+## Caching and Storage (read this; do not bypass)
 
-1. **Client Geolocation**: Controlled by `DISABLE_CLIENT_GEOLOCATION` flag:
-   - **Enabled (`False`)**: Browser geolocation using `navigator.geolocation.getCurrentPosition()`
-   - **Disabled (`True`)**: Skip browser geolocation entirely
-2. **Server Geolocation**: Controlled by `DISABLE_IP_GEOLOCATION` flag in `shared.py`:
-   - **Enabled (`False`)**: Use IP-based location when client geolocation fails or is disabled
-   - **Disabled (`True`)**: Always show Detroit weather when client geolocation fails
-3. **Caching**: Location data is cached to avoid repeated permission requests
-4. **Error Handling**: Graceful degradation with appropriate fallbacks
+LinuxReport relies heavily on caching. Agents must integrate with these layers correctly.
 
-### Weather API Endpoints
+Core layers:
 
-- **`/api/weather`**: Main weather API endpoint
-  - Accepts `lat` and `lon` parameters for precise location
-  - Falls back to IP-based location or Detroit based on configuration
-  - Supports both imperial and metric units
-  - Includes comprehensive caching with 4-hour expiration
+1) Disk cache (g_c, via diskcache / SQLite)
+- Persistent and shared across processes.
+- Stores:
+  - Weather and geolocation buckets.
+  - Chat comments, banned IPs, rate limiting and lock state.
+  - Feed content and other durable data.
+- Use for: values that must survive restarts or be shared between workers.
 
-## Database and Caching System
+2) Memory cache (g_cm, via cacheout)
+- In-process, fast, TTL-based.
+- Use for:
+  - Hot data, e.g., full page HTML, parsed feeds, small computed results.
+- Do not rely on it for correctness; it is an optimization only.
 
-LinuxReport uses a sophisticated multi-layer caching system (see `Caching.md` for full details):
+3) File-based cache
+- AI-generated HTML snippets like {mode}reportabove.html.
+- Used as a lightweight content store and mtime indicator.
+- Avoid extra file I/O when mtime/content matches expectations.
 
-### CDN and Image Delivery
+4) Assets and CDN
+- JS/CSS are built from templates/ into static/linuxreport.js and static/linuxreport.css (often served via CDN).
+- Long cache lifetimes are assumed.
+- When changing front-end behavior, update templates/*; let the build/bundling pipeline regenerate static assets.
 
-The system includes CDN support for optimal image delivery:
-
-- **s3cmd Integration**: Images are synchronized to object storage using `s3cmd` with long cache expiration headers
-- **Client-Side Caching**: HTTP headers are set to instruct browsers to cache images for extended periods, reducing server load
-- **CDN Configuration**: Configurable CDN URL in `config.yaml` for serving static images from edge locations
-- **Performance Optimization**: Long expiration dates significantly reduce bandwidth usage and improve load times
-
-### Core Caching Layers
-
-1. **Disk Cache (`diskcache` via `g_c`)**:
-   - Primary persistent storage using SQLite backend
-   - Weather data with geographical bucketing
-   - Chat comments and banned IP addresses
-   - Cross-process locking for feed synchronization
-
-2. **Memory Cache (`cacheout` via `g_cm`)**:
-   - Full page caching with TTL
-   - RSS template caching with invalidation
-   - Performance-critical data with size limits
-
-3. **File-based Caching (`_file_cache`)**:
-   - AI-generated headlines from `{mode}reportabove.html` files
-   - Modification time tracking to avoid unnecessary disk I/O
-   - Administrative content that changes infrequently
-
-4. **Asset Management (Flask-Assets)**:
-   - Automatic JavaScript bundling from modular files in templates/
-   - Conditional minification (debug vs production)
-   - Cache busting with automatic versioning
-   - Custom header injection with compilation metadata
+Agent rules:
+- Do:
+  - Prefer existing cache helpers instead of creating ad-hoc caches.
+  - Reuse cache keys/patterns where the codebase already uses them.
+- Do not:
+  - Introduce separate SQLite/databases for similar data.
+  - Bypass caching for hot paths (feeds, weather, front page) unless debugging.
+  - Modify generated static/* files by hand.
 
 ## Feed Processing and Workers
- 
-- **Thread Pool Architecture**: Uses `workers.py` for concurrent feed fetching
-- **Tor Integration**: Selenium with Tor support for sites requiring anonymity
-- **Custom Site Handlers**: Special configurations for Reddit, complex sites
-- **Deduplication**: Article deduplication across feeds and time periods
-- **Image Processing**: Automatic WebP conversion and optimization
-- **Reddit Integration**:
-  - Controlled by global flag `ENABLE_REDDIT_API_FETCH` in [`shared.py`](shared.py:202).
-  - When `ENABLE_REDDIT_API_FETCH = False` (default):
-    - Reddit URLs are fetched via the legacy `RedditFetcher` in [`workers.py`](workers.py:163) using Tor and/or standard RSS/feedparser logic.
-  - When `ENABLE_REDDIT_API_FETCH = True`:
-    - Reddit URLs are fetched via `fetch_reddit_feed_as_feedparser()` in [`Reddit.py`](Reddit.py:346) through `RedditFetcher` in [`workers.py`](workers.py:163).
-    - `fetch_reddit_feed_as_feedparser()` returns feedparser-like entries; no extra normalization is needed in `workers.py`.
-  - This switch is reversible and only affects how Reddit feeds are fetched; other feeds are unaffected.
 
-## Image Processing System
+- workers.py:
+  - Uses thread pools for concurrent feed fetching and processing.
+  - Integrates:
+    - *_report_settings.py for which feeds to hit and how.
+    - Deduplication, caching, and image selection.
+    - Optional Tor/Selenium paths for complex sources.
+- Custom site handlers:
+  - Implement site-specific scraping/normalization logic without cluttering generic pipelines.
+- Tor/Selenium:
+  - Encapsulated in seleniumfetch.py, Tor.py, and custom handlers.
+  - Toggle or extend here; do not scatter Selenium/Tor usage.
 
-The project includes a comprehensive image processing pipeline:
+### Reddit Integration (important toggle)
 
-1. **image_processing.py**: Main entry points for image extraction and processing, including Selenium-based fetching. Orchestrates calls to utility and parsing functions defined in other modules.
+- Controlled by ENABLE_REDDIT_API_FETCH in [shared.py](shared.py:202).
+- When ENABLE_REDDIT_API_FETCH = False (default):
+  - Legacy behavior:
+    - Reddit URLs fetched via legacy RedditFetcher in [workers.py](workers.py:163) using Tor and/or RSS/feedparser flows.
+- When ENABLE_REDDIT_API_FETCH = True:
+  - New behavior:
+    - Reddit URLs fetched via fetch_reddit_feed_as_feedparser() in [Reddit.py](Reddit.py:346) through RedditFetcher in [workers.py](workers.py:163).
+    - Returns feedparser-like entries; workers do not need special handling.
+- Bootstrapping:
+  - Run [Reddit.py](Reddit.py:487) once interactively on the server to obtain tokens and write reddit_token.json (mode 0600).
+  - Do not commit credentials or reddit_token.json.
 
-2. **image_parser.py**: Handles HTML parsing, image candidate extraction and selection, and custom site-specific logic. Contains the main `custom_fetch_largest_image` function that serves as the primary entry point for image fetching.
+This flag only affects how Reddit feeds are fetched; other feeds are unaffected.
 
-3. **image_utils.py**: Contains core utility functions, constants, and image dimension logic. Includes functions for scoring image candidates, parsing srcset attributes, extracting dimensions, and handling SVG images.
 
-4. **convert_png_to_webp.py**: PNG to WebP conversion utilities for image optimization.
+## Coding Conventions (brief but binding)
 
-The image processing system has been refactored to consolidate functionality into these core modules, with `image_parser.py` serving as the main entry point and `image_utils.py` providing shared utilities and constants.
+- Follow PEP 8.
+- Indent with 4 spaces.
+- Target max line length: 160 chars.
+- Use type hints for public functions where practical.
+- Use existing patterns:
+  - Classes: PascalCase (SiteConfig, RssInfo).
+  - Functions/vars: snake_case.
+  - Constants: UPPER_SNAKE_CASE.
+  - Filenames: lowercase_with_underscores.py.
+- Place:
+  - New core modules at repo root.
+  - New report configs in *_report_settings.py.
+  - New Jinja templates in templates/.
+  - New static assets under static/images/ (or appropriate subdir).
 
-## Coding Conventions
+## Security and Authentication (project-specific points)
 
-1. **File Organization**:
-   - New Python modules in root directory
-   - Report-specific settings in `*_report_settings.py` files
-   - Templates in `templates/`, static assets in `static/`
+- Admin:
+  - Flask-Login for authentication; credentials/config from config.yaml.
+- Forms:
+  - Flask-WTF with CSRF—reuse existing patterns for new forms.
+- Rate limiting:
+  - Flask-Limiter configured centrally; follow its helpers/utilities for new endpoints.
+- CORS and headers:
+  - Security headers and allowed domains are set in core routes; align new endpoints with these defaults.
+- IP blocking:
+  - Banned IPs stored persistently (diskcache); use the same mechanism when extending protections.
+- Never:
+  - Commit secrets, tokens, passwords, or private keys.
+  - Introduce unauthenticated admin-style endpoints.
 
-2. **Code Style**:
-   - Follow PEP 8 guidelines
-   - Use 4 spaces for indentation
-   - Maximum line length of 160 characters
-   - Type hints for function parameters and returns
+## JavaScript and CSS Architecture (minimal operational view)
 
-3. **Naming Conventions**:
-   - Classes: PascalCase (`SiteConfig`, `RssInfo`)
-   - Functions and variables: snake_case
-   - Constants: UPPER_SNAKE_CASE
-   - File names: lowercase with underscores
-
-## Security and Authentication
-
-- **Admin Authentication**: Flask-Login with config.yaml password storage
-- **Form Security**: Flask-WTF with CSRF protection and comprehensive form validation
-- **Rate Limiting**: Flask-Limiter with dynamic rate adjustment
-- **CORS Configuration**: Configurable allowed domains for API access
-- **Input Validation**: Secure file uploads with size/type restrictions
-- **Security Headers**: CSP, XSS protection, frame options
-- **IP Blocking**: Persistent banned IP storage in disk cache
-
-## JavaScript and CSS Architecture
-
-1. **Modular System**:
-    - **JavaScript**: Source files in `templates/`: `app.js`, `core.js`, `config.js`, `chat.js`, `weather.js`, `infinitescroll.js`
-    - **CSS**: Modular files in `templates/`: `themes.css`, `core.css`, `weather.css`, `chat.css`, `config.css`
-    - Automatic bundling into `static/linuxreport.js` and `static/linuxreport.css` via Flask-Assets
-    - Development mode: unminified for debugging
-    - Production mode: minified with source file headers and compilation metadata
-
-2. **Core Functionality**:
-   - Theme management (dark/light mode persistence)
-   - Font size controls with localStorage persistence
-   - Infinite scroll with mobile detection
-   - Auto-refresh with configurable intervals
-   - CSRF token handling for secure AJAX requests
-   - Image optimization utilities (currently unused)
-   - **Geolocation support**: Browser-based geolocation with fallback to IP-based location or default coordinates
-
-3. **Geolocation System**:
-   - `app.utils.GeolocationManager`: Global geolocation utility in `app.js`
-   - Browser geolocation API integration with high accuracy settings
-   - Client-side control via `DISABLE_CLIENT_GEOLOCATION` flag in `app.js`:
-     - **When `DISABLE_CLIENT_GEOLOCATION = True`**: Skip browser geolocation entirely
-     - **When `DISABLE_CLIENT_GEOLOCATION = False`**: Attempt browser geolocation
-   - Backend-controlled fallback logic based on `DISABLE_IP_GEOLOCATION` flag:
-     - **When `DISABLE_IP_GEOLOCATION = True`**: Always show Detroit weather when geolocation fails
-     - **When `DISABLE_IP_GEOLOCATION = False`**: Use IP-based location when geolocation fails
-   - Caching of location data to avoid repeated permission requests
-
-3. **Integration Patterns**:
-   - Jinja2 templating for dynamic JavaScript content
-   - Event delegation for performance
-   - Progressive enhancement principles
-   - Consistent error handling and logging
-   - CSRF token handling for secure AJAX requests
+- Edit JS/CSS source only in templates/:
+  - JS: app.js, core.js, config.js, chat.js, weather.js, infinitescroll.js.
+  - CSS: themes.css, core.css, weather.css, chat.css, config.css.
+- These are bundled into:
+  - static/linuxreport.js
+  - static/linuxreport.css
+- Rules:
+  - Do not edit static/linuxreport.* directly.
+  - Keep CSRF handling and existing event/delegation patterns consistent.
+  - Respect theme, font-size, infinite scroll, and auto-refresh behavior already implemented.
 
 ## Configuration Management
 
-- **Primary Config**: `config.yaml` with admin credentials, storage settings, domain allowlists
-- **Environment-Specific**: Report settings files for different news categories
-- **Security**: Never commit sensitive data; change default passwords
-- **Validation**: Input validation for admin configuration changes
+- config.yaml:
+  - Central runtime config: domains, credentials, feature flags, storage settings.
+- *_report_settings.py:
+  - Per-report source and behavior.
+- Guidelines:
+  - Never hardcode sensitive values into Python/JS.
+  - Keep configuration-driven behavior in these files instead of scattering constants.
 
-## Common Tasks
+## Common Tasks (quick recipes)
 
-### Adding a New Report Type
+Adding a new report type:
+1) Create {type}_report_settings.py with a CONFIG object:
+   - Use existing *_report_settings.py as reference.
+2) Add {type}reportabove.html template and relevant branding in static/images/.
+3) Wire any domain/routing needs in config.yaml and routes.py (following existing patterns).
+4) Ensure workers pick it up (typically automatic via CONFIG structure).
 
-1. Create `{type}_report_settings.py` with CONFIG object:
-   ```python
-   from models import SiteConfig, RssInfo
-   CONFIG = SiteConfig(
-       ALL_URLS={...},
-       SITE_URLS=[...],
-       WEB_TITLE="...",
-       REPORT_PROMPT="...",
-       # ... other settings
-   )
-   ```
+Adding a new feature/route:
+1) Create a module, e.g. my_feature.py, that exposes init_my_feature_routes(app).
+2) Call that initializer from routes.py.
+3) Add templates/static assets under templates/ and static/ as needed.
+4) Add tests under tests/.
 
-2. Add corresponding HTML template `{type}reportabove.html`
-3. Add static assets (logos, favicons) in `static/images/`
-4. Update domain configuration in `config.yaml` if needed
-5. Configure systemd timers for automatic updates
+Modifying caching behavior:
+1) For page caching: adjust keys/TTLs where caching decorators or helpers are used (often in routes.py or shared utilities).
+2) For data caching:
+   - Use g_c for persistent/shared data.
+   - Use g_cm for hot ephemeral data.
+3) When changing data flows:
+   - Implement appropriate invalidation or key versioning.
 
-### Adding New Routes/Features
+## Development Workflows (minimal)
 
-1. Create feature module (e.g., `my_feature.py`)
-2. Define `init_my_feature_routes(app)` function
-3. Import and call in `routes.py`'s `init_app()` function
-4. Add templates and static assets as needed
-5. Write tests in `tests/` directory
+Setup:
+- git clone <repo>
+- cd LinuxReport
+- pip install -r requirements.txt (or use pyproject.toml)
+- Copy/edit config.yaml for local settings.
+- python app.py
 
-### Modifying Caching Behavior
+Testing:
+- pytest tests/
+- Use targeted tests for specific components when modifying them.
 
-1. **Page Caching**: Modify cache keys and TTL in `routes.py`
-2. **Data Caching**: Use appropriate cache layer (`g_c` for persistence, `g_cm` for speed)
-3. **File Caching**: Update `_file_cache` patterns in `caching.py`
-4. **Cache Invalidation**: Implement proper cache clearing on data updates
-
-## Development Workflows
-
-1. **Setup**:
-   ```bash
-   git clone <repository>
-   cd LinuxReport
-   pip install -r requirements.txt
-   # Edit config.yaml with your settings
-   python app.py
-   ```
-
-2. **Testing**:
-   ```bash
-   pytest tests/
-   # Run specific test: pytest tests/test_specific.py
-   ```
-
-3. **Asset Development**:
-    - Edit JavaScript and CSS in `templates/` directory
-    - Flask-Assets automatically rebuilds on startup
-    - Debug mode serves unminified assets
-    - CSS modules: themes.css (design system), core.css (main UI), weather.css/chat.css/config.css (features)
+Assets:
+- Edit JS/CSS in templates/.
+- Let the asset pipeline (Flask-Assets or equivalent) regenerate static bundles.
 
 ## Performance Considerations
 
-- **Caching Strategy**: Use appropriate cache layer for data lifecycle
-- **Database Operations**: Leverage diskcache for high-performance SQLite access
-- **Concurrent Processing**: Use thread pools for I/O-bound operations
-- **Asset Optimization**: Automatic minification and bundling in production
-- **Rate Limiting**: Protect against abuse while allowing legitimate usage
+- Use caching correctly before optimizing elsewhere.
+- Keep I/O-bound work in workers/thread pools rather than blocking request handlers.
+- Leverage existing minified/bundled assets in production.
+- Respect rate limiting and avoid adding unbounded per-request work.
 
-## Troubleshooting
+## Troubleshooting (short checklist)
 
-1. **Cache Issues**:
-   - Check disk space and `cache.db` permissions
-   - Review cache key naming and TTL settings
-   - Monitor cache hit rates in admin stats
+- Cache/db:
+  - Verify cache.db exists and is writable.
+  - Confirm cache keys and TTLs are sane when debugging stale/fresh data.
+- Feeds:
+  - Check network/SSL.
+  - Verify related *_report_settings.py and custom_site_handlers.py entries.
+  - Inspect workers and Tor/Selenium configuration for special sites.
+- Assets:
+  - Ensure bundling runs; check console/network for 404s or JS errors.
+- Auth:
+  - Confirm config.yaml credentials.
+  - Verify Flask-Login wiring and protected routes.
 
-2. **Feed Processing**:
-   - Verify network connectivity and SSL certificates
-   - Check custom fetch configurations for complex sites
-   - Review Selenium/Tor setup for sites requiring special handling
+## Important Guidelines (agent checklist)
 
-3. **Asset Loading**:
-   - Ensure Flask-Assets properly bundles JavaScript
-   - Check for compilation errors in asset pipeline
-   - Verify static file serving configuration
+Do:
+- Use existing caching infrastructure and helpers.
+- Follow the modular route pattern for new features.
+- Keep behavior configuration-driven (config.yaml, *_report_settings.py).
+- Use type hints and match existing style/patterns.
+- Add or update tests for non-trivial changes.
 
-4. **Authentication**:
-   - Confirm config.yaml password settings
-   - Check Flask-Login session configuration
-   - Verify admin route protections
-
-## Important Guidelines
-
-### What to Do
-- **Use existing caching infrastructure** rather than implementing custom storage
-- **Follow the modular route pattern** for new features  
-- **Leverage the multi-layer cache system** for optimal performance
-- **Configure CDN properly** for static asset delivery with appropriate cache headers
-- **Use type hints** and follow existing code patterns
-- **Test thoroughly** with pytest before deployment
-
-### What to Avoid
-- **DO NOT** bypass the caching system for performance-critical operations
-- **DO NOT** hardcode configuration values; use config.yaml or settings files
-- **DO NOT** modify auto-generated files in `static/` directory
-- **DO NOT** create circular dependencies between modules
-- **DO NOT** commit sensitive information like passwords or API keys
-- **DO NOT** serve images locally when CDN is properly configured - always use the CDN URL for better performance
+Avoid:
+- Bypassing caches on hot paths.
+- Hardcoding config, secrets, or environment-specific values.
+- Editing generated static/ assets directly.
+- Creating circular imports.
+- Shipping credentials, tokens, or private keys in the repo.
 
 ## Reddit API Setup (for agents and operators)
 
-To use the new Reddit API-based fetching:
+- Create a Reddit "script" app in your Reddit preferences.
+- Set redirect URI to a URL handled by /reddit/callback (see [routes.py](routes.py:748)); this route is cosmetic.
+- On the server, run [Reddit.py](Reddit.py:487) once:
+  - Provide client_id, client_secret, username, password.
+  - It writes reddit_token.json (mode 0600) with tokens.
+- Toggle:
+  - ENABLE_REDDIT_API_FETCH in [shared.py](shared.py:205).
+    - False: legacy Tor/Selenium/RSS pipeline.
+    - True: Reddit API via [Reddit.py](Reddit.py:346) + [workers.py](workers.py:163).
+- Never commit reddit_token.json or credentials.
 
-1. Create a Reddit "script" app:
-   - Go to https://www.reddit.com/prefs/apps.
-   - Create an app of type "script".
-   - Set redirect URI to your live callback, e.g. `https://your-domain.tld/reddit/callback`.
-     - This URL is handled by the cosmetic `/reddit/callback` route in [`routes.py`](routes.py:748) and does not perform OAuth logic.
+## Additional Documentation (if available)
 
-2. One-time token bootstrap:
-   - On the server (interactive shell), run [`Reddit.py`](Reddit.py:487) directly:
-     - Provide:
-       - Client ID
-       - Client Secret
-       - Reddit username
-       - Reddit password
-     - The script requests tokens from Reddit and writes `reddit_token.json` (mode 0600).
-   - Subsequent runs use the stored access/refresh tokens; no further password prompts.
+If present in the repo/deploy environment, see:
 
-3. Toggle integration:
-   - Keep `ENABLE_REDDIT_API_FETCH = False` in [`shared.py`](shared.py:205) to use legacy Tor/Selenium/RSS behavior.
-   - Set `ENABLE_REDDIT_API_FETCH = True` to route Reddit URLs through the Reddit API via [`workers.py`](workers.py:161) and [`Reddit.py`](Reddit.py:346).
+- README.md: setup and high-level overview.
+- Caching.md: deeper caching internals.
+- README_object_storage_sync.md: CDN/object storage sync configuration.
+- PWA.md, Scaling.md, ROADMAP.md: advanced deployment and roadmap details.
+- httpd-vhosts-sample.conf: sample Apache deployment.
 
-4. Notes:
-   - `/reddit/callback` is cosmetic and safe to expose; it exists only to satisfy Reddit's redirect URI requirement and show a friendly message.
-   - Do not store Reddit credentials in git; keep `reddit_token.json` and any secrets on the server only.
+External references:
 
-## Additional Documentation
- 
-Refer to these specialized documentation files for detailed information:
- 
-- `README.md`: Project overview and setup instructions
-- `Caching.md`: Comprehensive caching system documentation
-- `README_object_storage_sync.md`: Object storage and CDN configuration
-- `PWA.md`: Progressive Web App implementation details
-- `PERFORMANCE_OPTIMIZATIONS.md`: Performance optimization strategies
-- `MONITORING.md`: Application monitoring and metrics
-- `Scaling.md`: Scaling strategies and considerations
-- `api_docs.md`: API documentation and endpoints
-- `function_dependencies.md`: Function dependency analysis
-- `ROADMAP.md`: Project roadmap and future plans
-- `config.yaml`: Configuration file with inline comments
-- `httpd-vhosts-sample.conf`: Apache production deployment configuration
-
-## Resources
-
-- [Flask Documentation](https://flask.palletsprojects.com/)
-- [Jinja2 Documentation](https://jinja.palletsprojects.com/)
-- [Python Style Guide (PEP 8)](https://www.python.org/dev/peps/pep-0008/)
-- [Flask-Assets Documentation](https://flask-assets.readthedocs.io/)
-- [Diskcache Documentation](https://grantjenks.com/docs/diskcache/)
+- Flask, Jinja2, PEP 8, Flask-Assets, Diskcache docs for library specifics.
