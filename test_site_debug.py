@@ -146,20 +146,26 @@ def test_uniteai_selenium():
 
 
 def test_venturebeat_requests():
-    """Test VentureBeat using requests/BeautifulSoup debugging."""
-    
+    """
+    Test VentureBeat using requests/BeautifulSoup debugging.
+
+    Behavior:
+    - On first run (no existing saved HTML), fetch from network via debug_requests(),
+      save the HTML snapshot, and report.
+    - On subsequent runs, if the saved HTML exists, re-run analysis ONLY against
+      the saved file via debug_from_html() with no additional network calls.
+    """
     def custom_analysis(soup):
         """Custom analysis for VentureBeat - analyze article structure."""
         articles = soup.find_all('article')
         article_data = []
-        
+
         for i, article in enumerate(articles[:5]):
             article_info = {
                 'index': i,
                 'classes': article.get('class', []),
             }
-            
-            # Look for title
+
             for title_tag in ['h1', 'h2', 'h3', 'h4']:
                 title_elem = article.find(title_tag)
                 if title_elem:
@@ -167,33 +173,49 @@ def test_venturebeat_requests():
                     article_info['title_tag'] = title_elem.name
                     article_info['title_classes'] = title_elem.get('class', [])
                     break
-            
-            # Look for link
+
             link_elem = article.find('a')
             if link_elem and link_elem.get('href'):
                 article_info['link'] = link_elem['href']
-            
-            # Look for date/time
-            time_elem = article.find(['time', 'span'], 
-                                    class_=lambda x: x and ('date' in str(x).lower() or 'time' in str(x).lower()))
+
+            time_elem = article.find(
+                ['time', 'span'],
+                class_=lambda x: x and ('date' in str(x).lower() or 'time' in str(x).lower())
+            )
             if time_elem:
                 article_info['time_text'] = time_elem.text.strip()
                 article_info['time_attrs'] = dict(time_elem.attrs)
-            
+
             article_data.append(article_info)
-        
+
         return {'article_analysis': article_data}
-    
+
     config = DebugConfig(
         url="https://venturebeat.com/category/ai/",
         site_name="venturebeat_ai",
-        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        user_agent=(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/91.0.4472.124 Safari/537.36"
+        ),
         custom_analysis=custom_analysis,
     )
-    
+
     debugger = SiteDebugger(config)
-    result = debugger.debug_requests()
-    
+
+    # Determine expected HTML snapshot path used by debug_requests()
+    html_path = f"{config.site_name.lower().replace('.', '_').replace('/', '_')}_debug_{debugger.timestamp}.html"
+
+    if os.path.exists(html_path):
+        print(f"Re-using existing HTML snapshot for VentureBeat: {html_path}")
+        result = debugger.debug_from_html(html_path, is_selenium=False)
+    else:
+        print("No existing HTML snapshot found for VentureBeat; fetching once via debug_requests()")
+        result = debugger.debug_requests()
+        if result and 'html' in result.get('files', {}):
+            html_path = result['files']['html']
+            print(f"Saved HTML snapshot for future runs: {html_path}")
+
     if result:
         print(f"\n[SUCCESS] VentureBeat debug completed!")
         print(f"Files created: {', '.join(result.get('files', {}).values())}")
@@ -208,24 +230,31 @@ def test_venturebeat_requests():
         return False
 
 
-def test_custom_site(url: str, name: str, use_selenium: bool = True):
-    """Test a custom site."""
+def run_custom_site(url: str, name: str, use_selenium: bool = True) -> bool:
+    """
+    Helper to debug a custom site.
+
+    Note:
+    - This is an executable helper, not a pytest test.
+    - It is intentionally NOT named like `test_*` to avoid pytest treating
+      `url` / `name` as fixtures.
+    """
     print(f"Testing custom site: {name} at {url}")
-    
+
     config = DebugConfig(
         url=url,
         site_name=name,
         user_agent="Site Debugger Bot",
         wait_time=5,
     )
-    
+
     debugger = SiteDebugger(config)
-    
+
     if use_selenium:
         result = debugger.debug_selenium()
     else:
         result = debugger.debug_requests()
-    
+
     if result:
         print(f"\n[SUCCESS] Custom site debug completed!")
         print(f"Files created: {', '.join(result.get('files', {}).values())}")

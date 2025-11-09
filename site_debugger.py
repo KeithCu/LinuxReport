@@ -7,20 +7,23 @@ using Selenium (for JavaScript-heavy sites) or requests/BeautifulSoup
 (for static sites).
 
 Usage:
-    from site_debugger import SiteDebugger, DebugConfig
-    
-    config = DebugConfig(
-        url="https://example.com",
-        site_name="example",
-        user_agent="My Bot -- https://example.com",
-        wait_time=5,
-        post_selectors=[".post", "article"],
-        title_selectors=["h1", "h2", ".title"],
-        link_selectors=["a[href*='/20']"],
-    )
-    
-    debugger = SiteDebugger(config)
-    result = debugger.debug_selenium()
+    - Generic:
+        from site_debugger import SiteDebugger, DebugConfig
+
+        config = DebugConfig(
+            url="https://example.com",
+            site_name="example",
+            user_agent="My Bot -- https://example.com",
+            wait_time=5,
+            post_selectors=[".post", "article"],
+            title_selectors=["h1", "h2", ".title"],
+            link_selectors=["a[href*='/20']"],
+        )
+
+        debugger = SiteDebugger(config)
+        result = debugger.debug_selenium()
+
+
 """
 
 import time
@@ -66,17 +69,96 @@ class DebugConfig:
 
 
 class SiteDebugger:
-    """Generalized site debugging utility."""
-    
+    """Generalized site debugging utility.
+
+    Key behavior:
+
+    - Each run that fetches from the network (Selenium or requests) MUST:
+      - Save the HTML it received to disk (if save_html is True).
+      - Return the paths of all generated artifacts in `result["files"]`.
+    - All subsequent parsing / selector experiments for that snapshot MUST:
+      - Operate ONLY on the saved HTML file (no additional network calls).
+      - Be driven via the `debug_from_html()` helper below.
+
+    This ensures:
+    - Repeatable debugging against a frozen DOM snapshot.
+    - No accidental hammering of source sites when iterating on selectors.
+    """
+
     def __init__(self, config: DebugConfig):
         self.config = config
         self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self.files_created = []
-        
+        self.files_created: List[str] = []
+
     def _get_file_prefix(self) -> str:
         """Generate file prefix from site name and timestamp."""
         safe_name = self.config.site_name.lower().replace('.', '_').replace('/', '_')
         return f"{safe_name}_debug_{self.timestamp}"
+
+    def debug_from_html(self, html_path: str, is_selenium: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        Run analysis and reports using an existing HTML file on disk.
+
+        This is the canonical way to iterate on selectors/parsing logic without
+        performing additional network fetches.
+
+        Args:
+            html_path: Path to a previously saved HTML file (typically from
+                       debug_selenium() or debug_requests()).
+            is_selenium: If True, run Selenium-style DOM/selector analysis
+                         semantics where applicable; otherwise use the
+                         requests/BeautifulSoup analysis.
+
+        Returns:
+            Result dict (same shape as debug_* methods) or None on error.
+        """
+        try:
+            with open(html_path, "r", encoding="utf-8") as f:
+                html = f.read()
+        except Exception as e:
+            print(f"Error reading HTML from {html_path}: {e}")
+            return None
+
+        # Common result scaffold
+        result: Dict[str, Any] = {
+            "url": self.config.url,
+            "title": "N/A (from file)",
+            "current_url": self.config.url,
+            "html_length": len(html),
+            "files": {"html": html_path},
+        }
+
+        # For Selenium-style analysis, we rely on BeautifulSoup plus the
+        # same selector logic patterns used in _analyze_requests_page.
+        soup = BeautifulSoup(html, "html.parser")
+        if soup.title and soup.title.text:
+            result["title"] = soup.title.text.strip()
+
+        if is_selenium:
+            # Reuse the BeautifulSoup-based analysis but label appropriately.
+            analysis = self._analyze_requests_page(soup)
+            result.update(analysis)
+            console_logs: List[Any] = []
+            if self.config.save_report:
+                report_filename = self._save_requests_report(result, soup)
+                result["files"]["report"] = report_filename
+                self.files_created.append(report_filename)
+        else:
+            analysis = self._analyze_requests_page(soup)
+            result.update(analysis)
+            if self.config.custom_analysis:
+                try:
+                    custom_result = self.config.custom_analysis(soup)
+                    result["custom_analysis"] = custom_result
+                except Exception as e:
+                    print(f"Custom analysis error (from HTML): {e}")
+                    result["custom_analysis_error"] = str(e)
+            if self.config.save_report:
+                report_filename = self._save_requests_report(result, soup)
+                result["files"]["report"] = report_filename
+                self.files_created.append(report_filename)
+
+        return result
     
     def debug_selenium(self) -> Optional[Dict[str, Any]]:
         """

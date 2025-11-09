@@ -44,15 +44,29 @@ If logs confirm "no entries found" or DOM mismatch for a specific site, continue
 
 ---
 
-## 2. Use site_debugger.py to Inspect the Site
+## 2. Use site_debugger.py to Inspect the Site (Single Fetch, Local Iteration)
 
 `site_debugger.py` is your primary tool to see what LinuxReport actually receives from a site.
 
+Key guarantees:
+
+- The first debug run (via Selenium or requests) will:
+  - Fetch the page once.
+  - Save the full HTML snapshot (and optional JS/console/report) to disk.
+- All subsequent selector/parsing experiments for that snapshot MUST:
+  - Use the saved HTML file only.
+  - Avoid additional network calls for the same investigation.
+
+This is enforced via:
+- [`site_debugger.py DebugConfig()`](site_debugger.py:65) + [`site_debugger.py SiteDebugger.debug_requests()`](site_debugger.py:387) / [`site_debugger.py SiteDebugger.debug_selenium()`](site_debugger.py:103) for the initial fetch.
+- [`site_debugger.py SiteDebugger.debug_from_html()`](site_debugger.py:115) for all follow-up analysis using the saved HTML.
+
 Typical workflow (examples; adjust arguments to your env):
 
-1. Run debugger against a problematic URL:
-   - Check `site_debugger.py` usage (arguments/options) to:
+1. Run debugger against a problematic URL (one network call):
+   - Use `SiteDebugger.debug_requests()` or `SiteDebugger.debug_selenium()`:
      - Fetch the page similarly to production.
+     - Save `{site}_debug_*.html` plus related artifacts.
      - Optionally use the same user agent, headers, and Tor/Selenium/Playwright paths.
 
 2. Inspect outputs:
@@ -62,7 +76,12 @@ Typical workflow (examples; adjust arguments to your env):
      - Snippets of HTML around the expected headline/link elements.
      - Whether content is loaded server-side or via JavaScript only.
 
-3. Decide:
+3. Iterate on selectors locally, no more network:
+   - Point `debug_from_html()` at the saved HTML file.
+   - Adjust CSS selectors / parsing logic until results look correct.
+   - This loop never re-fetches the live site.
+
+4. Decide:
    - If HTML contains the items in clear tags, this is a selector/parsing issue.
    - If HTML is mostly empty but browser shows content:
      - Site is JS-heavy → should use `seleniumfetch.py` or `playwrightfetch.py`.
@@ -71,6 +90,7 @@ Typical workflow (examples; adjust arguments to your env):
 
 Use `test_site_debug.py` to:
 - Validate that `site_debugger.py` semantics stay correct.
+- Confirm that once an HTML snapshot exists, re-runs reuse the local file instead of performing new fetches (see the VentureBeat example).
 - Provide regression protection when modifying debugging utilities.
 
 ---
