@@ -1195,6 +1195,11 @@ def build_feed_result(entries, url, status=200, etag="", modified=None):
 
     Returns:
         dict: Standardized feed result
+
+    Notes:
+        - Includes zero_latest flag so downstream code can detect when the latest
+          fetch produced zero entries. This enables immediate stale/broken-feed
+          highlighting on the frontend without extra cache keys.
     """
     if modified is None:
         modified = datetime.now(timezone.utc)
@@ -1209,7 +1214,10 @@ def build_feed_result(entries, url, status=200, etag="", modified=None):
             'description': ''
         },
         'href': url,
-        'status': status
+        'status': status,
+        # True iff THIS fetch returned zero entries; callers may override or
+        # enrich this if they have more nuanced logic.
+        'zero_latest': len(entries) == 0
     }
 
 

@@ -365,15 +365,53 @@ def _register_main_routes(flask_app):
             if DEBUG or template is None:
                 feed = g_c.get(url)
                 last_fetch_str = format_last_updated(last_fetch)
+
+                # Normalize feed structure:
+                # - browser_fetch-style dict: use feed['entries'], feed.get('zero_latest')
+                # - RssFeed instance: use feed.entries, getattr(feed, 'zero_latest', False)
+                # - legacy feedparser-like objects: use feed.entries, no zero_latest flag
+                zero_latest = False
                 if feed is not None:
-                    entries = feed.entries
-                    top_images = {article['url']: article['image_url'] for article in feed.top_articles if article['image_url']}
+                    if isinstance(feed, dict):
+                        entries = feed.get('entries', [])
+                        zero_latest = bool(feed.get('zero_latest', False))
+                        # top_articles, if present, should be respected
+                        top_articles = feed.get('top_articles') or []
+                        top_images = {
+                            article['url']: article['image_url']
+                            for article in top_articles
+                            if article.get('url') and article.get('image_url')
+                        }
+                    elif hasattr(feed, 'entries'):
+                        entries = getattr(feed, 'entries', [])
+                        zero_latest = bool(getattr(feed, 'zero_latest', False))
+                        top_articles = getattr(feed, 'top_articles', []) if hasattr(feed, 'top_articles') else []
+                        top_images = {
+                            article['url']: article['image_url']
+                            for article in top_articles
+                            if article.get('url') and article.get('image_url')
+                        }
+                    else:
+                        # Fallback: unknown shape, try best-effort entries; no zero_latest
+                        entries = getattr(feed, 'entries', []) if hasattr(feed, 'entries') else []
+                        top_images = {}
                 else:
                     entries = []
                     top_images = {}
-                template = render_template('sitebox.html', top_images=top_images, entries=entries, logo=URL_IMAGES + rss_info.logo_url,
-                                           alt_tag=rss_info.logo_alt, link=rss_info.site_url, last_fetch = last_fetch_str, feed_id = rss_info.site_url,
-                                           error_message=("Feed could not be loaded." if feed is None else None))
+                    zero_latest = False
+
+                template = render_template(
+                    'sitebox.html',
+                    top_images=top_images,
+                    entries=entries,
+                    logo=URL_IMAGES + rss_info.logo_url,
+                    alt_tag=rss_info.logo_alt,
+                    link=rss_info.site_url,
+                    last_fetch=last_fetch_str,
+                    feed_id=rss_info.site_url,
+                    error_message=("Feed could not be loaded." if feed is None else None),
+                    zero_latest=zero_latest
+                )
 
                 # Cache entry deleted by worker thread after fetch, however, that only effects the same process.
                 g_cm.set(rss_info.site_url, template, ttl=EXPIRE_DAY)

@@ -745,6 +745,16 @@
   app.utils.StaleFeedManager = {
     init() {
       document.querySelectorAll('.box').forEach(box => {
+        // If the backend marked this feed as having zero entries on the latest fetch
+        // (e.g. JS/selenium selector or format broke), immediately apply stale-feed.
+        // This uses the same visual cue as aged feeds and does not wait 2 days.
+        const zeroLatest = box.getAttribute('data-zero-latest') === '1';
+        if (zeroLatest) {
+          box.classList.add('stale-feed');
+        }
+
+        // Existing age-based stale detection: if the newest visible entry is older
+        // than 2 days, mark the feed as stale.
         const firstArticle = box.querySelector('.linkclass');
         if (firstArticle) {
           const timestamp = parseInt(firstArticle.dataset.index, 10);

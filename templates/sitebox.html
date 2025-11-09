@@ -1,4 +1,4 @@
-<div class="box" id="feed-{{ feed_id }}">
+<div class="box" id="feed-{{ feed_id }}"{% if zero_latest %} data-zero-latest="1"{% endif %}>
 <center><a target="_blank" href="{{ link }}"><img loading="lazy" src="{{ logo }}" alt="{{ alt_tag | safe }}" style="max-height:100px;"/></a></center>
   <center>
     <small>Last updated: <span class="last-updated-time" data-utc-time="{{ last_fetch }}"></span></small>
