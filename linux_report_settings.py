@@ -49,15 +49,14 @@ CONFIG: SiteConfig = SiteConfig(
     ],
     URL_IMAGES="https://linuxreport.net/static/images/",
     FAVICON="linuxreport192.ico",
-    LOGO_URL="LinuxReportFallharvesttheme.webp",   
+    LOGO_URL="LinuxReportThanksgivingharvesttheme.webp",   
     WEB_DESCRIPTION="Top Linux news: updates, distros, and open-source tech. Hourly briefs for geeks, no fluff.",
     WEB_TITLE="Linux Report | Latest Linux News",
-    REPORT_PROMPT="""Arch and Debian Linux programmers and experienced users.
-    Prefer major news especially about important codebases. 
-    Avoid simple tutorials, error explanations, troubleshooting guides, or cheat sheets.
-    Nothing about Ubuntu or any other distro. Anything non-distro-specific is fine, but nothing about 
-    the following products:
-    tmux, redox, java, Rust, PHP, javascript, mysql (but mariadb is fine) .""",
+    REPORT_PROMPT="""Arch and Debian Linux developers and experienced users.
+    Prefer major, high-impact Linux news, especially about important codebases, kernels, tools, and distributions.
+    Avoid all tutorials, error explanations, troubleshooting guides, or cheat sheets.
+    Exclude Ubuntu-specific content and avoid coverage centered on the following products:
+    tmux, Redox, Java, Rust, PHP, JavaScript, MySQL (MariaDB is fine).""",
     PATH="/srv/http/LinuxReport2",
     SCHEDULE=[0, 8, 12, 17],  # Update schedule for Linux Report
     CUSTOM_FETCH_CONFIG={
