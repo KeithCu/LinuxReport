@@ -48,10 +48,12 @@ from shared import (
     USER_AGENT, RssFeed, g_c, g_cs, g_cm, get_lock, GLOBAL_FETCH_MODE_LOCK_KEY,
     ENABLE_OBJECT_STORE_FEEDS, OBJECT_STORE_FEED_TIMEOUT,
     ENABLE_OBJECT_STORE_FEED_PUBLISH, g_logger, history, WORKER_PROXYING,
-    PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD
+    PROXY_SERVER, PROXY_USERNAME, PROXY_PASSWORD,
+    ENABLE_REDDIT_API_FETCH
 )
 from Tor import fetch_via_tor
 from app_config import DEBUG, USE_TOR
+from Reddit import fetch_reddit_feed_as_feedparser
 from object_storage_config import StorageOperationError, LibcloudError
 from object_storage_sync import smart_fetch, publish_bytes
 
@@ -159,19 +161,47 @@ class LwnFetcher(FetcherStrategy):
         return ready
 
 class RedditFetcher(FetcherStrategy):
-    """Strategy for fetching Reddit feeds, with optional Tor support."""
+    """
+    Strategy for fetching Reddit feeds.
+
+    Behavior:
+    - If ENABLE_REDDIT_API_FETCH is True:
+        Use Reddit API via fetch_reddit_feed_as_feedparser() from Reddit.py.
+        That function returns feedparser-like entries already normalized for workers.py.
+    - Else:
+        Preserve legacy behavior:
+        * If USE_TOR: use fetch_via_tor + RSS/HTML.
+        * Otherwise: use direct feedparser with random UA.
+    """
 
     def fetch(self, url, rss_info):
+        # Prefer new Reddit API path when enabled
+        if ENABLE_REDDIT_API_FETCH:
+            g_logger.info(f"[RedditFetcher] Using Reddit API for URL: {url}")
+            api_result = fetch_reddit_feed_as_feedparser(url)
+
+            if not api_result or api_result.get('bozo'):
+                g_logger.error(f"[RedditFetcher] Reddit API fetch failed for {url}: {api_result.get('bozo_exception')}")
+                return []
+
+            # Reddit.fetch_reddit_feed_as_feedparser is responsible for returning
+            # entries that are compatible with the rest of the pipeline:
+            # - each entry should have link/title/summary/content (if applicable)
+            entries = api_result.get('entries', []) or []
+            return list(itertools.islice(entries, MAX_ITEMS))
+
+        # Legacy behavior: TOR or direct RSS/HTML fetch
         if USE_TOR:
-            g_logger.info(f"Using TOR proxy for Reddit URL: {url}")
+            g_logger.info(f"[RedditFetcher] Using TOR proxy for Reddit URL: {url}")
             res = fetch_via_tor(url, rss_info.site_url)
         else:
+            g_logger.info(f"[RedditFetcher] Using legacy feedparser for Reddit URL: {url}")
             res = feedparser.parse(url, agent=USER_AGENT_RANDOM)
 
         if not res:
             return []
 
-        new_entries = res['entries']
+        new_entries = res.get('entries', []) if isinstance(res, dict) else getattr(res, 'entries', [])
         return list(itertools.islice(new_entries, MAX_ITEMS))
 
 class SeleniumFetcher(FetcherStrategy):

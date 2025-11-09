@@ -200,6 +200,17 @@ INFINITE_SCROLL_MOBILE = True
 INFINITE_SCROLL_DEBUG = True
 
 # =============================================================================
+# REDDIT INTEGRATION SETTINGS
+# =============================================================================
+# When True:
+#   - workers.py will fetch Reddit feeds via the Reddit API, using fetch_reddit_feed_as_feedparser()
+#     from Reddit.py, instead of legacy Tor / HTML RSS scraping.
+# When False (default):
+#   - Existing behavior is preserved; Reddit URLs are handled by the current RedditFetcher
+#     using RSS / Tor / feedparser logic.
+ENABLE_REDDIT_API_FETCH = False
+
+# =============================================================================
 # GEOLOCATION SETTINGS
 # =============================================================================
 

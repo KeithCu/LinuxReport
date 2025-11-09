@@ -773,13 +773,59 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
                 continue
 
         # Render the about page template
-        return render_template('about.html',
-                             title=WEB_TITLE,
-                             description=WEB_DESCRIPTION,
-                             logo_url=LOGO_URL,
-                             favicon=FAVICON,
-                             all_reports=all_reports,
-                             current_mode=MODE.value)
+        return render_template(
+            'about.html',
+            title=WEB_TITLE,
+            description=WEB_DESCRIPTION,
+            logo_url=LOGO_URL,
+            favicon=FAVICON,
+            all_reports=all_reports,
+            current_mode=MODE.value
+        )
+
+    @flask_app.route('/reddit/callback')
+    @limiter.limit(dynamic_rate_limit)
+    def reddit_callback():
+        """
+        Cosmetic Reddit OAuth callback endpoint.
+
+        This endpoint exists primarily so that a real-looking redirect URL
+        (e.g. https://your-domain.tld/reddit/callback) can be configured in
+        the Reddit application settings.
+
+        It does NOT perform any OAuth or token-handling logic for the current
+        LinuxReport deployment, which uses script-style credentials via Reddit.py.
+        """
+        # Build the same all_reports list used on the /about page for consistency
+        all_reports = []
+        for mode in Mode:
+            try:
+                config_module = __import__(f"{mode.value}_report_settings", fromlist=["CONFIG"])
+                config = config_module.CONFIG
+                all_reports.append({
+                    'name': mode.value.title(),
+                    'url': f"https://{mode.value}report.keithcu.com" if mode.value != "robot" else "https://robotreport.keithcu.com",
+                    'description': config.WEB_DESCRIPTION,
+                    'is_current': mode == MODE
+                })
+            except ImportError:
+                continue
+
+        callback_description = (
+            "Reddit authorization callback endpoint for LinuxReport. "
+            "If you reached this page after authorizing an application on Reddit, "
+            "the configuration is complete and you can safely close this tab."
+        )
+
+        return render_template(
+            'about.html',
+            title=WEB_TITLE,
+            description=callback_description,
+            logo_url=LOGO_URL,
+            favicon=FAVICON,
+            all_reports=all_reports,
+            current_mode=MODE.value
+        )
 
     # Rate limit error handler
     @flask_app.errorhandler(429)

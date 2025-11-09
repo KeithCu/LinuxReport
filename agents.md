@@ -250,12 +250,19 @@ The system includes CDN support for optimal image delivery:
    - Custom header injection with compilation metadata
 
 ## Feed Processing and Workers
-
+ 
 - **Thread Pool Architecture**: Uses `workers.py` for concurrent feed fetching
 - **Tor Integration**: Selenium with Tor support for sites requiring anonymity
 - **Custom Site Handlers**: Special configurations for Reddit, complex sites
 - **Deduplication**: Article deduplication across feeds and time periods
 - **Image Processing**: Automatic WebP conversion and optimization
+- **Reddit Integration**:
+  - Controlled by global flag `ENABLE_REDDIT_API_FETCH` in [`shared.py`](shared.py:202).
+  - When `ENABLE_REDDIT_API_FETCH = False` (default):
+    - Reddit URLs are fetched via the legacy `RedditFetcher` in [`workers.py`](workers.py:161) using Tor and/or standard RSS/feedparser logic.
+  - When `ENABLE_REDDIT_API_FETCH = True`:
+    - Reddit URLs are fetched via `fetch_reddit_feed_as_feedparser()` in [`Reddit.py`](Reddit.py:346) through `RedditFetcher` in [`workers.py`](workers.py:161), which adapts the Reddit API response into the internal feed structure.
+  - This switch is reversible and only affects how Reddit feeds are fetched; other feeds are unaffected.
 
 ## Image Processing System
 
@@ -450,10 +457,38 @@ The image processing system has been refactored to consolidate functionality int
 - **DO NOT** commit sensitive information like passwords or API keys
 - **DO NOT** serve images locally when CDN is properly configured - always use the CDN URL for better performance
 
+## Reddit API Setup (for agents and operators)
+
+To use the new Reddit API-based fetching:
+
+1. Create a Reddit "script" app:
+   - Go to https://www.reddit.com/prefs/apps.
+   - Create an app of type "script".
+   - Set redirect URI to your live callback, e.g. `https://your-domain.tld/reddit/callback`.
+     - This URL is handled by the cosmetic `/reddit/callback` route in [`routes.py`](routes.py:748) and does not perform OAuth logic.
+
+2. One-time token bootstrap:
+   - On the server (interactive shell), run [`Reddit.py`](Reddit.py:487) directly:
+     - Provide:
+       - Client ID
+       - Client Secret
+       - Reddit username
+       - Reddit password
+     - The script requests tokens from Reddit and writes `reddit_token.json` (mode 0600).
+   - Subsequent runs use the stored access/refresh tokens; no further password prompts.
+
+3. Toggle integration:
+   - Keep `ENABLE_REDDIT_API_FETCH = False` in [`shared.py`](shared.py:205) to use legacy Tor/Selenium/RSS behavior.
+   - Set `ENABLE_REDDIT_API_FETCH = True` to route Reddit URLs through the Reddit API via [`workers.py`](workers.py:161) and [`Reddit.py`](Reddit.py:346).
+
+4. Notes:
+   - `/reddit/callback` is cosmetic and safe to expose; it exists only to satisfy Reddit's redirect URI requirement and show a friendly message.
+   - Do not store Reddit credentials in git; keep `reddit_token.json` and any secrets on the server only.
+
 ## Additional Documentation
-
+ 
 Refer to these specialized documentation files for detailed information:
-
+ 
 - `README.md`: Project overview and setup instructions
 - `Caching.md`: Comprehensive caching system documentation
 - `README_object_storage_sync.md`: Object storage and CDN configuration
