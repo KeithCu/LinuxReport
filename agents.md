@@ -242,7 +242,7 @@ Adding a new feature/route:
 1) Create a module, e.g. my_feature.py, that exposes init_my_feature_routes(app).
 2) Call that initializer from routes.py.
 3) Add templates/static assets under templates/ and static/ as needed.
-4) Add tests under tests/.
+4) Add or update tests under tests/ (see "Relevant tests" below).
 
 Modifying caching behavior:
 1) For page caching: adjust keys/TTLs where caching decorators or helpers are used (often in routes.py or shared utilities).
@@ -251,6 +251,7 @@ Modifying caching behavior:
    - Use g_cm for hot ephemeral data.
 3) When changing data flows:
    - Implement appropriate invalidation or key versioning.
+4) After cache-related changes, run the relevant cache/perf tests.
 
 ## Development Workflows (minimal)
 
@@ -262,12 +263,41 @@ Setup:
 - python app.py
 
 Testing:
-- pytest tests/
-- Use targeted tests for specific components when modifying them.
+- Run the full suite when in doubt:
+  - pytest tests/
+- Prefer targeted tests after specific changes.
 
 Assets:
 - Edit JS/CSS in templates/.
 - Let the asset pipeline (Flask-Assets or equivalent) regenerate static bundles.
+
+## Relevant tests (what to run after changes)
+
+When modifying specific areas, run at least the corresponding tests:
+
+- Caching / compression / infra:
+  - tests/test_compression.py
+  - tests/test_sqlitelock.py
+
+- Feed parsing, titles, deduplication:
+  - tests/test_extract_titles.py
+  - tests/test_dedup.py
+
+- Forms and input handling:
+  - tests/test_forms.py
+
+- Browser / scraper behavior:
+  - tests/test_browser_switch.py
+  - tests/playwright_test.py
+  - tests/playwright_simple_test.py
+  - tests/selenium_test.py
+
+- Tor / network behavior:
+  - tests/tortest.py
+
+Note:
+- Additional benchmark scripts exist under tests/ for historical performance experiments.
+  They are optional and not part of the normal regression suite.
 
 ## Performance Considerations
 
