@@ -1408,7 +1408,7 @@ def extract_title(post, config, url, use_browser, get_text_func=None, get_attr_f
     """
     # Special case: if title_selector equals post_container, use the post element itself
     if config.title_selector == config.post_container:
-        g_logger.info(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
+        g_logger.debug(f"Using special case title extraction for {url}: title_selector='{config.title_selector}' == post_container='{config.post_container}'")
         if use_browser and get_text_func:
             title = get_text_func(post).strip()
         else:
