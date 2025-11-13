@@ -34,6 +34,7 @@ FREE_MODELS = [
     "google/gemma-3-4b-it:free",
     "google/gemma-3n-e2b-it:free",
     "google/gemma-3n-e4b-it:free",
+    "kwaipilot/kat-coder-pro:free",
     "meituan/longcat-flash-chat:free",
     # "meta-llama/llama-3.1-405b-instruct:free", # Removed by openrouter.ai on: 2025-10-03
     # "meta-llama/llama-3.2-11b-vision-instruct:free", # Removed by openrouter.ai on: 2025-09-07
@@ -45,7 +46,7 @@ FREE_MODELS = [
     "microsoft/mai-ds-r1:free",
   #  "microsoft/phi-4-reasoning-plus:free", very long answers, often fails to follow instructions
   #  "microsoft/phi-4-reasoning:free", 
-    "minimax/minimax-m2:free",
+    # "minimax/minimax-m2:free", # Removed by openrouter.ai on: 2025-11-12
     # "mistralai/devstral-small-2505:free", # Removed by openrouter.ai on: 2025-11-09
     # "mistralai/devstral-small:free", # Removed by openrouter.ai on: 2025-08-01
     "mistralai/mistral-7b-instruct:free",
