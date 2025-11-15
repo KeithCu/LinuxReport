@@ -51,7 +51,11 @@ LinuxReport uses LLMs via [OpenRouter.ai](https://openrouter.ai) to generate and
 git clone https://github.com/KeithCu/LinuxReport
 cd LinuxReport
 
-# Install dependencies
+# Option 1: Modern approach with uv (recommended - 10-100x faster)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync
+
+# Option 2: Traditional approach with pip
 pip install -r requirements.txt
 
 # For CPU-only PyTorch and ML dependencies (optional, for auto-update features)
@@ -63,7 +67,8 @@ cp config.yaml.example config.yaml
 # Edit config.yaml with your settings
 
 # Run development server
-python -m flask run
+uv run python -m flask run
+# Or with pip: python -m flask run
 ```
 
 ## 🏗️ Architecture Overview

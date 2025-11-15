@@ -1,14 +1,20 @@
 """
 app.py
 
-Main entry point for the Flask application. Initializes the Flask app, configures extensions, 
+Main entry point for the Flask application. Initializes the Flask app, configures extensions,
 loads shared settings, and registers routes.
 """
 
 # =============================================================================
-# STANDARD LIBRARY IMPORTS
+# DEBUG: Show which Python is being used
 # =============================================================================
 import sys
+print(f"🐍 Flask app starting with Python: {sys.executable}", file=sys.stderr)
+print(f"🐍 Python path starts with: {sys.path[:2]}", file=sys.stderr)
+
+# =============================================================================
+# STANDARD LIBRARY IMPORTS
+# =============================================================================
 import os
 import datetime
 import hashlib
@@ -140,7 +146,6 @@ def create_app():
 
 # Create the main application instance
 g_app = create_app()
-application = g_app  # WSGI entry point
 
 # Logging is now handled in shared.py and imported
 
@@ -441,4 +446,14 @@ init_app(g_app)
 
 if DEBUG or g_app.debug:
     g_logger.warning("Application is running in debug mode")
+
+# =============================================================================
+# WSGI ENTRY POINT
+# =============================================================================
+
+# WSGI entry point - set after all initialization is complete
+# This ensures the application is fully configured before being used by WSGI servers
+# Compatible with both mod_wsgi (Apache) and Gunicorn
+# Use 'app:application' as the WSGI callable in Gunicorn configs
+application = g_app
 

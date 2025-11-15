@@ -16,6 +16,7 @@ License: GNU LGPL v3.
 ## Key Technologies (what matters to your code)
 
 - Python 3.x, Flask.
+- Package management: uv (recommended, 10-100x faster) or pip (traditional)
 - Diskcache (SQLite-backed) and Cacheout for caching.
 - Feedparser, BeautifulSoup4 for feeds/HTML.
 - Selenium (+ optional Tor) for JS-heavy sites.
@@ -258,8 +259,17 @@ Modifying caching behavior:
 Setup:
 - git clone <repo>
 - cd LinuxReport
-- pip install -r requirements.txt (or use pyproject.toml)
 - Copy/edit config.yaml for local settings.
+
+Dependency installation options:
+
+**Option 1: uv (recommended - 10-100x faster, reproducible builds)**
+- Install uv: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- uv sync
+- uv run python app.py
+
+**Option 2: pip (traditional, widely supported)**
+- pip install -r requirements.txt
 - python app.py
 
 Testing:
