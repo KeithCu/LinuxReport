@@ -54,6 +54,10 @@ cd LinuxReport
 # Install dependencies
 pip install -r requirements.txt
 
+# For CPU-only PyTorch and ML dependencies (optional, for auto-update features)
+# Run this script to install CPU versions of PyTorch/sentence-transformers to save space:
+./install_cpu_ml_deps.sh
+
 # Configure (see Configuration section below)
 cp config.yaml.example config.yaml
 # Edit config.yaml with your settings

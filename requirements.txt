@@ -1,5 +1,5 @@
 # The requirements to run the app
-apache_libcloud>=3.8.0
+#apache_libcloud>=3.8.0
 beautifulsoup4>=4.13.4
 cacheout>=0.16.0
 cssmin>=0.2.0
