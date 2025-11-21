@@ -53,7 +53,7 @@ DEFAULT_LOGOS = {
 
 def encode_image_to_base64(image_path: str) -> str:
     """Encode image file to base64 string."""
-    if not os.path.exists(image_path):
+    if not Path(image_path).exists():
         raise FileNotFoundError(f"Image file not found: {image_path}")
     
     with open(image_path, "rb") as image_file:
@@ -195,7 +195,7 @@ def extract_image_url(response_json: dict) -> str:
 
 def download_image(image_url_or_data: str, save_path: str) -> None:
     """Download image from URL or save base64 data to file."""
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    Path(save_path).parent.mkdir(parents=True, exist_ok=True)
     
     # Handle base64 data URI
     if image_url_or_data.startswith('data:image'):
@@ -231,7 +231,7 @@ def update_logo_url_in_settings(report_type: str, new_logo_filename: str) -> Non
     """
     settings_file = f"{report_type}_report_settings.py"
     
-    if not os.path.exists(settings_file):
+    if not Path(settings_file).exists():
         print(f"Warning: Settings file not found: {settings_file}")
         return
     
@@ -356,9 +356,9 @@ Note: Images are generated at 1920x1080 (1080p) resolution.
         default_logo_path = args.default_logo
     else:
         default_logo_filename = DEFAULT_LOGOS[args.report]
-        default_logo_path = os.path.join(STATIC_IMAGES_DIR, default_logo_filename)
+        default_logo_path = Path(STATIC_IMAGES_DIR) / default_logo_filename
     
-    if not os.path.exists(default_logo_path):
+    if not Path(default_logo_path).exists():
         print(f"Error: Default logo not found: {default_logo_path}")
         sys.exit(1)
     
@@ -380,7 +380,7 @@ Note: Images are generated at 1920x1080 (1080p) resolution.
     else:
         output_filename = generate_logo_filename(args.report, theme_name)
     
-    output_path = os.path.join(STATIC_IMAGES_DIR, output_filename)
+    output_path = Path(STATIC_IMAGES_DIR) / output_filename
     
     try:
         # Step 1: Encode image

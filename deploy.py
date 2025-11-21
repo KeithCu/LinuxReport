@@ -26,6 +26,7 @@ import argparse
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+from pathlib import Path
 
 # =============================================================================
 # CONFIGURATION - Edit these values as needed
@@ -207,7 +208,7 @@ def copy_files_to_directories(files, target_dirs):
         print("❌ Could not find LinuxReport2 directory in URLS")
         return False
 
-    if not os.path.exists(linux_report_dir):
+    if not Path(linux_report_dir).exists():
         print(f"❌ Source directory {linux_report_dir} does not exist")
         return False
 
@@ -216,23 +217,23 @@ def copy_files_to_directories(files, target_dirs):
         if target_dir == linux_report_dir:
             continue  # Skip copying to itself
 
-        if not os.path.exists(target_dir):
+        if not Path(target_dir).exists():
             print(f"⚠️  Target directory {target_dir} does not exist, skipping")
             continue
 
         print(f"  📂 Copying to {target_dir}...")
 
         for file_path in files:
-            source_file = os.path.join(linux_report_dir, file_path)
-            target_file = os.path.join(target_dir, file_path)
+            source_file = Path(linux_report_dir) / file_path
+            target_file = Path(target_dir) / file_path
 
-            if not os.path.exists(source_file):
+            if not source_file.exists():
                 print(f"    ❌ Source file {source_file} does not exist")
                 continue
 
             try:
                 # Create target directory if it doesn't exist
-                os.makedirs(os.path.dirname(target_file), exist_ok=True)
+                target_file.parent.mkdir(parents=True, exist_ok=True)
 
                 # Copy the file
                 shutil.copy2(source_file, target_file)
@@ -251,7 +252,7 @@ def add_files_to_git(files, directories):
 
     success_count = 0
     for directory in directories:
-        if not os.path.exists(directory):
+        if not Path(directory).exists():
             print(f"⚠️  Directory {directory} does not exist, skipping")
             continue
 
@@ -264,7 +265,7 @@ def add_files_to_git(files, directories):
 
             # Add files to git
             for file_path in files:
-                if os.path.exists(file_path):
+                if Path(file_path).exists():
                     result = run_command(f"git add {file_path}", check=False)
                     if result is not None:
                         print(f"    ✅ Added {file_path} to git")

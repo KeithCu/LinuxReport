@@ -13,6 +13,7 @@ import json
 import sqlite3
 import datetime
 import time
+from pathlib import Path
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -96,11 +97,11 @@ SECURITY_HEADERS = _build_security_headers()
 def get_cached_above_html():
     """
     Return content of ABOVE_HTML_FILE using generic cache.
-    
+
     Returns:
         str: Cached HTML content from the above HTML file
     """
-    return get_cached_file_content(os.path.join(PATH, ABOVE_HTML_FILE))
+    return get_cached_file_content(Path(PATH) / ABOVE_HTML_FILE)
 
 class RateLimitStatsResource(Resource):
     """

@@ -1,6 +1,7 @@
 import os
 import json
 import datetime
+from pathlib import Path
 from flask import render_template, request
 from flask_login import current_user, login_required
 from flask_restful import Resource
@@ -22,7 +23,7 @@ class DeleteHeadlineResource(Resource):
         url = data.get('url')
         timestamp = data.get('timestamp')
         mode_str = MODE_MAP.get(MODE)
-        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
+        archive_file = Path(PATH) / f"{mode_str}report_archive.jsonl"
         
         try:
             with open(archive_file, "r", encoding="utf-8") as f:
@@ -59,7 +60,7 @@ def init_old_headlines_routes(app):
     @app.route('/old_headlines')
     def old_headlines():
         mode_str = MODE_MAP.get(MODE)
-        archive_file = os.path.join(PATH, f"{mode_str}report_archive.jsonl")
+        archive_file = Path(PATH) / f"{mode_str}report_archive.jsonl"
 
         def render_old_headlines_page():
             headlines = []

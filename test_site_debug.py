@@ -6,10 +6,11 @@ This script consolidates all the individual debug scripts into a single
 generalized test file that can handle various site formats.
 
 Usage:
+    python test_site_debug.py --site all to test all sites
+
     python test_site_debug.py --site patriots
     python test_site_debug.py --site uniteai
     python test_site_debug.py --site venturebeat
-    python test_site_debug.py --site all
     python test_site_debug.py --site custom --url https://example.com --name example
 """
 

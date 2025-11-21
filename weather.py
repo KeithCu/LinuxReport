@@ -20,6 +20,7 @@ from collections import defaultdict
 from datetime import date as date_obj
 from datetime import datetime, timedelta
 from bisect import bisect_left
+from pathlib import Path
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -75,15 +76,15 @@ CACHE_ENTRY_PREFIX = 'weather:cache_entry:'
 def _get_geoip_db_path():
     """
     Get the path to the GeoIP database file.
-    
+
     Returns:
         str: Path to the GeoIP database file
     """
     # Database stored in /srv/http/LinuxReport2/GeoLite2-City.mmdb
-    srv_path = os.path.join('/srv/http/LinuxReport2', 'GeoLite2-City.mmdb')
-    if os.path.exists(srv_path):
-        return srv_path
-    return os.path.join(os.path.dirname(__file__), 'GeoLite2-City.mmdb')
+    srv_path = Path('/srv/http/LinuxReport2') / 'GeoLite2-City.mmdb'
+    if srv_path.exists():
+        return str(srv_path)
+    return str(Path(__file__).parent / 'GeoLite2-City.mmdb')
 
 GEOIP_DB_PATH = _get_geoip_db_path()
 

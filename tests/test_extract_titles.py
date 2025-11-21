@@ -3,7 +3,7 @@ import sys
 import os
 
 # Add the parent directory to Python path when running tests directly
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from auto_update import extract_top_titles_from_ai, TITLE_MARKER
 

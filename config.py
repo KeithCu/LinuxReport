@@ -1,5 +1,6 @@
 import os
 import json
+from pathlib import Path
 from flask import request, render_template, make_response, flash
 from flask_login import current_user
 from shared import (
@@ -26,7 +27,7 @@ def init_config_routes(app):
             # Load headlines HTML if in admin mode
             if is_admin:
                 try:
-                    above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
+                    above_html_path = Path(PATH) / ABOVE_HTML_FILE
 
                     with open(above_html_path, 'r', encoding='utf-8') as f:
                         form.headlines.data = f.read()
@@ -93,7 +94,7 @@ def init_config_routes(app):
             # Save headlines if in admin mode and headlines were provided
             if is_admin and form.headlines.data:
                 try:
-                    above_html_path = os.path.join(PATH, ABOVE_HTML_FILE)
+                    above_html_path = Path(PATH) / ABOVE_HTML_FILE
                     with open(above_html_path, 'w', encoding='utf-8') as f:
                         f.write(form.headlines.data)
                     g_logger.info(f"Saved headlines to {above_html_path}.")
@@ -103,7 +104,7 @@ def init_config_routes(app):
                     flash('Error saving headlines. Please try again.', 'error')
 
                 # Clear the cache for the above HTML file (in-memory and diskcache)
-                above_html_full_path = os.path.join(PATH, ABOVE_HTML_FILE)
+                above_html_full_path = Path(PATH) / ABOVE_HTML_FILE
                 if above_html_full_path in _file_cache:
                     del _file_cache[above_html_full_path]
                 # Clear all page caches since headlines have changed

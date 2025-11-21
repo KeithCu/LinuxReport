@@ -11,6 +11,7 @@ Supports cross-platform line ending handling for log rotation.
 import os
 import sys
 import logging
+from pathlib import Path
 
 # =============================================================================
 # RE-EXPORT LOGGING CONSTANTS
@@ -36,8 +37,8 @@ CRITICAL = logging.CRITICAL
 LOG_LEVEL = "INFO"  # Change to "DEBUG" for maximum verbosity
 
 # Get the directory where this script is located and use it for the log file
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-LOG_FILE = os.path.join(SCRIPT_DIR, "linuxreport.log")  # Log file in the same directory as this script
+SCRIPT_DIR = Path(__file__).parent
+LOG_FILE = SCRIPT_DIR / "linuxreport.log"  # Log file in the same directory as this script
 
 def _rotate_log_file(log_file=None):
     """
@@ -49,11 +50,12 @@ def _rotate_log_file(log_file=None):
     target_file = log_file or LOG_FILE
 
     try:
-        if not os.path.exists(target_file):
+        target_path = Path(target_file)
+        if not target_path.exists():
             return  # File doesn't exist yet, nothing to rotate
 
         # Check file size
-        file_size = os.path.getsize(target_file)
+        file_size = target_path.stat().st_size
         if file_size <= max_size_bytes:
             return  # File is small enough, no rotation needed
 

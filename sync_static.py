@@ -5,6 +5,7 @@ import sys
 import os
 import platform
 import argparse
+from pathlib import Path
 from typing import List, Set
 
 # Cache duration configuration (in seconds)
@@ -34,7 +35,7 @@ def detect_environment():
             
             # Try to find the MSYS2 bash executable
             msys2_root = os.environ.get('MSYS2_ROOT', 'C:/tools/msys64')
-            bash_path = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
+            bash_path = Path(msys2_root) / 'usr' / 'bin' / 'bash.exe'
             
             if os.path.exists(bash_path):
                 print(f"Using MSYS2 bash: {bash_path}")
@@ -79,9 +80,9 @@ def run_command(command: str) -> str:
         if is_msys2:
             # Try to find the MSYS2 bash executable
             msys2_root = os.environ.get('MSYS2_ROOT', 'C:/tools/msys64')
-            bash_path = os.path.join(msys2_root, 'usr', 'bin', 'bash.exe')
-            
-            if os.path.exists(bash_path):
+            bash_path = Path(msys2_root) / 'usr' / 'bin' / 'bash.exe'
+
+            if bash_path.exists():
                 # Use bash with -c to run the command
                 result = subprocess.run([bash_path, '-c', command], 
                                       check=True, capture_output=True, text=True)
@@ -194,8 +195,8 @@ def main():
         sys.exit(1)
     
     print("\n=== Running S3 Sync ===")
-    # Use os.path.join for cross-platform path handling
-    static_path = os.path.join('static', 'images')
+    # Use pathlib for cross-platform path handling
+    static_path = Path('static') / 'images'
     sync_command = f's3cmd sync {static_path} s3://linuxreportstatic/ --delete-removed'
     sync_output = run_command(sync_command)
     

@@ -13,9 +13,10 @@ import threading
 import statistics
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 # Add parent directory to path for imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from seleniumfetch import fetch_site_posts as selenium_fetch, cleanup_selenium_drivers
 from playwrightfetch import fetch_site_posts as playwright_fetch, cleanup_playwright_browsers

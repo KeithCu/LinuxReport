@@ -18,6 +18,7 @@ print(f"🐍 Python path starts with: {sys.path[:2]}", file=sys.stderr)
 import os
 import datetime
 import hashlib
+from pathlib import Path
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -34,7 +35,7 @@ from flask_wtf.csrf import CSRFProtect
 # LOCAL IMPORTS
 # =============================================================================
 # Add current directory to path for local imports
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, str(Path(__file__).parent))
 
 from shared import (
     EXPIRE_WEEK, FLASK_DASHBOARD,
@@ -257,7 +258,7 @@ def setup_asset_bundles(app):
     
     # Create JS bundle from individual modules
     js_files = [
-        os.path.join(os.path.dirname(__file__), 'templates', module)
+        str(Path(__file__).parent / 'templates' / module)
         for module in JS_MODULES
     ]
 
@@ -269,7 +270,7 @@ def setup_asset_bundles(app):
 
     # Create CSS bundle from individual modules
     css_files = [
-        os.path.join(os.path.dirname(__file__), 'templates', module)
+        str(Path(__file__).parent / 'templates' / module)
         for module in CSS_MODULES
     ]
 
@@ -302,11 +303,11 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
     """
     with app.app_context():
         try:
-            js_output_path = os.path.join(app.static_folder, 'linuxreport.js')
+            js_output_path = Path(app.static_folder) / 'linuxreport.js'
 
             # Check if existing file exists and get its hash
             existing_hash = None
-            if os.path.exists(js_output_path):
+            if js_output_path.exists():
                 try:
                     with open(js_output_path, 'r', encoding='utf-8') as f:
                         content = f.read()
@@ -321,13 +322,13 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
 
             # Calculate hash of source files to see if they changed
             source_files = [
-                os.path.join(os.path.dirname(__file__), 'templates', module)
+                str(Path(__file__).parent / 'templates' / module)
                 for module in JS_MODULES
             ]
 
             source_content = ""
             for file_path in source_files:
-                if os.path.exists(file_path):
+                if Path(file_path).exists():
                     with open(file_path, 'r', encoding='utf-8') as f:
                         source_content += f.read()
 
@@ -336,15 +337,15 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
             # Only rebuild if hash changed or file doesn't exist
             if not existing_hash or existing_hash != new_hash:
                 # Clear existing file and rebuild
-                if os.path.exists(js_output_path):
-                    os.remove(js_output_path)
+                if js_output_path.exists():
+                    js_output_path.unlink()
                     g_logger.info("Removed existing JavaScript bundle for fresh build")
 
                 js_bundle.build()
                 g_logger.info("JavaScript bundle built successfully")
 
                 # Add header information
-                if os.path.exists(js_output_path):
+                if js_output_path.exists():
                     with open(js_output_path, 'r', encoding='utf-8') as f:
                         content = f.read()
 
@@ -363,11 +364,11 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
                 g_logger.info(f"JavaScript content unchanged (hash: {new_hash}), reusing existing file")
 
             # Handle CSS bundling with similar logic
-            css_output_path = os.path.join(app.static_folder, 'linuxreport.css')
+            css_output_path = Path(app.static_folder) / 'linuxreport.css'
 
             # Check if existing CSS file exists and get its hash
             existing_css_hash = None
-            if os.path.exists(css_output_path):
+            if css_output_path.exists():
                 try:
                     with open(css_output_path, 'r', encoding='utf-8') as f:
                         content = f.read()
@@ -382,13 +383,13 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
 
             # Calculate hash of CSS source files to see if they changed
             css_source_files = [
-                os.path.join(os.path.dirname(__file__), 'templates', module)
+                str(Path(__file__).parent / 'templates' / module)
                 for module in CSS_MODULES
             ]
 
             css_source_content = ""
             for file_path in css_source_files:
-                if os.path.exists(file_path):
+                if Path(file_path).exists():
                     with open(file_path, 'r', encoding='utf-8') as f:
                         css_source_content += f.read()
 
@@ -397,15 +398,15 @@ def perform_startup_tasks(app, js_bundle, css_bundle):
             # Only rebuild CSS if hash changed or file doesn't exist
             if not existing_css_hash or existing_css_hash != new_css_hash:
                 # Clear existing file and rebuild
-                if os.path.exists(css_output_path):
-                    os.remove(css_output_path)
+                if css_output_path.exists():
+                    css_output_path.unlink()
                     g_logger.info("Removed existing CSS bundle for fresh build")
 
                 css_bundle.build()
                 g_logger.info("CSS bundle built successfully")
 
                 # Add header information
-                if os.path.exists(css_output_path):
+                if css_output_path.exists():
                     with open(css_output_path, 'r', encoding='utf-8') as f:
                         content = f.read()
 

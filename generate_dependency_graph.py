@@ -12,6 +12,7 @@ import json
 from typing import Dict, Set, List, Tuple
 import graphviz
 from datetime import datetime
+from pathlib import Path
 
 class FunctionVisitor(ast.NodeVisitor):
     """AST visitor to collect function definitions and their calls."""
@@ -166,10 +167,10 @@ def generate_documentation(directory: str) -> None:
     for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith('.py'):
-                file_path = os.path.join(root, file)
-                if should_process_file(file_path):
-                    module_name = os.path.splitext(file)[0]
-                    functions, calls, imports = get_function_dependencies(file_path)
+                file_path = Path(root) / file
+                if should_process_file(str(file_path)):
+                    module_name = Path(file).stem
+                    functions, calls, imports = get_function_dependencies(str(file_path))
                     
                     all_functions[module_name] = functions
                     all_calls[module_name] = calls
@@ -298,10 +299,10 @@ def generate_function_graph(directory: str) -> None:
     for root, _, files in os.walk(directory):
         for file in files:
             if file.endswith('.py'):
-                file_path = os.path.join(root, file)
-                if should_process_file(file_path):
-                    module_name = os.path.splitext(file)[0]
-                    functions, calls, imports = get_function_dependencies(file_path)
+                file_path = Path(root) / file
+                if should_process_file(str(file_path)):
+                    module_name = Path(file).stem
+                    functions, calls, imports = get_function_dependencies(str(file_path))
                     
                     all_functions[module_name] = functions
                     all_calls[module_name] = calls

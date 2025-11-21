@@ -15,6 +15,7 @@ import uuid
 import html
 import datetime
 import time
+from pathlib import Path
 from shared import g_logger
 
 # =============================================================================
@@ -37,7 +38,7 @@ MAX_COMMENTS = 1000
 COMMENTS_KEY = "chat_comments"
 BANNED_IPS_KEY = "banned_ips"
 WEB_UPLOAD_PATH = '/static/uploads'
-UPLOAD_FOLDER = os.path.join(PATH, 'static', 'uploads')
+UPLOAD_FOLDER = PATH / 'static' / 'uploads'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
 
@@ -239,12 +240,12 @@ class ImageUploadResource(Resource):
         file.seek(0)
 
         # Save file with a secure, unique name
-        _, ext = os.path.splitext(file.filename)
+        ext = Path(file.filename).suffix
         filename = secure_filename(f"{uuid.uuid4()}{ext}")
-        
+
         # Ensure the upload directory exists
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        Path(UPLOAD_FOLDER).mkdir(parents=True, exist_ok=True)
+        filepath = Path(UPLOAD_FOLDER) / filename
 
         try:
             file.save(filepath)

@@ -8,9 +8,10 @@ import hashlib
 import time
 import sys
 import os
+from pathlib import Path
 
 # Add the parent directory to Python path when running tests directly
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 def test_compression_caching():
     """Test the compression caching functions."""

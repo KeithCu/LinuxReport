@@ -1,5 +1,6 @@
 import os
 import glob
+from pathlib import Path
 from PIL import Image, UnidentifiedImageError
 import sys
 
@@ -15,7 +16,7 @@ except ImportError:
 image_dir = "static/images"
 
 # Find all PNG files
-png_files = glob.glob(os.path.join(image_dir, "*.png"))
+png_files = list(Path(image_dir).glob("*.png"))
 
 # Results table
 results = []

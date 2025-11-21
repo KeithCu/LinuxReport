@@ -22,6 +22,7 @@ License: See LICENSE file
 import os
 import socket
 from functools import lru_cache
+from pathlib import Path
 from typing import Dict, Any, Optional, List, NamedTuple
 
 import yaml
@@ -31,7 +32,7 @@ from Logging import g_logger as logging
 # GLOBAL CONSTANTS AND CONFIGURATION
 # =============================================================================
 
-PATH: str = os.path.dirname(os.path.abspath(__file__))
+PATH: Path = Path(__file__).parent
 DEBUG = False
 USE_TOR = True
 
@@ -122,9 +123,9 @@ class ConfigManager:
             yaml.YAMLError: If config.yaml is malformed
             ValueError: If required configuration sections are missing
         """
-        config_path = os.path.join(PATH, 'config.yaml')
-        
-        if not os.path.exists(config_path):
+        config_path = PATH / 'config.yaml'
+
+        if not config_path.exists():
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
         
         try:

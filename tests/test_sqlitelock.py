@@ -181,7 +181,8 @@ if __name__ == '__main__':
     # Add the parent directory to Python path when running tests directly
     import sys
     import os
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent))
 
     try:
         test_diskcache_lock_basic()

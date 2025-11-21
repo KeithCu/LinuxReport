@@ -27,6 +27,7 @@ import datetime
 import os
 import sys
 from enum import Enum
+from pathlib import Path
 from typing import Any, Optional, Type
 
 # Third-party imports
@@ -132,13 +133,13 @@ CONFIG_MODULES = {mode: f"{mode.value}_report_settings" for mode in Mode}
 # =============================================================================
 
 # Path for code and cache
-PATH: str = os.path.dirname(os.path.abspath(__file__))
+PATH: Path = Path(__file__).parent
 
 # Shared path for weather, etc.
 storage_config = get_storage_config()
 # Use test-friendly path when running tests
 if 'pytest' in sys.modules or 'test' in sys.argv[0]:
-    SPATH: str = os.path.join(PATH, 'test_cache')
+    SPATH: str = str(PATH / 'test_cache')
 else:
     SPATH: str = storage_config['shared_path']
 TZ = FeedHistory.FeedConfig.TZ

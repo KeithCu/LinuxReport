@@ -10,9 +10,10 @@ import sys
 import os
 import time
 import threading
+from pathlib import Path
 
 # Add the parent directory to Python path when running tests directly
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from browser_fetch import fetch_site_posts, cleanup_browsers, get_shared_driver, acquire_fetch_lock, release_fetch_lock
 from shared import USE_PLAYWRIGHT, g_logger
