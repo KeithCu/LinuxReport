@@ -40,7 +40,7 @@ CONFIG: SiteConfig = SiteConfig(
     WEB_TITLE="Robot Report | Latest Robotics News",
     REPORT_PROMPT="Robotics enthusiasts, programmers, and builders interested in major robotics and automation developments, especially humanoid robots and FOSS (free and open source software) projects. Focus on research breakthroughs, industry news, and robotics tutorials for intro builders. Avoid software-only automation (except for virtual robotics which is an important test and learning environment for real but more expensive robots), quantum computing, or unrelated tech content.",
     PATH="/srv/http/robotreport",
-    SCHEDULE=[0, 8, 12, 16],
+    SCHEDULE=[8, 12, 16, 20],
     CUSTOM_FETCH_CONFIG={
         # Site-specific Selenium config for Unite.AI main page
         # Updated to match actual site structure
