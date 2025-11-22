@@ -365,10 +365,10 @@ def _prepare_messages(prompt_mode, filtered_articles):
         ]
     return messages
 
-def ask_ai_top_articles(articles, dry_run=False):
+def ask_ai_top_articles(articles, dry_run=False, forced_model=None):
     """Filters articles, constructs prompt, queries the primary AI, handles fallback (if applicable)."""
     logger.info(f"Starting AI article selection with {len(articles)} total articles")
-    
+
     # Prepare articles
     result = _prepare_articles_for_ai(articles)
     if result is None:
@@ -378,14 +378,14 @@ def ask_ai_top_articles(articles, dry_run=False):
     # Prepare messages
     messages = _prepare_messages(PROMPT_MODE, filtered_articles)
     logger.info(f"Constructed prompt for {PROMPT_MODE} mode with {len(filtered_articles)} articles")
-    
+
     if logger.isEnabledFor(DEBUG):
         logger.debug("Prompt messages:")
         for i, msg in enumerate(messages):
             logger.debug(f"  Message {i+1} ({msg['role']}): {msg['content'][:200]}...")
 
     # Try AI selection with simplified logic
-    response_text, top_articles, used_model = _try_ai_models(messages, filtered_articles)
+    response_text, top_articles, used_model = _try_ai_models(messages, filtered_articles, forced_model)
     
     # Check if we succeeded
     if not top_articles or len(top_articles) < 3:
@@ -398,7 +398,7 @@ def ask_ai_top_articles(articles, dry_run=False):
     return response_text, top_articles, used_model
 
 
-def _try_ai_models(messages, filtered_articles):
+def _try_ai_models(messages, filtered_articles, forced_model=None):
     """Simplified model selection logic."""
     logger.info("Starting AI model selection process")
 
@@ -410,7 +410,7 @@ def _try_ai_models(messages, filtered_articles):
             current_model = FALLBACK_MODEL
             logger.info(f"Using fallback model: {current_model}")
         else:
-            current_model = model_manager.get_available_model(current_model=current_model)
+            current_model = model_manager.get_available_model(current_model=current_model, forced_model=forced_model)
 
         logger.info(f"Trying model: {current_model}")
 
@@ -677,7 +677,7 @@ def _process_normal_mode(mode, articles, html_file, dry_run):
     logger.info("Running in normal mode")
     
     # Get AI-selected articles
-    full_response, top_3_articles_match, used_model = ask_ai_top_articles(articles, dry_run)
+    full_response, top_3_articles_match, used_model = ask_ai_top_articles(articles, dry_run, MODEL_1)
 
     # Handle AI processing results
     if not top_3_articles_match:
