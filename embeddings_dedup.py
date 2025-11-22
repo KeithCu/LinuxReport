@@ -200,14 +200,13 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
         unique_articles = []
         all_excluded = list(excluded_embeddings)  # Growing exclusion list
 
+        # Get all article titles and compute embeddings in batch for efficiency
+        article_titles = [article["title"] for article in articles]
+        article_embeddings = get_embeddings_batch(article_titles)
+
         # Process articles individually to maintain exact progressive exclusion behavior
         # This ensures each article is checked against ALL previously selected articles
-        for article in articles:
-            title = article["title"]
-
-            # Get embedding for this article
-            current_emb = get_embedding(title)
-
+        for article, current_emb in zip(articles, article_embeddings):
             # Check similarity against all current exclusions
             is_similar = False
             if all_excluded:
