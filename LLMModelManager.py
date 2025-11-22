@@ -9,14 +9,14 @@ from Logging import _setup_logging, g_logger
 
 # List of free models to try
 FREE_MODELS = [
-    "agentica-org/deepcoder-14b-preview:free",
+    # "agentica-org/deepcoder-14b-preview:free", # Removed by openrouter.ai on: 2025-11-21
     "alibaba/tongyi-deepresearch-30b-a3b:free",
     "arliai/qwq-32b-arliai-rpr-v1:free",
     "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
     # "cognitivecomputations/dolphin3.0-mistral-24b:free", # Removed by openrouter.ai on: 2025-11-09
     # "cognitivecomputations/dolphin3.0-r1-mistral-24b:free", # Removed by openrouter.ai on: 2025-10-29
     "deepseek/deepseek-chat-v3-0324:free",
-    "deepseek/deepseek-chat-v3.1:free",
+    # "deepseek/deepseek-chat-v3.1:free", # Removed by openrouter.ai on: 2025-11-21
     # "deepseek/deepseek-chat:free", # Removed by openrouter.ai on: 2025-08-01
     "deepseek/deepseek-r1-0528-qwen3-8b:free",
     "deepseek/deepseek-r1-0528:free",
@@ -70,7 +70,7 @@ FREE_MODELS = [
     # "opengvlab/internvl3-14b:free", # Removed by openrouter.ai on: 2025-08-01
     # "openrouter/cypher-alpha:free", # Removed by openrouter.ai on: 2025-08-01
     # "openrouter/horizon-alpha", # Removed by openrouter.ai on: 2025-08-10
-    "openrouter/polaris-alpha",
+    # "openrouter/polaris-alpha", # Removed by openrouter.ai on: 2025-11-21
     # "openrouter/sonoma-dusk-alpha", # Removed by openrouter.ai on: 2025-09-21
     # "openrouter/sonoma-sky-alpha", # Removed by openrouter.ai on: 2025-09-21
     "qwen/qwen-2.5-72b-instruct:free",
@@ -94,6 +94,8 @@ FREE_MODELS = [
     "tngtech/deepseek-r1t-chimera:free",
     "tngtech/deepseek-r1t2-chimera:free",
     # "x-ai/grok-4-fast:free", # Removed by openrouter.ai on: 2025-10-03
+    "x-ai/grok-4.1-fast",
+    "x-ai/grok-4.1-fast:free",
     "z-ai/glm-4.5-air:free",
 ]
 
