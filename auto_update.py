@@ -623,6 +623,100 @@ def append_to_archive(mode, top_articles):
     
     logger.info(f"Successfully updated archive file: {archive_file}")
 
+
+def clean_excess_headlines(mode, settings_config, dry_run=False):
+    """Remove headlines from archive and recent selections cache that were created outside scheduled hours."""
+    archive_file = f"{mode}report_archive.jsonl"
+    schedule_hours = set(settings_config.SCHEDULE or [])
+    now = datetime.datetime.now(TZ)
+    twenty_four_hours_ago = now - datetime.timedelta(hours=24)
+
+    logger.info(f"Cleaning excess headlines for mode: {mode}")
+    logger.info(f"Archive file: {archive_file}")
+    logger.info(f"Scheduled hours: {sorted(schedule_hours)}")
+    logger.info(f"Only considering entries from last 24 hours (since {twenty_four_hours_ago.isoformat()})")
+    if dry_run:
+        logger.info("DRY RUN: Will only log what would be removed, no actual changes will be made")
+
+    # Read current archive
+    try:
+        with open(archive_file, "r", encoding="utf-8") as f:
+            all_entries = [json.loads(line) for line in f if line.strip()]
+        logger.info(f"Read {len(all_entries)} entries from archive")
+    except FileNotFoundError:
+        logger.warning(f"Archive file {archive_file} not found, nothing to clean")
+        return
+
+    # Filter entries to keep only those created during scheduled hours (within last 24 hours)
+    kept_entries = []
+    removed_entries = []
+
+    for entry in all_entries:
+        try:
+            # Parse timestamp and get hour in Eastern time
+            timestamp_str = entry.get("timestamp")
+            if not timestamp_str:
+                logger.warning(f"Entry missing timestamp: {entry.get('title', 'Unknown')}")
+                kept_entries.append(entry)  # Keep entries without timestamps
+                continue
+
+            # Parse ISO timestamp and get hour
+            dt = datetime.datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            # Convert to Eastern time if not already
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=datetime.timezone.utc)
+            eastern_dt = dt.astimezone(TZ)
+
+            # Only consider entries from the last 24 hours
+            if eastern_dt < twenty_four_hours_ago:
+                kept_entries.append(entry)  # Keep old entries regardless of schedule
+                continue
+
+            entry_hour = eastern_dt.hour
+
+            if entry_hour in schedule_hours:
+                kept_entries.append(entry)
+            else:
+                removed_entries.append(entry)
+                logger.info(f"Would remove entry from hour {entry_hour} ({eastern_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}): {entry.get('title', 'Unknown')}")
+
+        except (ValueError, AttributeError) as e:
+            logger.warning(f"Error parsing timestamp for entry {entry.get('title', 'Unknown')}: {e}")
+            # Keep entries with unparseable timestamps to be safe
+            kept_entries.append(entry)
+
+    logger.info(f"Kept {len(kept_entries)} entries, would remove {len(removed_entries)} entries")
+
+    if dry_run:
+        logger.info("DRY RUN: Skipping actual file and cache updates")
+        return
+
+    # Write back filtered archive
+    with open(archive_file, "w", encoding="utf-8") as f:
+        for entry in kept_entries:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    logger.info(f"Updated archive file: {archive_file}")
+
+    # Now clean the recent selections cache
+    previous_selections = g_c.get("previously_selected_selections_2") or []
+    logger.info(f"Found {len(previous_selections)} entries in recent selections cache")
+
+    # Create set of URLs that should be removed (from removed archive entries)
+    removed_urls = {entry["url"] for entry in removed_entries}
+
+    # Filter recent selections to remove excess entries
+    cleaned_selections = [sel for sel in previous_selections if sel["url"] not in removed_urls]
+    removed_count = len(previous_selections) - len(cleaned_selections)
+
+    logger.info(f"Removed {removed_count} entries from recent selections cache")
+    logger.info(f"Kept {len(cleaned_selections)} entries in recent selections cache")
+
+    # Update cache
+    g_c.put("previously_selected_selections_2", cleaned_selections, timeout=EXPIRE_WEEK)
+
+    logger.info("Excess headlines cleaning completed")
+
 # --- Integration into the main pipeline ---
 def main(mode, settings_module, settings_config, dry_run=False):
     """Main processing function with improved error handling and dry run logic."""
@@ -730,7 +824,8 @@ def parse_arguments():
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
     parser.add_argument('--force-model', type=str, help='Force the use of a specific model (overrides random/cached selection)')
     parser.add_argument('--clear-failed-models', action='store_true', help='Clear the list of failed models from cache')
-    
+    parser.add_argument('--clean-excess-headlines', action='store_true', help='Remove headlines created outside scheduled hours from archive and recent selections cache (use --dry-run to preview)')
+
     args = parser.parse_args()
     logger.info("Command line arguments parsed")
     
@@ -811,9 +906,15 @@ if __name__ == "__main__":
         else:
             logger.info("No failed models to clear")
         sys.exit(0)
-    
+
     # Detect mode and load settings
     selected_mode_str, loaded_settings_module, loaded_settings_config = detect_mode()
+
+    # Handle clean excess headlines case early (needs mode detection)
+    if args.clean_excess_headlines:
+        logger.info("Cleaning excess headlines created outside scheduled hours...")
+        clean_excess_headlines(selected_mode_str, loaded_settings_config, dry_run=args.dry_run)
+        sys.exit(0)
     logger.info(f"Detected mode '{selected_mode_str}' based on current directory.")
     
     # Handle forceimage case early
