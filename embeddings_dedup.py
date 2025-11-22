@@ -175,7 +175,7 @@ def get_embeddings_batch(texts):
 # DEDUPLICATION FUNCTIONS
 # =============================================================================
 
-def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD):
+def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshold=THRESHOLD, use_fast=True):
     """
     Deduplicate articles based on their embeddings, excluding similar ones.
 
@@ -187,35 +187,68 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
         articles (list): List of article dictionaries with 'title' keys
         excluded_embeddings (list): List of embedding tensors to compare against
         threshold (float): Similarity threshold for filtering (default: THRESHOLD)
+        use_fast (bool): Use optimized vectorized implementation (default: False)
 
     Returns:
         list: Filtered list of unique articles
     """
-    unique_articles = []
-    do_not_select_similar = list(excluded_embeddings)  # Start with embeddings of previous selections
+    if use_fast:
+        # Fast implementation using vectorized operations
+        if not articles:
+            return []
 
-    for article in articles:
-        title = article["title"]
+        unique_articles = []
+        all_excluded = list(excluded_embeddings)  # Growing exclusion list
 
-        # Get embedding
-        current_emb = get_embedding(title)
+        # Process articles individually to maintain exact progressive exclusion behavior
+        # This ensures each article is checked against ALL previously selected articles
+        for article in articles:
+            title = article["title"]
 
-        # Check similarity against excluded embeddings
-        is_similar = False
-        for emb in do_not_select_similar:
-            if emb is None:
-                continue
-            similarity = clamp_similarity(st_util.cos_sim(current_emb, emb).item())
-            if similarity >= threshold:
-                is_similar = True
-                break
+            # Get embedding for this article
+            current_emb = get_embedding(title)
 
-        if not is_similar:
-            unique_articles.append(article)
-            do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
+            # Check similarity against all current exclusions
+            is_similar = False
+            if all_excluded:
+                # Use vectorized check against all exclusions
+                similarities = compute_batch_similarities(all_excluded, [current_emb])
+                max_similarity = np.max(similarities)
+                is_similar = max_similarity >= threshold
 
-    logger.info(f"Filtered {len(articles) - len(unique_articles)} duplicate articles")
-    return unique_articles
+            if not is_similar:
+                unique_articles.append(article)
+                all_excluded.append(current_emb)  # Add to exclusions for future checks
+
+        logger.info(f"Fast deduplication: Filtered {len(articles) - len(unique_articles)} duplicate articles")
+        return unique_articles
+    else:
+        # Original implementation for backward compatibility
+        unique_articles = []
+        do_not_select_similar = list(excluded_embeddings)  # Start with embeddings of previous selections
+
+        for article in articles:
+            title = article["title"]
+
+            # Get embedding
+            current_emb = get_embedding(title)
+
+            # Check similarity against excluded embeddings
+            is_similar = False
+            for emb in do_not_select_similar:
+                if emb is None:
+                    continue
+                similarity = clamp_similarity(st_util.cos_sim(current_emb, emb).item())
+                if similarity >= threshold:
+                    is_similar = True
+                    break
+
+            if not is_similar:
+                unique_articles.append(article)
+                do_not_select_similar.append(current_emb)  # Add to the list to avoid similar articles later
+
+        logger.info(f"Filtered {len(articles) - len(unique_articles)} duplicate articles")
+        return unique_articles
 
 
 def get_best_matching_article(target_title, articles):
