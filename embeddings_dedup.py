@@ -77,16 +77,23 @@ def compute_batch_similarities(existing_embeddings, new_embeddings):
     if len(existing_embeddings) == 0 or len(new_embeddings) == 0:
         return np.array([])
 
-    # Convert to numpy arrays for vectorized operations
+    # Convert to numpy arrays for vectorized operations (avoid repeated conversions)
     existing_array = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in existing_embeddings])
     new_array = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in new_embeddings])
 
-    # Vectorized computation
-    dot_products = np.dot(existing_array, new_array.T)
+    # Vectorized computation - use direct operations for better performance
+    # Normalize vectors for cosine similarity
     existing_norms = np.linalg.norm(existing_array, axis=1, keepdims=True)
     new_norms = np.linalg.norm(new_array, axis=1, keepdims=True)
 
+    # Avoid division by zero
+    existing_norms = np.where(existing_norms == 0, 1, existing_norms)
+    new_norms = np.where(new_norms == 0, 1, new_norms)
+
+    # Compute cosine similarities directly
+    dot_products = np.dot(existing_array, new_array.T)
     similarities = dot_products / (existing_norms @ new_norms.T)
+
     return clamp_similarity_batch(similarities)
 
 def get_embedding(text):
@@ -204,20 +211,35 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
         article_titles = [article["title"] for article in articles]
         article_embeddings = get_embeddings_batch(article_titles)
 
+        # Convert all embeddings to numpy arrays upfront for efficient operations
+        # Initial excluded embeddings
+        if all_excluded:
+            excluded_arrays = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in all_excluded])
+        else:
+            excluded_arrays = np.empty((0, article_embeddings[0].shape[-1]) if article_embeddings else (0, 384))
+
+        # Convert article embeddings to numpy arrays
+        article_arrays = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in article_embeddings])
+
         # Process articles individually to maintain exact progressive exclusion behavior
         # This ensures each article is checked against ALL previously selected articles
-        for article, current_emb in zip(articles, article_embeddings):
+        for i, (article, current_emb) in enumerate(zip(articles, article_arrays)):
             # Check similarity against all current exclusions
             is_similar = False
-            if all_excluded:
-                # Use vectorized check against all exclusions
-                similarities = compute_batch_similarities(all_excluded, [current_emb])
+            if excluded_arrays.shape[0] > 0:
+                # Vectorized similarity computation with pre-converted arrays
+                current_norm = np.linalg.norm(current_emb)
+                excluded_norms = np.linalg.norm(excluded_arrays, axis=1)
+                dot_products = np.dot(excluded_arrays, current_emb)
+                similarities = dot_products / (excluded_norms * current_norm)
+                similarities = np.clip(similarities, -1.0, 1.0)  # Clamp to valid range
                 max_similarity = np.max(similarities)
                 is_similar = max_similarity >= threshold
 
             if not is_similar:
                 unique_articles.append(article)
-                all_excluded.append(current_emb)  # Add to exclusions for future checks
+                # Add to excluded arrays (expand the array)
+                excluded_arrays = np.vstack([excluded_arrays, current_emb.reshape(1, -1)])
 
         logger.info(f"Fast deduplication: Filtered {len(articles) - len(unique_articles)} duplicate articles")
         return unique_articles
@@ -265,36 +287,49 @@ def get_best_matching_article(target_title, articles):
     Returns:
         dict: Best matching article if similarity >= THRESHOLD, None otherwise
     """
+    if not articles:
+        return None
+
     # Get target embedding
     target_emb = get_embedding(target_title)
 
-    best_match = None
-    best_score = 0.0
+    # Get all article embeddings in batch for efficiency
+    article_titles = [article["title"] for article in articles]
+    article_embeddings = get_embeddings_batch(article_titles)
 
-    for article in articles:
-        article_title = article["title"]
+    # Convert to numpy arrays for efficient operations
+    target_array = target_emb.numpy() if hasattr(target_emb, 'numpy') else target_emb
+    article_arrays = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in article_embeddings])
 
-        # Get article embedding and compute similarity
-        article_emb = get_embedding(article_title)
-        score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
+    # Compute all similarities at once using vectorized operations
+    target_norm = np.linalg.norm(target_array)
+    article_norms = np.linalg.norm(article_arrays, axis=1)
 
-        if score > best_score:
-            best_match = article
-            if score == 1.0:
-                return best_match
-            best_score = score
+    # Avoid division by zero
+    target_norm = target_norm if target_norm > 0 else 1.0
+    article_norms = np.where(article_norms == 0, 1, article_norms)
+
+    dot_products = np.dot(article_arrays, target_array)
+    similarities = dot_products / (article_norms * target_norm)
+    similarities = np.clip(similarities, -1.0, 1.0)  # Clamp to valid range
+
+    # Find best match
+    best_idx = np.argmax(similarities)
+    best_score = similarities[best_idx]
+
+    # Early return for perfect match
+    if best_score >= 1.0:
+        return articles[best_idx]
 
     # Keep the verbose logging for debugging when no match found
     if best_score < THRESHOLD:
         logger.warning(f"No match found above threshold {THRESHOLD} for title: '{target_title}'")
         logger.warning(f"Best score was {best_score:.3f}")
         logger.info("All available headlines and their similarity scores:")
-        for article in articles:
-            article_emb = get_embedding(article["title"])
-            score = clamp_similarity(st_util.cos_sim(target_emb, article_emb).item())
-            logger.info(f"  {score:.3f} - '{article['title']}'")
+        for i, article in enumerate(articles):
+            logger.info(f"  {similarities[i]:.3f} - '{article['title']}'")
 
-    return best_match if best_score >= THRESHOLD else None
+    return articles[best_idx] if best_score >= THRESHOLD else None
 
 # =============================================================================
 # HTML PARSING AND EXTRACTION FUNCTIONS
