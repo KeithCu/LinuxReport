@@ -18,6 +18,7 @@ import logging
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
+import numpy as np
 from sentence_transformers import SentenceTransformer, util
 
 from Logging import g_logger
@@ -54,6 +55,40 @@ def clamp_similarity(score):
         return 0.0
     return max(-1.0, min(1.0, score))
 
+
+def clamp_similarity_batch(similarities):
+    """Clamp similarity scores to [-1, 1] and handle numerical issues."""
+    similarities = np.asarray(similarities)
+    similarities = np.nan_to_num(similarities, nan=0.0, posinf=1.0, neginf=-1.0)
+    return np.clip(similarities, -1.0, 1.0)
+
+
+def compute_batch_similarities(existing_embeddings, new_embeddings):
+    """
+    Compute similarities between new embeddings and all existing ones efficiently.
+
+    Args:
+        existing_embeddings: List of existing embedding tensors
+        new_embeddings: List of new embedding tensors
+
+    Returns:
+        numpy.ndarray: Similarity matrix of shape (len(existing_embeddings), len(new_embeddings))
+    """
+    if len(existing_embeddings) == 0 or len(new_embeddings) == 0:
+        return np.array([])
+
+    # Convert to numpy arrays for vectorized operations
+    existing_array = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in existing_embeddings])
+    new_array = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in new_embeddings])
+
+    # Vectorized computation
+    dot_products = np.dot(existing_array, new_array.T)
+    existing_norms = np.linalg.norm(existing_array, axis=1, keepdims=True)
+    new_norms = np.linalg.norm(new_array, axis=1, keepdims=True)
+
+    similarities = dot_products / (existing_norms @ new_norms.T)
+    return clamp_similarity_batch(similarities)
+
 def get_embedding(text):
     """
     Get the embedding vector for a piece of text using SentenceTransformer.
@@ -87,6 +122,54 @@ def get_embedding(text):
     embedding = embedder.encode(text, convert_to_tensor=True, show_progress_bar=False)
     embedding_cache[text] = embedding
     return embedding
+
+
+def get_embeddings_batch(texts):
+    """
+    Get embeddings for multiple texts with caching support.
+
+    Args:
+        texts: List of text strings to encode
+
+    Returns:
+        list: List of embedding tensors (same order as input texts)
+    """
+    global embedder
+    if embedder is None:
+        embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
+
+    # Filter out empty texts and get cached embeddings
+    valid_texts = []
+    valid_indices = []
+    embeddings = []
+
+    for i, text in enumerate(texts):
+        if text.strip():
+            if text in embedding_cache:
+                embeddings.append(embedding_cache[text])
+            else:
+                valid_texts.append(text)
+                valid_indices.append(i)
+
+    # Encode uncached texts in batch
+    if valid_texts:
+        batch_embeddings = embedder.encode(valid_texts, convert_to_tensor=True, show_progress_bar=False)
+
+        # Cache and add to results
+        for text, emb in zip(valid_texts, batch_embeddings):
+            embedding_cache[text] = emb
+
+        # Insert batch embeddings at correct positions
+        for idx, emb in zip(valid_indices, batch_embeddings):
+            embeddings.insert(idx, emb)
+
+    # Handle empty texts by returning zero vectors
+    for i, text in enumerate(texts):
+        if not text.strip():
+            zero_vec = embedder.encode(" ", convert_to_tensor=True, show_progress_bar=False) * 0
+            embeddings.insert(i, zero_vec)
+
+    return embeddings
 
 # =============================================================================
 # DEDUPLICATION FUNCTIONS
