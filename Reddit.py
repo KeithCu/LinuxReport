@@ -34,6 +34,7 @@ Runtime behavior:
 """
 
 import getpass
+import itertools
 import json
 # Standard library imports
 import os
@@ -55,10 +56,27 @@ DEFAULT_FEED_LIMIT = 25
 FEED_TYPES = ['hot', 'new', 'rising', 'controversial', 'top']
 REQUIRED_CREDENTIAL_KEYS = ['client_id', 'client_secret', 'username', 'password']
 
+# Constants for magic numbers and strings
+CREDENTIALS_FILE_MODE = 0o600
+USER_AGENT_PREFIX = 'python'
+USER_AGENT_VERSION = 'v1.0'
+CONTENT_TYPE_HTML = 'text/html'
+CONTENT_TYPE_PLAIN = 'text/plain'
+SUBREDDIT_NAME_MAX_LENGTH = 21  # Reddit's subreddit name limit
+DEFAULT_DOMAIN = 'linuxreport.net'
+
 def extract_domain_from_url_images(url_images):
-    """Extracts domain from URL_IMAGES config value for user agent construction."""
+    """
+    Extracts domain from URL_IMAGES config value for user agent construction.
+
+    Args:
+        url_images: URL path for static images (e.g., "https://example.com/static/images")
+
+    Returns:
+        str: Domain name extracted from the URL, or "linuxreport.net" as fallback
+    """
     if not url_images:
-        return "linuxreport.net"
+        return DEFAULT_DOMAIN
     url = url_images
     if url.startswith('https://'):
         url = url[len('https://'):]
@@ -68,6 +86,20 @@ def extract_domain_from_url_images(url_images):
         url = url[:-len('/static/images')]
     url = url.rstrip('/')
     return url
+
+
+def _build_user_agent(username):
+    """
+    Builds a standardized user agent string for PRAW authentication.
+
+    Args:
+        username: Reddit username for the user agent
+
+    Returns:
+        str: Formatted user agent string
+    """
+    domain = extract_domain_from_url_images(URL_IMAGES)
+    return f'{USER_AGENT_PREFIX}:{domain}:{USER_AGENT_VERSION} (by /u/{username})'
 
 
 def _create_error_response(status, exception, feed_url, title_suffix=''):
@@ -140,20 +172,36 @@ def _get_submissions(subreddit_obj, feed_type, limit=DEFAULT_FEED_LIMIT):
 # --- Token Handling ---
 
 def save_token(credentials):
-    """Saves PRAW credentials (client_id, client_secret, username, password) to a file."""
+    """
+    Saves PRAW credentials to a JSON file with secure permissions.
+
+    Args:
+        credentials: Dictionary containing Reddit API credentials
+                   (client_id, client_secret, username, password, user_agent)
+    """
     try:
         # Ensure sensitive data like client_secret isn't inadvertently logged
         # In a real app, consider encrypting CREDENTIALS_FILE or using secure storage
         g_logger.info(f"Saving credentials for user '{credentials.get('username', 'N/A')}' to {CREDENTIALS_FILE}")
         with open(CREDENTIALS_FILE, 'w') as f:
             json.dump(credentials, f, indent=4) # Add indent for readability
-        os.chmod(CREDENTIALS_FILE, 0o600) # Read/write only for owner
+        os.chmod(CREDENTIALS_FILE, CREDENTIALS_FILE_MODE)  # Read/write only for owner
+
+        # Verify file permissions are correct
+        actual_mode = os.stat(CREDENTIALS_FILE).st_mode & 0o777
+        if actual_mode != CREDENTIALS_FILE_MODE:
+            g_logger.warning(f"Credentials file permissions may not be secure. Expected {oct(CREDENTIALS_FILE_MODE)}, got {oct(actual_mode)}")
     except (IOError, OSError, TypeError) as e:
         g_logger.error(f"Error saving credentials file '{CREDENTIALS_FILE}': {e}")
 
 
 def load_token():
-    """Loads PRAW credentials (client_id, client_secret, username, password) from a file."""
+    """
+    Loads PRAW credentials from the JSON file.
+
+    Returns:
+        dict: Credentials dictionary if file exists and is valid, None otherwise
+    """
     if not os.path.exists(CREDENTIALS_FILE):
         return None
     try:
@@ -174,49 +222,55 @@ def load_token():
         g_logger.error(f"Unexpected data type in credentials file '{CREDENTIALS_FILE}': {e}")
         return None
 
-def get_valid_reddit_client():
+def _prompt_for_credentials():
     """
-    Gets a valid PRAW Reddit client instance,
-    prompting for initial credentials if needed.
-    PRAW handles token refresh automatically.
+    Prompts user for Reddit API credentials and saves them to file.
+
     Returns:
-        praw.Reddit instance or None on failure.
+        dict: Credentials dictionary or None on failure
     """
-    credentials = load_token()
+    try:
+        client_id = input("Enter your Reddit Client ID: ").strip()
+        client_secret = getpass.getpass("Enter your Reddit Client Secret: ").strip()
+        username = input("Enter your Reddit Username: ").strip()
+        password = getpass.getpass("Enter your Reddit Password (stored securely for PRAW): ").strip()
 
-    if not credentials:
-        g_logger.info(f"No valid credentials file found ('{CREDENTIALS_FILE}'). Prompting for Reddit API credentials.")
-        try:
-            client_id = input("Enter your Reddit Client ID: ").strip()
-            client_secret = getpass.getpass("Enter your Reddit Client Secret: ").strip()
-            username = input("Enter your Reddit Username: ").strip()
-            password = getpass.getpass("Enter your Reddit Password (stored securely for PRAW): ").strip()
+        if not all([client_id, client_secret, username, password]) or not all([client_id.strip(), client_secret.strip(), username.strip(), password.strip()]):
+            g_logger.error("Error: All credentials must be provided for initial setup and cannot be empty or whitespace-only.")
+            return None
 
-            if not all([client_id, client_secret, username, password]):
-                g_logger.error("Error: All credentials must be provided for initial setup. Missing one or more required fields.")
-                return None
+        # Store credentials for PRAW
+        credentials = {
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'username': username,
+            'password': password,
+            'user_agent': _build_user_agent(username)
+        }
+        save_token(credentials)
+        g_logger.info(f"Credentials saved successfully to '{CREDENTIALS_FILE}' for user '{username}'.")
+        return credentials
+    except EOFError:
+         g_logger.error("Error: Cannot prompt for credentials in non-interactive mode. Please create credentials file manually or run in interactive mode.")
+         return None
+    except (IOError, OSError) as e:
+         g_logger.error(f"Error reading input or saving credentials: {e}")
+         return None
+    except ValueError as e:
+         g_logger.error(f"Invalid input value: {e}")
+         return None
 
-            # Store credentials for PRAW
-            credentials = {
-                'client_id': client_id,
-                'client_secret': client_secret,
-                'username': username,
-                'password': password,
-                'user_agent': f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{username})'
-            }
-            save_token(credentials)
-            g_logger.info(f"Credentials saved successfully to '{CREDENTIALS_FILE}' for user '{username}'.")
-        except EOFError:
-             g_logger.error("Error: Cannot prompt for credentials in non-interactive mode. Please create credentials file manually or run in interactive mode.")
-             return None
-        except (IOError, OSError) as e:
-             g_logger.error(f"Error reading input or saving credentials: {e}")
-             return None
-        except ValueError as e:
-             g_logger.error(f"Invalid input value: {e}")
-             return None
 
-    # Create PRAW Reddit instance
+def _create_reddit_instance(credentials):
+    """
+    Creates and tests a PRAW Reddit client instance.
+
+    Args:
+        credentials: Dictionary with Reddit API credentials
+
+    Returns:
+        praw.Reddit instance or None on failure
+    """
     try:
         g_logger.debug(f"Creating PRAW Reddit client for user '{credentials['username']}'")
         reddit = praw.Reddit(
@@ -224,7 +278,7 @@ def get_valid_reddit_client():
             client_secret=credentials['client_secret'],
             username=credentials['username'],
             password=credentials['password'],
-            user_agent=credentials.get('user_agent', f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{credentials["username"]})')
+            user_agent=credentials.get('user_agent', _build_user_agent(credentials['username']))
         )
         # Test the connection by trying to access user info
         try:
@@ -247,21 +301,61 @@ def get_valid_reddit_client():
         g_logger.error(f"Failed to create PRAW Reddit client: {e}")
         return None
 
+
+def get_valid_reddit_client():
+    """
+    Gets a valid PRAW Reddit client instance,
+    prompting for initial credentials if needed.
+    PRAW handles token refresh automatically.
+    Returns:
+        praw.Reddit instance or None on failure.
+    """
+    credentials = load_token()
+
+    if not credentials:
+        g_logger.info(f"No valid credentials file found ('{CREDENTIALS_FILE}'). Prompting for Reddit API credentials.")
+        credentials = _prompt_for_credentials()
+        if not credentials:
+            return None
+
+    # Create and test PRAW Reddit instance
+    return _create_reddit_instance(credentials)
+
 def parse_reddit_url(url):
     """
     Parses a Reddit URL to extract subreddit and feed type.
 
-    Handles URLs like:
-    - https://www.reddit.com/r/linux/hot/.rss
-    - https://www.reddit.com/r/archlinux/new
-    - https://reddit.com/r/AskElectronics/
+    Handles various Reddit URL formats and validates them for correctness.
+
+    Args:
+        url: Reddit URL string to parse
 
     Returns:
         tuple: (subreddit, feed_type) or (None, None) if invalid.
-               Feed type defaults to 'hot'.
+               Feed type defaults to 'hot' if not specified.
+
+    Examples:
+        >>> parse_reddit_url("https://www.reddit.com/r/linux/hot")
+        ('linux', 'hot')
+        >>> parse_reddit_url("https://reddit.com/r/python/new/.rss")
+        ('python', 'new')
+        >>> parse_reddit_url("https://www.reddit.com/r/AskElectronics/")
+        ('AskElectronics', 'hot')
+
+    Edge cases:
+        - Invalid URL schemes (not http/https) return (None, None)
+        - Subreddit names longer than 21 characters return (None, None)
+        - Invalid feed types return (None, None)
+        - Malformed URLs return (None, None)
     """
     try:
         parsed_url = urlparse(url)
+
+        # Validate URL scheme
+        if parsed_url.scheme.lower() not in ('http', 'https'):
+            g_logger.warning(f"Invalid URL scheme in Reddit URL: {parsed_url.scheme}. Must be http or https.")
+            return None, None
+
         # Robustly split path, removing empty segments from leading/trailing slashes
         path_parts = [part for part in parsed_url.path.split('/') if part]
 
@@ -269,9 +363,20 @@ def parse_reddit_url(url):
             return None, None # Must start with /r/ and have a subreddit name
 
         subreddit = path_parts[1]
+
+        # Validate that subreddit is not empty
+        if not subreddit or not subreddit.strip():
+            g_logger.warning("Empty subreddit name found in URL")
+            return None, None
+
         # Basic check for valid subreddit characters
         if not re.match(r'^[a-zA-Z0-9_]+$', subreddit):
             g_logger.warning(f"Invalid subreddit format found: {subreddit}")
+            return None, None
+
+        # Validate subreddit name length (Reddit limit is 21 characters)
+        if len(subreddit) > SUBREDDIT_NAME_MAX_LENGTH:
+            g_logger.warning(f"Subreddit name too long: {subreddit} ({len(subreddit)} chars, max {SUBREDDIT_NAME_MAX_LENGTH})")
             return None, None
 
         feed_type = 'hot'  # Default
@@ -279,8 +384,11 @@ def parse_reddit_url(url):
         if len(path_parts) > 2:
             # Check third part, removing potential .rss/.json suffix
             potential_feed = path_parts[2].lower().rsplit('.', 1)[0]
-            if potential_feed in FEED_TYPES:
+            if potential_feed and potential_feed.strip() and potential_feed in FEED_TYPES:
                 feed_type = potential_feed
+            else:
+                g_logger.warning(f"Invalid feed type '{potential_feed}' for subreddit {subreddit}. Valid types: {FEED_TYPES}")
+                return None, None
 
         return subreddit, feed_type
     except (AttributeError, TypeError, ValueError) as e:
@@ -289,11 +397,24 @@ def parse_reddit_url(url):
 
 
 def format_reddit_entry(submission):
-    """Formats a single PRAW Submission object into a feedparser-like entry dict."""
+    """
+    Formats a single PRAW Submission object into a feedparser-like entry dict.
+
+    Args:
+        submission: PRAW Submission object to format
+
+    Returns:
+        dict: Feedparser-compatible entry dict, or None if formatting fails
+
+    Edge cases:
+        - Deleted/suspended posts may have missing author information (shown as '[deleted]')
+        - Private/banned subreddits may have missing subreddit information
+        - Malformed submissions may cause formatting to fail and return None
+    """
     try:
         entry = {}
         entry['title'] = submission.title or ''
-        entry['author'] = submission.author.name if submission.author else ''
+        entry['author'] = submission.author.name if submission.author and hasattr(submission.author, 'name') else '[deleted]'
         # Reddit 'permalink' is relative, needs domain prepended
         entry['link'] = f"https://www.reddit.com{submission.permalink}" if submission.permalink else ''
         # Use Reddit's 'name' (e.g., t3_xxxxx) as the stable ID
@@ -313,14 +434,14 @@ def format_reddit_entry(submission):
         if content_html:
              # Note: Reddit's selftext_html from PRAW may already be unescaped
             entry['content'].append({
-                 'type': 'text/html',
+                 'type': CONTENT_TYPE_HTML,
                  'language': None,
                  'base': entry['link'],
                  'value': content_html
              })
         elif summary and submission.is_self: # Only add plain text content for self posts
             entry['content'].append({
-                 'type': 'text/plain',
+                 'type': CONTENT_TYPE_PLAIN,
                  'language': None,
                  'base': entry['link'],
                  'value': summary
@@ -349,7 +470,7 @@ def format_reddit_entry(submission):
         entry['reddit_url'] = submission.url # The external link for link posts
         entry['reddit_domain'] = submission.domain
         entry['reddit_is_self'] = submission.is_self
-        entry['reddit_subreddit'] = submission.subreddit.display_name if submission.subreddit else ''
+        entry['reddit_subreddit'] = submission.subreddit.display_name if submission.subreddit and hasattr(submission.subreddit, 'display_name') else ''
 
         return entry
     except AttributeError as e:
@@ -428,31 +549,32 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     subreddit, feed_type = parse_reddit_url(feed_url)
 
     if not subreddit or not feed_type:
-        g_logger.error(f"Could not parse subreddit/feed type from URL: {feed_url}")
+        g_logger.error(f"Could not parse subreddit/feed type from URL: {feed_url}. Parsed subreddit: '{subreddit}', feed_type: '{feed_type}'")
         return _create_error_response(400, ValueError(f"Invalid Reddit URL format: {feed_url}"), feed_url)
 
     # Get PRAW Reddit client
     reddit = get_valid_reddit_client()
     if not reddit:
-        g_logger.error("Could not obtain valid PRAW Reddit client.")
+        g_logger.error(f"Could not obtain valid PRAW Reddit client for URL: {feed_url}")
         return _create_error_response(401, ConnectionError("Failed to get PRAW Reddit client"), feed_url)
 
     praw_url = f"https://www.reddit.com/r/{subreddit}/{feed_type}"
     g_logger.info(f"Fetching {feed_type} feed for r/{subreddit} using PRAW")
+    g_logger.debug(f"Reddit API URL: {praw_url}")
     
     output = _create_success_response(praw_url)
 
     try:
         subreddit_obj = reddit.subreddit(subreddit)
         submissions = _get_submissions(subreddit_obj, feed_type)
-        submissions_list = list(submissions)
+        submissions_list = list(itertools.islice(submissions, DEFAULT_FEED_LIMIT))
 
     except (praw.exceptions.NotFound, praw.exceptions.Forbidden, praw.exceptions.RedditAPIException) as e:
         if _handle_praw_exception(e, subreddit, feed_type, praw_url, output):
             return output
         # Fall through to generic handler if not matched
     except Exception as e:
-        g_logger.error(f"Unexpected error fetching Reddit data with PRAW for 'r/{subreddit}/{feed_type}': {e}", exc_info=True)
+        g_logger.error(f"Unexpected error fetching Reddit data with PRAW for 'r/{subreddit}/{feed_type}' from URL {feed_url}: {e}", exc_info=True)
         output['bozo'] = 1
         output['bozo_exception'] = e
         output['feed']['title'] = f"r/{subreddit} - {feed_type} (Error)"
@@ -467,9 +589,13 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         entry = format_reddit_entry(submission)
         if entry:
             output['entries'].append(entry)
+        else:
+            g_logger.debug(f"Failed to format submission {submission.id} in r/{subreddit}/{feed_type}")
 
     if not submissions_list:
-        g_logger.info(f"Note: No posts found for r/{subreddit}/{feed_type} (Subreddit might be empty or filtered).")
+        g_logger.warning(f"No posts found for r/{subreddit}/{feed_type} (Subreddit might be empty or filtered).")
+    else:
+        g_logger.debug(f"Successfully fetched {len(output['entries'])} entries for r/{subreddit}/{feed_type}")
 
     return output
 
