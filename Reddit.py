@@ -53,6 +53,7 @@ import praw
 
 # Local imports
 from shared import g_logger, URL_IMAGES, USER_AGENT
+from app_config import get_reddit_username
 
 # --- Configuration ---
 # Credentials are handled via the token file for PRAW authentication
@@ -70,9 +71,11 @@ CONTENT_TYPE_HTML = 'text/html'
 CONTENT_TYPE_PLAIN = 'text/plain'
 SUBREDDIT_NAME_MAX_LENGTH = 21  # Reddit's subreddit name limit
 DEFAULT_DOMAIN = 'linuxreport.net'
+REDDIT_BASE_URL = 'https://www.reddit.com'
+HTTP_SCHEME_PREFIX = 'http'
 
-# Reddit-specific user agent combining official app user agent with Reddit username
-REDDIT_USER_AGENT = f"{USER_AGENT} (by /u/keithcu)"
+# Reddit-specific user agent combining official app user agent with Reddit username from config
+REDDIT_USER_AGENT = f"{USER_AGENT} (by /u/{get_reddit_username()})"
 
 def extract_domain_from_url_images(url_images):
     """
@@ -86,15 +89,18 @@ def extract_domain_from_url_images(url_images):
     """
     if not url_images:
         return DEFAULT_DOMAIN
-    url = url_images
-    if url.startswith('https://'):
-        url = url[len('https://'):]
-    elif url.startswith('http://'):
-        url = url[len('http://'):]
-    if url.endswith('/static/images'):
-        url = url[:-len('/static/images')]
-    url = url.rstrip('/')
-    return url
+    try:
+        parsed = urlparse(url_images)
+        # Extract domain from netloc (handles ports, userinfo, etc.)
+        domain = parsed.netloc
+        if not domain:
+            return DEFAULT_DOMAIN
+        # Remove port if present (netloc includes port)
+        if ':' in domain:
+            domain = domain.split(':')[0]
+        return domain if domain else DEFAULT_DOMAIN
+    except Exception:
+        return DEFAULT_DOMAIN
 
 
 def _build_user_agent(username):
@@ -176,8 +182,6 @@ def _get_submissions(subreddit_obj, feed_type, limit=DEFAULT_FEED_LIMIT):
     method = feed_methods.get(feed_type, subreddit_obj.hot)
     return method(limit=limit)
 
-# USER_AGENT is constructed by PRAW using the username from credentials
-
 # --- Token Handling ---
 
 def save_token(credentials):
@@ -244,7 +248,7 @@ def _prompt_for_credentials():
         username = input("Enter your Reddit Username: ").strip()
         password = getpass.getpass("Enter your Reddit Password (stored securely for PRAW): ").strip()
 
-        if not all([client_id, client_secret, username, password]) or not all([client_id.strip(), client_secret.strip(), username.strip(), password.strip()]):
+        if not all([client_id, client_secret, username, password]):
             g_logger.error("Error: All credentials must be provided for initial setup and cannot be empty or whitespace-only.")
             return None
 
@@ -414,6 +418,77 @@ def parse_reddit_url(url):
         return None, None
 
 
+def _build_entry_basic_fields(submission, entry):
+    """Builds basic entry fields: title, author, link, id."""
+    entry['title'] = submission.title or ''
+    entry['author'] = submission.author.name if submission.author and hasattr(submission.author, 'name') else '[deleted]'
+    # Reddit 'permalink' is relative, needs domain prepended
+    entry['link'] = f"{REDDIT_BASE_URL}{submission.permalink}" if submission.permalink else ''
+    # Use Reddit's 'name' (e.g., t3_xxxxx) as the stable ID
+    entry['id'] = submission.name or entry['link'] # Fallback to link if name missing
+
+
+def _build_entry_content(submission, entry):
+    """Builds entry content: summary and content array."""
+    # Summary & Content (Mimic feedparser structure)
+    summary = submission.selftext or '' # Markdown version
+    content_html = submission.selftext_html # HTML version
+
+    # If not a self-post and summary is empty, use the external URL as summary
+    if not submission.is_self and not summary:
+        summary = submission.url or '' # Link posts point to external URL here
+    entry['summary'] = summary
+
+    # feedparser 'content' is often a list of dicts
+    entry['content'] = []
+    if content_html:
+         # Note: Reddit's selftext_html from PRAW may already be unescaped
+        entry['content'].append({
+             'type': CONTENT_TYPE_HTML,
+             'language': None,
+             'base': entry['link'],
+             'value': content_html
+         })
+    elif summary and submission.is_self: # Only add plain text content for self posts
+        entry['content'].append({
+             'type': CONTENT_TYPE_PLAIN,
+             'language': None,
+             'base': entry['link'],
+             'value': summary
+        })
+
+
+def _build_entry_timestamps(submission, entry):
+    """Builds entry timestamp fields: published and updated."""
+    # Time parsing - Reddit provides UTC timestamp
+    published_parsed, published_str = _parse_timestamp(submission.created_utc)
+    if published_parsed:
+        entry['published_parsed'] = published_parsed
+        entry['published'] = published_str
+        # Use published time for updated time as well, as Reddit doesn't track updates in listings
+        entry['updated_parsed'] = published_parsed
+        entry['updated'] = published_str
+    else:
+        entry['published_parsed'] = None
+        entry['published'] = None
+        entry['updated_parsed'] = None
+        entry['updated'] = None
+
+
+def _build_entry_reddit_fields(submission, entry):
+    """Builds Reddit-specific entry fields."""
+    # Add custom Reddit-specific fields, prefixed for clarity
+    entry['reddit_score'] = submission.score
+    entry['reddit_num_comments'] = submission.num_comments
+    # Provide thumbnail URL only if it's a valid image URL
+    thumb = submission.thumbnail
+    entry['reddit_thumbnail'] = thumb if thumb and isinstance(thumb, str) and thumb.startswith(HTTP_SCHEME_PREFIX) else None
+    entry['reddit_url'] = submission.url # The external link for link posts
+    entry['reddit_domain'] = submission.domain
+    entry['reddit_is_self'] = submission.is_self
+    entry['reddit_subreddit'] = submission.subreddit.display_name if submission.subreddit and hasattr(submission.subreddit, 'display_name') else ''
+
+
 def format_reddit_entry(submission):
     """
     Formats a single PRAW Submission object into a feedparser-like entry dict.
@@ -431,65 +506,10 @@ def format_reddit_entry(submission):
     """
     try:
         entry = {}
-        entry['title'] = submission.title or ''
-        entry['author'] = submission.author.name if submission.author and hasattr(submission.author, 'name') else '[deleted]'
-        # Reddit 'permalink' is relative, needs domain prepended
-        entry['link'] = f"https://www.reddit.com{submission.permalink}" if submission.permalink else ''
-        # Use Reddit's 'name' (e.g., t3_xxxxx) as the stable ID
-        entry['id'] = submission.name or entry['link'] # Fallback to link if name missing
-
-        # Summary & Content (Mimic feedparser structure)
-        summary = submission.selftext or '' # Markdown version
-        content_html = submission.selftext_html # HTML version
-
-        # If not a self-post and summary is empty, use the external URL as summary
-        if not submission.is_self and not summary:
-            summary = submission.url or '' # Link posts point to external URL here
-        entry['summary'] = summary
-
-        # feedparser 'content' is often a list of dicts
-        entry['content'] = []
-        if content_html:
-             # Note: Reddit's selftext_html from PRAW may already be unescaped
-            entry['content'].append({
-                 'type': CONTENT_TYPE_HTML,
-                 'language': None,
-                 'base': entry['link'],
-                 'value': content_html
-             })
-        elif summary and submission.is_self: # Only add plain text content for self posts
-            entry['content'].append({
-                 'type': CONTENT_TYPE_PLAIN,
-                 'language': None,
-                 'base': entry['link'],
-                 'value': summary
-            })
-
-        # Time parsing - Reddit provides UTC timestamp
-        published_parsed, published_str = _parse_timestamp(submission.created_utc)
-        if published_parsed:
-            entry['published_parsed'] = published_parsed
-            entry['published'] = published_str
-            # Use published time for updated time as well, as Reddit doesn't track updates in listings
-            entry['updated_parsed'] = published_parsed
-            entry['updated'] = published_str
-        else:
-            entry['published_parsed'] = None
-            entry['published'] = None
-            entry['updated_parsed'] = None
-            entry['updated'] = None
-
-        # Add custom Reddit-specific fields, prefixed for clarity
-        entry['reddit_score'] = submission.score
-        entry['reddit_num_comments'] = submission.num_comments
-        # Provide thumbnail URL only if it's a valid image URL
-        thumb = submission.thumbnail
-        entry['reddit_thumbnail'] = thumb if thumb and isinstance(thumb, str) and thumb.startswith('http') else None
-        entry['reddit_url'] = submission.url # The external link for link posts
-        entry['reddit_domain'] = submission.domain
-        entry['reddit_is_self'] = submission.is_self
-        entry['reddit_subreddit'] = submission.subreddit.display_name if submission.subreddit and hasattr(submission.subreddit, 'display_name') else ''
-
+        _build_entry_basic_fields(submission, entry)
+        _build_entry_content(submission, entry)
+        _build_entry_timestamps(submission, entry)
+        _build_entry_reddit_fields(submission, entry)
         return entry
     except AttributeError as e:
         g_logger.error(f"Error formatting PRAW submission: Missing expected attribute. Submission may be deleted or malformed: {e}")
@@ -566,6 +586,23 @@ def fetch_reddit_feed_as_feedparser(feed_url):
 
     Args:
         feed_url: Reddit URL to fetch (e.g., "https://www.reddit.com/r/linux/hot")
+
+    Returns:
+        dict: Feedparser-compatible dictionary with the following structure:
+            - 'bozo': 0 for success, 1 for errors
+            - 'bozo_exception': Exception object if bozo=1, None otherwise
+            - 'feed': Dictionary with feed metadata (title, link, subtitle, language, etc.)
+            - 'entries': List of entry dictionaries, each containing:
+                - Standard feedparser fields: title, author, link, id, summary, content, published, updated
+                - Reddit-specific fields: reddit_score, reddit_num_comments, reddit_thumbnail, 
+                  reddit_url, reddit_domain, reddit_is_self, reddit_subreddit
+            - 'status': HTTP status code (200 for success, 4xx/5xx for errors)
+            - 'href': The canonical Reddit URL used for fetching
+            - 'encoding': 'utf-8'
+            - 'version': 'praw_api_v1'
+        
+        On error, returns a structure with bozo=1, appropriate status code, and error details.
+        Structure matches _create_success_response() for success and _create_error_response() for errors.
     """
     subreddit, feed_type = parse_reddit_url(feed_url)
 
@@ -579,7 +616,7 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         g_logger.error(f"Could not obtain valid PRAW Reddit client for URL: {feed_url}")
         return _create_error_response(401, ConnectionError("Failed to get PRAW Reddit client"), feed_url)
 
-    praw_url = f"https://www.reddit.com/r/{subreddit}/{feed_type}"
+    praw_url = f"{REDDIT_BASE_URL}/r/{subreddit}/{feed_type}"
     g_logger.info(f"Fetching {feed_type} feed for r/{subreddit} using PRAW")
     g_logger.debug(f"Reddit API URL: {praw_url}")
     
@@ -595,7 +632,8 @@ def fetch_reddit_feed_as_feedparser(feed_url):
             return output
         # Fall through to generic handler if not matched
     except Exception as e:
-        g_logger.error(f"Unexpected error fetching Reddit data with PRAW for 'r/{subreddit}/{feed_type}' from URL {feed_url}: {e}", exc_info=True)
+        # Unexpected error type - log with full context for debugging
+        g_logger.error(f"Unexpected error type '{type(e).__name__}' fetching Reddit data with PRAW for 'r/{subreddit}/{feed_type}' from URL {feed_url}: {e}", exc_info=True)
         output['bozo'] = 1
         output['bozo_exception'] = e
         output['feed']['title'] = f"r/{subreddit} - {feed_type} (Error)"

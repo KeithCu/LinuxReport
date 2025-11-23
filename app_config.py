@@ -445,6 +445,15 @@ def get_proxy_password() -> Optional[str]:
     """
     return config_manager.get('proxy.password')
 
+def get_reddit_username() -> str:
+    """
+    Get the Reddit username from configuration for user agent construction.
+    
+    Returns:
+        str: Reddit username, defaults to "keithcu" if not configured
+    """
+    return config_manager.get('reddit.username', 'keithcu')
+
 
 # =============================================================================
 # CONFIGURATION VALIDATION

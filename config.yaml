@@ -26,6 +26,10 @@ storage:
 tor:
   password: "TESTPASSWORD"  # Password for Tor control port authentication
 
+# Reddit API settings
+reddit:
+  username: "keithcu"  # Reddit username for user agent (change for your deployment)
+
 # Proxy server settings
 proxy:
   server: "127.0.0.1:8080"  # Proxy server address and port
