@@ -52,69 +52,26 @@ from urllib.parse import urlparse
 import praw
 
 # Local imports
-from shared import g_logger, URL_IMAGES, USER_AGENT
+from shared import g_logger, USER_AGENT, g_c, EXPIRE_WEEK
 from app_config import get_reddit_username
 
 # --- Configuration ---
 # Credentials are handled via the token file for PRAW authentication
 
 CREDENTIALS_FILE = 'reddit_token.json' # Simple file storage for PRAW credentials
-DEFAULT_FEED_LIMIT = 25
+DEFAULT_FEED_LIMIT = 10
 FEED_TYPES = ['hot', 'new', 'rising', 'controversial', 'top']
 REQUIRED_CREDENTIAL_KEYS = ['client_id', 'client_secret', 'username', 'password']
 
 # Constants for magic numbers and strings
 CREDENTIALS_FILE_MODE = 0o600
-USER_AGENT_PREFIX = 'python'
-USER_AGENT_VERSION = 'v1.0'
 CONTENT_TYPE_HTML = 'text/html'
 CONTENT_TYPE_PLAIN = 'text/plain'
 SUBREDDIT_NAME_MAX_LENGTH = 21  # Reddit's subreddit name limit
-DEFAULT_DOMAIN = 'linuxreport.net'
 REDDIT_BASE_URL = 'https://www.reddit.com'
-HTTP_SCHEME_PREFIX = 'http'
 
 # Reddit-specific user agent combining official app user agent with Reddit username from config
 REDDIT_USER_AGENT = f"{USER_AGENT} (by /u/{get_reddit_username()})"
-
-def extract_domain_from_url_images(url_images):
-    """
-    Extracts domain from URL_IMAGES config value for user agent construction.
-
-    Args:
-        url_images: URL path for static images (e.g., "https://example.com/static/images")
-
-    Returns:
-        str: Domain name extracted from the URL, or "linuxreport.net" as fallback
-    """
-    if not url_images:
-        return DEFAULT_DOMAIN
-    try:
-        parsed = urlparse(url_images)
-        # Extract domain from netloc (handles ports, userinfo, etc.)
-        domain = parsed.netloc
-        if not domain:
-            return DEFAULT_DOMAIN
-        # Remove port if present (netloc includes port)
-        if ':' in domain:
-            domain = domain.split(':')[0]
-        return domain if domain else DEFAULT_DOMAIN
-    except Exception:
-        return DEFAULT_DOMAIN
-
-
-def _build_user_agent(username):
-    """
-    Builds a standardized user agent string for PRAW authentication.
-
-    Args:
-        username: Reddit username for the user agent
-
-    Returns:
-        str: Formatted user agent string
-    """
-    domain = extract_domain_from_url_images(URL_IMAGES)
-    return f'{USER_AGENT_PREFIX}:{domain}:{USER_AGENT_VERSION} (by /u/{username})'
 
 
 def _create_error_response(status, exception, feed_url, title_suffix=''):
@@ -253,12 +210,13 @@ def _prompt_for_credentials():
             return None
 
         # Store credentials for PRAW
+        # Note: user_agent stored here is for reference only; runtime uses REDDIT_USER_AGENT
         credentials = {
             'client_id': client_id,
             'client_secret': client_secret,
             'username': username,
             'password': password,
-            'user_agent': _build_user_agent(username)
+            'user_agent': REDDIT_USER_AGENT
         }
         save_token(credentials)
         g_logger.info(f"Credentials saved successfully to '{CREDENTIALS_FILE}' for user '{username}'.")
@@ -480,9 +438,9 @@ def _build_entry_reddit_fields(submission, entry):
     # Add custom Reddit-specific fields, prefixed for clarity
     entry['reddit_score'] = submission.score
     entry['reddit_num_comments'] = submission.num_comments
-    # Provide thumbnail URL only if it's a valid image URL
+    # Provide thumbnail URL only if it's a valid HTTP/HTTPS URL
     thumb = submission.thumbnail
-    entry['reddit_thumbnail'] = thumb if thumb and isinstance(thumb, str) and thumb.startswith(HTTP_SCHEME_PREFIX) else None
+    entry['reddit_thumbnail'] = thumb if thumb and isinstance(thumb, str) and (thumb.startswith('http://') or thumb.startswith('https://')) else None
     entry['reddit_url'] = submission.url # The external link for link posts
     entry['reddit_domain'] = submission.domain
     entry['reddit_is_self'] = submission.is_self
@@ -578,6 +536,52 @@ def _handle_praw_exception(e, subreddit, feed_type, praw_url, output):
     return False
 
 
+def _get_seen_reddit_ids(feed_url):
+    """
+    Retrieves the set of seen Reddit submission IDs for a given feed URL.
+    
+    Args:
+        feed_url: The Reddit feed URL to get seen IDs for
+        
+    Returns:
+        set: Set of submission IDs (e.g., {"t3_xxxxx", "t3_yyyyy"}) or empty set if none found
+    """
+    cache_key = f"reddit_seen_ids:{feed_url}"
+    try:
+        seen_ids = g_c.get(cache_key)
+        if seen_ids is None:
+            return set()
+        # Ensure we return a set (cache might return a list or other iterable)
+        return set(seen_ids) if isinstance(seen_ids, (set, list, tuple)) else set()
+    except Exception as e:
+        g_logger.warning(f"Error retrieving seen Reddit IDs from cache for {feed_url}: {e}")
+        return set()
+
+
+def _mark_reddit_ids_seen(feed_url, submission_ids):
+    """
+    Stores Reddit submission IDs in cache for a given feed URL.
+    
+    Args:
+        feed_url: The Reddit feed URL these IDs belong to
+        submission_ids: Set or list of submission IDs to mark as seen
+    """
+    if not submission_ids:
+        return
+    
+    cache_key = f"reddit_seen_ids:{feed_url}"
+    try:
+        # Get existing seen IDs and merge with new ones
+        existing_ids = _get_seen_reddit_ids(feed_url)
+        all_ids = existing_ids | set(submission_ids)
+        
+        # Store in cache with expiration
+        g_c.put(cache_key, all_ids, timeout=EXPIRE_WEEK)
+        g_logger.debug(f"Marked {len(submission_ids)} Reddit IDs as seen for {feed_url} (total: {len(all_ids)})")
+    except Exception as e:
+        g_logger.warning(f"Error storing seen Reddit IDs in cache for {feed_url}: {e}")
+
+
 def fetch_reddit_feed_as_feedparser(feed_url):
     """
     Fetches data from Reddit API based on an RSS-like URL
@@ -622,10 +626,42 @@ def fetch_reddit_feed_as_feedparser(feed_url):
     
     output = _create_success_response(praw_url)
 
+    # Get seen submission IDs before fetching to enable early-stop deduplication
+    seen_ids = _get_seen_reddit_ids(feed_url)
+    g_logger.debug(f"Found {len(seen_ids)} previously seen Reddit IDs for {feed_url}")
+
     try:
         subreddit_obj = reddit.subreddit(subreddit)
         submissions = _get_submissions(subreddit_obj, feed_type)
-        submissions_list = list(itertools.islice(submissions, DEFAULT_FEED_LIMIT))
+        
+        # Process submissions one at a time with early-stop on seen submissions
+        submissions_list = []
+        new_submission_ids = []
+        stopped_early = False
+        
+        for submission in itertools.islice(submissions, DEFAULT_FEED_LIMIT):
+            # Check if we've already seen this submission
+            submission_id = submission.name if hasattr(submission, 'name') and submission.name else None
+            
+            if not submission_id:
+                g_logger.debug(f"Skipping submission without ID in r/{subreddit}/{feed_type}")
+                continue
+            
+            if submission_id in seen_ids:
+                # Stop iterating immediately - all subsequent submissions are older/seen
+                stopped_early = True
+                g_logger.debug(f"Stopped early at seen submission {submission_id} in r/{subreddit}/{feed_type}")
+                break
+            
+            # This is a new submission - format and collect it
+            submissions_list.append(submission)
+            new_submission_ids.append(submission_id)
+            
+            entry = format_reddit_entry(submission)
+            if entry:
+                output['entries'].append(entry)
+            else:
+                g_logger.debug(f"Failed to format submission {submission_id} in r/{subreddit}/{feed_type}")
 
     except (praw.exceptions.NotFound, praw.exceptions.Forbidden, praw.exceptions.RedditAPIException) as e:
         if _handle_praw_exception(e, subreddit, feed_type, praw_url, output):
@@ -641,20 +677,20 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         output['status'] = 500
         return output
 
-    # Populate feed metadata and entries
+    # Update cache with newly seen submission IDs
+    if new_submission_ids:
+        _mark_reddit_ids_seen(feed_url, new_submission_ids)
+
+    # Populate feed metadata using the submissions we processed
     _populate_feed_metadata(output, subreddit, feed_type, praw_url, submissions_list)
-    
-    for submission in submissions_list:
-        entry = format_reddit_entry(submission)
-        if entry:
-            output['entries'].append(entry)
-        else:
-            g_logger.debug(f"Failed to format submission {submission.id} in r/{subreddit}/{feed_type}")
 
     if not submissions_list:
-        g_logger.warning(f"No posts found for r/{subreddit}/{feed_type} (Subreddit might be empty or filtered).")
+        g_logger.warning(f"No new posts found for r/{subreddit}/{feed_type} (Subreddit might be empty, filtered, or all posts already seen).")
     else:
-        g_logger.debug(f"Successfully fetched {len(output['entries'])} entries for r/{subreddit}/{feed_type}")
+        log_msg = f"Successfully fetched {len(output['entries'])} new entries for r/{subreddit}/{feed_type}"
+        if stopped_early:
+            log_msg += " (stopped early at already-seen submission)"
+        g_logger.debug(log_msg)
 
     return output
 
