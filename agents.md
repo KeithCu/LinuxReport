@@ -272,6 +272,8 @@ Dependency installation options:
 - pip install -r requirements.txt
 - python app.py
 
+**Note**: The dev environment uses `.venv` virtual environment, but both `pyproject.toml` (for uv users) and `requirements.txt` (for pip users) are maintained to support different development workflows and deployment scenarios.
+
 Testing:
 - Run the full suite when in doubt:
   - pytest tests/

@@ -25,6 +25,7 @@ matplotlib>=3.8.0
 openai>=1.75.0
 pandas>=2.2.3
 Pillow>=11.2.1
+praw>=7.7.0
 pyahocorasick>=2.1.0
 PyYAML>=6.0.2
 requests>=2.32.0

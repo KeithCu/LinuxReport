@@ -47,6 +47,7 @@ dependencies = [
     "openai>=1.75.0",
     "pandas>=2.2.3",
     "Pillow>=11.2.1",
+    "praw>=7.7.0",
     "playwright>=1.40.0",
     "pyahocorasick>=2.1.0",
     "PyYAML>=6.0.2",
