@@ -92,13 +92,19 @@ def load_token():
     try:
         with open(CREDENTIALS_FILE, 'r') as f:
             credentials = json.load(f)
-            # Basic validation: check for essential PRAW keys
+            # Validate: check for essential PRAW keys
             if not all(k in credentials for k in ['client_id', 'client_secret', 'username', 'password']):
-                 g_logger.warning(f"Token file '{CREDENTIALS_FILE}' is missing essential PRAW credentials. Re-authentication may be required.")
+                 g_logger.debug(f"Credentials file '{CREDENTIALS_FILE}' exists but is missing required PRAW credentials. Will prompt for new credentials.")
                  return None
             return credentials
-    except (IOError, json.JSONDecodeError, OSError, TypeError) as e:
-        g_logger.error(f"Error loading or parsing credentials file '{CREDENTIALS_FILE}': {e}")
+    except json.JSONDecodeError as e:
+        g_logger.error(f"Error parsing JSON from credentials file '{CREDENTIALS_FILE}': {e}. File may be corrupted or invalid.")
+        return None
+    except (IOError, OSError) as e:
+        g_logger.error(f"Error reading credentials file '{CREDENTIALS_FILE}': {e}")
+        return None
+    except TypeError as e:
+        g_logger.error(f"Unexpected data type in credentials file '{CREDENTIALS_FILE}': {e}")
         return None
 
 def get_valid_reddit_client():
@@ -109,16 +115,10 @@ def get_valid_reddit_client():
     Returns:
         praw.Reddit instance or None on failure.
     """
-    token_data = load_token()
+    credentials = load_token()
 
-    # Check if we need to migrate from old token format or get new credentials
-    if not token_data or not all(k in token_data for k in ['client_id', 'client_secret', 'username', 'password']):
-        if token_data:
-            g_logger.info("Existing token file found but needs migration to PRAW format.")
-        else:
-            g_logger.info(f"No token file found ('{CREDENTIALS_FILE}') or file is invalid.")
-
-        g_logger.info("Please provide your Reddit API credentials for initial setup.")
+    if not credentials:
+        g_logger.info(f"No valid credentials file found ('{CREDENTIALS_FILE}'). Prompting for Reddit API credentials.")
         try:
             client_id = input("Enter your Reddit Client ID: ").strip()
             client_secret = getpass.getpass("Enter your Reddit Client Secret: ").strip()
@@ -126,10 +126,10 @@ def get_valid_reddit_client():
             password = getpass.getpass("Enter your Reddit Password (stored securely for PRAW): ").strip()
 
             if not all([client_id, client_secret, username, password]):
-                g_logger.error("Error: All credentials must be provided for initial setup.")
+                g_logger.error("Error: All credentials must be provided for initial setup. Missing one or more required fields.")
                 return None
 
-            # Store credentials in new format for PRAW
+            # Store credentials for PRAW
             credentials = {
                 'client_id': client_id,
                 'client_secret': client_secret,
@@ -138,19 +138,20 @@ def get_valid_reddit_client():
                 'user_agent': f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{username})'
             }
             save_token(credentials)
-            g_logger.info("Credentials saved successfully.")
-        except EOFError: # Handle running in non-interactive environment
-             g_logger.error("\nError: Cannot prompt for credentials in non-interactive mode and no token file found.")
+            g_logger.info(f"Credentials saved successfully to '{CREDENTIALS_FILE}' for user '{username}'.")
+        except EOFError:
+             g_logger.error("Error: Cannot prompt for credentials in non-interactive mode. Please create credentials file manually or run in interactive mode.")
              return None
-        except (IOError, OSError, ValueError) as e: # Catch other potential input errors
-             g_logger.error(f"\nAn error occurred during credential input: {e}")
+        except (IOError, OSError) as e:
+             g_logger.error(f"Error reading input or saving credentials: {e}")
              return None
-    else:
-        # Load existing PRAW-compatible credentials
-        credentials = token_data
+        except ValueError as e:
+             g_logger.error(f"Invalid input value: {e}")
+             return None
 
     # Create PRAW Reddit instance
     try:
+        g_logger.debug(f"Creating PRAW Reddit client for user '{credentials['username']}'")
         reddit = praw.Reddit(
             client_id=credentials['client_id'],
             client_secret=credentials['client_secret'],
@@ -159,9 +160,22 @@ def get_valid_reddit_client():
             user_agent=credentials.get('user_agent', f'python:{extract_domain_from_url_images(URL_IMAGES)}:v1.0 (by /u/{credentials["username"]})')
         )
         # Test the connection by trying to access user info
-        reddit.user.me()
-        g_logger.info(f"Successfully authenticated as user: {credentials['username']}")
+        try:
+            user = reddit.user.me()
+            g_logger.info(f"Successfully authenticated as user: {user.name}")
+        except praw.exceptions.Forbidden as e:
+            g_logger.error(f"Authentication failed: Reddit API returned Forbidden (403). User '{credentials['username']}' may be suspended or credentials may be invalid: {e}")
+            return None
+        except praw.exceptions.Unauthorized as e:
+            g_logger.error(f"Authentication failed: Reddit API returned Unauthorized (401). Invalid credentials for user '{credentials['username']}': {e}")
+            return None
+        except Exception as e:
+            g_logger.error(f"Authentication test failed for user '{credentials['username']}': {e}")
+            return None
         return reddit
+    except KeyError as e:
+        g_logger.error(f"Missing required credential field: {e}. Credentials file may be corrupted.")
+        return None
     except Exception as e:
         g_logger.error(f"Failed to create PRAW Reddit client: {e}")
         return None
@@ -277,8 +291,11 @@ def format_reddit_entry(submission):
         entry['reddit_subreddit'] = submission.subreddit.display_name if submission.subreddit else ''
 
         return entry
+    except AttributeError as e:
+        g_logger.error(f"Error formatting PRAW submission: Missing expected attribute. Submission may be deleted or malformed: {e}")
+        return None
     except Exception as e:
-        g_logger.error(f"Error formatting PRAW submission: {e}")
+        g_logger.error(f"Error formatting PRAW submission: Unexpected error: {e}")
         return None
 
 
@@ -354,14 +371,37 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         # Convert generator to list to get the first item for feed metadata
         submissions_list = list(submissions)
 
-    except Exception as e:
-        msg = f"Error fetching Reddit data with PRAW: {e}"
-        g_logger.error(f"Error: {msg}")
+    except praw.exceptions.NotFound as e:
+        g_logger.error(f"Subreddit 'r/{subreddit}' not found or does not exist: {e}")
         output['bozo'] = 1
         output['bozo_exception'] = e
-        # Attempt to populate feed info even on error
+        output['feed']['title'] = f"r/{subreddit} - {feed_type} (Not Found)"
+        output['feed']['link'] = praw_url
+        output['status'] = 404
+        return output
+    except praw.exceptions.Forbidden as e:
+        g_logger.error(f"Access forbidden to subreddit 'r/{subreddit}': {e}. Subreddit may be private or banned.")
+        output['bozo'] = 1
+        output['bozo_exception'] = e
+        output['feed']['title'] = f"r/{subreddit} - {feed_type} (Forbidden)"
+        output['feed']['link'] = praw_url
+        output['status'] = 403
+        return output
+    except praw.exceptions.RedditAPIException as e:
+        g_logger.error(f"Reddit API error fetching 'r/{subreddit}/{feed_type}': {e}")
+        output['bozo'] = 1
+        output['bozo_exception'] = e
+        output['feed']['title'] = f"r/{subreddit} - {feed_type} (API Error)"
+        output['feed']['link'] = praw_url
+        output['status'] = 500
+        return output
+    except Exception as e:
+        g_logger.error(f"Unexpected error fetching Reddit data with PRAW for 'r/{subreddit}/{feed_type}': {e}", exc_info=True)
+        output['bozo'] = 1
+        output['bozo_exception'] = e
         output['feed']['title'] = f"r/{subreddit} - {feed_type} (Error)"
         output['feed']['link'] = praw_url
+        output['status'] = 500
         return output
 
     # --- Format the successful output ---
