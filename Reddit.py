@@ -33,6 +33,12 @@ Runtime behavior:
 - PRAW automatically handles authentication and token refresh.
 """
 
+# NOTE: No caching or rate limiting is implemented here because it's handled at higher levels
+# (workers.py, FeedHistory.py). This module makes requests very infrequently -
+# at most one per Reddit feed per hour initially, but FeedHistory.py's intelligent scheduling
+# (based on historical fetch success rates and time patterns) typically stretches this to
+# much longer intervals (up to 12 hours), making requests respectful of Reddit's servers.
+
 import getpass
 import itertools
 import json
@@ -46,7 +52,7 @@ from urllib.parse import urlparse
 import praw
 
 # Local imports
-from shared import g_logger, URL_IMAGES
+from shared import g_logger, URL_IMAGES, USER_AGENT
 
 # --- Configuration ---
 # Credentials are handled via the token file for PRAW authentication
@@ -64,6 +70,9 @@ CONTENT_TYPE_HTML = 'text/html'
 CONTENT_TYPE_PLAIN = 'text/plain'
 SUBREDDIT_NAME_MAX_LENGTH = 21  # Reddit's subreddit name limit
 DEFAULT_DOMAIN = 'linuxreport.net'
+
+# Reddit-specific user agent combining official app user agent with Reddit username
+REDDIT_USER_AGENT = f"{USER_AGENT} (by /u/keithcu)"
 
 def extract_domain_from_url_images(url_images):
     """
@@ -334,7 +343,8 @@ def get_valid_reddit_client(user_agent):
             return None
 
     # Create and test PRAW Reddit instance
-    return _create_reddit_instance(credentials, user_agent)
+    # Always use the official Reddit-formatted user agent for API compliance
+    return _create_reddit_instance(credentials, REDDIT_USER_AGENT)
 
 def parse_reddit_url(url):
     """
