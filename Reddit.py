@@ -261,16 +261,22 @@ def _prompt_for_credentials():
          return None
 
 
-def _create_reddit_instance(credentials):
+def _create_reddit_instance(credentials, user_agent):
     """
     Creates and tests a PRAW Reddit client instance.
 
     Args:
         credentials: Dictionary with Reddit API credentials
+        user_agent: User agent string to use for API requests (required).
 
     Returns:
         praw.Reddit instance or None on failure
+
+    Raises:
+        ValueError: If user_agent is None or empty.
     """
+    if not user_agent or not isinstance(user_agent, str) or not user_agent.strip():
+        raise ValueError("user_agent must be a non-empty string")
     try:
         g_logger.debug(f"Creating PRAW Reddit client for user '{credentials['username']}'")
         reddit = praw.Reddit(
@@ -278,7 +284,7 @@ def _create_reddit_instance(credentials):
             client_secret=credentials['client_secret'],
             username=credentials['username'],
             password=credentials['password'],
-            user_agent=credentials.get('user_agent', _build_user_agent(credentials['username']))
+            user_agent=user_agent
         )
         # Test the connection by trying to access user info
         try:
@@ -302,14 +308,23 @@ def _create_reddit_instance(credentials):
         return None
 
 
-def get_valid_reddit_client():
+def get_valid_reddit_client(user_agent):
     """
     Gets a valid PRAW Reddit client instance,
     prompting for initial credentials if needed.
     PRAW handles token refresh automatically.
+
+    Args:
+        user_agent: User agent string to use for API requests (required).
+
     Returns:
         praw.Reddit instance or None on failure.
+
+    Raises:
+        ValueError: If user_agent is None or empty.
     """
+    if not user_agent or not isinstance(user_agent, str) or not user_agent.strip():
+        raise ValueError("user_agent must be a non-empty string")
     credentials = load_token()
 
     if not credentials:
@@ -319,7 +334,7 @@ def get_valid_reddit_client():
             return None
 
     # Create and test PRAW Reddit instance
-    return _create_reddit_instance(credentials)
+    return _create_reddit_instance(credentials, user_agent)
 
 def parse_reddit_url(url):
     """
@@ -540,12 +555,21 @@ def _handle_praw_exception(e, subreddit, feed_type, praw_url, output):
     return False
 
 
-def fetch_reddit_feed_as_feedparser(feed_url):
+def fetch_reddit_feed_as_feedparser(feed_url, user_agent):
     """
     Fetches data from Reddit API based on an RSS-like URL
     and returns it in a structure similar to feedparser output.
     Uses PRAW for authentication and API calls.
+
+    Args:
+        feed_url: Reddit URL to fetch (e.g., "https://www.reddit.com/r/linux/hot")
+        user_agent: User agent string to use for API requests (required).
+
+    Raises:
+        ValueError: If user_agent is None or empty.
     """
+    if not user_agent or not isinstance(user_agent, str) or not user_agent.strip():
+        raise ValueError("user_agent must be a non-empty string")
     subreddit, feed_type = parse_reddit_url(feed_url)
 
     if not subreddit or not feed_type:
@@ -553,7 +577,7 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         return _create_error_response(400, ValueError(f"Invalid Reddit URL format: {feed_url}"), feed_url)
 
     # Get PRAW Reddit client
-    reddit = get_valid_reddit_client()
+    reddit = get_valid_reddit_client(user_agent)
     if not reddit:
         g_logger.error(f"Could not obtain valid PRAW Reddit client for URL: {feed_url}")
         return _create_error_response(401, ConnectionError("Failed to get PRAW Reddit client"), feed_url)
@@ -603,7 +627,9 @@ def fetch_reddit_feed_as_feedparser(feed_url):
 if __name__ == '__main__':
     g_logger.info("Attempting to ensure a valid PRAW Reddit client can be created...")
     # This call will handle loading, prompting for initial creds
-    reddit = get_valid_reddit_client()
+    # Use a default user agent for testing
+    default_user_agent = "python:linuxreport.net:v1.0 (by /u/testuser)"
+    reddit = get_valid_reddit_client(default_user_agent)
 
     if reddit:
         g_logger.info(f"\nSuccessfully created PRAW Reddit client for user: {reddit.user.me().name}.")
@@ -611,8 +637,9 @@ if __name__ == '__main__':
 
         # Example usage (optional):
         # test_url = "https://www.reddit.com/r/python/hot/.rss"
+        # test_user_agent = "python:linuxreport.net:v1.0 (by /u/exampleuser)"
         # print(f"\nAttempting to fetch example feed: {test_url}")
-        # feed_data = fetch_reddit_feed_as_feedparser(test_url)
+        # feed_data = fetch_reddit_feed_as_feedparser(test_url, test_user_agent)
         # if feed_data and not feed_data.get('bozo'):
         #     print(f"Successfully fetched {len(feed_data.get('entries', []))} entries.")
         #     # print(json.dumps(feed_data, indent=2)) # Pretty print result
