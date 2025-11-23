@@ -45,17 +45,18 @@ from urllib.parse import urlparse
 import praw
 
 # Local imports
-from shared import g_logger
+from shared import g_logger, URL_IMAGES
 
 # --- Configuration ---
 # Credentials are handled via the token file for PRAW authentication
 
 CREDENTIALS_FILE = 'reddit_token.json' # Simple file storage for PRAW credentials
-
-# --- User Agent Domain Extraction ---
-URL_IMAGES = None  # Should be set from config (or default)
+DEFAULT_FEED_LIMIT = 25
+FEED_TYPES = ['hot', 'new', 'rising', 'controversial', 'top']
+REQUIRED_CREDENTIAL_KEYS = ['client_id', 'client_secret', 'username', 'password']
 
 def extract_domain_from_url_images(url_images):
+    """Extracts domain from URL_IMAGES config value for user agent construction."""
     if not url_images:
         return "linuxreport.net"
     url = url_images
@@ -67,6 +68,72 @@ def extract_domain_from_url_images(url_images):
         url = url[:-len('/static/images')]
     url = url.rstrip('/')
     return url
+
+
+def _create_error_response(status, exception, feed_url, title_suffix=''):
+    """
+    Creates a standardized error response structure compatible with feedparser format.
+    
+    Args:
+        status: HTTP status code
+        exception: Exception object or error message
+        feed_url: Original feed URL
+        title_suffix: Optional suffix for feed title
+        
+    Returns:
+        dict: Standardized error response structure
+    """
+    return {
+        'bozo': 1,
+        'bozo_exception': exception,
+        'feed': {'title': f"Reddit Feed{title_suffix}", 'link': feed_url} if title_suffix else {},
+        'entries': [],
+        'status': status,
+        'href': feed_url
+    }
+
+
+def _parse_timestamp(created_utc):
+    """
+    Parses Reddit UTC timestamp into feedparser-compatible format.
+    
+    Args:
+        created_utc: Unix timestamp (float or int)
+        
+    Returns:
+        tuple: (published_parsed, published_str) or (None, None) on error
+    """
+    if not created_utc:
+        return None, None
+    try:
+        published_parsed = time.gmtime(float(created_utc))
+        published_str = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
+        return published_parsed, published_str
+    except (ValueError, TypeError):
+        return None, None
+
+
+def _get_submissions(subreddit_obj, feed_type, limit=DEFAULT_FEED_LIMIT):
+    """
+    Fetches submissions from a subreddit based on feed type.
+    
+    Args:
+        subreddit_obj: PRAW Subreddit object
+        feed_type: Type of feed ('hot', 'new', 'rising', 'controversial', 'top')
+        limit: Maximum number of submissions to fetch
+        
+    Returns:
+        Generator: PRAW submission generator
+    """
+    feed_methods = {
+        'hot': subreddit_obj.hot,
+        'new': subreddit_obj.new,
+        'rising': subreddit_obj.rising,
+        'controversial': subreddit_obj.controversial,
+        'top': subreddit_obj.top
+    }
+    method = feed_methods.get(feed_type, subreddit_obj.hot)
+    return method(limit=limit)
 
 # USER_AGENT is constructed by PRAW using the username from credentials
 
@@ -93,7 +160,7 @@ def load_token():
         with open(CREDENTIALS_FILE, 'r') as f:
             credentials = json.load(f)
             # Validate: check for essential PRAW keys
-            if not all(k in credentials for k in ['client_id', 'client_secret', 'username', 'password']):
+            if not all(k in credentials for k in REQUIRED_CREDENTIAL_KEYS):
                  g_logger.debug(f"Credentials file '{CREDENTIALS_FILE}' exists but is missing required PRAW credentials. Will prompt for new credentials.")
                  return None
             return credentials
@@ -207,13 +274,12 @@ def parse_reddit_url(url):
             g_logger.warning(f"Invalid subreddit format found: {subreddit}")
             return None, None
 
-        feed_type = 'hot' # Default
-        possible_feeds = ['hot', 'new', 'rising', 'controversial', 'top']
+        feed_type = 'hot'  # Default
 
         if len(path_parts) > 2:
             # Check third part, removing potential .rss/.json suffix
             potential_feed = path_parts[2].lower().rsplit('.', 1)[0]
-            if potential_feed in possible_feeds:
+            if potential_feed in FEED_TYPES:
                 feed_type = potential_feed
 
         return subreddit, feed_type
@@ -261,23 +327,18 @@ def format_reddit_entry(submission):
             })
 
         # Time parsing - Reddit provides UTC timestamp
-        created_utc = submission.created_utc
-        if created_utc:
-            try:
-                # feedparser uses time.struct_time in UTC/GMT for _parsed fields
-                published_parsed = time.gmtime(float(created_utc))
-                entry['published_parsed'] = published_parsed
-                # Standard RSS/Atom time format string
-                entry['published'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', published_parsed)
-                # Use published time for updated time as well, as Reddit doesn't track updates in listings
-                entry['updated_parsed'] = published_parsed
-                entry['updated'] = entry['published']
-            except (ValueError, TypeError):
-                g_logger.warning(f"Could not parse timestamp {created_utc}")
-                entry['published_parsed'] = None
-                entry['published'] = None
-                entry['updated_parsed'] = None
-                entry['updated'] = None
+        published_parsed, published_str = _parse_timestamp(submission.created_utc)
+        if published_parsed:
+            entry['published_parsed'] = published_parsed
+            entry['published'] = published_str
+            # Use published time for updated time as well, as Reddit doesn't track updates in listings
+            entry['updated_parsed'] = published_parsed
+            entry['updated'] = published_str
+        else:
+            entry['published_parsed'] = None
+            entry['published'] = None
+            entry['updated_parsed'] = None
+            entry['updated'] = None
 
         # Add custom Reddit-specific fields, prefixed for clarity
         entry['reddit_score'] = submission.score
@@ -299,6 +360,65 @@ def format_reddit_entry(submission):
         return None
 
 
+def _create_success_response(praw_url):
+    """Creates base structure for successful feed response."""
+    return {
+        'bozo': 0,
+        'bozo_exception': None,
+        'feed': {},
+        'entries': [],
+        'headers': {},
+        'href': praw_url,
+        'status': 200,
+        'encoding': 'utf-8',
+        'version': 'praw_api_v1'
+    }
+
+
+def _populate_feed_metadata(output, subreddit, feed_type, praw_url, submissions_list):
+    """Populates feed metadata in the output structure."""
+    output['feed']['title'] = f"r/{subreddit} - {feed_type}"
+    output['feed']['link'] = praw_url
+    output['feed']['links'] = [{'rel': 'alternate', 'type': 'text/html', 'href': praw_url}]
+    output['feed']['subtitle'] = f"Posts from r/{subreddit} sorted by {feed_type} via PRAW"
+    output['feed']['language'] = 'en'
+    
+    # Use the timestamp of the newest post as the feed's updated time
+    if submissions_list:
+        updated_parsed, updated_str = _parse_timestamp(submissions_list[0].created_utc)
+        if updated_parsed:
+            output['feed']['updated_parsed'] = updated_parsed
+            output['feed']['updated'] = updated_str
+
+
+def _handle_praw_exception(e, subreddit, feed_type, praw_url, output):
+    """
+    Handles PRAW exceptions and updates output accordingly.
+    
+    Returns:
+        bool: True if exception was handled, False otherwise
+    """
+    exception_handlers = {
+        praw.exceptions.NotFound: (404, f"r/{subreddit} - {feed_type} (Not Found)", 
+                                   f"Subreddit 'r/{subreddit}' not found or does not exist"),
+        praw.exceptions.Forbidden: (403, f"r/{subreddit} - {feed_type} (Forbidden)",
+                                   f"Access forbidden to subreddit 'r/{subreddit}'. Subreddit may be private or banned."),
+        praw.exceptions.RedditAPIException: (500, f"r/{subreddit} - {feed_type} (API Error)",
+                                            f"Reddit API error fetching 'r/{subreddit}/{feed_type}'")
+    }
+    
+    for exc_type, (status, title, log_msg) in exception_handlers.items():
+        if isinstance(e, exc_type):
+            g_logger.error(f"{log_msg}: {e}")
+            output['bozo'] = 1
+            output['bozo_exception'] = e
+            output['feed']['title'] = title
+            output['feed']['link'] = praw_url
+            output['status'] = status
+            return True
+    return False
+
+
 def fetch_reddit_feed_as_feedparser(feed_url):
     """
     Fetches data from Reddit API based on an RSS-like URL
@@ -309,92 +429,28 @@ def fetch_reddit_feed_as_feedparser(feed_url):
 
     if not subreddit or not feed_type:
         g_logger.error(f"Could not parse subreddit/feed type from URL: {feed_url}")
-        # Return a structure indicating failure, similar to feedparser's bozo=1
-        return {
-            'bozo': 1,
-            'bozo_exception': ValueError(f"Invalid Reddit URL format: {feed_url}"),
-            'feed': {},
-            'entries': [],
-            'status': 400, # Indicate bad request
-            'href': feed_url
-        }
+        return _create_error_response(400, ValueError(f"Invalid Reddit URL format: {feed_url}"), feed_url)
 
     # Get PRAW Reddit client
     reddit = get_valid_reddit_client()
     if not reddit:
         g_logger.error("Could not obtain valid PRAW Reddit client.")
-        # Return structure indicating auth failure
-        return {
-            'bozo': 1,
-            'bozo_exception': ConnectionError("Failed to get PRAW Reddit client"),
-            'feed': {},
-            'entries': [],
-            'status': 401, # Indicate auth failure
-            'href': feed_url
-        }
+        return _create_error_response(401, ConnectionError("Failed to get PRAW Reddit client"), feed_url)
 
-    # Construct PRAW subreddit and feed URL for logging
     praw_url = f"https://www.reddit.com/r/{subreddit}/{feed_type}"
-
     g_logger.info(f"Fetching {feed_type} feed for r/{subreddit} using PRAW")
-    output = {
-        'bozo': 0, # Assume success unless errors occur
-        'bozo_exception': None,
-        'feed': {},
-        'entries': [],
-        'headers': {},
-        'href': praw_url,
-        'status': 200, # PRAW doesn't use HTTP status codes
-        'encoding': 'utf-8',
-        'version': 'praw_api_v1' # Custom version identifier
-    }
+    
+    output = _create_success_response(praw_url)
 
     try:
-        # Get the subreddit object
         subreddit_obj = reddit.subreddit(subreddit)
-
-        # Get submissions based on feed type
-        if feed_type == 'hot':
-            submissions = subreddit_obj.hot(limit=25)
-        elif feed_type == 'new':
-            submissions = subreddit_obj.new(limit=25)
-        elif feed_type == 'rising':
-            submissions = subreddit_obj.rising(limit=25)
-        elif feed_type == 'controversial':
-            submissions = subreddit_obj.controversial(limit=25)
-        elif feed_type == 'top':
-            submissions = subreddit_obj.top(limit=25)
-        else:
-            # Default to hot if unknown feed type
-            submissions = subreddit_obj.hot(limit=25)
-
-        # Convert generator to list to get the first item for feed metadata
+        submissions = _get_submissions(subreddit_obj, feed_type)
         submissions_list = list(submissions)
 
-    except praw.exceptions.NotFound as e:
-        g_logger.error(f"Subreddit 'r/{subreddit}' not found or does not exist: {e}")
-        output['bozo'] = 1
-        output['bozo_exception'] = e
-        output['feed']['title'] = f"r/{subreddit} - {feed_type} (Not Found)"
-        output['feed']['link'] = praw_url
-        output['status'] = 404
-        return output
-    except praw.exceptions.Forbidden as e:
-        g_logger.error(f"Access forbidden to subreddit 'r/{subreddit}': {e}. Subreddit may be private or banned.")
-        output['bozo'] = 1
-        output['bozo_exception'] = e
-        output['feed']['title'] = f"r/{subreddit} - {feed_type} (Forbidden)"
-        output['feed']['link'] = praw_url
-        output['status'] = 403
-        return output
-    except praw.exceptions.RedditAPIException as e:
-        g_logger.error(f"Reddit API error fetching 'r/{subreddit}/{feed_type}': {e}")
-        output['bozo'] = 1
-        output['bozo_exception'] = e
-        output['feed']['title'] = f"r/{subreddit} - {feed_type} (API Error)"
-        output['feed']['link'] = praw_url
-        output['status'] = 500
-        return output
+    except (praw.exceptions.NotFound, praw.exceptions.Forbidden, praw.exceptions.RedditAPIException) as e:
+        if _handle_praw_exception(e, subreddit, feed_type, praw_url, output):
+            return output
+        # Fall through to generic handler if not matched
     except Exception as e:
         g_logger.error(f"Unexpected error fetching Reddit data with PRAW for 'r/{subreddit}/{feed_type}': {e}", exc_info=True)
         output['bozo'] = 1
@@ -404,29 +460,9 @@ def fetch_reddit_feed_as_feedparser(feed_url):
         output['status'] = 500
         return output
 
-    # --- Format the successful output ---
-
-    # Populate feed metadata
-    output['feed']['title'] = f"r/{subreddit} - {feed_type}"
-    # Link to the human-viewable Reddit page for the feed
-    output['feed']['link'] = praw_url
-    output['feed']['links'] = [{'rel': 'alternate', 'type': 'text/html', 'href': output['feed']['link']}]
-    output['feed']['subtitle'] = f"Posts from r/{subreddit} sorted by {feed_type} via PRAW"
-    output['feed']['language'] = 'en' # Assume English
-
-    # Use the timestamp of the newest post as the feed's updated time
-    if submissions_list:
-        first_submission = submissions_list[0]
-        created_utc = first_submission.created_utc
-        if created_utc:
-            try:
-                updated_parsed = time.gmtime(float(created_utc))
-                output['feed']['updated_parsed'] = updated_parsed
-                output['feed']['updated'] = time.strftime('%a, %d %b %Y %H:%M:%S GMT', updated_parsed)
-            except (ValueError, TypeError):
-                pass # Ignore if timestamp is bad
-
-    # Populate entries
+    # Populate feed metadata and entries
+    _populate_feed_metadata(output, subreddit, feed_type, praw_url, submissions_list)
+    
     for submission in submissions_list:
         entry = format_reddit_entry(submission)
         if entry:
@@ -434,7 +470,6 @@ def fetch_reddit_feed_as_feedparser(feed_url):
 
     if not submissions_list:
         g_logger.info(f"Note: No posts found for r/{subreddit}/{feed_type} (Subreddit might be empty or filtered).")
-        # Still a valid response, just no entries. bozo remains 0.
 
     return output
 
