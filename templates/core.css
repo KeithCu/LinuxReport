@@ -1031,8 +1031,6 @@ a:focus {
 /* Silver theme link hover enhancement */
 [data-theme="silver"] .linkclass:hover {
   background-color: rgba(0, 102, 204, 0.06);
-  border-left: 2px solid rgba(0, 102, 204, 0.3);
-  padding-left: calc(var(--spacing-xs) - 2px);
 }
 
 [data-theme="dark"] .linkclass:hover {
