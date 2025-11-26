@@ -58,6 +58,137 @@ body {
   line-height: 1.6;
 }
 
+/* Silver theme background textures - 8 options for random selection */
+/* Option 1: Subtle Brushed Metal */
+body[data-theme="silver"].silver-texture-1 {
+  background-image: 
+    linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 50%, rgba(0,0,0,0.05) 100%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255,255,255,0.03) 0px,
+      transparent 1px,
+      transparent 2px,
+      rgba(0,0,0,0.02) 3px,
+      transparent 4px
+    );
+  background-size: 100% 100%, 100% 4px;
+  background-attachment: fixed;
+  background-color: var(--bg);
+}
+
+/* Option 2: Shimmer Effect */
+body[data-theme="silver"].silver-texture-2 {
+  background-image: 
+    linear-gradient(
+      135deg,
+      rgba(255,255,255,0.1) 0%,
+      transparent 25%,
+      transparent 75%,
+      rgba(0,0,0,0.05) 100%
+    ),
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 2px,
+      rgba(255,255,255,0.02) 2px,
+      rgba(255,255,255,0.02) 4px
+    );
+  background-size: 100% 100%, 20px 20px;
+  background-color: var(--bg);
+}
+
+/* Option 3: Fine Grain Texture */
+body[data-theme="silver"].silver-texture-3 {
+  background-image: 
+    radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0),
+    radial-gradient(circle at 1px 1px, rgba(0,0,0,0.1) 1px, transparent 0);
+  background-size: 3px 3px, 2px 2px;
+  background-position: 0 0, 1px 1px;
+  background-color: var(--bg);
+}
+
+/* Option 4: Subtle Vertical Brushed */
+body[data-theme="silver"].silver-texture-4 {
+  background-image: 
+    linear-gradient(90deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(0,0,0,0.03) 100%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(255,255,255,0.02) 0px,
+      transparent 1px,
+      transparent 3px,
+      rgba(0,0,0,0.01) 4px,
+      transparent 5px
+    );
+  background-size: 100% 100%, 6px 100%;
+  background-color: var(--bg);
+}
+
+/* Option 5: Polished Metal */
+body[data-theme="silver"].silver-texture-5 {
+  background-image: 
+    linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 30%, transparent 70%, rgba(0,0,0,0.08) 100%),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 0%, transparent 50%, rgba(255,255,255,0.05) 100%);
+  background-size: 100% 100%, 200px 100%;
+  background-position: 0 0, 0 0;
+  background-color: var(--bg);
+}
+
+/* Option 6: Subtle Mesh Pattern */
+body[data-theme="silver"].silver-texture-6 {
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
+  background-size: 50px 50px, 50px 50px, 10px 10px, 10px 10px;
+  background-position: 0 0, 0 0, 0 0, 0 0;
+  background-color: var(--bg);
+}
+
+/* Option 7: Minimal Texture */
+body[data-theme="silver"].silver-texture-7 {
+  background-image: 
+    linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 50%, rgba(0,0,0,0.03) 100%);
+  background-size: 100% 100%;
+  background-color: var(--bg);
+}
+
+/* Option 8: Anodized Aluminum Look */
+body[data-theme="silver"].silver-texture-8 {
+  background-image: 
+    repeating-linear-gradient(
+      0deg,
+      rgba(255,255,255,0.03) 0px,
+      transparent 0.5px,
+      transparent 1px,
+      rgba(0,0,0,0.02) 1.5px,
+      transparent 2px
+    ),
+    linear-gradient(180deg, rgba(255,255,255,0.1) 0%, transparent 40%, rgba(0,0,0,0.05) 100%);
+  background-size: 100% 2px, 100% 100%;
+  background-color: var(--bg);
+}
+
+/* Silver texture indicator styling */
+.silver-texture-indicator {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  padding: 4px 8px;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 4px;
+  z-index: 9999;
+  display: none;
+  font-family: monospace;
+}
+
+body[data-theme="silver"] .silver-texture-indicator {
+  display: block;
+}
+
 /* =============================================================================
    4. TYPOGRAPHY
    ============================================================================= */
@@ -572,6 +703,14 @@ textarea:focus {
   transform: translateY(-1px);
 }
 
+/* Silver theme form input improvements */
+[data-theme="silver"] select:focus,
+[data-theme="silver"] input:focus,
+[data-theme="silver"] textarea:focus {
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.2), var(--shadow-btn-hover);
+  border-color: var(--link);
+}
+
 /* Dark theme form input improvements */
 [data-theme="dark"] select:focus,
 [data-theme="dark"] input:focus,
@@ -838,6 +977,16 @@ a:focus {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
 }
 
+/* Silver theme adjustments for cards */
+[data-theme="silver"] .box {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.05);
+  background: #E0E0E0; /* Slightly lighter than bg for subtle contrast */
+}
+
+[data-theme="silver"] .box:hover {
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15), 0 0 2px rgba(0, 102, 204, 0.1);
+}
+
 /* Dark theme adjustments for cards */
 [data-theme="dark"] .box {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 0 1px rgba(255, 255, 255, 0.05);
@@ -845,6 +994,13 @@ a:focus {
 
 [data-theme="dark"] .box:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+/* Silver theme enhanced shadows */
+[data-theme="silver"] {
+  --shadow-btn: 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-btn-hover: 0 4px 8px rgba(0, 102, 204, 0.2), 0 2px 4px rgba(0, 0, 0, 0.12);
+  --shadow-btn-active: 0 1px 2px rgba(0, 0, 0, 0.15), inset 0 1px 1px rgba(0, 0, 0, 0.1);
 }
 
 /* Dark theme enhanced shadows */
@@ -870,6 +1026,13 @@ a:focus {
 
 .linkclass:hover {
   background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Silver theme link hover enhancement */
+[data-theme="silver"] .linkclass:hover {
+  background-color: rgba(0, 102, 204, 0.06);
+  border-left: 2px solid rgba(0, 102, 204, 0.3);
+  padding-left: calc(var(--spacing-xs) - 2px);
 }
 
 [data-theme="dark"] .linkclass:hover {

@@ -6,29 +6,8 @@
     1. CSS CUSTOM PROPERTIES & THEMES
     ============================================================================= */
 
-/* Base CSS Custom Properties */
+/* Base CSS Custom Properties - Structural variables only (not theme-specific) */
 :root {
-  /* Default theme (silver) */
-  --bg: #C0C0C0;
-  --text: #000000;
-  --link: #1a0dab;
-  --btn-bg: #EFEFEF;
-  --btn-border: #888888;
-  --btn-text: #000000;
-  --btn-hover-bg: #C0C0C0;
-  --btn-hover-text: #FFFFFF;
-
-  /* Secondary text color */
-  --text-secondary: #666666;
-
-  /* Accent colors for enhanced visual hierarchy */
-  --accent-primary: #1a0dab;
-  --accent-secondary: #6c757d;
-  --success: #28a745;
-  --warning: #ffc107;
-  --danger: #dc3545;
-  --info: #17a2b8;
-
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -46,12 +25,12 @@
   --transition-normal: 0.3s ease;
   --transition-slow: 0.5s ease;
 
-  /* Shadows */
+  /* Shadows - base definitions (themes can override) */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
   --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 6px 8px rgba(0, 0, 0, 0.2);
   
-  /* Enhanced button shadows */
+  /* Enhanced button shadows - base definitions (themes can override) */
   --shadow-btn: 0 2px 4px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-btn-hover: 0 4px 8px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
   --shadow-btn-active: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -89,15 +68,21 @@
 }
 
 [data-theme="silver"] {
-  --bg: #C0C0C0;
-  --text: #000000;
-  --link: #1a0dab;
-  --btn-bg: #EFEFEF;
-  --btn-border: #888888;
-  --btn-text: #000000;
-  --btn-hover-bg: #C0C0C0;
+  --bg: #B8B8B8;
+  --text: #1a1a1a;
+  --link: #0066cc;
+  --btn-bg: #E8E8E8;
+  --btn-border: #999999;
+  --btn-text: #1a1a1a;
+  --btn-hover-bg: #4a90e2;
   --btn-hover-text: #FFFFFF;
-  --text-secondary: #666666;
+  --text-secondary: #555555;
+  --accent-primary: #0066cc;
+  --accent-secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --info: #17a2b8;
 }
 
 [data-theme="retro"] {
