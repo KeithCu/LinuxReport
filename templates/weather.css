@@ -94,22 +94,30 @@
   position: absolute;
   top: 0;
   right: 30px;
-  background: none;
-  border: none;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
   font-size: 0.9em;
   font-weight: bold;
   cursor: pointer;
   color: var(--text);
-  padding: 0 var(--spacing-xs);
+  padding: 2px 6px;
   z-index: 1;
   vertical-align: middle;
-  transition: color var(--transition-fast);
-  border-radius: var(--border-radius-sm);
+  transition: all var(--transition-fast);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-btn);
 }
 
 .weather-unit-toggle:hover {
   color: var(--accent);
   background-color: var(--btn-hover-bg);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-btn-hover);
+}
+
+.weather-unit-toggle:active {
+  transform: translateY(0) scale(0.95);
+  box-shadow: var(--shadow-btn-active);
 }
 
 #weather-outer.collapsed .weather-unit-toggle {

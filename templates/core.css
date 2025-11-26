@@ -202,18 +202,26 @@ nav {
 .nav-links-mobile a {
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid transparent;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   margin: 2px 0;
   display: block;
   text-align: center;
+  box-shadow: var(--shadow-btn);
+  transition: all var(--transition-fast);
 }
 
 .nav-links-desktop a:hover,
 .nav-links-mobile a:hover {
   background-color: var(--btn-hover-bg);
   color: var(--btn-hover-text);
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-btn-hover);
+}
+
+.nav-links-desktop a:active,
+.nav-links-mobile a:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-btn-active);
 }
 
 .nav-links-mobile a:active,
@@ -389,13 +397,13 @@ main {
   color: var(--text);
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--btn-border);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   background: var(--btn-bg);
   transition: all var(--transition-normal);
   text-align: center;
   position: relative;
   font-weight: normal;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-btn);
   font-size: 0.9em;
   flex: 1;
   min-width: 120px;
@@ -408,10 +416,15 @@ main {
 }
 
 .api-link:hover {
-  transform: scale(1.02);
+  transform: translateY(-2px) scale(1.02);
   background: var(--btn-hover-bg);
   color: var(--btn-hover-text) !important;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-btn-hover);
+}
+
+.api-link:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-btn-active);
 }
 
 /* Legacy RSS styles for backward compatibility */
@@ -422,14 +435,14 @@ main {
   padding: var(--spacing-sm) var(--spacing-md);
   margin: var(--spacing-sm) auto;
   border: 1px solid var(--btn-border);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   background: var(--btn-bg);
   transition: all var(--transition-normal);
   max-width: 200px;
   text-align: center;
   position: relative;
   font-weight: normal;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-btn);
   font-size: 0.9em;
 }
 
@@ -444,10 +457,15 @@ main {
 }
 
 #rss-feed-link:hover {
-  transform: scale(1.02);
+  transform: translateY(-2px) scale(1.02);
   background: var(--btn-hover-bg);
   color: var(--btn-hover-text) !important;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-btn-hover);
+}
+
+#rss-feed-link:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-btn-active);
 }
 
 .rss-feed-subtitle {
@@ -481,14 +499,14 @@ input[type="submit"],
 select,
 textarea {
   padding: 5px var(--spacing-md);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   font-weight: bold;
   transition: all var(--transition-normal);
   background: var(--btn-bg);
   border: 2px solid var(--btn-border);
   color: var(--btn-text);
   cursor: pointer;
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-btn);
   font-family: inherit;
 }
 
@@ -496,10 +514,10 @@ textarea {
 button:hover,
 input[type="button"]:hover,
 input[type="submit"]:hover {
-  transform: scale(1.05);
+  transform: translateY(-2px) scale(1.02);
   background: var(--btn-hover-bg);
   color: var(--btn-hover-text) !important;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-btn-hover);
 }
 
 .btn:disabled,
@@ -509,6 +527,16 @@ input:disabled {
   color: #a0a0a0;
   cursor: not-allowed;
   transform: none;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.btn:active,
+button:active,
+input[type="button"]:active,
+input[type="submit"]:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-btn-active);
 }
 
 select,
@@ -518,9 +546,11 @@ input[type="number"],
 textarea {
   padding: var(--spacing-sm);
   border: 1px solid var(--btn-border);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   background-color: var(--bg);
   color: var(--text) !important;
+  box-shadow: var(--shadow-btn);
+  transition: all var(--transition-fast);
 }
 
 /* Ensure select elements always use theme text color */
@@ -538,7 +568,16 @@ input:focus,
 textarea:focus {
   outline: none;
   border-color: var(--link);
-  box-shadow: 0 0 0 2px rgba(26, 13, 171, 0.2);
+  box-shadow: 0 0 0 3px rgba(26, 13, 171, 0.15), var(--shadow-btn-hover);
+  transform: translateY(-1px);
+}
+
+select:hover,
+input[type="text"]:hover,
+input[type="password"]:hover,
+input[type="number"]:hover,
+textarea:hover {
+  box-shadow: var(--shadow-btn-hover);
 }
 
 /* =============================================================================
@@ -864,20 +903,26 @@ a:focus {
 .pagination-controls button {
   background: var(--btn-bg);
   border: 1px solid var(--btn-border);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
   color: var(--btn-text);
   cursor: pointer;
   font-size: 0.9em;
   margin: 0 2px;
   padding: 4px 8px;
   transition: all 0.15s ease-out;
+  box-shadow: var(--shadow-btn);
 }
 
 .pagination-controls button:hover:not(:disabled) {
   background: var(--btn-hover-bg);
   color: var(--btn-hover-text);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-btn-hover);
+}
+
+.pagination-controls button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: var(--shadow-btn-active);
 }
 
 .pagination-controls button:disabled {
@@ -948,13 +993,14 @@ a:focus {
 
 .btn:hover,
 .url-entry:hover {
-  transform: translateY(-1px) translateZ(0);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px) translateZ(0);
+  box-shadow: var(--shadow-btn-hover);
 }
 
 .btn:active,
 .url-entry:active {
   transform: translateY(0) scale(0.98) translateZ(0);
+  box-shadow: var(--shadow-btn-active);
 }
 
 /* Smooth scroll behavior */
