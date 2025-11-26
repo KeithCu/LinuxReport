@@ -400,10 +400,140 @@
     }
   };
 
+  // Thanksgiving date utilities
+  app.utils.ThanksgivingManager = {
+    /**
+     * Calculate the date of Thanksgiving (4th Thursday of November) for a given year
+     * @param {number} year - The year to calculate Thanksgiving for
+     * @returns {Date} Date object representing Thanksgiving day
+     */
+    getThanksgivingDate(year) {
+      // Start with November 1st of the given year (using UTC to avoid timezone issues)
+      const nov1 = new Date(Date.UTC(year, 10, 1)); // Month is 0-indexed, so 10 = November
+      
+      // Get the day of the week for November 1st (0 = Sunday, 1 = Monday, ..., 4 = Thursday)
+      const dayOfWeek = nov1.getUTCDay();
+      
+      // Calculate how many days to add to get to the first Thursday
+      // If Nov 1 is Sunday (0), add 4 days to get Thursday
+      // If Nov 1 is Monday (1), add 3 days to get Thursday
+      // If Nov 1 is Tuesday (2), add 2 days to get Thursday
+      // If Nov 1 is Wednesday (3), add 1 day to get Thursday
+      // If Nov 1 is Thursday (4), add 0 days (it's already Thursday)
+      // If Nov 1 is Friday (5), add 6 days to get next Thursday
+      // If Nov 1 is Saturday (6), add 5 days to get next Thursday
+      const daysToFirstThursday = (4 - dayOfWeek + 7) % 7;
+      
+      // First Thursday is Nov 1 + daysToFirstThursday
+      // 4th Thursday is first Thursday + 21 days (3 weeks)
+      const thanksgivingDate = new Date(Date.UTC(year, 10, 1 + daysToFirstThursday + 21));
+      
+      return thanksgivingDate;
+    },
+
+    /**
+     * Get current date in US Eastern Time
+     * @returns {Date} Date object representing current date in Eastern Time
+     */
+    getCurrentDateInEastern() {
+      const now = new Date();
+      
+      // Convert to Eastern Time using Intl.DateTimeFormat
+      // This handles both EST (UTC-5) and EDT (UTC-4) automatically
+      const easternTimeString = now.toLocaleString('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      
+      // Parse the date string (format: MM/DD/YYYY)
+      const [month, day, year] = easternTimeString.split('/').map(Number);
+      
+      // Create a date object at midnight Eastern Time
+      // We use UTC methods to avoid timezone conversion issues
+      const easternDate = new Date(Date.UTC(year, month - 1, day));
+      
+      return easternDate;
+    },
+
+    /**
+     * Check if the current date (in US Eastern Time) is Thanksgiving, the day before, or 2 days before
+     * @returns {boolean} True if today is Thanksgiving, the day before, or 2 days before, false otherwise
+     */
+    isThanksgivingOrDayBefore() {
+      const todayEastern = this.getCurrentDateInEastern();
+      const year = todayEastern.getUTCFullYear();
+      
+      // Get Thanksgiving date for current year
+      const thanksgivingDate = this.getThanksgivingDate(year);
+      
+      // Get the day before Thanksgiving
+      const dayBeforeThanksgiving = new Date(thanksgivingDate);
+      dayBeforeThanksgiving.setUTCDate(dayBeforeThanksgiving.getUTCDate() - 1);
+      
+      // Get 2 days before Thanksgiving
+      const twoDaysBeforeThanksgiving = new Date(thanksgivingDate);
+      twoDaysBeforeThanksgiving.setUTCDate(twoDaysBeforeThanksgiving.getUTCDate() - 2);
+      
+      // Compare dates (year, month, day only, ignoring time)
+      const todayYear = todayEastern.getUTCFullYear();
+      const todayMonth = todayEastern.getUTCMonth();
+      const todayDay = todayEastern.getUTCDate();
+      
+      const thanksgivingYear = thanksgivingDate.getUTCFullYear();
+      const thanksgivingMonth = thanksgivingDate.getUTCMonth();
+      const thanksgivingDay = thanksgivingDate.getUTCDate();
+      
+      const dayBeforeYear = dayBeforeThanksgiving.getUTCFullYear();
+      const dayBeforeMonth = dayBeforeThanksgiving.getUTCMonth();
+      const dayBeforeDay = dayBeforeThanksgiving.getUTCDate();
+      
+      const twoDaysBeforeYear = twoDaysBeforeThanksgiving.getUTCFullYear();
+      const twoDaysBeforeMonth = twoDaysBeforeThanksgiving.getUTCMonth();
+      const twoDaysBeforeDay = twoDaysBeforeThanksgiving.getUTCDate();
+      
+      // Check if today matches Thanksgiving, the day before, or 2 days before
+      const isThanksgiving = (
+        todayYear === thanksgivingYear &&
+        todayMonth === thanksgivingMonth &&
+        todayDay === thanksgivingDay
+      );
+      
+      const isDayBefore = (
+        todayYear === dayBeforeYear &&
+        todayMonth === dayBeforeMonth &&
+        todayDay === dayBeforeDay
+      );
+      
+      const isTwoDaysBefore = (
+        todayYear === twoDaysBeforeYear &&
+        todayMonth === twoDaysBeforeMonth &&
+        todayDay === twoDaysBeforeDay
+      );
+      
+      return isThanksgiving || isDayBefore || isTwoDaysBefore;
+    }
+  };
+
   // UI management (theme and font)
   app.utils.UIManager = {
     applySettings() {
-      const theme = app.utils.CookieManager.get('Theme') || app.config.DEFAULT_THEME;
+      // Check if user has a custom theme setting
+      const customTheme = app.utils.CookieManager.get('Theme');
+      
+      let theme;
+      if (customTheme) {
+        // User has a custom theme, use it
+        theme = customTheme;
+      } else {
+        // No custom theme - check if it's Thanksgiving or day before
+        if (app.utils.ThanksgivingManager.isThanksgivingOrDayBefore()) {
+          theme = 'autumn';
+        } else {
+          theme = app.config.DEFAULT_THEME;
+        }
+      }
       const font = app.utils.CookieManager.get('FontFamily') || app.config.DEFAULT_FONT;
       const noUnderlines = app.utils.CookieManager.get('NoUnderlines');
       
