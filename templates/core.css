@@ -980,7 +980,7 @@ a:focus {
 /* Silver theme adjustments for cards */
 [data-theme="silver"] .box {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 1px rgba(0, 0, 0, 0.05);
-  background: #E0E0E0; /* Slightly lighter than bg for subtle contrast */
+  background: #9A9A9A; /* Darker gray for better contrast */
 }
 
 [data-theme="silver"] .box:hover {
