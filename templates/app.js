@@ -9,7 +9,7 @@
  * @version 3.1.0
  */
 
-(function() {
+(function () {
   'use strict';
 
   // =============================================================================
@@ -46,7 +46,7 @@
       COOKIE_SAME_SITE: 'Lax',
       IMPERIAL_REGIONS: ['US', 'BS', 'BZ', 'KY', 'PW'],
       DEFAULT_LOCALE: 'en-US',
-      
+
       // Client geolocation configuration
       // When True: Client geolocation is disabled, server uses IP-based location or defaults
       // When False: Client geolocation is enabled, server respects client-provided coordinates
@@ -109,12 +109,12 @@
               `;
               button.addEventListener('mouseenter', () => button.style.opacity = '1');
               button.addEventListener('mouseleave', () => button.style.opacity = '0.6');
-              
+
               // Make the box container relative positioned if it isn't already
               if (getComputedStyle(box).position === 'static') {
                 box.style.position = 'relative';
               }
-              
+
               box.appendChild(button);
             }
           });
@@ -332,7 +332,7 @@
     get(name) {
       const cookies = document.cookie.split(';');
       const cookiesLength = cookies.length;
-      
+
       for (let i = 0; i < cookiesLength; i++) {
         const trimmedCookie = cookies[i].trim();
         const separatorIndex = trimmedCookie.indexOf('=');
@@ -360,7 +360,7 @@
         'SameSite': app.config.COOKIE_SAME_SITE,
         ...options
       };
-      const cookieString = `${name}=${encodeURIComponent(value)}` + 
+      const cookieString = `${name}=${encodeURIComponent(value)}` +
         Object.entries(opts).map(([k, v]) => `; ${k}${v !== true ? `=${v}` : ''}`).join('');
       document.cookie = cookieString;
     }
@@ -382,13 +382,13 @@
       try {
         const saved = localStorage.getItem('scrollPosition');
         if (!saved) return;
-        
+
         const data = JSON.parse(saved);
         if (Date.now() - data.timestamp > app.config.SCROLL_TIMEOUT) {
           localStorage.removeItem('scrollPosition');
           return;
         }
-        
+
         requestAnimationFrame(() => {
           window.scrollTo({ top: data.position, behavior: 'instant' });
           localStorage.removeItem('scrollPosition');
@@ -410,10 +410,10 @@
     getThanksgivingDate(year) {
       // Start with November 1st of the given year (using UTC to avoid timezone issues)
       const nov1 = new Date(Date.UTC(year, 10, 1)); // Month is 0-indexed, so 10 = November
-      
+
       // Get the day of the week for November 1st (0 = Sunday, 1 = Monday, ..., 4 = Thursday)
       const dayOfWeek = nov1.getUTCDay();
-      
+
       // Calculate how many days to add to get to the first Thursday
       // If Nov 1 is Sunday (0), add 4 days to get Thursday
       // If Nov 1 is Monday (1), add 3 days to get Thursday
@@ -423,11 +423,11 @@
       // If Nov 1 is Friday (5), add 6 days to get next Thursday
       // If Nov 1 is Saturday (6), add 5 days to get next Thursday
       const daysToFirstThursday = (4 - dayOfWeek + 7) % 7;
-      
+
       // First Thursday is Nov 1 + daysToFirstThursday
       // 4th Thursday is first Thursday + 21 days (3 weeks)
       const thanksgivingDate = new Date(Date.UTC(year, 10, 1 + daysToFirstThursday + 21));
-      
+
       return thanksgivingDate;
     },
 
@@ -437,7 +437,7 @@
      */
     getCurrentDateInEastern() {
       const now = new Date();
-      
+
       // Convert to Eastern Time using Intl.DateTimeFormat
       // This handles both EST (UTC-5) and EDT (UTC-4) automatically
       const easternTimeString = now.toLocaleString('en-US', {
@@ -446,14 +446,14 @@
         month: '2-digit',
         day: '2-digit'
       });
-      
+
       // Parse the date string (format: MM/DD/YYYY)
       const [month, day, year] = easternTimeString.split('/').map(Number);
-      
+
       // Create a date object at midnight Eastern Time
       // We use UTC methods to avoid timezone conversion issues
       const easternDate = new Date(Date.UTC(year, month - 1, day));
-      
+
       return easternDate;
     },
 
@@ -464,54 +464,54 @@
     isThanksgivingOrDayBefore() {
       const todayEastern = this.getCurrentDateInEastern();
       const year = todayEastern.getUTCFullYear();
-      
+
       // Get Thanksgiving date for current year
       const thanksgivingDate = this.getThanksgivingDate(year);
-      
+
       // Get the day before Thanksgiving
       const dayBeforeThanksgiving = new Date(thanksgivingDate);
       dayBeforeThanksgiving.setUTCDate(dayBeforeThanksgiving.getUTCDate() - 1);
-      
+
       // Get 2 days before Thanksgiving
       const twoDaysBeforeThanksgiving = new Date(thanksgivingDate);
       twoDaysBeforeThanksgiving.setUTCDate(twoDaysBeforeThanksgiving.getUTCDate() - 2);
-      
+
       // Compare dates (year, month, day only, ignoring time)
       const todayYear = todayEastern.getUTCFullYear();
       const todayMonth = todayEastern.getUTCMonth();
       const todayDay = todayEastern.getUTCDate();
-      
+
       const thanksgivingYear = thanksgivingDate.getUTCFullYear();
       const thanksgivingMonth = thanksgivingDate.getUTCMonth();
       const thanksgivingDay = thanksgivingDate.getUTCDate();
-      
+
       const dayBeforeYear = dayBeforeThanksgiving.getUTCFullYear();
       const dayBeforeMonth = dayBeforeThanksgiving.getUTCMonth();
       const dayBeforeDay = dayBeforeThanksgiving.getUTCDate();
-      
+
       const twoDaysBeforeYear = twoDaysBeforeThanksgiving.getUTCFullYear();
       const twoDaysBeforeMonth = twoDaysBeforeThanksgiving.getUTCMonth();
       const twoDaysBeforeDay = twoDaysBeforeThanksgiving.getUTCDate();
-      
+
       // Check if today matches Thanksgiving, the day before, or 2 days before
       const isThanksgiving = (
         todayYear === thanksgivingYear &&
         todayMonth === thanksgivingMonth &&
         todayDay === thanksgivingDay
       );
-      
+
       const isDayBefore = (
         todayYear === dayBeforeYear &&
         todayMonth === dayBeforeMonth &&
         todayDay === dayBeforeDay
       );
-      
+
       const isTwoDaysBefore = (
         todayYear === twoDaysBeforeYear &&
         todayMonth === twoDaysBeforeMonth &&
         todayDay === twoDaysBeforeDay
       );
-      
+
       return isThanksgiving || isDayBefore || isTwoDaysBefore;
     }
   };
@@ -521,7 +521,7 @@
     applySettings() {
       // Check if user has a custom theme setting
       const customTheme = app.utils.CookieManager.get('Theme');
-      
+
       let theme;
       if (customTheme) {
         // User has a custom theme, use it
@@ -531,20 +531,20 @@
         if (app.utils.ThanksgivingManager.isThanksgivingOrDayBefore()) {
           theme = 'autumn';
         } else {
-          theme = app.config.DEFAULT_THEME;
+          theme = window.defaultTheme || app.config.DEFAULT_THEME;
         }
       }
       const font = app.utils.CookieManager.get('FontFamily') || app.config.DEFAULT_FONT;
       const noUnderlines = app.utils.CookieManager.get('NoUnderlines');
-      
+
       // Apply all settings at once
       document.body.setAttribute('data-theme', theme);
       document.body.setAttribute('data-font', font);
-      
+
       if (!noUnderlines || noUnderlines === '1') {
         document.body.classList.add('no-underlines');
       }
-      
+
       // Apply random silver texture if silver theme is active
       if (theme === 'silver') {
         this.applySilverTexture();
@@ -558,42 +558,42 @@
           indicator.textContent = '';
         }
       }
-      
+
       // Update select elements
       this.updateSelects(theme, font);
     },
-    
+
     applySilverTexture() {
       // Randomly select texture option 1-8
       const textureOption = Math.floor(Math.random() * 8) + 1;
-      
+
       // Remove any existing silver-texture classes
       for (let i = 1; i <= 8; i++) {
         document.body.classList.remove('silver-texture-' + i);
       }
-      
+
       // Add the selected texture class
       document.body.classList.add('silver-texture-' + textureOption);
-      
+
       // Update indicator text
       const indicator = document.getElementById('silver-texture-indicator');
       if (indicator) {
         indicator.textContent = 'Texture: ' + textureOption;
       }
     },
-    
+
     updateSelects(theme, font) {
       const themeSelect = document.getElementById('theme-select');
       const fontSelect = document.getElementById('font-select');
-      
+
       if (themeSelect) themeSelect.value = theme;
       if (fontSelect) fontSelect.value = font;
     },
-    
+
     setTheme(theme) {
       document.body.setAttribute('data-theme', theme);
       app.utils.CookieManager.set('Theme', theme);
-      
+
       // Apply random silver texture if switching to silver theme
       if (theme === 'silver') {
         this.applySilverTexture();
@@ -607,19 +607,19 @@
           indicator.textContent = '';
         }
       }
-      
+
       const themeSelect = document.getElementById('theme-select');
       if (themeSelect) themeSelect.value = theme;
     },
-    
+
     setFont(font) {
       app.utils.ScrollManager.savePosition();
       document.body.setAttribute('data-font', font);
       app.utils.CookieManager.set('FontFamily', font);
-      
+
       const fontSelect = document.getElementById('font-select');
       if (fontSelect) fontSelect.value = font;
-      
+
       app.utils.ScrollManager.restorePosition();
     }
   };
@@ -634,37 +634,37 @@
       if (!utcTime || utcTime === 'Unknown' || utcTime === '') {
         return 'Unknown';
       }
-      
+
       app.utils.logger.debug('Attempting to parse time:', utcTime, 'Type:', typeof utcTime);
-      
+
       try {
         const date = new Date(utcTime);
         app.utils.logger.debug('Parsed date:', date, 'Valid:', !isNaN(date.getTime()));
-        
+
         if (isNaN(date.getTime())) {
           app.utils.logger.warn('Invalid time format:', utcTime);
           return 'Invalid time';
         }
-        
+
         // Check if the date is today
         const today = new Date();
         const isToday = date.toDateString() === today.toDateString();
-        
+
         // Get user's locale for formatting
         const userLocale = navigator.language || 'en-US';
-        
+
         // Format time according to user's locale preferences
         const timeString = date.toLocaleTimeString(userLocale, {
           hour: 'numeric',
           minute: '2-digit',
           hour12: userLocale.includes('en') || userLocale.includes('US') || userLocale.includes('CA')
         });
-        
+
         // Get timezone abbreviation
         const timezoneAbbr = this.getTimezoneAbbreviation();
-        
+
         let result = `${timeString} ${timezoneAbbr}`;
-        
+
         // If not today, add the date in user's preferred format
         if (!isToday) {
           const dateString = date.toLocaleDateString(userLocale, {
@@ -672,7 +672,7 @@
             day: 'numeric',
             year: 'numeric'
           });
-          
+
           // Use appropriate connector based on locale
           let connector = ' at ';
           if (userLocale.startsWith('de')) {
@@ -694,10 +694,10 @@
           } else if (userLocale.startsWith('ko')) {
             connector = ' ';
           }
-          
+
           result = `${dateString}${connector}${result}`;
         }
-        
+
         app.utils.logger.debug('Final result:', result);
         return result;
       } catch (error) {
@@ -715,7 +715,7 @@
         const date = new Date();
         const options = { timeZoneName: 'short' };
         const timeZoneString = date.toLocaleString('en-US', options);
-        
+
         // Extract timezone abbreviation from the formatted string
         const match = timeZoneString.match(/\s([A-Z]{3,4})$/);
         return match ? match[1] : 'Local';
@@ -764,12 +764,12 @@
      */
     animateTransform(element, transform, duration = 300, easing = 'ease-out') {
       if (!element) return;
-      
+
       // Force GPU acceleration
       element.style.willChange = 'transform';
       element.style.transition = `transform ${duration}ms ${easing}`;
       element.style.transform = transform;
-      
+
       // Clean up after animation
       setTimeout(() => {
         element.style.willChange = '';
@@ -804,11 +804,11 @@
      */
     fadeTransition(element, targetOpacity, duration = 300) {
       if (!element) return;
-      
+
       element.style.willChange = 'opacity';
       element.style.transition = `opacity ${duration}ms ease-out`;
       element.style.opacity = targetOpacity;
-      
+
       setTimeout(() => {
         element.style.willChange = '';
         element.style.transition = '';
@@ -828,10 +828,10 @@
       container.addEventListener('dragstart', e => {
         if (e.target.matches(itemSelector)) {
           draggedItem = e.target;
-          
+
           // Add GPU-accelerated dragging class for smooth animations
           draggedItem.classList.add('dragging', 'gpu-accelerated');
-          
+
           // Create a visual clone for smoother drag feedback
           draggedItemClone = draggedItem.cloneNode(true);
           draggedItemClone.classList.add('drag-clone', 'gpu-accelerated');
@@ -841,7 +841,7 @@
           draggedItemClone.style.opacity = '0.8';
           draggedItemClone.style.transform = 'scale(1.02) rotate(2deg)';
           draggedItemClone.style.transition = 'transform 0.2s ease-out';
-          
+
           // Make original item semi-transparent during drag
           draggedItem.style.opacity = '0.5';
           draggedItem.style.transform = 'scale(0.98)';
@@ -854,21 +854,21 @@
           // Remove GPU-accelerated classes and reset styles
           draggedItem.classList.remove('dragging', 'gpu-accelerated');
           draggedItem.classList.add('dragging-normal');
-          
+
           // Animate back to normal state
           draggedItem.style.opacity = '';
           draggedItem.style.transform = '';
           draggedItem.style.transition = 'all 0.3s ease-out';
-          
+
           // Remove clone if it exists
           if (draggedItemClone && draggedItemClone.parentNode) {
             draggedItemClone.remove();
           }
-          
+
           // Clean up references
           draggedItem = null;
           draggedItemClone = null;
-          
+
           // Clean up transition after animation
           setTimeout(() => {
             const items = container.querySelectorAll(itemSelector);
@@ -888,7 +888,7 @@
           items.forEach(item => {
             item.style.transition = 'transform 0.2s ease-out';
           });
-          
+
           container.insertBefore(draggedItem, afterElement);
         }
       });

@@ -37,7 +37,8 @@ from shared import (
     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML,
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS,
     ALLOWED_REQUESTER_DOMAINS, ENABLE_URL_IMAGE_CDN_DELIVERY, CDN_IMAGE_URL,
-    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION, Mode
+    INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION, Mode,
+    DEFAULT_THEME
 )
 from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
@@ -454,7 +455,8 @@ def _register_main_routes(flask_app):
                                weather_html=Markup(weather_html),
                                INFINITE_SCROLL_MOBILE=INFINITE_SCROLL_MOBILE,
                                INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG,
-                               weather_lat=template_lat, weather_lon=template_lon)
+                               weather_lat=template_lat, weather_lon=template_lon,
+                               default_theme=DEFAULT_THEME)
 
         # Trigger background fetching if needed
         if need_fetch and ENABLE_BACKGROUND_REFRESH and not is_bot:

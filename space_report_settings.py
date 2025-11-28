@@ -39,6 +39,7 @@ CONFIG: SiteConfig = SiteConfig(
 	REPORT_PROMPT="Space enthusiasts and professionals interested in top space exploration and space industry news, including any progress on space elevators.",
     PATH="/srv/http/spacereport",
     SCHEDULE=[0, 8, 16],
+    DEFAULT_THEME="midnight",
     CUSTOM_FETCH_CONFIG={
         "reddit.com": RedditFetchConfig(),
     }

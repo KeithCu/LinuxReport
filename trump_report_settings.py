@@ -85,6 +85,7 @@ Allies: Elon Musk (DOGE - Department of Government Efficiency), Russell Vought (
 ''',
     PATH="/srv/http/trumpreport",
     SCHEDULE=[0, 4, 8, 10, 12, 14, 16, 18, 20, 22],
+    DEFAULT_THEME="silver",
     CUSTOM_FETCH_CONFIG={
         "patriots.win": PatriotsWinFetchConfig(),
         "revolver.news": RevolverNewsFetchConfig(),

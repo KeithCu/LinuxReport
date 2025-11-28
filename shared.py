@@ -272,9 +272,11 @@ FAVICON = URL_IMAGES + config_settings.CONFIG.FAVICON
 LOGO_URL = URL_IMAGES + config_settings.CONFIG.LOGO_URL
 WEB_DESCRIPTION = config_settings.CONFIG.WEB_DESCRIPTION
 WEB_TITLE = config_settings.CONFIG.WEB_TITLE
+WEB_TITLE = config_settings.CONFIG.WEB_TITLE
 ABOVE_HTML_FILE = f"{MODE.value}reportabove.html"
 CUSTOM_FETCH_CONFIG = config_settings.CONFIG.CUSTOM_FETCH_CONFIG
 SITE_PATH = config_settings.CONFIG.PATH
+DEFAULT_THEME = getattr(config_settings.CONFIG, 'DEFAULT_THEME', 'silver')
 
 # Override image URLs with CDN if enabled
 if ENABLE_URL_IMAGE_CDN_DELIVERY:

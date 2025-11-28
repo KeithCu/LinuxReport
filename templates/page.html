@@ -176,6 +176,7 @@
       window.isAdmin = {{ 'true' if current_user.is_authenticated else 'false' }};
       window.flaskDebug = {{ 'true' if config.DEBUG else 'false' }};
       window.csrf_token = "{{ csrf_token() }}";
+      window.defaultTheme = "{{ default_theme }}";
     </script>
   </body>
 </html>

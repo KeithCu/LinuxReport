@@ -49,6 +49,7 @@ CONFIG: SiteConfig = SiteConfig(
     REPORT_PROMPT = "Detroit techno fans, DJs, producers, and labels interested in significant Detroit techno news, releases, and events.",
     PATH = "/srv/http/flask",
     SCHEDULE = [0],
+    DEFAULT_THEME="paper",
     CUSTOM_FETCH_CONFIG={
         "bandcamp.com": BandcampFetchConfig(),
     }

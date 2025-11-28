@@ -53,6 +53,7 @@ class SiteConfig:
     REPORT_PROMPT: str
     PATH: str
     SCHEDULE: List[int]
+    DEFAULT_THEME: str = "silver" # Default fallback
     CUSTOM_FETCH_CONFIG: Optional[Dict[str, Any]] = None
 
 class RssInfo:

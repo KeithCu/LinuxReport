@@ -27,6 +27,7 @@ CONFIG: SiteConfig = SiteConfig(
     REPORT_PROMPT="COVID-19 and infectious disease researchers and serious followers, focusing on significant developments in virology, epidemiology, vaccines, treatments, and public health policy.",
     PATH="/srv/http/CovidReport2",
     SCHEDULE=[8, 12, 18, 23],
+    DEFAULT_THEME="paper",
     CUSTOM_FETCH_CONFIG={
         "reddit.com": RedditFetchConfig()
     }

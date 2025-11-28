@@ -51,6 +51,7 @@ CONFIG: SiteConfig = SiteConfig(
     REPORT_PROMPT="Solar energy professionals and enthusiasts, primarily in the US. Focus on major solar and battery technology, policy, and market news. Avoid basic how-to guides, generic green content, and unrelated renewable topics.",
     PATH="/srv/http/pvreport",
     SCHEDULE=[7, 12, 17],
+    DEFAULT_THEME="solarized",
     CUSTOM_FETCH_CONFIG={
         "solarmagazine.com": SolarMagazineFetchConfig(),
     },
