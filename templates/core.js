@@ -29,6 +29,8 @@
             });
             window.addEventListener('online', () => this.start());
             window.addEventListener('offline', () => this.stop());
+            // Clean up interval on page unload to prevent memory leaks
+            window.addEventListener('beforeunload', () => this.stop());
             this.start();
         }
 
@@ -51,7 +53,7 @@
             
             if (navigator.onLine && isInactive && !hasUnsavedChanges && !hasOpenDialogs) {
                 app.utils.ScrollManager.savePosition();
-                self.location.reload();
+                window.location.reload();
             }
         }
     }

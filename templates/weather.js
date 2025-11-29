@@ -447,7 +447,6 @@
                     container.insertBefore(headerInInitial, initial);
                     // Update our header reference to point to the moved element
                     this.elements.set('header', headerInInitial);
-                    header = headerInInitial;
                 }
                 
                 // Hide initial - it's just the initial server-rendered HTML
@@ -497,18 +496,22 @@
             this.currentWeatherData = data;
 
             // Set city info in header and ensure it's visible
-            if (data.city_name) {
-                header.textContent = `5-Day Weather (${data.city_name})`;
-            } else {
-                // Keep default text if no city name
-                if (!header.textContent || header.textContent.trim() === '') {
-                    header.textContent = '5-Day Weather';
+            // Get header reference (may have been updated if moved from initial)
+            const currentHeader = this.elements.get('header');
+            if (currentHeader) {
+                if (data.city_name) {
+                    currentHeader.textContent = `5-Day Weather (${data.city_name})`;
+                } else {
+                    // Keep default text if no city name
+                    if (!currentHeader.textContent || currentHeader.textContent.trim() === '') {
+                        currentHeader.textContent = '5-Day Weather';
+                    }
                 }
+                
+                // Make sure header is visible (use important to override any CSS that might hide it)
+                currentHeader.style.setProperty('display', 'block', 'important');
+                currentHeader.style.setProperty('visibility', 'visible', 'important');
             }
-            
-            // Make sure header is visible (use important to override any CSS that might hide it)
-            header.style.setProperty('display', 'block', 'important');
-            header.style.setProperty('visibility', 'visible', 'important');
             
             // Ensure container is visible after render
             if (container) {

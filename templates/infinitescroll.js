@@ -276,6 +276,18 @@
 
         // Method to clear cache when needed (e.g., when content changes)
         clearCache() {
+            // Initialize cache properties if they don't exist
+            if (!this.cachedFeedInfo) {
+                this.cachedFeedInfo = new Map();
+            }
+            if (this.cachedItems === undefined) {
+                this.cachedItems = null;
+            }
+            if (this.lastCollectionTime === undefined) {
+                this.lastCollectionTime = 0;
+            }
+            
+            // Clear cache
             this.cachedFeedInfo.clear();
             this.cachedItems = null;
             this.lastCollectionTime = 0;

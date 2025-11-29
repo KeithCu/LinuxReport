@@ -137,6 +137,21 @@
                 }
             }
             
+            // Event delegation for delete buttons to avoid XSS and improve maintainability
+            const messagesContainer = this.elements.get('chat-messages');
+            if (messagesContainer) {
+                messagesContainer.addEventListener('click', (e) => {
+                    const deleteBtn = e.target.closest('.chat-delete-btn');
+                    if (deleteBtn) {
+                        e.preventDefault();
+                        const commentId = parseInt(deleteBtn.getAttribute('data-comment-id'), 10);
+                        if (commentId && !isNaN(commentId)) {
+                            this.handleDelete(e, commentId);
+                        }
+                    }
+                });
+            }
+            
             document.addEventListener('mouseup', () => this.stopDrag());
         }
 
@@ -321,21 +336,35 @@
         }
 
         createMessageElement(comment) {
-            const deleteBtnHTML = this.state.isAdminMode && comment.id 
-                ? `<button class="chat-delete-btn" title="Delete" onclick="app.modules.chat.handleDelete(event, ${comment.id})">✕</button>`
-                : '';
+            // Create message element using DOM methods to prevent XSS
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${comment.is_own ? 'chat-message-own' : 'chat-message-other'}`;
             
-            const imageHTML = comment.image_url 
-                ? `<img src="${comment.image_url}" alt="Comment image">`
-                : '';
+            // Use textContent for comment text to prevent XSS
+            const textDiv = document.createElement('div');
+            textDiv.textContent = comment.text || '';
+            messageDiv.appendChild(textDiv);
             
-            return `
-                <div class="chat-message ${comment.is_own ? 'chat-message-own' : 'chat-message-other'}">
-                    <div>${comment.text}</div>
-                    ${imageHTML}
-                    ${deleteBtnHTML}
-                </div>
-            `;
+            // Add image if present (using DOM methods prevents XSS)
+            if (comment.image_url) {
+                const img = document.createElement('img');
+                // Setting src via DOM property automatically escapes the URL
+                img.src = comment.image_url;
+                img.alt = 'Comment image';
+                messageDiv.appendChild(img);
+            }
+            
+            // Add delete button if admin (using data attribute instead of inline onclick)
+            if (this.state.isAdminMode && comment.id) {
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'chat-delete-btn';
+                deleteBtn.title = 'Delete';
+                deleteBtn.setAttribute('data-comment-id', comment.id.toString());
+                deleteBtn.textContent = '✕';
+                messageDiv.appendChild(deleteBtn);
+            }
+            
+            return messageDiv.outerHTML;
         }
 
         async handleDelete(e, commentId) {
