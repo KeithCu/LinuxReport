@@ -11,14 +11,13 @@ using advanced NLP techniques to identify and filter duplicate or similar conten
 # =============================================================================
 import os
 import re
-import warnings
 import math
-import logging
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
 import numpy as np
+import torch
 from sentence_transformers import SentenceTransformer, util
 
 from Logging import g_logger
@@ -44,6 +43,8 @@ THRESHOLD = 0.75  # Similarity threshold for deduplication (lowered for AI-gener
 embedder = None
 st_util = util  # Initialize st_util immediately since it's just a reference to sentence_transformers.util
 embedding_cache = {}  # Cache for storing computed embeddings
+_embedding_dim = None  # Cache embedding dimension for zero vector creation
+_embedding_device = None  # Cache device for zero vector creation
 
 # =============================================================================
 # EMBEDDING UTILITY FUNCTIONS
@@ -56,45 +57,19 @@ def clamp_similarity(score):
     return max(-1.0, min(1.0, score))
 
 
-def clamp_similarity_batch(similarities):
-    """Clamp similarity scores to [-1, 1] and handle numerical issues."""
-    similarities = np.asarray(similarities)
-    similarities = np.nan_to_num(similarities, nan=0.0, posinf=1.0, neginf=-1.0)
-    return np.clip(similarities, -1.0, 1.0)
+def _get_zero_embedding():
+    """Get a zero embedding vector of the correct dimension and device."""
+    global embedder, _embedding_dim, _embedding_device
+    if embedder is None:
+        embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
+    if _embedding_dim is None:
+        # Get dimension and device by encoding a dummy text once
+        sample = embedder.encode(" ", convert_to_tensor=True, show_progress_bar=False)
+        _embedding_dim = sample.shape[-1]
+        _embedding_device = sample.device
+    # Create zero tensor directly on the same device as embeddings
+    return torch.zeros(_embedding_dim, dtype=torch.float32, device=_embedding_device)
 
-
-def compute_batch_similarities(existing_embeddings, new_embeddings):
-    """
-    Compute similarities between new embeddings and all existing ones efficiently.
-
-    Args:
-        existing_embeddings: List of existing embedding tensors
-        new_embeddings: List of new embedding tensors
-
-    Returns:
-        numpy.ndarray: Similarity matrix of shape (len(existing_embeddings), len(new_embeddings))
-    """
-    if len(existing_embeddings) == 0 or len(new_embeddings) == 0:
-        return np.array([])
-
-    # Convert to numpy arrays for vectorized operations (avoid repeated conversions)
-    existing_array = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in existing_embeddings])
-    new_array = np.stack([emb.numpy() if hasattr(emb, 'numpy') else emb for emb in new_embeddings])
-
-    # Vectorized computation - use direct operations for better performance
-    # Normalize vectors for cosine similarity
-    existing_norms = np.linalg.norm(existing_array, axis=1, keepdims=True)
-    new_norms = np.linalg.norm(new_array, axis=1, keepdims=True)
-
-    # Avoid division by zero
-    existing_norms = np.where(existing_norms == 0, 1, existing_norms)
-    new_norms = np.where(new_norms == 0, 1, new_norms)
-
-    # Compute cosine similarities directly
-    dot_products = np.dot(existing_array, new_array.T)
-    similarities = dot_products / (existing_norms @ new_norms.T)
-
-    return clamp_similarity_batch(similarities)
 
 def get_embedding(text):
     """
@@ -118,8 +93,7 @@ def get_embedding(text):
 
     # Handle empty/whitespace-only strings gracefully
     if not text.strip():
-        # Return a zero vector of the same shape as a normal embedding
-        return embedder.encode(" ", convert_to_tensor=True, show_progress_bar=False) * 0
+        return _get_zero_embedding()
 
     # Check cache first
     if text in embedding_cache:
@@ -145,36 +119,39 @@ def get_embeddings_batch(texts):
     if embedder is None:
         embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
 
-    # Filter out empty texts and get cached embeddings
+    # Pre-allocate result list with None to maintain order
+    embeddings = [None] * len(texts)
     valid_texts = []
     valid_indices = []
-    embeddings = []
 
+    # First pass: handle cached and identify texts to encode
     for i, text in enumerate(texts):
         if text.strip():
             if text in embedding_cache:
-                embeddings.append(embedding_cache[text])
+                embeddings[i] = embedding_cache[text]
             else:
                 valid_texts.append(text)
                 valid_indices.append(i)
+        else:
+            # Mark empty texts for zero vector assignment
+            embeddings[i] = None  # Will be replaced with zero vector
 
     # Encode uncached texts in batch
     if valid_texts:
         batch_embeddings = embedder.encode(valid_texts, convert_to_tensor=True, show_progress_bar=False)
 
-        # Cache and add to results
-        for text, emb in zip(valid_texts, batch_embeddings):
+        # Cache and assign to correct positions
+        for text, emb, idx in zip(valid_texts, batch_embeddings, valid_indices):
             embedding_cache[text] = emb
+            embeddings[idx] = emb
 
-        # Insert batch embeddings at correct positions
-        for idx, emb in zip(valid_indices, batch_embeddings):
-            embeddings.insert(idx, emb)
-
-    # Handle empty texts by returning zero vectors
+    # Fill in zero vectors for empty texts
+    zero_vec = None
     for i, text in enumerate(texts):
         if not text.strip():
-            zero_vec = embedder.encode(" ", convert_to_tensor=True, show_progress_bar=False) * 0
-            embeddings.insert(i, zero_vec)
+            if zero_vec is None:
+                zero_vec = _get_zero_embedding()
+            embeddings[i] = zero_vec
 
     return embeddings
 
@@ -202,6 +179,12 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
     Returns:
         list: Filtered list of unique articles
     """
+    # Validate input parameters
+    if not isinstance(articles, (list, tuple)):
+        raise TypeError(f"articles must be a list or tuple, got {type(articles).__name__}")
+    if not isinstance(excluded_embeddings, (list, tuple)):
+        raise TypeError(f"excluded_embeddings must be a list or tuple, got {type(excluded_embeddings).__name__}")
+    
     # Vectorized implementation using numpy operations for optimal performance
     if not articles:
         return []
@@ -233,7 +216,16 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
             current_norm = np.linalg.norm(current_emb)
             excluded_norms = np.linalg.norm(excluded_arrays, axis=1)
             dot_products = np.dot(excluded_arrays, current_emb)
-            similarities = dot_products / (excluded_norms * current_norm)
+            
+            # Avoid division by zero: if either norm is zero, similarity is 0
+            denominator = excluded_norms * current_norm
+            # Suppress warning for division by zero, then handle it with np.where
+            with np.errstate(divide='ignore', invalid='ignore'):
+                similarities = np.where(
+                    denominator > 0,
+                    dot_products / denominator,
+                    0.0
+                )
             similarities = np.clip(similarities, -1.0, 1.0)  # Clamp to valid range
             max_similarity = np.max(similarities)
             is_similar = max_similarity >= threshold
@@ -280,12 +272,17 @@ def get_best_matching_article(target_title, articles):
     target_norm = np.linalg.norm(target_array)
     article_norms = np.linalg.norm(article_arrays, axis=1)
 
-    # Avoid division by zero
-    target_norm = target_norm if target_norm > 0 else 1.0
-    article_norms = np.where(article_norms == 0, 1, article_norms)
-
     dot_products = np.dot(article_arrays, target_array)
-    similarities = dot_products / (article_norms * target_norm)
+    
+    # Avoid division by zero: if either norm is zero, similarity is 0
+    denominator = article_norms * target_norm
+    # Suppress warning for division by zero, then handle it with np.where
+    with np.errstate(divide='ignore', invalid='ignore'):
+        similarities = np.where(
+            denominator > 0,
+            dot_products / denominator,
+            0.0
+        )
     similarities = np.clip(similarities, -1.0, 1.0)  # Clamp to valid range
 
     # Find best match
