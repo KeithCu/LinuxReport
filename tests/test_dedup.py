@@ -24,7 +24,7 @@ import math
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from embeddings_dedup import (
-    get_embedding,
+    get_embeddings,
     deduplicate_articles_with_exclusions,
     get_best_matching_article,
     clamp_similarity,
@@ -119,27 +119,28 @@ class TestArticleDeduplication(unittest.TestCase):
     def test_get_embedding_robustness(self):
         """Test that get_embedding handles various input types robustly."""
         # Test normal cases
-        emb1 = get_embedding("Normal text")
+        emb1 = get_embeddings("Normal text")
         self.assertIsNotNone(emb1)
         self.assertTrue(hasattr(emb1, 'tolist'))
         
         # Test edge cases
-        emb2 = get_embedding("")  # Empty string
+        emb2 = get_embeddings("")  # Empty string
         self.assertIsNotNone(emb2)
         
-        emb3 = get_embedding("   ")  # Whitespace only
+        emb3 = get_embeddings("   ")  # Whitespace only
         self.assertIsNotNone(emb3)
 
         # Test None input - should raise exception when calling .strip()
         with self.assertRaises(AttributeError):
-            get_embedding(None)
+            get_embeddings(None)
         
-        # Test non-string inputs - should raise exceptions
+        # Test non-string, non-list inputs - should raise exceptions
         with self.assertRaises((TypeError, AttributeError)):
-            get_embedding(123)  # Integer
-
-        with self.assertRaises((TypeError, AttributeError)):
-            get_embedding(["list"])  # List
+            get_embeddings(123)  # Integer
+        
+        # Lists are now valid inputs (batch mode)
+        emb_list = get_embeddings(["test", "text"])
+        self.assertEqual(len(emb_list), 2)
 
     def test_deduplication_with_malformed_input(self):
         """Test deduplication with malformed input data."""
@@ -308,20 +309,20 @@ class TestArticleDeduplication(unittest.TestCase):
         
         # Test basic caching
         text = "Test text for caching"
-        emb1 = get_embedding(text)
-        emb2 = get_embedding(text)
+        emb1 = get_embeddings(text)
+        emb2 = get_embeddings(text)
         self.assertIs(emb1, emb2)  # Should be the same object
         self.assertIn(text, embedding_cache)
         
         # Test cache with edge cases
         edge_texts = ["", "   "]
         for text in edge_texts:
-            emb = get_embedding(text)
+            emb = get_embeddings(text)
             self.assertIsNotNone(emb)
 
         # Test None input - should raise exception when calling .strip()
         with self.assertRaises(AttributeError):
-            get_embedding(None)
+            get_embeddings(None)
         
         # Test cache size doesn't grow excessively
         cache_size = len(embedding_cache)
@@ -353,20 +354,20 @@ class TestArticleDeduplication(unittest.TestCase):
     def test_embedding_consistency(self):
         """Test that embeddings are consistent for the same text."""
         text = "Trump Delivers Victory in 12-Day War"
-        emb1 = get_embedding(text)
-        emb2 = get_embedding(text)
+        emb1 = get_embeddings(text)
+        emb2 = get_embeddings(text)
         
         # Should be the same tensor (cached)
         self.assertEqual(emb1.tolist(), emb2.tolist())
         
         # Test that different text gives different embeddings
-        emb3 = get_embedding("Biden Announces New Economic Policy")
+        emb3 = get_embeddings("Biden Announces New Economic Policy")
         self.assertNotEqual(emb1.tolist(), emb3.tolist())
 
     def test_embedding_validity(self):
         """Test that embeddings are valid (not NaN, not all zeros, etc.)."""
         text = "Trump Delivers Victory in 12-Day War"
-        embedding = get_embedding(text)
+        embedding = get_embeddings(text)
         
         # Should be a tensor
         self.assertTrue(hasattr(embedding, 'tolist'))
@@ -385,9 +386,9 @@ class TestArticleDeduplication(unittest.TestCase):
         text1 = "Trump Delivers Victory in 12-Day War"
         text2 = "Trump Delivers Victory in 12 Day War"  # Minor difference
         text3 = "Biden Announces New Economic Policy"   # Different topic
-        emb1 = get_embedding(text1)
-        emb2 = get_embedding(text2)
-        emb3 = get_embedding(text3)
+        emb1 = get_embeddings(text1)
+        emb2 = get_embeddings(text2)
+        emb3 = get_embeddings(text3)
         # Similar texts should have high similarity
         sim_similar = clamp_similarity(st_util.cos_sim(emb1, emb2).item())
         self.assertGreaterEqual(sim_similar, 0.8)  # Should be very similar
@@ -436,7 +437,7 @@ class TestArticleDeduplication(unittest.TestCase):
         ]
         
         # Create embeddings for previous selections
-        excluded_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
+        excluded_embeddings = get_embeddings([sel["title"] for sel in previous_selections])
         
         # New articles (some similar to previous)
         new_articles = [
@@ -535,10 +536,10 @@ class TestArticleDeduplication(unittest.TestCase):
         
         # First call should compute embedding
         text = "Test text for caching"
-        emb1 = get_embedding(text)
+        emb1 = get_embeddings(text)
         
         # Second call should use cache
-        emb2 = get_embedding(text)
+        emb2 = get_embeddings(text)
         
         # Should be the same object (cached)
         self.assertIs(emb1, emb2)
@@ -555,8 +556,8 @@ class TestArticleDeduplication(unittest.TestCase):
             ("TRUMP DELIVERS VICTORY IN 12-DAY WAR", "trump delivers victory in 12-day war"),
         ]
         for text1, text2 in test_cases:
-            emb1 = get_embedding(text1)
-            emb2 = get_embedding(text2)
+            emb1 = get_embeddings(text1)
+            emb2 = get_embeddings(text2)
             similarity = clamp_similarity(st_util.cos_sim(emb1, emb2).item())
             # Similarity should be in [-1, 1]
             self.assertGreaterEqual(similarity, -1.0)
@@ -575,7 +576,7 @@ class TestArticleDeduplication(unittest.TestCase):
             {"title": "Trump Delivers Victory in 12-Day War", "url": "https://example.com/prev1"},
         ]
         
-        excluded_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
+        excluded_embeddings = [get_embeddings(sel["title"]) for sel in previous_selections]
         
         # New articles that might be selected
         new_articles = [
@@ -604,7 +605,7 @@ class TestArticleDeduplication(unittest.TestCase):
         ]
 
         # Create embeddings for previous selections
-        excluded_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
+        excluded_embeddings = get_embeddings([sel["title"] for sel in previous_selections])
 
         # New articles
         new_articles = [
@@ -785,8 +786,8 @@ class TestThresholdValidation(unittest.TestCase):
         ]
 
         for title1, title2 in similar_pairs:
-            emb1 = get_embedding(title1)
-            emb2 = get_embedding(title2)
+            emb1 = get_embeddings(title1)
+            emb2 = get_embeddings(title2)
             similarity = clamp_similarity(st_util.cos_sim(emb1, emb2).item())
 
             # With threshold 0.75, these should be filtered out

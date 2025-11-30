@@ -78,56 +78,34 @@ def _get_zero_embedding():
     return _zero_embedding
 
 
-def get_embedding(text):
+def get_embeddings(texts):
     """
-    Get the embedding vector for a piece of text using SentenceTransformer.
-
-    Computes semantic embeddings for text using the configured transformer model.
-    Implements caching to avoid recomputing embeddings for the same text.
-    Uses lazy loading to defer model initialization until first use.
+    Get embeddings for text(s) with caching support.
+    
+    Accepts either a single string or a list of strings. Returns a single embedding
+    for a single string, or a list of embeddings for a list of strings.
+    
+    Automatically handles batching for optimal performance when given a list.
 
     Args:
-        text (str): Text to compute embedding for
+        texts: Single text string or list of text strings to encode
 
     Returns:
-        np.ndarray: Embedding vector for the input text (numpy array)
-    """
-    global embedder
-
-    # Normalize input early - strip whitespace (will raise AttributeError for None)
-    text = text.strip()
-
-    # Initialize embedder once if needed
-    if embedder is None:
-        embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
-
-    # Handle empty strings gracefully
-    if not text:
-        return _get_zero_embedding()
-
-    # Check cache first
-    if text in embedding_cache:
-        return embedding_cache[text]
-
-    # Compute embedding as numpy array directly (no tensor conversion)
-    embedding = embedder.encode(text, convert_to_tensor=False, show_progress_bar=False)
-    embedding_cache[text] = embedding
-    return embedding
-
-
-def get_embeddings_batch(texts):
-    """
-    Get embeddings for multiple texts with caching support.
-
-    Args:
-        texts: List of text strings to encode
-
-    Returns:
-        list: List of embedding numpy arrays (same order as input texts)
+        np.ndarray: Single embedding if input is a string
+        list: List of embedding numpy arrays if input is a list (same order as input)
     """
     global embedder
     if embedder is None:
         embedder = SentenceTransformer(EMBEDDER_MODEL_NAME)
+
+    # Handle single string input
+    is_single = isinstance(texts, str)
+    if is_single:
+        texts = [texts]
+    elif not isinstance(texts, (list, tuple)):
+        # If not a string and not a list/tuple, wrap it in a list
+        # This allows the .strip() call below to raise AttributeError for None
+        texts = [texts]
 
     # Pre-allocate result list to maintain order
     embeddings = [None] * len(texts)
@@ -162,7 +140,8 @@ def get_embeddings_batch(texts):
             embedding_cache[text] = emb
             embeddings[idx] = emb
 
-    return embeddings
+    # Return single embedding for single input, list for list input
+    return embeddings[0] if is_single else embeddings
 
 # =============================================================================
 # DEDUPLICATION FUNCTIONS
@@ -231,7 +210,7 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
 
     # Get all article titles and compute embeddings in batch for efficiency
     article_titles = [article["title"] for article in articles]
-    article_embeddings = get_embeddings_batch(article_titles)  # Already numpy arrays
+    article_embeddings = get_embeddings(article_titles)  # Already numpy arrays
 
     # Convert excluded embeddings to numpy arrays (handle both numpy and torch tensors)
     excluded_list = []
@@ -286,11 +265,11 @@ def get_best_matching_article(target_title, articles):
         return None
 
     # Get target embedding
-    target_emb = get_embedding(target_title)
+    target_emb = get_embeddings(target_title)
 
     # Get all article embeddings in batch for efficiency
     article_titles = [article["title"] for article in articles]
-    article_embeddings = get_embeddings_batch(article_titles)
+    article_embeddings = get_embeddings(article_titles)
 
     # Embeddings are already numpy arrays, use them directly
     target_array = target_emb

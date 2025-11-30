@@ -17,7 +17,7 @@ from typing import List, Optional, Tuple
 
 from image_parser import custom_fetch_largest_image
 from embeddings_dedup import (
-    fetch_recent_articles, get_embedding, deduplicate_articles_with_exclusions,
+    fetch_recent_articles, get_embeddings, deduplicate_articles_with_exclusions,
     get_best_matching_article
 )
 from html_generation import (
@@ -488,7 +488,12 @@ def _prepare_articles_for_ai(articles):
         previous_selections = previous_selections[-MAX_PREVIOUS_HEADLINES:]
         logger.info(f"Trimmed previous selections to {len(previous_selections)} entries (max: {MAX_PREVIOUS_HEADLINES})")
     
-    previous_embeddings = [get_embedding(sel["title"]) for sel in previous_selections]
+    # Compute embeddings in batch for efficiency
+    previous_titles = [sel["title"] for sel in previous_selections]
+    if previous_titles:
+        previous_embeddings = get_embeddings(previous_titles)
+    else:
+        previous_embeddings = []
     previous_urls = [sel["url"] for sel in previous_selections]
     logger.info(f"Found {len(previous_selections)} previous selections to exclude")
 
