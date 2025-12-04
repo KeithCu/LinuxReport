@@ -439,6 +439,9 @@ nav {
 
 .column {
   padding: var(--spacing-sm);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .desktop-view .column {
