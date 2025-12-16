@@ -154,6 +154,7 @@ def _compute_cosine_similarities(query_emb, candidate_embs):
     Args:
         query_emb: Query embedding vector (1D numpy array)
         candidate_embs: Candidate embedding vectors (2D numpy array, shape: [n_candidates, dim])
+                         Expected to be L2-normalized (as produced by SentenceTransformer).
     
     Returns:
         Array of similarity scores (1D numpy array, shape: [n_candidates])
@@ -161,18 +162,11 @@ def _compute_cosine_similarities(query_emb, candidate_embs):
     if candidate_embs.shape[0] == 0:
         return np.array([])
     
-    query_norm = np.linalg.norm(query_emb)
-    candidate_norms = np.linalg.norm(candidate_embs, axis=1)
-    dot_products = np.dot(candidate_embs, query_emb)
-    
-    # Avoid division by zero: if either norm is zero, similarity is 0
-    denominator = candidate_norms * query_norm
-    with np.errstate(divide='ignore', invalid='ignore'):
-        similarities = np.where(
-            denominator > 0,
-            dot_products / denominator,
-            0.0
-        )
+    # For L2-normalized embeddings, cosine similarity is just the dot product.
+    # Empty/whitespace texts use a cached zero vector, which naturally yields 0.0
+    # similarity via the dot product with any normalized vector.
+    similarities = np.dot(candidate_embs, query_emb)
+
     return np.clip(similarities, -1.0, 1.0)
 
 
