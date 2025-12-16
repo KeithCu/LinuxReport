@@ -216,15 +216,20 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
         else:
             excluded_list.append(np.asarray(emb))
     
-    # Build excluded arrays list (will stack once at end for efficiency)
-    excluded_arrays_list = excluded_list.copy()
+    # Stack initial excluded embeddings once (outside loop for efficiency)
+    # This avoids repeated stacking on every iteration
+    if excluded_list:
+        excluded_arrays = np.stack(excluded_list)
+    else:
+        # Create empty 2D array with correct embedding dimension
+        embedding_dim = _get_zero_embedding().shape[0]
+        excluded_arrays = np.empty((0, embedding_dim), dtype=np.float32)
 
     # Process articles individually to maintain exact progressive exclusion behavior
     # This ensures each article is checked against ALL previously selected articles
     for article, current_emb in zip(articles, article_embeddings):
         # Check similarity against all current exclusions
-        if excluded_arrays_list:
-            excluded_arrays = np.stack(excluded_arrays_list)
+        if excluded_arrays.shape[0] > 0:
             similarities = _compute_cosine_similarities(current_emb, excluded_arrays)
             max_similarity = np.max(similarities)
             is_similar = max_similarity >= threshold
@@ -233,8 +238,8 @@ def deduplicate_articles_with_exclusions(articles, excluded_embeddings, threshol
 
         if not is_similar:
             unique_articles.append(article)
-            # Add to excluded list (will be stacked on next iteration if needed)
-            excluded_arrays_list.append(current_emb)
+            # Append to stacked array efficiently (avoids re-stacking entire list)
+            excluded_arrays = np.concatenate([excluded_arrays, current_emb[None, :]], axis=0)
 
     logger.info(f"Deduplication: Filtered {len(articles) - len(unique_articles)} duplicate articles")
     return unique_articles
