@@ -35,12 +35,13 @@ CONFIG: SiteConfig = SiteConfig(
     USER_AGENT="Robot Report -- https://robotreport.keithcu.com",
     URL_IMAGES="https://robotreport.keithcu.com/static/images/",
     FAVICON="robotreport192.ico",
-    LOGO_URL="RobotReportFallharvesttheme.webp",
+    LOGO_URL="RobotReportChristmasfestivewintertheme.webp",
     WEB_DESCRIPTION="Latest robotics news: breakthroughs, trends, and tech for enthusiasts. Hourly updates, no fluff.",
     WEB_TITLE="Robot Report | Latest Robotics News",
     REPORT_PROMPT="Robotics enthusiasts, programmers, and builders interested in major robotics and automation developments, especially humanoid robots and FOSS (free and open source software) projects. Focus on research breakthroughs, industry news, and robotics tutorials for intro builders. Avoid software-only automation (except for virtual robotics which is an important test and learning environment for real but more expensive robots), quantum computing, or unrelated tech content.",
     PATH="/srv/http/robotreport",
     SCHEDULE=[8, 12, 16, 20],
+    DEFAULT_THEME="monokai",
     CUSTOM_FETCH_CONFIG={
         # Site-specific Selenium config for Unite.AI main page
         # Updated to match actual site structure

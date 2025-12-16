@@ -73,8 +73,8 @@ CONFIG: SiteConfig = SiteConfig(
 	#	"https://bonginoreport.com/index.rss",
 	],
 	URL_IMAGES="https://trumpreport.info/static/images/",
-	FAVICON="TrumpReportSpooky.webp",
-	LOGO_URL="TrumpReportFallharvesttheme.webp",
+	FAVICON="TrumpReportChristmasfestivewintertheme.webp",
+	LOGO_URL="TrumpReportChristmasfestivewintertheme.webp",
 	WEB_DESCRIPTION="Fast Trump 2025 news for MAGA: tariffs, immigration, deregulation. Hourly conservative headlines.",
 	WEB_TITLE="Trump Report | Conservative News",
 	REPORT_PROMPT=f'''Trump's biggest supporters of his second term Presidency, which began on January 20, 2025, as of today: {datetime.date.today().strftime('%B %d, %Y')}

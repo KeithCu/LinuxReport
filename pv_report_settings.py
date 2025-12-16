@@ -45,7 +45,7 @@ CONFIG: SiteConfig = SiteConfig(
     ],
     URL_IMAGES="https://pvreport.org/static/images/",
     FAVICON="pvreport.ico",
-    LOGO_URL="pvreport.webp",
+    LOGO_URL="PVReportChristmasfestivewintertheme.webp",
     WEB_DESCRIPTION="Solar and Renewable Energy News",
     WEB_TITLE="Photovoltaic Report",
     REPORT_PROMPT="Solar energy professionals and enthusiasts, primarily in the US. Focus on major solar and battery technology, policy, and market news. Avoid basic how-to guides, generic green content, and unrelated renewable topics.",
