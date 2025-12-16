@@ -545,41 +545,8 @@
         document.body.classList.add('no-underlines');
       }
 
-      // Apply random silver texture if silver theme is active
-      if (theme === 'silver') {
-        this.applySilverTexture();
-      } else {
-        // Remove any silver texture classes if not silver theme
-        for (let i = 1; i <= 8; i++) {
-          document.body.classList.remove('silver-texture-' + i);
-        }
-        const indicator = document.getElementById('silver-texture-indicator');
-        if (indicator) {
-          indicator.textContent = '';
-        }
-      }
-
       // Update select elements
       this.updateSelects(theme, font);
-    },
-
-    applySilverTexture() {
-      // Randomly select texture option 1-8
-      const textureOption = Math.floor(Math.random() * 8) + 1;
-
-      // Remove any existing silver-texture classes
-      for (let i = 1; i <= 8; i++) {
-        document.body.classList.remove('silver-texture-' + i);
-      }
-
-      // Add the selected texture class
-      document.body.classList.add('silver-texture-' + textureOption);
-
-      // Update indicator text
-      const indicator = document.getElementById('silver-texture-indicator');
-      if (indicator) {
-        indicator.textContent = 'Texture: ' + textureOption;
-      }
     },
 
     updateSelects(theme, font) {
@@ -593,20 +560,6 @@
     setTheme(theme) {
       document.body.setAttribute('data-theme', theme);
       app.utils.CookieManager.set('Theme', theme);
-
-      // Apply random silver texture if switching to silver theme
-      if (theme === 'silver') {
-        this.applySilverTexture();
-      } else {
-        // Remove any silver texture classes if switching away from silver
-        for (let i = 1; i <= 8; i++) {
-          document.body.classList.remove('silver-texture-' + i);
-        }
-        const indicator = document.getElementById('silver-texture-indicator');
-        if (indicator) {
-          indicator.textContent = '';
-        }
-      }
 
       const themeSelect = document.getElementById('theme-select');
       if (themeSelect) themeSelect.value = theme;
