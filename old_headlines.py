@@ -2,10 +2,10 @@ import os
 import json
 import datetime
 from pathlib import Path
-from flask import render_template, request
+from flask import render_template, request, jsonify
 from flask_login import current_user, login_required
 from flask_restful import Resource
-from shared import MODE_MAP, MODE, PATH, FAVICON, LOGO_URL, WEB_DESCRIPTION, API, g_logger
+from shared import MODE_MAP, MODE, PATH, FAVICON, LOGO_URL, WEB_DESCRIPTION, API, g_logger, g_c
 from caching import get_cached_page
 
 
@@ -61,6 +61,7 @@ def init_old_headlines_routes(app):
     def old_headlines():
         mode_str = MODE_MAP.get(MODE)
         archive_file = Path(PATH) / f"{mode_str}report_archive.jsonl"
+        is_admin = current_user.is_authenticated
 
         def render_old_headlines_page():
             headlines = []
@@ -83,7 +84,7 @@ def init_old_headlines_routes(app):
             # Sort headlines by timestamp
             headlines.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
             
-            # Skip the first 3 headlines (most recent)
+            # Skip the first 3 headlines (most recent) - these are on the main page
             if len(headlines) > 3:
                 headlines = headlines[3:]
             else:
@@ -100,11 +101,29 @@ def init_old_headlines_routes(app):
                     grouped_headlines[date_str].append(headline)
 
             # Convert to list of tuples (date, headlines) and sort by date
-            grouped_headlines_list = [(date, headlines) for date, headlines in grouped_headlines.items()]
+            grouped_headlines_list = []
+            for date_str, heads in grouped_headlines.items():
+                # For admins, try to find LLM attempts for the timestamps in this date group
+                if is_admin:
+                    # Group headlines by exact timestamp within this date
+                    time_groups = {}
+                    for h in heads:
+                        ts = h.get('timestamp')
+                        if ts not in time_groups:
+                            time_groups[ts] = {
+                                'headlines': [],
+                                'attempts': g_c.get(f"llm_attempts:{mode_str}:{ts}")
+                            }
+                        time_groups[ts]['headlines'].append(h)
+                    
+                    # Sort time groups by timestamp descending
+                    sorted_times = sorted(time_groups.items(), key=lambda x: x[0], reverse=True)
+                    grouped_headlines_list.append((date_str, sorted_times))
+                else:
+                    grouped_headlines_list.append((date_str, heads))
+
             grouped_headlines_list.sort(key=lambda x: datetime.datetime.strptime(x[0], '%B %d, %Y'), reverse=True)
 
-            # Use Flask-Login for admin authentication
-            is_admin = current_user.is_authenticated
             return render_template(
                 'old_headlines.html',
                 grouped_headlines=grouped_headlines_list,
@@ -116,7 +135,9 @@ def init_old_headlines_routes(app):
                 is_admin=is_admin
             )
 
-        return get_cached_page('old_headlines', render_old_headlines_page, archive_file)
+        # Cache key includes admin status because we show extra info for admins
+        cache_key = f'old_headlines:{mode_str}:{"admin" if is_admin else "user"}'
+        return get_cached_page(cache_key, render_old_headlines_page, archive_file)
     
     # Register Flask-RESTful resource
     API.add_resource(DeleteHeadlineResource, '/api/delete_headline')

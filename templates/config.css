@@ -115,4 +115,53 @@
   color: var(--text);
 }
 
+/* LLM Model Management */
+.model-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--spacing-md);
+  background: var(--bg);
+}
+
+.model-table th, .model-table td {
+  padding: var(--spacing-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--btn-border);
+}
+
+.model-table th {
+  background: var(--btn-bg);
+  font-weight: bold;
+}
+
+.status-failed {
+  color: #dc3545;
+  font-weight: bold;
+}
+
+.status-working {
+  color: #28a745;
+  font-weight: bold;
+}
+
+.status-ok {
+  color: var(--text);
+}
+
+.btn-small {
+  padding: 4px 8px;
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.btn-warn {
+  background-color: #ffc107;
+  color: #212529;
+  border: 1px solid #ffc107;
+}
+
+.btn-warn:hover {
+  background-color: #e0a800;
+}
+
 /* =============================================================================

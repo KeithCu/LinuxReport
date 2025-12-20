@@ -76,6 +76,85 @@
         .date-header:first-child {
             margin-top: 0;
         }
+        .ai-process-container {
+            margin: 0.5em 0 1em;
+            font-size: 0.9em;
+            color: var(--muted, #888);
+        }
+        .ai-process-link {
+            color: var(--link, #1a0dab);
+            text-decoration: underline;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .ai-process-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 800px;
+            height: 80%;
+            background: var(--bg, #fff);
+            border: 2px solid var(--border, #ddd);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+            padding: 2em;
+            overflow-y: auto;
+        }
+        .ai-process-popup.active {
+            display: block;
+        }
+        .ai-process-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+        .ai-process-overlay.active {
+            display: block;
+        }
+        .ai-attempt {
+            margin-bottom: 2em;
+            padding-bottom: 1em;
+            border-bottom: 1px dashed var(--border, #ddd);
+        }
+        .ai-attempt:last-child {
+            border-bottom: none;
+        }
+        .ai-attempt-header {
+            font-weight: bold;
+            margin-bottom: 0.5em;
+            color: var(--text, #222);
+        }
+        .ai-attempt-body {
+            background: #f8f8f8;
+            padding: 1em;
+            border-radius: 6px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #eee;
+            color: #333;
+        }
+        .ai-process-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5em;
+            cursor: pointer;
+            color: var(--muted, #888);
+        }
+        .ai-success { color: green; }
+        .ai-failed { color: red; }
     </style>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
@@ -86,8 +165,36 @@
         // Initialize delete functionality for old headlines
         initDeleteHeadlines();
         
-        
+        // Initialize AI process popups
+        initAiProcessPopups();
       });
+
+      function initAiProcessPopups() {
+        const links = document.querySelectorAll('.ai-process-link');
+        const overlay = document.querySelector('.ai-process-overlay');
+        
+        links.forEach(link => {
+            link.addEventListener('click', () => {
+                const id = link.dataset.target;
+                const popup = document.getElementById(id);
+                if (popup) {
+                    popup.classList.add('active');
+                    overlay.classList.add('active');
+                }
+            });
+        });
+
+        overlay?.addEventListener('click', closeAllPopups);
+        
+        document.querySelectorAll('.ai-process-close').forEach(btn => {
+            btn.addEventListener('click', closeAllPopups);
+        });
+
+        function closeAllPopups() {
+            document.querySelectorAll('.ai-process-popup').forEach(p => p.classList.remove('active'));
+            overlay.classList.remove('active');
+        }
+      }
       
       // Pass admin status from Flask-Login to JavaScript
       window.isAdmin = {{ 'true' if is_admin else 'false' }};
@@ -145,24 +252,72 @@
         <a href="/" class="back-link">&larr; Back to Main Page</a>
         <h2>Old Headlines ({{ mode.title() }}Report)</h2>
         {% if grouped_headlines %}
-            {% for date, headlines in grouped_headlines %}
+            <div class="ai-process-overlay"></div>
+            {% for date, content in grouped_headlines %}
                 <div class="date-header">{{ date }}</div>
-                {% for h in headlines %}
-                    <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
-                        <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
-                            <span><a href="{{ h.url }}" target="_blank">{{ h.title | safe }}</a></span>
-                            {% if is_admin %}
-                            <button class="delete-headline-btn" title="Delete">&#10005;</button>
+                {% if is_admin %}
+                    {# content is a list of (timestamp, time_group_dict) #}
+                    {% for timestamp, group in content %}
+                        <div class="ai-process-container">
+                            Generated: {{ timestamp }}
+                            {% if group.attempts %}
+                                | <span class="ai-process-link" data-target="popup-{{ timestamp | replace(':', '-') | replace('.', '-') }}">View LLM Process</span>
+                                <div class="ai-process-popup" id="popup-{{ timestamp | replace(':', '-') | replace('.', '-') }}">
+                                    <span class="ai-process-close">&times;</span>
+                                    <h3>LLM Process for {{ timestamp }}</h3>
+                                    {% for attempt in group.attempts %}
+                                        <div class="ai-attempt">
+                                            <div class="ai-attempt-header">
+                                                Model: {{ attempt.model }} | 
+                                                Status: <span class="{{ 'ai-success' if attempt.success else 'ai-failed' }}">
+                                                    {{ 'Success' if attempt.success else 'Failed' }}{% if attempt.error %} ({{ attempt.error }}){% endif %}
+                                                </span>
+                                            </div>
+                                            <div class="ai-attempt-header">Prompt:</div>
+                                            <div class="ai-attempt-body">{% for msg in attempt.messages %}[{{ msg.role }}]: {{ msg.content }}
+{% endfor %}</div>
+                                            {% if attempt.response %}
+                                                <div class="ai-attempt-header">Response:</div>
+                                                <div class="ai-attempt-body">{{ attempt.response }}</div>
+                                            {% endif %}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                | <span style="font-style: italic;">(No LLM process logs available)</span>
                             {% endif %}
                         </div>
-                        {% if h.image_url %}
-<img loading="lazy" src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
-                        {% endif %}
-                        <div class="headline-timestamp">
-                            <span class="last-updated-time" data-utc-time="{{ h.timestamp }}"></span>
+                        {% for h in group.headlines %}
+                            <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
+                                <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
+                                    <span><a href="{{ h.url }}" target="_blank">{{ h.title | safe }}</a></span>
+                                    <button class="delete-headline-btn" title="Delete">&#10005;</button>
+                                </div>
+                                {% if h.image_url %}
+                                    <img loading="lazy" src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
+                                {% endif %}
+                                <div class="headline-timestamp">
+                                    <span class="last-updated-time" data-utc-time="{{ h.timestamp }}"></span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% endfor %}
+                {% else %}
+                    {# content is a list of headline dicts #}
+                    {% for h in content %}
+                        <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
+                            <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
+                                <span><a href="{{ h.url }}" target="_blank">{{ h.title | safe }}</a></span>
+                            </div>
+                            {% if h.image_url %}
+                                <img loading="lazy" src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
+                            {% endif %}
+                            <div class="headline-timestamp">
+                                <span class="last-updated-time" data-utc-time="{{ h.timestamp }}"></span>
+                            </div>
                         </div>
-                    </div>
-                {% endfor %}
+                    {% endfor %}
+                {% endif %}
             {% endfor %}
         {% else %}
             <p>No old headlines found for this report.</p>

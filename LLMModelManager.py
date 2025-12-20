@@ -197,6 +197,30 @@ class LLMModelManager:
             logger.error(f"Error clearing failed models cache: {e}")
             return False
     
+    def get_all_models_status(self):
+        """Get status of all models."""
+        failed_models = self.get_failed_models()
+        working_model = g_c.get(self.working_model_cache_key)
+        
+        status = []
+        for model in FREE_MODELS:
+            status.append({
+                'name': model,
+                'is_failed': model in failed_models,
+                'is_working': model == working_model
+            })
+        return status
+
+    def unmark_failed(self, model):
+        """Remove a model from the failed list."""
+        failed_models_data = g_c.get(self.failed_models_cache_key) or {}
+        if model in failed_models_data:
+            del failed_models_data[model]
+            g_c.put(self.failed_models_cache_key, failed_models_data, timeout=self.cache_duration)
+            logger.info(f"Unmarked model as failed: {model}")
+            return True
+        return False
+
     def mark_success(self, model, forced_model=None):
         """Mark a model as successful and update cache."""
         if model not in FREE_MODELS:

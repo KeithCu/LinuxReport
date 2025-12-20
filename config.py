@@ -1,15 +1,18 @@
 import os
 import json
 from pathlib import Path
-from flask import request, render_template, make_response, flash
+from flask import request, render_template, make_response, flash, redirect, url_for
 from flask_login import current_user
 from shared import (
     limiter, dynamic_rate_limit, PATH, ABOVE_HTML_FILE,
     ENABLE_URL_CUSTOMIZATION, SITE_URLS, ALL_URLS, FAVICON,
-    EXPIRE_YEARS, URLS_COOKIE_VERSION, clear_page_caches, g_c, history, g_logger
+    EXPIRE_YEARS, URLS_COOKIE_VERSION, clear_page_caches, g_c, history, g_logger, MODE
 )
 from forms import ConfigForm, UrlForm, CustomRSSForm
 from caching import _file_cache
+from LLMModelManager import LLMModelManager
+
+model_manager = LLMModelManager()
 
 def init_config_routes(app):
     @app.route('/config', methods=['GET', 'POST'], strict_slashes=False)
@@ -18,8 +21,29 @@ def init_config_routes(app):
         # Use Flask-Login for admin authentication
         is_admin = current_user.is_authenticated
 
+        if request.method == 'POST' and is_admin:
+            # Handle LLM model management actions
+            action = request.form.get('llm_action')
+            if action:
+                if action == 'reset_all':
+                    model_manager.clear_failed_models()
+                    flash('All failed models have been reset.', 'success')
+                elif action == 'unmark_failed':
+                    model = request.form.get('model_name')
+                    if model:
+                        model_manager.unmark_failed(model)
+                        flash(f'Model {model} has been unmarked as failed.', 'success')
+                elif action == 'mark_failed':
+                    model = request.form.get('model_name')
+                    if model:
+                        model_manager.mark_failed(model)
+                        flash(f'Model {model} has been marked as failed.', 'success')
+                return redirect(url_for('config'))
+
         if request.method == 'GET':
             form = ConfigForm()
+            
+            # ... existing code ...
 
             no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
             form.no_underlines.data = no_underlines_cookie == "1"
@@ -66,8 +90,11 @@ def init_config_routes(app):
                     rssf.pri = (i + 30) * 10
                     form.url_custom.append_entry(rssf)
 
+            llm_models = model_manager.get_all_models_status() if is_admin else []
+
             page = render_template('config.html', form=form, is_admin=is_admin, 
-                                  favicon=FAVICON, enable_url_customization=ENABLE_URL_CUSTOMIZATION)
+                                  favicon=FAVICON, enable_url_customization=ENABLE_URL_CUSTOMIZATION,
+                                  llm_models=llm_models)
             return page
         else:
             form = ConfigForm()

@@ -68,6 +68,57 @@
           </p>
           {{ render_field(form.headlines) }}
         </div>
+
+        <div class="form-group admin-section">
+          <h3>LLM Model Management</h3>
+          <p class="admin-description">
+            Manage models used for headline generation. Models that fail are automatically blacklisted for 30 days.
+          </p>
+          <div class="model-list">
+            <table class="model-table">
+              <thead>
+                <tr>
+                  <th>Model Name</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for model in llm_models %}
+                <tr>
+                  <td>{{ model.name }}</td>
+                  <td>
+                    {% if model.is_failed %}
+                      <span class="status-failed">Failed</span>
+                    {% elif model.is_working %}
+                      <span class="status-working">Working (Cached)</span>
+                    {% else %}
+                      <span class="status-ok">OK</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <form method="POST" style="display:inline;">
+                      {{ form.hidden_tag() }}
+                      <input type="hidden" name="model_name" value="{{ model.name }}">
+                      {% if model.is_failed %}
+                        <button type="submit" name="llm_action" value="unmark_failed" class="btn-small">Reset</button>
+                      {% else %}
+                        <button type="submit" name="llm_action" value="mark_failed" class="btn-small btn-warn">Mark Failed</button>
+                      {% endif %}
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <div style="margin-top: 1em;">
+              <form method="POST">
+                {{ form.hidden_tag() }}
+                <button type="submit" name="llm_action" value="reset_all" class="btn-warn">Reset All Failed Models</button>
+              </form>
+            </div>
+          </div>
+        </div>
         {% endif %}
 
         {% if enable_url_customization %}

@@ -372,7 +372,7 @@ def ask_ai_top_articles(articles, dry_run=False, forced_model=None):
     # Prepare articles
     result = _prepare_articles_for_ai(articles)
     if result is None:
-        return "No new articles to rank.", [], None
+        return "No new articles to rank.", [], None, []
     filtered_articles, previous_selections = result
 
     # Prepare messages
@@ -385,17 +385,17 @@ def ask_ai_top_articles(articles, dry_run=False, forced_model=None):
             logger.debug(f"  Message {i+1} ({msg['role']}): {msg['content'][:200]}...")
 
     # Try AI selection with simplified logic
-    response_text, top_articles, used_model = _try_ai_models(messages, filtered_articles, forced_model)
+    response_text, top_articles, used_model, attempts = _try_ai_models(messages, filtered_articles, forced_model)
     
     # Check if we succeeded
     if not top_articles or len(top_articles) < 3:
         logger.error("Failed to get 3 articles after trying all available models")
-        return "Failed to get 3 articles after trying all available models.", [], None
+        return "Failed to get 3 articles after trying all available models.", [], None, attempts
 
     # Update cache
     _update_selections_cache(top_articles, previous_selections, used_model, dry_run)
     
-    return response_text, top_articles, used_model
+    return response_text, top_articles, used_model, attempts
 
 
 def _try_ai_models(messages, filtered_articles, forced_model=None):
@@ -403,10 +403,11 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
     logger.info("Starting AI model selection process")
 
     current_model = None
+    attempts = []
 
     # Try up to 3 different models (including fallback)
-    for attempt in range(3):
-        if attempt == 2:  # 3rd attempt
+    for attempt_idx in range(3):
+        if attempt_idx == 2:  # 3rd attempt
             current_model = FALLBACK_MODEL
             logger.info(f"Using fallback model: {current_model}")
         else:
@@ -414,29 +415,43 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
 
         logger.info(f"Trying model: {current_model}")
 
+        attempt_record = {
+            "model": current_model,
+            "messages": messages,
+            "response": None,
+            "success": False,
+            "error": None
+        }
+        attempts.append(attempt_record)
+
         try:
-            response_text, used_model = call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt+1}")
+            response_text, used_model = call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt_idx+1}")
+            attempt_record["response"] = response_text
 
             if not response_text:
                 logger.warning(f"Model {current_model} returned no response")
                 model_manager.mark_failed(current_model)
+                attempt_record["error"] = "Empty response"
                 continue
 
             top_articles = _process_ai_response(response_text, filtered_articles, f"model {current_model}")
             if top_articles and len(top_articles) >= 3:
                 logger.info(f"Successfully got {len(top_articles)} articles from model {current_model}")
                 model_manager.mark_success(current_model)
-                return response_text, top_articles, current_model
+                attempt_record["success"] = True
+                return response_text, top_articles, current_model, attempts
             else:
                 logger.warning(f"Model {current_model} failed to produce enough articles")
                 model_manager.mark_failed(current_model)
+                attempt_record["error"] = "Insufficient articles returned"
 
         except (RuntimeError, RateLimitError, APITimeoutError) as e:
             logger.error(f"Model {current_model} failed: {str(e)}")
             model_manager.mark_failed(current_model)
+            attempt_record["error"] = str(e)
 
     logger.error("All model attempts failed")
-    return None, [], None
+    return None, [], None, attempts
 
 
 
@@ -586,10 +601,11 @@ def _run_comparison_model(model, filtered_articles, label):
 
 
 
-def append_to_archive(mode, top_articles):
+def append_to_archive(mode, top_articles, timestamp=None):
     """Append the current top articles to the archive file with timestamp and image. Limit archive to MAX_ARCHIVE_HEADLINES."""
     archive_file = f"{mode}report_archive.jsonl"
-    timestamp = datetime.datetime.now(TZ).isoformat()
+    if timestamp is None:
+        timestamp = datetime.datetime.now(TZ).isoformat()
     
     logger.info(f"Appending {len(top_articles)} articles to archive: {archive_file}")
     
@@ -775,8 +791,17 @@ def _process_normal_mode(mode, articles, html_file, dry_run):
     """Process articles in normal mode with improved error handling."""
     logger.info("Running in normal mode")
     
+    # Generate a single timestamp for this run
+    run_timestamp = datetime.datetime.now(TZ).isoformat()
+    
     # Get AI-selected articles
-    full_response, top_3_articles_match, used_model = ask_ai_top_articles(articles, dry_run, MODEL_1)
+    full_response, top_3_articles_match, used_model, attempts = ask_ai_top_articles(articles, dry_run, MODEL_1)
+
+    # Save LLM attempts to cache
+    if attempts:
+        cache_key = f"llm_attempts:{mode}:{run_timestamp}"
+        logger.info(f"Saving {len(attempts)} LLM attempts to cache with key {cache_key}")
+        g_c.put(cache_key, attempts, timeout=EXPIRE_WEEK * 2)
 
     # Handle AI processing results
     if not top_3_articles_match:
@@ -812,7 +837,7 @@ def _process_normal_mode(mode, articles, html_file, dry_run):
     generate_headlines_html(top_3_articles_match, html_file, model_name=used_model if SHOW_AI_ATTRIBUTION else None)
                 
     logger.info(f"Appending to archive for mode: {mode}")
-    append_to_archive(mode, top_3_articles_match)
+    append_to_archive(mode, top_3_articles_match, run_timestamp)
     
     logger.info("Normal mode processing completed successfully")
     return 0
