@@ -23,7 +23,8 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Any, Optional, List, NamedTuple
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 
 import yaml
 from Logging import g_logger as logging
@@ -43,41 +44,39 @@ USE_TOR = True
 # --- Shared Reddit Fetch Config ---
 # Import here to avoid circular imports
 
-class FetchConfig(NamedTuple):
+@dataclass(frozen=True)
+class FetchConfig:
     """
     Base class for fetch configurations.
     
     This immutable configuration class provides type safety for all fetch-related
     settings used across different sites and services.
     """
-    needs_selenium: bool
-    needs_tor: bool
-    post_container: str
-    title_selector: str
-    link_selector: str
-    link_attr: str
-    filter_pattern: str
-    use_random_user_agent: bool
+    needs_selenium: bool = False
+    needs_tor: bool = False
+    post_container: str = ""
+    title_selector: str = ""
+    link_selector: str = ""
+    link_attr: str = "href"
+    filter_pattern: Optional[str] = None
+    use_random_user_agent: bool = False
     published_selector: Optional[str] = None
 
+@dataclass(frozen=True)
 class RedditFetchConfig(FetchConfig):
     """
     Reddit-specific fetch configuration.
     
     Inherits from FetchConfig with Reddit-specific defaults.
     """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=True,
-            needs_tor=True,
-            post_container="article",
-            title_selector="a[id^='post-title-']",
-            link_selector="a[id^='post-title-']",
-            link_attr="href",
-            filter_pattern="",
-            use_random_user_agent=True
-        )
+    needs_selenium: bool = True
+    needs_tor: bool = True
+    post_container: str = "article"
+    title_selector: str = "a[id^='post-title-']"
+    link_selector: str = "a[id^='post-title-']"
+    link_attr: str = "href"
+    filter_pattern: Optional[str] = None
+    use_random_user_agent: bool = True
 
 REDDIT_FETCH_CONFIG = RedditFetchConfig()
 

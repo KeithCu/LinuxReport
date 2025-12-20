@@ -1,25 +1,24 @@
+from typing import Optional
+from dataclasses import dataclass
 from models import RssInfo, SiteConfig
 from app_config import FetchConfig
 
+@dataclass(frozen=True)
 class SolarMagazineFetchConfig(FetchConfig):
     """
     Solar Magazine-specific fetch configuration.
     
     Inherits from FetchConfig with Solar Magazine-specific settings.
     """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=False,
-            needs_tor=False,
-            post_container="h3",
-            title_selector="a",
-            link_selector="a",
-            link_attr="href",
-            filter_pattern="",
-            use_random_user_agent=False,
-            published_selector=".date"
-        )
+    needs_selenium: bool = False
+    needs_tor: bool = False
+    post_container: str = "h3"
+    title_selector: str = "a"
+    link_selector: str = "a"
+    link_attr: str = "href"
+    filter_pattern: Optional[str] = None
+    use_random_user_agent: bool = False
+    published_selector: Optional[str] = ".date"
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS={

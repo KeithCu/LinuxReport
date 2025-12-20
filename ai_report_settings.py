@@ -1,27 +1,25 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
+from dataclasses import dataclass
 
 from models import RssInfo, SiteConfig
 from app_config import RedditFetchConfig, FetchConfig
 
+@dataclass(frozen=True)
 class VentureBeatFetchConfig(FetchConfig):
     """
     VentureBeat-specific fetch configuration.
     
     Inherits from FetchConfig with VentureBeat-specific settings.
     """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=True,
-            needs_tor=False,
-            post_container="article",
-            title_selector="h2 a",
-            link_selector="h2 a",
-            link_attr="href",
-            filter_pattern="",
-            use_random_user_agent=True,
-            published_selector="time"
-        )
+    needs_selenium: bool = True
+    needs_tor: bool = False
+    post_container: str = "article"
+    title_selector: str = "h2 a"
+    link_selector: str = "h2 a"
+    link_attr: str = "href"
+    filter_pattern: Optional[str] = None
+    use_random_user_agent: bool = True
+    published_selector: Optional[str] = "time"
 
 CONFIG: SiteConfig = SiteConfig(
 	ALL_URLS={

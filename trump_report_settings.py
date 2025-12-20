@@ -1,46 +1,42 @@
+from typing import Optional
+from dataclasses import dataclass
 from models import RssInfo, SiteConfig
 from app_config import RedditFetchConfig, FetchConfig
 
+@dataclass(frozen=True)
 class PatriotsWinFetchConfig(FetchConfig):
     """
     Patriots.win-specific fetch configuration.
     
     Inherits from FetchConfig with Patriots.win-specific settings.
     """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=True,
-            needs_tor=False,
-            post_container="a[href^='/p/']",  # Post links start with /p/
-            title_selector="a[href^='/p/']",  # Title is the text content of post links
-            link_selector="a[href^='/p/']",   # Post links
-            link_attr="href",
-            filter_pattern="",
-            use_random_user_agent=False,
-            published_selector="span:contains('ago')"  # Time elements contain "ago"
-        )
+    needs_selenium: bool = True
+    needs_tor: bool = False
+    post_container: str = "a[href^='/p/']"  # Post links start with /p/
+    title_selector: str = "a[href^='/p/']"  # Title is the text content of post links
+    link_selector: str = "a[href^='/p/']"   # Post links
+    link_attr: str = "href"
+    filter_pattern: Optional[str] = None
+    use_random_user_agent: bool = False
+    published_selector: Optional[str] = "span:contains('ago')"  # Time elements contain "ago"
 
 
+@dataclass(frozen=True)
 class RevolverNewsFetchConfig(FetchConfig):
     """
     Revolver.news-specific fetch configuration.
     
     Inherits from FetchConfig with Revolver.news-specific settings.
     """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=False,
-            needs_tor=False,
-            post_container="article.item",
-            title_selector="h2.title a",
-            link_selector="h2.title a",
-            link_attr="href",
-            filter_pattern="",
-            use_random_user_agent=False,
-            published_selector=".meta time"
-        )
+    needs_selenium: bool = False
+    needs_tor: bool = False
+    post_container: str = "article.item"
+    title_selector: str = "h2.title a"
+    link_selector: str = "h2.title a"
+    link_attr: str = "href"
+    filter_pattern: Optional[str] = None
+    use_random_user_agent: bool = False
+    published_selector: Optional[str] = ".meta time"
 import datetime
 
 CONFIG: SiteConfig = SiteConfig(

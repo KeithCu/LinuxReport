@@ -1,25 +1,24 @@
+from typing import Optional
+from dataclasses import dataclass
 from models import RssInfo, SiteConfig
 from app_config import FetchConfig
 
+@dataclass(frozen=True)
 class BandcampFetchConfig(FetchConfig):
     """
     Bandcamp-specific fetch configuration.
     
     Inherits from FetchConfig with Bandcamp-specific settings.
     """
-    def __new__(cls):
-        return super().__new__(
-            cls,
-            needs_selenium=True,
-            needs_tor=False,
-            post_container=".music-grid-item",
-            title_selector=".title",
-            link_selector="a",
-            link_attr="href",
-            filter_pattern="",
-            use_random_user_agent=False,
-            published_selector=".date"
-        )
+    needs_selenium: bool = True
+    needs_tor: bool = False
+    post_container: str = ".music-grid-item"
+    title_selector: str = ".title"
+    link_selector: str = "a"
+    link_attr: str = "href"
+    filter_pattern: Optional[str] = None
+    use_random_user_agent: bool = False
+    published_selector: Optional[str] = ".date"
 
 CONFIG: SiteConfig = SiteConfig(
     ALL_URLS = {
