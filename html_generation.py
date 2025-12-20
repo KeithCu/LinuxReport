@@ -109,7 +109,7 @@ def build_llm_process_viewer_html(attempts, timestamp):
             link.addEventListener('click', function() {
                 const targetId = this.dataset.target;
                 const popup = document.getElementById(targetId);
-                const overlayId = 'overlay-' + targetId.replace('popup-main-', '');
+                const overlayId = 'overlay-main-' + targetId.replace('popup-main-', '');
                 const overlay = document.getElementById(overlayId);
                 if (popup && overlay) {
                     popup.classList.add('active');
@@ -122,7 +122,7 @@ def build_llm_process_viewer_html(attempts, timestamp):
             btn.addEventListener('click', function() {
                 const targetId = this.dataset.target;
                 const popup = document.getElementById(targetId);
-                const overlayId = 'overlay-' + targetId.replace('popup-main-', '');
+                const overlayId = 'overlay-main-' + targetId.replace('popup-main-', '');
                 const overlay = document.getElementById(overlayId);
                 if (popup) popup.classList.remove('active');
                 if (overlay) overlay.classList.remove('active');
