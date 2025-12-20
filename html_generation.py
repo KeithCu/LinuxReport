@@ -9,7 +9,7 @@ This includes rendering articles with Jinja2 templates and refreshing images.
 # STANDARD LIBRARY IMPORTS
 # =============================================================================
 import os
-from shared import g_logger
+from shared import g_logger, g_c
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -48,13 +48,177 @@ HEADLINE_TEMPLATE = Template("""
 # HTML GENERATION FUNCTIONS
 # =============================================================================
 
-def generate_headlines_html(top_articles, output_file, model_name=None):
+def build_llm_process_viewer_html(attempts, timestamp):
+    """
+    Build HTML for LLM process viewer popup with CSS and JavaScript.
+    
+    Args:
+        attempts (list): List of LLM attempt dictionaries
+        timestamp (str): ISO timestamp for this headline generation
+    
+    Returns:
+        str: HTML string containing popup, CSS, and JavaScript
+    """
+    if not attempts:
+        return ""
+    
+    # Sanitize timestamp for use as HTML ID
+    sanitized_id = timestamp.replace(':', '-').replace('.', '-').replace('+', '-').replace('/', '-').replace('T', '-').replace('Z', '')
+    
+    # Build popup HTML
+    popup_html = f"""
+<div class="ai-process-overlay-main" id="overlay-main-{sanitized_id}"></div>
+<div class="ai-process-popup-main" id="popup-main-{sanitized_id}">
+    <span class="ai-process-close-main" data-target="popup-main-{sanitized_id}">&times;</span>
+    <h3>LLM Process</h3>"""
+    
+    for attempt in attempts:
+        success_class = "ai-success" if attempt.get('success') else "ai-failed"
+        status_text = "Success" if attempt.get('success') else "Failed"
+        error_text = f" ({attempt.get('error', '')})" if attempt.get('error') else ""
+        
+        popup_html += f"""
+    <div class="ai-attempt-main">
+        <div class="ai-attempt-header-main">
+            Model: {attempt.get('model', 'Unknown')} | 
+            Status: <span class="{success_class}">{status_text}{error_text}</span>
+        </div>
+        <div class="ai-attempt-header-main">Prompt:</div>
+        <div class="ai-attempt-body-main">"""
+        
+        for msg in attempt.get('messages', []):
+            popup_html += f"[{msg.get('role', 'unknown')}]: {msg.get('content', '')}\n"
+        
+        popup_html += """</div>"""
+        
+        if attempt.get('response'):
+            popup_html += f"""
+        <div class="ai-attempt-header-main">Response:</div>
+        <div class="ai-attempt-body-main">{attempt.get('response')}</div>"""
+        
+        popup_html += """
+    </div>"""
+    
+    popup_html += """
+</div>
+<style>
+.ai-process-link-main { color: var(--link, #1a0dab); }
+.ai-process-popup-main {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 800px;
+    height: 80%;
+    background: var(--bg, #fff);
+    border: 2px solid var(--border, #ddd);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    z-index: 1000;
+    padding: 2em;
+    overflow-y: auto;
+}
+.ai-process-popup-main.active { display: block; }
+.ai-process-overlay-main {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 999;
+}
+.ai-process-overlay-main.active { display: block; }
+.ai-attempt-main {
+    margin-bottom: 2em;
+    padding-bottom: 1em;
+    border-bottom: 1px dashed var(--border, #ddd);
+}
+.ai-attempt-main:last-child { border-bottom: none; }
+.ai-attempt-header-main {
+    font-weight: bold;
+    margin-bottom: 0.5em;
+    color: var(--text, #222);
+}
+.ai-attempt-body-main {
+    background: #f8f8f8;
+    padding: 1em;
+    border-radius: 6px;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    color: #333;
+}
+.ai-process-close-main {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 1.5em;
+    cursor: pointer;
+    color: var(--muted, #888);
+}
+.ai-success { color: green; }
+.ai-failed { color: red; }
+</style>
+<script>
+(function() {
+    function initAiProcessPopups() {
+        const links = document.querySelectorAll('.ai-process-link-main');
+        links.forEach(link => {
+            link.addEventListener('click', function() {
+                const targetId = this.dataset.target;
+                const popup = document.getElementById(targetId);
+                const overlayId = 'overlay-' + targetId.replace('popup-main-', '');
+                const overlay = document.getElementById(overlayId);
+                if (popup && overlay) {
+                    popup.classList.add('active');
+                    overlay.classList.add('active');
+                }
+            });
+        });
+        
+        document.querySelectorAll('.ai-process-close-main').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const targetId = this.dataset.target;
+                const popup = document.getElementById(targetId);
+                const overlayId = 'overlay-' + targetId.replace('popup-main-', '');
+                const overlay = document.getElementById(overlayId);
+                if (popup) popup.classList.remove('active');
+                if (overlay) overlay.classList.remove('active');
+            });
+        });
+        
+        document.querySelectorAll('.ai-process-overlay-main').forEach(overlay => {
+            overlay.addEventListener('click', function() {
+                document.querySelectorAll('.ai-process-popup-main').forEach(p => p.classList.remove('active'));
+                document.querySelectorAll('.ai-process-overlay-main').forEach(o => o.classList.remove('active'));
+            });
+        });
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAiProcessPopups);
+    } else {
+        initAiProcessPopups();
+    }
+})();
+</script>"""
+    
+    return popup_html
+
+def generate_headlines_html(top_articles, output_file, model_name=None, attempts=None, timestamp=None):
     """
     Generates the complete HTML for the headlines section and writes it to a file.
 
     This function takes a list of articles, renders them using the HEADLINE_TEMPLATE,
     and ensures that only the first article with a valid image displays that image.
-    It can also add an attribution link for the AI model used.
+    It can also add an attribution link for the AI model used and an LLM process viewer.
 
     Args:
         top_articles (list[dict]): A list of article dictionaries. Each dictionary
@@ -63,6 +227,11 @@ def generate_headlines_html(top_articles, output_file, model_name=None):
         output_file (str): The absolute path to the output HTML file.
         model_name (str, optional): The name of the AI model used for generation.
                                     If provided, an attribution link is added.
+                                    Defaults to None.
+        attempts (list, optional): List of LLM attempt dictionaries for process viewer.
+                                    Defaults to None.
+        timestamp (str, optional): ISO timestamp for this headline generation.
+                                   Required if attempts are provided.
                                     Defaults to None.
     """
     html_parts = []
@@ -82,14 +251,24 @@ def generate_headlines_html(top_articles, output_file, model_name=None):
         )
         html_parts.append(rendered_html)
 
-    # Add AI model attribution if a model name is provided.
+    # Add AI model attribution and LLM process viewer if a model name is provided.
     if model_name:
         attribution_html = f"""
-<div style="text-align: right; font-size: 8px; color: var(--link);">
-<a href="https://openrouter.ai/{model_name}" target="_blank" style="text-decoration: none; color: inherit;">Generated by {model_name}</a>
-</div>
-"""
+<div style="text-align: right; font-size: 8px; color: var(--link); margin-top: 0.5em;">
+<a href="https://openrouter.ai/{model_name}" target="_blank" style="text-decoration: none; color: inherit;">Generated by {model_name}</a>"""
+        
+        # Add LLM process viewer link if attempts are available
+        if attempts and timestamp:
+            sanitized_id = timestamp.replace(':', '-').replace('.', '-').replace('+', '-').replace('/', '-').replace('T', '-').replace('Z', '')
+            attribution_html += f""" | <span class="ai-process-link-main" data-target="popup-main-{sanitized_id}" style="cursor: pointer; text-decoration: underline;">View LLM Process</span>"""
+        
+        attribution_html += "</div>"
         html_parts.append(attribution_html)
+        
+        # Add LLM process viewer popup if attempts are available
+        if attempts and timestamp:
+            popup_html = build_llm_process_viewer_html(attempts, timestamp)
+            html_parts.append(popup_html)
 
     full_html = "\n".join(html_parts)
 

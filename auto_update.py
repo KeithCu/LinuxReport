@@ -850,7 +850,13 @@ def _process_normal_mode(mode, articles, html_file, dry_run):
             
     # Generate HTML and archive
     logger.info(f"Generating HTML file: {html_file}")
-    generate_headlines_html(top_3_articles_match, html_file, model_name=used_model if SHOW_AI_ATTRIBUTION else None)
+    generate_headlines_html(
+        top_3_articles_match, 
+        html_file, 
+        model_name=used_model if SHOW_AI_ATTRIBUTION else None,
+        attempts=attempts,
+        timestamp=run_timestamp
+    )
                 
     logger.info(f"Appending to archive for mode: {mode}")
     append_to_archive(mode, top_3_articles_match, run_timestamp)
