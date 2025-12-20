@@ -155,29 +155,56 @@ class LLMModelManager:
         self.working_model_cache_key = "working_llm_model"
         
     def get_failed_models(self):
-        """Get the set of currently failed models."""
+        """Get dict of currently failed models with their failure reasons and responses.
+        
+        Returns:
+            dict: Mapping of model name to dict with 'reason' and 'response' keys.
+                  Only includes models currently in FREE_MODELS.
+        """
         failed_models_data = g_c.get(self.failed_models_cache_key) or {}
         current_time = time.time()
         
-        # Filter out models that have been failed for too long
-        failed_models = {
-            model for model, fail_time in failed_models_data.items()
-            if current_time - fail_time < self.cache_duration
-        }
+        # Filter out models that have been failed for too long or are no longer in FREE_MODELS
+        failed_models = {}
+        for model, fail_info in failed_models_data.items():
+            # Skip models that are no longer in FREE_MODELS
+            if model not in FREE_MODELS:
+                continue
+            
+            # Handle both old format (just timestamp) and new format (dict with timestamp, reason, and response)
+            if isinstance(fail_info, dict):
+                fail_time = fail_info.get('timestamp', 0)
+                reason = fail_info.get('reason', 'Unknown error')
+                response = fail_info.get('response', '')
+            else:
+                # Old format: just a timestamp
+                fail_time = fail_info
+                reason = 'Unknown error'
+                response = ''
+            
+            if current_time - fail_time < self.cache_duration:
+                failed_models[model] = {
+                    'reason': reason,
+                    'response': response
+                }
         
         logger.debug(f"Loaded {len(failed_models)} failed models from cache")
         return failed_models
     
-    def mark_failed(self, model):
-        """Mark a model as failed with timestamp."""
+    def mark_failed(self, model, reason=None, response_text=None):
+        """Mark a model as failed with timestamp, reason, and full response."""
         if model not in FREE_MODELS:
             logger.warning(f"Attempted to mark unknown model as failed: {model}")
             return
             
         failed_models_data = g_c.get(self.failed_models_cache_key) or {}
-        failed_models_data[model] = time.time()
+        failed_models_data[model] = {
+            'timestamp': time.time(),
+            'reason': reason or 'Unknown error',
+            'response': response_text or ''
+        }
         g_c.put(self.failed_models_cache_key, failed_models_data, timeout=self.cache_duration)
-        logger.info(f"Marked model as failed: {model}")
+        logger.info(f"Marked model as failed: {model} - Reason: {reason}")
     
     def clear_failed_models(self):
         """Clear all failed models from cache."""
@@ -198,15 +225,19 @@ class LLMModelManager:
             return False
     
     def get_all_models_status(self):
-        """Get status of all models."""
-        failed_models = self.get_failed_models()
+        """Get status of all models. Only returns models currently in FREE_MODELS."""
+        failed_models = self.get_failed_models()  # Returns dict of {model: {reason, response}}
         working_model = g_c.get(self.working_model_cache_key)
         
         status = []
+        # Only show models that are currently in FREE_MODELS
         for model in FREE_MODELS:
+            failed_info = failed_models.get(model)
             status.append({
                 'name': model,
                 'is_failed': model in failed_models,
+                'failure_reason': failed_info.get('reason') if failed_info else None,
+                'failure_response': failed_info.get('response') if failed_info else None,
                 'is_working': model == working_model
             })
         return status
@@ -220,6 +251,11 @@ class LLMModelManager:
             logger.info(f"Unmarked model as failed: {model}")
             return True
         return False
+    
+    def get_failed_model_reason(self, model):
+        """Get the failure reason and response for a specific model."""
+        failed_models = self.get_failed_models()
+        return failed_models.get(model, None)
 
     def mark_success(self, model, forced_model=None):
         """Mark a model as successful and update cache."""
@@ -242,7 +278,7 @@ class LLMModelManager:
         Returns:
             Model name or None if no models available
         """
-        failed_models = self.get_failed_models()
+        failed_models = self.get_failed_models()  # Now returns dict, but we just need keys for membership check
         
         # 1. Forced model takes precedence
         if forced_model:

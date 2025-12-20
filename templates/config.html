@@ -80,6 +80,7 @@
                 <tr>
                   <th>Model Name</th>
                   <th>Status</th>
+                  <th>Failure Reason</th>
                   <th>Action</th>
                 </tr>
               </thead>
@@ -94,6 +95,31 @@
                       <span class="status-working">Working (Cached)</span>
                     {% else %}
                       <span class="status-ok">OK</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if model.failure_reason %}
+                      {% if model.failure_response %}
+                        <span class="failure-reason-link" data-target="response-popup-{{ loop.index }}" title="Click to view full response">{{ model.failure_reason }}</span>
+                        <div class="response-popup" id="response-popup-{{ loop.index }}">
+                          <span class="response-popup-close">&times;</span>
+                          <h3>Failure Details: {{ model.name }}</h3>
+                          <div class="response-popup-section">
+                            <strong>Reason:</strong>
+                            <div class="response-text">{{ model.failure_reason }}</div>
+                          </div>
+                          {% if model.failure_response %}
+                          <div class="response-popup-section">
+                            <strong>Full Response:</strong>
+                            <div class="response-text full-response">{{ model.failure_response }}</div>
+                          </div>
+                          {% endif %}
+                        </div>
+                      {% else %}
+                        <span class="failure-reason" title="{{ model.failure_reason }}">{{ model.failure_reason }}</span>
+                      {% endif %}
+                    {% else %}
+                      <span class="no-reason">—</span>
                     {% endif %}
                   </td>
                   <td>
@@ -160,6 +186,37 @@
 <script>
   window.isAdmin = {{ 'true' if is_admin else 'false' }};
   window.flaskDebug = {{ 'true' if config.DEBUG else 'false' }};
+  
+  // Initialize response popups
+  document.addEventListener('DOMContentLoaded', function() {
+    const overlay = document.createElement('div');
+    overlay.className = 'response-popup-overlay';
+    document.body.appendChild(overlay);
+    
+    const links = document.querySelectorAll('.failure-reason-link');
+    links.forEach(link => {
+      link.addEventListener('click', () => {
+        const id = link.dataset.target;
+        const popup = document.getElementById(id);
+        if (popup) {
+          popup.classList.add('active');
+          overlay.classList.add('active');
+        }
+      });
+    });
+    
+    overlay.addEventListener('click', () => {
+      document.querySelectorAll('.response-popup').forEach(p => p.classList.remove('active'));
+      overlay.classList.remove('active');
+    });
+    
+    document.querySelectorAll('.response-popup-close').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.response-popup').forEach(p => p.classList.remove('active'));
+        overlay.classList.remove('active');
+      });
+    });
+  });
 </script>
 </body>
 </html>

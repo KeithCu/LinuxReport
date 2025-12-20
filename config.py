@@ -36,7 +36,7 @@ def init_config_routes(app):
                 elif action == 'mark_failed':
                     model = request.form.get('model_name')
                     if model:
-                        model_manager.mark_failed(model)
+                        model_manager.mark_failed(model, 'Manually marked as failed by admin', '')
                         flash(f'Model {model} has been marked as failed.', 'success')
                 return redirect(url_for('config'))
 

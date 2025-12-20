@@ -440,9 +440,10 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
             attempt_record["response"] = response_text
 
             if not response_text:
+                error_msg = "Empty response"
                 logger.warning(f"Model {current_model} returned no response")
-                model_manager.mark_failed(current_model)
-                attempt_record["error"] = "Empty response"
+                model_manager.mark_failed(current_model, error_msg, response_text="")
+                attempt_record["error"] = error_msg
                 continue
 
             top_articles = _process_ai_response(response_text, filtered_articles, f"model {current_model}")
@@ -452,14 +453,18 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
                 attempt_record["success"] = True
                 return response_text, top_articles, current_model, attempts
             else:
+                error_msg = "Insufficient articles returned"
                 logger.warning(f"Model {current_model} failed to produce enough articles")
-                model_manager.mark_failed(current_model)
-                attempt_record["error"] = "Insufficient articles returned"
+                model_manager.mark_failed(current_model, error_msg, response_text)
+                attempt_record["error"] = error_msg
 
         except (RuntimeError, RateLimitError, APITimeoutError) as e:
-            logger.error(f"Model {current_model} failed: {str(e)}")
-            model_manager.mark_failed(current_model)
-            attempt_record["error"] = str(e)
+            error_msg = str(e)
+            logger.error(f"Model {current_model} failed: {error_msg}")
+            # For exceptions, we might not have a response_text, so use empty string
+            response_text_for_failure = attempt_record.get("response", "")
+            model_manager.mark_failed(current_model, error_msg, response_text_for_failure)
+            attempt_record["error"] = error_msg
 
     logger.error("All model attempts failed")
     return None, [], None, attempts
