@@ -255,60 +255,45 @@
             <div class="ai-process-overlay"></div>
             {% for date, content in grouped_headlines %}
                 <div class="date-header">{{ date }}</div>
-                {% if is_admin %}
-                    {# content is a list of (timestamp, time_group_dict) #}
-                    {% for timestamp, group in content %}
-                        {% set sanitized_id = timestamp | replace(':', '-') | replace('.', '-') | replace('+', '-') | replace('/', '-') | replace('T', '-') | replace('Z', '') %}
-                        <div class="ai-process-container">
-                            Generated: {{ timestamp }}
-                            {% if group.attempts %}
-                                | <span class="ai-process-link" data-target="popup-{{ sanitized_id }}">View LLM Process</span>
-                                <div class="ai-process-popup" id="popup-{{ sanitized_id }}">
-                                    <span class="ai-process-close">&times;</span>
-                                    <h3>LLM Process for {{ timestamp }}</h3>
-                                    {% for attempt in group.attempts %}
-                                        <div class="ai-attempt">
-                                            <div class="ai-attempt-header">
-                                                Model: {{ attempt.model }} | 
-                                                Status: <span class="{{ 'ai-success' if attempt.success else 'ai-failed' }}">
-                                                    {{ 'Success' if attempt.success else 'Failed' }}{% if attempt.error %} ({{ attempt.error }}){% endif %}
-                                                </span>
-                                            </div>
-                                            <div class="ai-attempt-header">Prompt:</div>
-                                            <div class="ai-attempt-body">{% for msg in attempt.messages %}[{{ msg.role }}]: {{ msg.content }}
-{% endfor %}</div>
-                                            {% if attempt.response %}
-                                                <div class="ai-attempt-header">Response:</div>
-                                                <div class="ai-attempt-body">{{ attempt.response }}</div>
-                                            {% endif %}
+                {# content is a list of (timestamp, time_group_dict) #}
+                {% for timestamp, group in content %}
+                    {% set sanitized_id = timestamp | replace(':', '-') | replace('.', '-') | replace('+', '-') | replace('/', '-') | replace('T', '-') | replace('Z', '') %}
+                    <div class="ai-process-container">
+                        Generated: {{ timestamp }}
+                        {% if group.attempts %}
+                            | <span class="ai-process-link" data-target="popup-{{ sanitized_id }}">View LLM Process</span>
+                            <div class="ai-process-popup" id="popup-{{ sanitized_id }}">
+                                <span class="ai-process-close">&times;</span>
+                                <h3>LLM Process for {{ timestamp }}</h3>
+                                {% for attempt in group.attempts %}
+                                    <div class="ai-attempt">
+                                        <div class="ai-attempt-header">
+                                            Model: {{ attempt.model }} | 
+                                            Status: <span class="{{ 'ai-success' if attempt.success else 'ai-failed' }}">
+                                                {{ 'Success' if attempt.success else 'Failed' }}{% if attempt.error %} ({{ attempt.error }}){% endif %}
+                                            </span>
                                         </div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                | <span style="font-style: italic;">(No LLM process logs available)</span>
-                            {% endif %}
-                        </div>
-                        {% for h in group.headlines %}
-                            <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
-                                <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
-                                    <span><a href="{{ h.url }}" target="_blank">{{ h.title | safe }}</a></span>
-                                    <button class="delete-headline-btn" title="Delete">&#10005;</button>
-                                </div>
-                                {% if h.image_url %}
-                                    <img loading="lazy" src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
-                                {% endif %}
-                                <div class="headline-timestamp">
-                                    <span class="last-updated-time" data-utc-time="{{ h.timestamp }}"></span>
-                                </div>
+                                        <div class="ai-attempt-header">Prompt:</div>
+                                        <div class="ai-attempt-body">{% for msg in attempt.messages %}[{{ msg.role }}]: {{ msg.content }}
+{% endfor %}</div>
+                                        {% if attempt.response %}
+                                            <div class="ai-attempt-header">Response:</div>
+                                            <div class="ai-attempt-body">{{ attempt.response }}</div>
+                                        {% endif %}
+                                    </div>
+                                {% endfor %}
                             </div>
-                        {% endfor %}
-                    {% endfor %}
-                {% else %}
-                    {# content is a list of headline dicts #}
-                    {% for h in content %}
+                        {% else %}
+                            | <span style="font-style: italic;">(No LLM process logs available)</span>
+                        {% endif %}
+                    </div>
+                    {% for h in group.headlines %}
                         <div class="headline-entry" data-url="{{ h.url }}" data-timestamp="{{ h.timestamp }}">
                             <div class="headline-title" style="display: flex; align-items: center; justify-content: space-between;">
                                 <span><a href="{{ h.url }}" target="_blank">{{ h.title | safe }}</a></span>
+                                {% if is_admin %}
+                                    <button class="delete-headline-btn" title="Delete">&#10005;</button>
+                                {% endif %}
                             </div>
                             {% if h.image_url %}
                                 <img loading="lazy" src="{{ h.image_url }}" class="headline-image" alt="{{ h.alt_text or 'headline image' }}">
@@ -318,7 +303,7 @@
                             </div>
                         </div>
                     {% endfor %}
-                {% endif %}
+                {% endfor %}
             {% endfor %}
         {% else %}
             <p>No old headlines found for this report.</p>

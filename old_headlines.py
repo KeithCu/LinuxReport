@@ -103,24 +103,20 @@ def init_old_headlines_routes(app):
             # Convert to list of tuples (date, headlines) and sort by date
             grouped_headlines_list = []
             for date_str, heads in grouped_headlines.items():
-                # For admins, try to find LLM attempts for the timestamps in this date group
-                if is_admin:
-                    # Group headlines by exact timestamp within this date
-                    time_groups = {}
-                    for h in heads:
-                        ts = h.get('timestamp')
-                        if ts not in time_groups:
-                            time_groups[ts] = {
-                                'headlines': [],
-                                'attempts': g_c.get(f"llm_attempts:{mode_str}:{ts}")
-                            }
-                        time_groups[ts]['headlines'].append(h)
-                    
-                    # Sort time groups by timestamp descending
-                    sorted_times = sorted(time_groups.items(), key=lambda x: x[0], reverse=True)
-                    grouped_headlines_list.append((date_str, sorted_times))
-                else:
-                    grouped_headlines_list.append((date_str, heads))
+                # Group headlines by exact timestamp within this date and fetch LLM attempts for all users
+                time_groups = {}
+                for h in heads:
+                    ts = h.get('timestamp')
+                    if ts not in time_groups:
+                        time_groups[ts] = {
+                            'headlines': [],
+                            'attempts': g_c.get(f"llm_attempts:{mode_str}:{ts}")
+                        }
+                    time_groups[ts]['headlines'].append(h)
+                
+                # Sort time groups by timestamp descending
+                sorted_times = sorted(time_groups.items(), key=lambda x: x[0], reverse=True)
+                grouped_headlines_list.append((date_str, sorted_times))
 
             grouped_headlines_list.sort(key=lambda x: datetime.datetime.strptime(x[0], '%B %d, %Y'), reverse=True)
 
