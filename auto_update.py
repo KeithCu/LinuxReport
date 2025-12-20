@@ -412,6 +412,17 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
             logger.info(f"Using fallback model: {current_model}")
         else:
             current_model = model_manager.get_available_model(current_model=current_model, forced_model=forced_model)
+            if current_model is None:
+                logger.error("No available models found, skipping this attempt")
+                attempt_record = {
+                    "model": None,
+                    "messages": messages,
+                    "response": None,
+                    "success": False,
+                    "error": "No available models"
+                }
+                attempts.append(attempt_record)
+                continue
 
         logger.info(f"Trying model: {current_model}")
 

@@ -42,8 +42,6 @@ def init_config_routes(app):
 
         if request.method == 'GET':
             form = ConfigForm()
-            
-            # ... existing code ...
 
             no_underlines_cookie = request.cookies.get('NoUnderlines', "1")
             form.no_underlines.data = no_underlines_cookie == "1"

@@ -258,11 +258,12 @@
                 {% if is_admin %}
                     {# content is a list of (timestamp, time_group_dict) #}
                     {% for timestamp, group in content %}
+                        {% set sanitized_id = timestamp | replace(':', '-') | replace('.', '-') | replace('+', '-') | replace('/', '-') | replace('T', '-') | replace('Z', '') %}
                         <div class="ai-process-container">
                             Generated: {{ timestamp }}
                             {% if group.attempts %}
-                                | <span class="ai-process-link" data-target="popup-{{ timestamp | replace(':', '-') | replace('.', '-') }}">View LLM Process</span>
-                                <div class="ai-process-popup" id="popup-{{ timestamp | replace(':', '-') | replace('.', '-') }}">
+                                | <span class="ai-process-link" data-target="popup-{{ sanitized_id }}">View LLM Process</span>
+                                <div class="ai-process-popup" id="popup-{{ sanitized_id }}">
                                     <span class="ai-process-close">&times;</span>
                                     <h3>LLM Process for {{ timestamp }}</h3>
                                     {% for attempt in group.attempts %}
