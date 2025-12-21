@@ -803,9 +803,21 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
             try:
                 config_module = __import__(f"{mode.value}_report_settings", fromlist=["CONFIG"])
                 config = config_module.CONFIG
+                # Extract base URL from URL_IMAGES (e.g., "https://linuxreport.net/static/images/" -> "https://linuxreport.net")
+                # Remove trailing slash and /static/images/ suffix if present
+                url_images = config.URL_IMAGES.rstrip('/')
+                if url_images.endswith('/static/images'):
+                    report_url = url_images[:-len('/static/images')]
+                else:
+                    # Fallback: try to extract base URL by removing /static/images/ pattern
+                    report_url = url_images.replace('/static/images', '').rstrip('/')
+                    # If that didn't work, use default pattern
+                    if report_url == url_images:
+                        report_url = f"https://{mode.value}report.keithcu.com"
+                
                 all_reports.append({
                     'name': mode.value.title(),
-                    'url': f"https://{mode.value}report.keithcu.com" if mode.value != "robot" else "https://robotreport.keithcu.com",
+                    'url': report_url,
                     'description': config.WEB_DESCRIPTION,
                     'is_current': mode == MODE
                 })
@@ -843,9 +855,21 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
             try:
                 config_module = __import__(f"{mode.value}_report_settings", fromlist=["CONFIG"])
                 config = config_module.CONFIG
+                # Extract base URL from URL_IMAGES (e.g., "https://linuxreport.net/static/images/" -> "https://linuxreport.net")
+                # Remove trailing slash and /static/images/ suffix if present
+                url_images = config.URL_IMAGES.rstrip('/')
+                if url_images.endswith('/static/images'):
+                    report_url = url_images[:-len('/static/images')]
+                else:
+                    # Fallback: try to extract base URL by removing /static/images/ pattern
+                    report_url = url_images.replace('/static/images', '').rstrip('/')
+                    # If that didn't work, use default pattern
+                    if report_url == url_images:
+                        report_url = f"https://{mode.value}report.keithcu.com"
+                
                 all_reports.append({
                     'name': mode.value.title(),
-                    'url': f"https://{mode.value}report.keithcu.com" if mode.value != "robot" else "https://robotreport.keithcu.com",
+                    'url': report_url,
                     'description': config.WEB_DESCRIPTION,
                     'is_current': mode == MODE
                 })
