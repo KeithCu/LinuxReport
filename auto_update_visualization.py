@@ -8,7 +8,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
-from embeddings_dedup import get_embedding
+from embeddings_dedup import get_embeddings
 from shared import g_c
 from Logging import _setup_logging
 
@@ -70,7 +70,7 @@ def create_embedding_visualization(mode=None, output_file="embedding_visualizati
     for i, title in enumerate(titles):
         if i % 10 == 0:  # Log progress every 10 titles
             logger.info(f"Processing title {i+1}/{len(titles)}")
-        embedding = get_embedding(title)
+        embedding = get_embeddings(title)
         if embedding is not None:
             embeddings.append(embedding.cpu().numpy())
             valid_titles.append(title)

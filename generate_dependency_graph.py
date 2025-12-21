@@ -24,6 +24,16 @@ class FunctionVisitor(ast.NodeVisitor):
         self.classes = {}    # Track class definitions and their bases
         self.class_methods = {}  # Track methods within classes
         self.class_instances = {}  # Track class instantiations
+    
+    def _get_attr_name(self, node):
+        """Recursively extract the full name from an Attribute node."""
+        if isinstance(node, ast.Name):
+            return node.id
+        elif isinstance(node, ast.Attribute):
+            value = self._get_attr_name(node.value)
+            return f"{value}.{node.attr}"
+        else:
+            return None
 
     def visit_Import(self, node):
         for name in node.names:
@@ -45,11 +55,12 @@ class FunctionVisitor(ast.NodeVisitor):
                 if self.current_function:
                     self.calls[self.current_function].add(base.id)
             elif isinstance(base, ast.Attribute):
-                base_name = f"{base.value.id}.{base.attr}"
-                bases.append(base_name)
-                # Add inheritance relationship to calls
-                if self.current_function:
-                    self.calls[self.current_function].add(base_name)
+                base_name = self._get_attr_name(base)
+                if base_name:
+                    bases.append(base_name)
+                    # Add inheritance relationship to calls
+                    if self.current_function:
+                        self.calls[self.current_function].add(base_name)
         
         self.classes[node.name] = bases
         
@@ -133,26 +144,54 @@ class FunctionVisitor(ast.NodeVisitor):
 
 def get_function_dependencies(file_path: str) -> Tuple[Dict, Dict, Set]:
     """Extract function definitions and their dependencies from a Python file."""
-    with open(file_path, 'r', encoding='utf-8') as f:
-        tree = ast.parse(f.read())
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        # Try with different encoding or skip the file
+        try:
+            with open(file_path, 'r', encoding='latin-1') as f:
+                content = f.read()
+        except Exception:
+            # Skip files that can't be decoded
+            return {}, {}, set()
     
-    visitor = FunctionVisitor()
-    visitor.visit(tree)
+    try:
+        tree = ast.parse(content)
+    except (SyntaxError, ValueError):
+        # Skip files with syntax errors
+        return {}, {}, set()
     
-    # Add class instantiation relationships to calls
-    for class_name, callers in visitor.class_instances.items():
-        for caller in callers:
-            visitor.calls[caller].add(class_name)
-    
-    return visitor.functions, visitor.calls, visitor.imports
+    try:
+        visitor = FunctionVisitor()
+        visitor.visit(tree)
+        
+        # Add class instantiation relationships to calls
+        for class_name, callers in visitor.class_instances.items():
+            for caller in callers:
+                visitor.calls[caller].add(class_name)
+        
+        return visitor.functions, visitor.calls, visitor.imports
+    except (RecursionError, AttributeError, TypeError) as e:
+        # Skip files that cause recursion errors or other AST parsing issues
+        print(f"Warning: Skipping {file_path} due to error: {e}")
+        return {}, {}, set()
 
 def should_process_file(file_path: str) -> bool:
     """Determine if a file should be processed."""
-    if 'venv' in file_path.split(os.sep):
+    if '.venv' in file_path.split(os.sep):
         return False
     if '__pycache__' in file_path.split(os.sep):
         return False
     if '.git' in file_path.split(os.sep):
+        return False
+    # Exclude test files
+    if 'tests' in file_path.split(os.sep):
+        return False
+    if os.path.basename(file_path).startswith('test_'):
+        return False
+    # Exclude the dependency graph generator itself
+    if os.path.basename(file_path) == 'generate_dependency_graph.py':
         return False
     return True
 

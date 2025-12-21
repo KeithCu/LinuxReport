@@ -10,6 +10,7 @@ import json
 import requests
 from typing import List, Set, Tuple, Dict
 import time
+from pathlib import Path
 
 
 def get_package_dependencies_from_pypi(package_name: str) -> Set[str]:
@@ -179,11 +180,11 @@ def save_dependency_cache(cache: Dict[str, Set[str]], cache_dir: str):
     Save dependency cache to individual files in a directory for future use.
     """
     # Create cache directory if it doesn't exist
-    os.makedirs(cache_dir, exist_ok=True)
-    
+    Path(cache_dir).mkdir(parents=True, exist_ok=True)
+
     # Save each package's dependencies to a separate file
     for package_name, dependencies in cache.items():
-        cache_file = os.path.join(cache_dir, f"{package_name}.json")
+        cache_file = Path(cache_dir) / f"{package_name}.json"
         # Convert set to list for JSON serialization
         deps_list = list(dependencies)
         
@@ -198,15 +199,15 @@ def load_dependency_cache(cache_dir: str) -> Dict[str, Set[str]]:
     Load dependency cache from individual files in directory.
     """
     cache = {}
-    
-    if not os.path.exists(cache_dir):
+
+    if not Path(cache_dir).exists():
         return cache
-    
+
     # Load each package's dependencies from individual files
     for filename in os.listdir(cache_dir):
         if filename.endswith('.json'):
             package_name = filename[:-5]  # Remove .json extension
-            cache_file = os.path.join(cache_dir, filename)
+            cache_file = Path(cache_dir) / filename
             
             try:
                 with open(cache_file, 'r') as f:
