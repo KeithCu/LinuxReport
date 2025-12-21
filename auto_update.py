@@ -198,8 +198,60 @@ def call_openrouter_model(model, messages, max_tokens, label=""):
 # Provider registry - simplified to just track the provider name
 PROVIDER_NAME = "openrouter"
 
+def _extract_error_details(e):
+    """
+    Extracts a descriptive error message and the response body from various exception types.
+    
+    Args:
+        e (Exception): The exception to analyze.
+        
+    Returns:
+        tuple: (error_message, error_body)
+    """
+    error_body = None
+    
+    # Handle custom RuntimeError with multi-args (from _try_call_model)
+    if isinstance(e, RuntimeError) and len(e.args) > 1:
+        return e.args[0], e.args[1]
+        
+    # Handle OpenAI-style API errors
+    if isinstance(e, APIError):
+        try:
+            status_code = getattr(e, 'status_code', 'N/A')
+            body = getattr(e, 'body', 'N/A')
+            error_body = body if body != 'N/A' else None
+            
+            details = []
+            if status_code != 'N/A':
+                details.append(f"HTTP {status_code}")
+            
+            if isinstance(body, dict):
+                inner = body.get('error', {})
+                if isinstance(inner, dict):
+                    msg = inner.get('message')
+                    code = inner_error_code = inner.get('code')
+                    if msg: details.append(f"Msg: {msg}")
+                    if code: details.append(f"Code: {code}")
+                else:
+                    details.append(f"Body: {json.dumps(body)}")
+            elif body != 'N/A':
+                details.append(f"Body: {body}")
+                
+            msg = f"APIError ({', '.join(details)})" if details else f"APIError: {str(e)}"
+            return msg, error_body
+        except Exception as inner_e:
+            return f"APIError: {str(e)} (parsing failed: {inner_e})", getattr(e, 'body', None)
+            
+    # Fallback for other exceptions
+    msg = f"{type(e).__name__}: {str(e)}"
+    error_body = getattr(e, 'body', str(e))
+    return msg, error_body
+
+
 def _try_call_model(client, model, messages, max_tokens):
     max_retries = 1
+    last_error = "Unknown error"
+    last_error_body = None
     for attempt in range(1, max_retries + 1):
         start = timer()
         logger.info(f"Calling model {model} (attempt {attempt}/{max_retries})")
@@ -249,17 +301,26 @@ def _try_call_model(client, model, messages, max_tokens):
 
             return response_text
         except (APITimeoutError, RateLimitError) as e:
-            logger.warning(f"API Error on attempt {attempt} for model {model}: {e}. Retrying...")
+            last_error, last_error_body = _extract_error_details(e)
+            logger.warning(f"API Error on attempt {attempt} for model {model}: {last_error}. Retrying...")
             if attempt < max_retries:
                 time.sleep(1)  # Wait before retrying
         except APIError as e:
-            logger.error(f"API Error on attempt {attempt} for model {model}: {e}")
-            # Don't retry on other API errors, as they are likely permanent
+            last_error, last_error_body = _extract_error_details(e)
+            logger.error(f"API Error on attempt {attempt} for model {model}: {last_error}")
+            break # Don't retry on other API errors
         except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
-            error_msg = str(e)
-            logger.error(f"Network or JSON error on attempt {attempt} for model {model}: {error_msg}")
-    logger.error(f"Model call failed after {max_retries} attempts for model {model}")
-    raise RuntimeError(f"Model call failed after {max_retries} attempts for model {model}")
+            last_error, last_error_body = _extract_error_details(e)
+            logger.error(f"Network or JSON error on attempt {attempt} for model {model}: {last_error}")
+            break
+        except Exception as e:
+            last_error, last_error_body = _extract_error_details(e)
+            logger.error(f"Unexpected error on attempt {attempt} for model {model}: {last_error}")
+            break
+    
+    error_msg = f"Model call failed after {max_retries} attempts for model {model}. Last error: {last_error}"
+    logger.error(error_msg)
+    raise RuntimeError(error_msg, last_error_body)
 
 
 def extract_top_titles_from_ai(text):
@@ -461,10 +522,18 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
                 attempt_record["error"] = error_msg
 
         except (RuntimeError, RateLimitError, APITimeoutError) as e:
-            error_msg = str(e)
+            error_msg, response_body = _extract_error_details(e)
             logger.error(f"Model {current_model} failed: {error_msg}")
-            # For exceptions, we might not have a response_text, so use empty string
-            response_text_for_failure = attempt_record.get("response", "")
+            
+            # Use the captured response body if available
+            response_text_for_failure = response_body if response_body else attempt_record.get("response", "")
+            if isinstance(response_text_for_failure, (dict, list)):
+                try:
+                    response_text_for_failure = json.dumps(response_text_for_failure, indent=2)
+                except Exception:
+                    response_text_for_failure = str(response_text_for_failure)
+            
+            attempt_record["response"] = response_text_for_failure
             model_manager.mark_failed(current_model, error_msg, response_text_for_failure)
             attempt_record["error"] = error_msg
 
