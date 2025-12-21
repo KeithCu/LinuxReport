@@ -238,10 +238,18 @@ def build_llm_process_viewer_html(attempts, timestamp):
         status_text = "Success" if attempt.get('success') else "Failed"
         error_text = f" ({attempt.get('error', '')})" if attempt.get('error') else ""
         
+        model_name = attempt.get('model', 'Unknown')
+        
+        # Make model name a link to OpenRouter
+        if model_name and model_name != 'Unknown':
+            model_display = f'<a href="https://openrouter.ai/{model_name}" target="_blank" style="text-decoration: underline; color: inherit;">{model_name}</a>'
+        else:
+            model_display = model_name
+        
         popup_html += f"""
     <div class="ai-attempt">
         <div class="ai-attempt-header">
-            Model: {attempt.get('model', 'Unknown')} | 
+            Model: {model_display} | 
             Status: <span class="{success_class}">{status_text}{error_text}</span>
         </div>
         <div class="ai-attempt-header">Prompt:</div>

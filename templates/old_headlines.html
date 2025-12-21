@@ -161,7 +161,7 @@
                                 {% for attempt in group.attempts %}
                                     <div class="ai-attempt">
                                         <div class="ai-attempt-header">
-                                            Model: {{ attempt.model }} | 
+                                            Model: <a href="https://openrouter.ai/{{ attempt.model }}" target="_blank" style="text-decoration: underline; color: inherit;">{{ attempt.model }}</a> | 
                                             Status: <span class="{{ 'ai-success' if attempt.success else 'ai-failed' }}">
                                                 {{ 'Success' if attempt.success else 'Failed' }}{% if attempt.error %} ({{ attempt.error }}){% endif %}
                                             </span>
