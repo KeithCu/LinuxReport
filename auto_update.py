@@ -28,6 +28,7 @@ from html_generation import (
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
 from LLMModelManager import LLMModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
 from Logging import _setup_logging, DEBUG
+from app import detect_mode
 
 from enum import Enum  # Ensure this is included if not already
 
@@ -753,60 +754,6 @@ def parse_arguments():
     logger.info("Command line arguments parsed")
     
     return args
-
-def detect_mode(forced_mode=None):
-    """
-    Detect the current mode based on working directory and settings files.
-    
-    Args:
-        forced_mode (str, optional): If provided, force this mode instead of detecting from cwd.
-    
-    Returns:
-        tuple: (mode_string, settings_module, settings_config)
-    """
-    # If mode is forced, use it directly
-    if forced_mode:
-        forced_mode = forced_mode.lower()
-        logger.info(f"Forcing mode: {forced_mode}")
-        
-        # Validate that the forced mode is a valid Mode enum value
-        valid_modes = [mode.value for mode in Mode]
-        if forced_mode not in valid_modes:
-            logger.error(f"Invalid mode '{forced_mode}'. Valid modes are: {', '.join(valid_modes)}")
-            sys.exit(1)
-        
-        # Load the settings file for the forced mode
-        settings_file = f"{forced_mode}_report_settings.py"
-        if not os.path.isfile(settings_file):
-            logger.error(f"Settings file not found for mode '{forced_mode}': {settings_file}")
-            sys.exit(1)
-        
-        spec = importlib.util.spec_from_file_location("module_name", settings_file)
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        
-        logger.info(f"Loaded settings for forced mode '{forced_mode}' from {settings_file}")
-        return forced_mode, module, module.CONFIG
-    
-    # Otherwise, use the original detection logic based on cwd
-    cwd = os.getcwd()
-    logger.info(f"Current working directory: {cwd}")
-    
-    for mode_enum_val in Mode:
-        settings_file = f"{mode_enum_val.value}_report_settings.py"
-        if os.path.isfile(settings_file):
-            spec = importlib.util.spec_from_file_location("module_name", settings_file)
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            
-            if cwd == module.CONFIG.PATH:
-                logger.info(f"Matched mode '{mode_enum_val.value}' with path {module.CONFIG.PATH}")
-                return mode_enum_val.value, module, module.CONFIG
-    
-    logger.error(f"Could not determine mode from current directory: {cwd}")
-    logger.error("Expected to find a settings file with a matching PATH in the current directory.")
-    logger.error("Use --mode <mode_name> to force a specific mode.")
-    sys.exit(1)
 
 def should_run_update(args, settings_config):
     """Determine if the update should run based on schedule and arguments."""

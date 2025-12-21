@@ -307,10 +307,6 @@ class LLMModelManager:
             logger.debug(f"Selected random model: {selected_model} from {len(available_models)} available")
             return selected_model
     
-    def get_comparison_models(self):
-        """Get models for comparison mode."""
-        return "google/gemma-3-27b-it", "mistralai/mistral-small-3.1-24b-instruct"
-    
     def is_user_only_instruction_model(self, model):
         """Check if a model requires user-only instructions."""
         return model in USER_ONLY_INSTRUCTION_MODELS

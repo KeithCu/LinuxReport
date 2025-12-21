@@ -18,6 +18,7 @@ print(f"🐍 Python path starts with: {sys.path[:2]}", file=sys.stderr)
 import os
 import datetime
 import hashlib
+import importlib.util
 from pathlib import Path
 
 # =============================================================================
@@ -40,7 +41,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from shared import (
     EXPIRE_WEEK, FLASK_DASHBOARD,
     limiter, ALL_URLS, get_lock, g_c, EXPIRE_YEARS,
-    set_flask_restful_api, g_logger
+    set_flask_restful_api, g_logger, Mode
 )
 from app_config import DEBUG, get_secret_key, get_dashboard_credentials
 from models import User
@@ -118,6 +119,60 @@ def run_one_time_last_fetch_migration(all_urls):
             # Set the flag to indicate migration is complete
             g_c.put('last_fetch_migration_complete', True, timeout=EXPIRE_YEARS)
             g_logger.info("Last_fetch migration complete.")
+
+def detect_mode(forced_mode=None):
+    """
+    Detect the current mode based on working directory and settings files.
+    
+    Args:
+        forced_mode (str, optional): If provided, force this mode instead of detecting from cwd.
+    
+    Returns:
+        tuple: (mode_string, settings_module, settings_config)
+    """
+    # If mode is forced, use it directly
+    if forced_mode:
+        forced_mode = forced_mode.lower()
+        g_logger.info(f"Forcing mode: {forced_mode}")
+        
+        # Validate that the forced mode is a valid Mode enum value
+        valid_modes = [mode.value for mode in Mode]
+        if forced_mode not in valid_modes:
+            g_logger.error(f"Invalid mode '{forced_mode}'. Valid modes are: {', '.join(valid_modes)}")
+            sys.exit(1)
+        
+        # Load the settings file for the forced mode
+        settings_file = f"{forced_mode}_report_settings.py"
+        if not os.path.isfile(settings_file):
+            g_logger.error(f"Settings file not found for mode '{forced_mode}': {settings_file}")
+            sys.exit(1)
+        
+        spec = importlib.util.spec_from_file_location("module_name", settings_file)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        g_logger.info(f"Loaded settings for forced mode '{forced_mode}' from {settings_file}")
+        return forced_mode, module, module.CONFIG
+    
+    # Otherwise, use the original detection logic based on cwd
+    cwd = os.getcwd()
+    g_logger.info(f"Current working directory: {cwd}")
+    
+    for mode_enum_val in Mode:
+        settings_file = f"{mode_enum_val.value}_report_settings.py"
+        if os.path.isfile(settings_file):
+            spec = importlib.util.spec_from_file_location("module_name", settings_file)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            
+            if cwd == module.CONFIG.PATH:
+                g_logger.info(f"Matched mode '{mode_enum_val.value}' with path {module.CONFIG.PATH}")
+                return mode_enum_val.value, module, module.CONFIG
+    
+    g_logger.error(f"Could not determine mode from current directory: {cwd}")
+    g_logger.error("Expected to find a settings file with a matching PATH in the current directory.")
+    g_logger.error("Use --mode <mode_name> to force a specific mode.")
+    sys.exit(1)
 
 # =============================================================================
 # FLASK APPLICATION INITIALIZATION
