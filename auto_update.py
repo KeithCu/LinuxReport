@@ -130,17 +130,11 @@ Candidate headlines:
 # PROVIDER CONFIGURATION
 # =============================================================================
 
-# Run mode configuration
-RUN_MODE = "normal"  # options: "normal", "compare"
-
 # Provider configuration
 PROVIDER = "openrouter"
 
 # Configuration for the primary provider/model
 MODEL_1 = None
-
-# Configuration for the secondary provider/model (for comparison mode)
-MODEL_2 = None  # Will be set based on provider
 
 # Add unified provider client cache (for normal mode)
 provider_client_cache = None
@@ -639,55 +633,6 @@ def _update_selections_cache(top_articles, previous_selections, used_model, dry_
     logger.info(f"Cache update status: {g_c.get('previously_selected_selections_2') is not None}")
 
 
-def run_comparison(articles):
-    """Runs two LLM calls with different configurations for comparison."""
-    logger.info("--- Running Comparison Mode ---")
-
-    # Use the same deduplication logic as ask_ai_top_articles
-    result = _prepare_articles_for_ai(articles)
-    if result is None:
-        logger.warning("No new articles available after deduplication for comparison.")
-        return
-    filtered_articles, _ = result
-
-    logger.info(f"Comparison mode: {len(filtered_articles)} articles after deduplication")
-
-    # Get comparison models and run them
-    model1, model2 = model_manager.get_comparison_models()
-    logger.info(f"Comparison model 1: {model1}")
-    logger.info(f"Comparison model 2: {model2}")
-    
-    # Run both models
-    _run_comparison_model(model1, filtered_articles, "Comparison 1")
-    _run_comparison_model(model2, filtered_articles, "Comparison 2")
-
-    logger.info("--- Comparison Mode Finished ---")
-
-
-def _run_comparison_model(model, filtered_articles, label):
-    """Helper function to run a single comparison model."""
-    try:
-        messages = _prepare_messages(PROMPT_MODE, filtered_articles)
-        response_text, used_model = call_openrouter_model(model, messages, MAX_TOKENS, label)
-        
-        if not response_text:
-            logger.error(f"{label} returned no response")
-            return
-        
-        logger.info(f"{label} completed successfully")
-        # Process and log the results
-        top_articles = _process_ai_response(response_text, filtered_articles, f"{label} ({model})")
-        if top_articles:
-            logger.info(f"{label} selected {len(top_articles)} articles")
-        else:
-            logger.warning(f"{label} failed to produce articles")
-            
-    except RuntimeError as e:
-        logger.error(f"{label} failed with exception: {e}")
-
-
-
-
 # --- Integration into the main pipeline ---
 def main(mode, settings_module, settings_config, dry_run=False):
     """Main processing function with improved error handling and dry run logic."""
@@ -717,16 +662,8 @@ def main(mode, settings_module, settings_config, dry_run=False):
 
         logger.info(f"Fetched {len(articles)} articles from {len(ALL_URLS)} URLs")
 
-        # Handle different run modes
-        if RUN_MODE == "compare":
-            logger.info("Running in comparison mode")
-            run_comparison(articles)
-            return 0
-        elif RUN_MODE == "normal":
-            return _process_normal_mode(mode, articles, html_file, dry_run)
-        else:
-            logger.error(f"Unknown RUN_MODE: {RUN_MODE}")
-            return 1
+        # Process articles in normal mode
+        return _process_normal_mode(mode, articles, html_file, dry_run)
 
     except (FileNotFoundError, ImportError) as e:
         logger.error(f"Configuration error for mode {mode}: {e}")
@@ -805,7 +742,6 @@ def parse_arguments():
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
-    parser.add_argument('--compare', action='store_true', help='Run in comparison mode')
     parser.add_argument('--include-summary', action='store_true', help='Include article summary/html_content in LLM prompt')
     parser.add_argument('--prompt-mode', type=str, help='Set the prompt mode (e.g., o3)')
     parser.add_argument('--use-cached-model', action='store_true', help='Use cached working model instead of random selection')
@@ -874,7 +810,7 @@ def detect_mode(forced_mode=None):
 
 def should_run_update(args, settings_config):
     """Determine if the update should run based on schedule and arguments."""
-    if args.force or args.dry_run or args.compare:
+    if args.force or args.dry_run:
         return True
     
     current_hour = datetime.datetime.now(TZ).hour
@@ -889,15 +825,11 @@ def should_run_update(args, settings_config):
 
 def configure_global_settings(args):
     """Configure global settings based on command line arguments."""
-    global USE_RANDOM_MODELS, RUN_MODE, INCLUDE_ARTICLE_SUMMARY_FOR_LLM, PROMPT_MODE, MODEL_1, MODEL_2
+    global USE_RANDOM_MODELS, INCLUDE_ARTICLE_SUMMARY_FOR_LLM, PROMPT_MODE, MODEL_1
 
 
     # Set model selection behavior
     USE_RANDOM_MODELS = not args.use_cached_model
-
-    # Set comparison mode
-    if args.compare:
-        RUN_MODE = "compare"
 
     # Set summary inclusion
     if args.include_summary:
@@ -905,7 +837,6 @@ def configure_global_settings(args):
 
     # Configure models
     MODEL_1 = model_manager.get_available_model(use_random=USE_RANDOM_MODELS, forced_model=args.force_model)
-    MODEL_2 = FALLBACK_MODEL
 
     # Set prompt mode
     if args.prompt_mode:
