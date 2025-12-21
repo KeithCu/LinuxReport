@@ -45,31 +45,50 @@ HEADLINE_TEMPLATE = Template("""
 """)
 
 # =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
+
+def sanitize_timestamp_for_id(timestamp):
+    """
+    Sanitize a timestamp string for use as an HTML ID attribute.
+    
+    Args:
+        timestamp (str): ISO timestamp string
+    
+    Returns:
+        str: Sanitized string safe for use in HTML IDs
+    """
+    return timestamp.replace(':', '-').replace('.', '-').replace('+', '-').replace('/', '-').replace('T', '-').replace('Z', '')
+
+# =============================================================================
 # HTML GENERATION FUNCTIONS
 # =============================================================================
 
 def build_llm_process_viewer_html(attempts, timestamp):
     """
-    Build HTML for LLM process viewer popup with CSS and JavaScript.
+    Build HTML for LLM process viewer popup.
+    
+    Note: JavaScript initialization is handled by the shared ai-process.js file
+    which is included via Flask-Assets bundle. No inline JavaScript needed.
     
     Args:
         attempts (list): List of LLM attempt dictionaries
         timestamp (str): ISO timestamp for this headline generation
     
     Returns:
-        str: HTML string containing popup, CSS, and JavaScript
+        str: HTML string containing popup HTML (no JavaScript)
     """
     if not attempts:
         return ""
     
     # Sanitize timestamp for use as HTML ID
-    sanitized_id = timestamp.replace(':', '-').replace('.', '-').replace('+', '-').replace('/', '-').replace('T', '-').replace('Z', '')
+    sanitized_id = sanitize_timestamp_for_id(timestamp)
     
-    # Build popup HTML
+    # Build popup HTML using base class names (no -main suffix)
     popup_html = f"""
-<div class="ai-process-overlay-main" id="overlay-main-{sanitized_id}"></div>
-<div class="ai-process-popup-main" id="popup-main-{sanitized_id}">
-    <span class="ai-process-close-main" data-target="popup-main-{sanitized_id}">&times;</span>
+<div class="ai-process-overlay" id="overlay-{sanitized_id}"></div>
+<div class="ai-process-popup" id="popup-{sanitized_id}">
+    <span class="ai-process-close" data-target="popup-{sanitized_id}">&times;</span>
     <h3>LLM Process</h3>"""
     
     for attempt in attempts:
@@ -78,13 +97,13 @@ def build_llm_process_viewer_html(attempts, timestamp):
         error_text = f" ({attempt.get('error', '')})" if attempt.get('error') else ""
         
         popup_html += f"""
-    <div class="ai-attempt-main">
-        <div class="ai-attempt-header-main">
+    <div class="ai-attempt">
+        <div class="ai-attempt-header">
             Model: {attempt.get('model', 'Unknown')} | 
             Status: <span class="{success_class}">{status_text}{error_text}</span>
         </div>
-        <div class="ai-attempt-header-main">Prompt:</div>
-        <div class="ai-attempt-body-main">"""
+        <div class="ai-attempt-header">Prompt:</div>
+        <div class="ai-attempt-body">"""
         
         for msg in attempt.get('messages', []):
             popup_html += f"[{msg.get('role', 'unknown')}]: {msg.get('content', '')}\n"
@@ -93,57 +112,14 @@ def build_llm_process_viewer_html(attempts, timestamp):
         
         if attempt.get('response'):
             popup_html += f"""
-        <div class="ai-attempt-header-main">Response:</div>
-        <div class="ai-attempt-body-main">{attempt.get('response')}</div>"""
+        <div class="ai-attempt-header">Response:</div>
+        <div class="ai-attempt-body">{attempt.get('response')}</div>"""
         
         popup_html += """
     </div>"""
     
     popup_html += """
-</div>
-<script>
-(function() {
-    function initAiProcessPopups() {
-        const links = document.querySelectorAll('.ai-process-link-main');
-        links.forEach(link => {
-            link.addEventListener('click', function() {
-                const targetId = this.dataset.target;
-                const popup = document.getElementById(targetId);
-                const overlayId = 'overlay-main-' + targetId.replace('popup-main-', '');
-                const overlay = document.getElementById(overlayId);
-                if (popup && overlay) {
-                    popup.classList.add('active');
-                    overlay.classList.add('active');
-                }
-            });
-        });
-        
-        document.querySelectorAll('.ai-process-close-main').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const targetId = this.dataset.target;
-                const popup = document.getElementById(targetId);
-                const overlayId = 'overlay-main-' + targetId.replace('popup-main-', '');
-                const overlay = document.getElementById(overlayId);
-                if (popup) popup.classList.remove('active');
-                if (overlay) overlay.classList.remove('active');
-            });
-        });
-        
-        document.querySelectorAll('.ai-process-overlay-main').forEach(overlay => {
-            overlay.addEventListener('click', function() {
-                document.querySelectorAll('.ai-process-popup-main').forEach(p => p.classList.remove('active'));
-                document.querySelectorAll('.ai-process-overlay-main').forEach(o => o.classList.remove('active'));
-            });
-        });
-    }
-    
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAiProcessPopups);
-    } else {
-        initAiProcessPopups();
-    }
-})();
-</script>"""
+</div>"""
     
     return popup_html
 
@@ -194,8 +170,8 @@ def generate_headlines_html(top_articles, output_file, model_name=None, attempts
         
         # Add LLM process viewer link if attempts are available
         if attempts and timestamp:
-            sanitized_id = timestamp.replace(':', '-').replace('.', '-').replace('+', '-').replace('/', '-').replace('T', '-').replace('Z', '')
-            attribution_html += f""" | <span class="ai-process-link-main" data-target="popup-main-{sanitized_id}" style="cursor: pointer; text-decoration: underline;">View LLM Process</span>"""
+            sanitized_id = sanitize_timestamp_for_id(timestamp)
+            attribution_html += f""" | <span class="ai-process-link" data-target="popup-{sanitized_id}" style="cursor: pointer; text-decoration: underline;">View LLM Process</span>"""
         
         attribution_html += "</div>"
         html_parts.append(attribution_html)

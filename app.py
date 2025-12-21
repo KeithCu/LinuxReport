@@ -52,6 +52,7 @@ JS_MODULES = [
     'core.js',
     'weather.js',
     'chat.js',
+    'ai-process.js',
     'config.js',
 ]
 

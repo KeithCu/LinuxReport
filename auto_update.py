@@ -867,6 +867,7 @@ def _process_normal_mode(mode, articles, html_file, dry_run):
 def parse_arguments():
     """Parse command line arguments and return a config object."""
     parser = argparse.ArgumentParser(description='Generate report with optional force update')
+    parser.add_argument('--mode', type=str, help='Force a specific mode (e.g., linux, trump, ai). If not provided, mode is detected from current working directory.')
     parser.add_argument('--force', action='store_true', help='Force update regardless of schedule')
     parser.add_argument('--forceimage', action='store_true', help='Only refresh images in the HTML file')
     parser.add_argument('--dry-run', action='store_true', help='Run AI analysis but do not update files')
@@ -883,8 +884,41 @@ def parse_arguments():
     
     return args
 
-def detect_mode():
-    """Detect the current mode based on working directory and settings files."""
+def detect_mode(forced_mode=None):
+    """
+    Detect the current mode based on working directory and settings files.
+    
+    Args:
+        forced_mode (str, optional): If provided, force this mode instead of detecting from cwd.
+    
+    Returns:
+        tuple: (mode_string, settings_module, settings_config)
+    """
+    # If mode is forced, use it directly
+    if forced_mode:
+        forced_mode = forced_mode.lower()
+        logger.info(f"Forcing mode: {forced_mode}")
+        
+        # Validate that the forced mode is a valid Mode enum value
+        valid_modes = [mode.value for mode in Mode]
+        if forced_mode not in valid_modes:
+            logger.error(f"Invalid mode '{forced_mode}'. Valid modes are: {', '.join(valid_modes)}")
+            sys.exit(1)
+        
+        # Load the settings file for the forced mode
+        settings_file = f"{forced_mode}_report_settings.py"
+        if not os.path.isfile(settings_file):
+            logger.error(f"Settings file not found for mode '{forced_mode}': {settings_file}")
+            sys.exit(1)
+        
+        spec = importlib.util.spec_from_file_location("module_name", settings_file)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        
+        logger.info(f"Loaded settings for forced mode '{forced_mode}' from {settings_file}")
+        return forced_mode, module, module.CONFIG
+    
+    # Otherwise, use the original detection logic based on cwd
     cwd = os.getcwd()
     logger.info(f"Current working directory: {cwd}")
     
@@ -901,6 +935,7 @@ def detect_mode():
     
     logger.error(f"Could not determine mode from current directory: {cwd}")
     logger.error("Expected to find a settings file with a matching PATH in the current directory.")
+    logger.error("Use --mode <mode_name> to force a specific mode.")
     sys.exit(1)
 
 def should_run_update(args, settings_config):
@@ -960,7 +995,7 @@ if __name__ == "__main__":
         sys.exit(0)
 
     # Detect mode and load settings
-    selected_mode_str, loaded_settings_module, loaded_settings_config = detect_mode()
+    selected_mode_str, loaded_settings_module, loaded_settings_config = detect_mode(forced_mode=args.mode)
 
     # Handle clean excess headlines case early (needs mode detection)
     if args.clean_excess_headlines:

@@ -702,6 +702,7 @@ textarea:hover {
   overflow-y: auto;
   border: 1px solid #eee;
   color: #333;
+  text-align: left;
 }
 
 .ai-process-close,

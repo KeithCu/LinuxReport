@@ -86,36 +86,8 @@
         // Initialize delete functionality for old headlines
         initDeleteHeadlines();
         
-        // Initialize AI process popups
-        initAiProcessPopups();
+        // AI process popups are initialized by shared ai-process.js
       });
-
-      function initAiProcessPopups() {
-        const links = document.querySelectorAll('.ai-process-link');
-        const overlay = document.querySelector('.ai-process-overlay');
-        
-        links.forEach(link => {
-            link.addEventListener('click', () => {
-                const id = link.dataset.target;
-                const popup = document.getElementById(id);
-                if (popup) {
-                    popup.classList.add('active');
-                    overlay.classList.add('active');
-                }
-            });
-        });
-
-        overlay?.addEventListener('click', closeAllPopups);
-        
-        document.querySelectorAll('.ai-process-close').forEach(btn => {
-            btn.addEventListener('click', closeAllPopups);
-        });
-
-        function closeAllPopups() {
-            document.querySelectorAll('.ai-process-popup').forEach(p => p.classList.remove('active'));
-            overlay.classList.remove('active');
-        }
-      }
       
       // Pass admin status from Flask-Login to JavaScript
       window.isAdmin = {{ 'true' if is_admin else 'false' }};
