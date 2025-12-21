@@ -156,7 +156,7 @@
                         {% if group.attempts %}
                             | <span class="ai-process-link" data-target="popup-{{ sanitized_id }}">View LLM Process</span>
                             <div class="ai-process-popup" id="popup-{{ sanitized_id }}">
-                                <span class="ai-process-close">&times;</span>
+                                <span class="ai-process-close" data-target="popup-{{ sanitized_id }}">&times;</span>
                                 <h3>LLM Process for {{ timestamp }}</h3>
                                 {% for attempt in group.attempts %}
                                     <div class="ai-attempt">
