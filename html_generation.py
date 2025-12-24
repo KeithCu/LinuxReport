@@ -22,7 +22,7 @@ from jinja2 import Template
 # LOCAL IMPORTS
 # =============================================================================
 from embeddings_dedup import extract_articles_from_html
-from image_parser import custom_fetch_largest_image
+from image_fetch import custom_fetch_largest_image
 
 # =============================================================================
 # CONSTANTS AND TEMPLATES

@@ -15,7 +15,7 @@ import requests
 from typing import List, Optional, Tuple
 
 
-from image_parser import custom_fetch_largest_image
+from image_fetch import custom_fetch_largest_image
 from embeddings_dedup import (
     fetch_recent_articles, get_embeddings, deduplicate_articles_with_exclusions,
     get_best_matching_article
