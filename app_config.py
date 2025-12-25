@@ -51,15 +51,15 @@ class FetchConfig:
     This immutable configuration class provides type safety for all fetch-related
     settings used across different sites and services.
     """
-    needs_selenium = False
-    needs_tor = False
-    post_container = ""
-    title_selector = ""
-    link_selector = ""
-    link_attr = "href"
-    filter_pattern = None
-    use_random_user_agent = False
-    published_selector = None
+    needs_selenium: bool = False
+    needs_tor: bool = False
+    post_container: str = ""
+    title_selector: str = ""
+    link_selector: str = ""
+    link_attr: str = "href"
+    filter_pattern: str = None
+    use_random_user_agent: bool = False
+    published_selector: str = None
 
 @dataclass(frozen=True)
 class RedditFetchConfig(FetchConfig):
@@ -68,14 +68,14 @@ class RedditFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Reddit-specific defaults.
     """
-    needs_selenium = True
-    needs_tor = True
-    post_container = "article"
-    title_selector = "a[id^='post-title-']"
-    link_selector = "a[id^='post-title-']"
-    link_attr = "href"
-    filter_pattern = None
-    use_random_user_agent = True
+    needs_selenium: bool = True
+    needs_tor: bool = True
+    post_container: str = "article"
+    title_selector: str = "a[id^='post-title-']"
+    link_selector: str = "a[id^='post-title-']"
+    link_attr: str = "href"
+    filter_pattern: str = None
+    use_random_user_agent: bool = True
 
 REDDIT_FETCH_CONFIG = RedditFetchConfig()
 

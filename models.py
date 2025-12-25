@@ -41,19 +41,19 @@ class SiteConfig:
     """
     Configuration for a site.
     """
-    ALL_URLS = None
-    USER_AGENT = None
-    SITE_URLS = None #This is the order of the URLs in the display (left to right), most active at top
-    URL_IMAGES = None
-    FAVICON = None
-    LOGO_URL = None
-    WEB_DESCRIPTION = None
-    WEB_TITLE = None
-    REPORT_PROMPT = None
-    PATH = None
-    SCHEDULE = None
-    DEFAULT_THEME = "silver" # Default fallback
-    CUSTOM_FETCH_CONFIG = None
+    ALL_URLS: dict = None
+    USER_AGENT: str = None
+    SITE_URLS: list = None #This is the order of the URLs in the display (left to right), most active at top
+    URL_IMAGES: str = None
+    FAVICON: str = None
+    LOGO_URL: str = None
+    WEB_DESCRIPTION: str = None
+    WEB_TITLE: str = None
+    REPORT_PROMPT: str = None
+    PATH: str = None
+    SCHEDULE: list = None
+    DEFAULT_THEME: str = "silver" # Default fallback
+    CUSTOM_FETCH_CONFIG: dict = None
 
 class RssInfo:
     """

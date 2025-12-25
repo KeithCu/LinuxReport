@@ -110,7 +110,7 @@ class FeedHistory:
         print("[FeedHistory] No valid data file found, returning empty dictionary")
         return {}
 
-    def _load_json(self) -> Optional[Dict[str, dict]]:
+    def _load_json(self):
         """
         Attempt to load and validate JSON data.
         

@@ -9,15 +9,15 @@ class PatriotsWinFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Patriots.win-specific settings.
     """
-    needs_selenium = True
-    needs_tor = False
-    post_container = "a[href^='/p/']"  # Post links start with /p/
-    title_selector = "a[href^='/p/']"  # Title is the text content of post links
-    link_selector = "a[href^='/p/']"   # Post links
-    link_attr = "href"
-    filter_pattern = None
-    use_random_user_agent = False
-    published_selector = "span:contains('ago')"  # Time elements contain "ago"
+    needs_selenium: bool = True
+    needs_tor: bool = False
+    post_container: str = "a[href^='/p/']"  # Post links start with /p/
+    title_selector: str = "a[href^='/p/']"  # Title is the text content of post links
+    link_selector: str = "a[href^='/p/']"   # Post links
+    link_attr: str = "href"
+    filter_pattern: str = None
+    use_random_user_agent: bool = False
+    published_selector: str = "span:contains('ago')"  # Time elements contain "ago"
 
 
 @dataclass(frozen=True)
@@ -27,15 +27,15 @@ class RevolverNewsFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Revolver.news-specific settings.
     """
-    needs_selenium = False
-    needs_tor = False
-    post_container = "article.item"
-    title_selector = "h2.title a"
-    link_selector = "h2.title a"
-    link_attr = "href"
-    filter_pattern = None
-    use_random_user_agent = False
-    published_selector = ".meta time"
+    needs_selenium: bool = False
+    needs_tor: bool = False
+    post_container: str = "article.item"
+    title_selector: str = "h2.title a"
+    link_selector: str = "h2.title a"
+    link_attr: str = "href"
+    filter_pattern: str = None
+    use_random_user_agent: bool = False
+    published_selector: str = ".meta time"
 import datetime
 
 CONFIG = SiteConfig(

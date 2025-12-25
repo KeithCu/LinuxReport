@@ -9,15 +9,15 @@ class BreitbartTechFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Breitbart tech-specific settings.
     """
-    needs_selenium = False
-    needs_tor = False
-    post_container = "article"
-    title_selector = "h2 a"
-    link_selector = "h2 a"
-    link_attr = "href"
-    filter_pattern = "/tech/"  # Only tech articles
-    use_random_user_agent = False
-    published_selector = ".header_byline time"
+    needs_selenium: bool = False
+    needs_tor: bool = False
+    post_container: str = "article"
+    title_selector: str = "h2 a"
+    link_selector: str = "h2 a"
+    link_attr: str = "href"
+    filter_pattern: str = "/tech/"  # Only tech articles
+    use_random_user_agent: bool = False
+    published_selector: str = ".header_byline time"
 
 CONFIG = SiteConfig(
     ALL_URLS={

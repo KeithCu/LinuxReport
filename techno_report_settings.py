@@ -9,15 +9,15 @@ class BandcampFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Bandcamp-specific settings.
     """
-    needs_selenium = True
-    needs_tor = False
-    post_container = ".music-grid-item"
-    title_selector = ".title"
-    link_selector = "a"
-    link_attr = "href"
-    filter_pattern = None
-    use_random_user_agent = False
-    published_selector = ".date"
+    needs_selenium: bool = True
+    needs_tor: bool = False
+    post_container: str = ".music-grid-item"
+    title_selector: str = ".title"
+    link_selector: str = "a"
+    link_attr: str = "href"
+    filter_pattern: str = None
+    use_random_user_agent: bool = False
+    published_selector: str = ".date"
 
 CONFIG = SiteConfig(
     ALL_URLS = {

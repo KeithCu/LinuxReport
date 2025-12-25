@@ -10,15 +10,15 @@ class VentureBeatFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with VentureBeat-specific settings.
     """
-    needs_selenium = True
-    needs_tor = False
-    post_container = "article"
-    title_selector = "h2 a"
-    link_selector = "h2 a"
-    link_attr = "href"
-    filter_pattern = None
-    use_random_user_agent = True
-    published_selector = "time"
+    needs_selenium: bool = True
+    needs_tor: bool = False
+    post_container: str = "article"
+    title_selector: str = "h2 a"
+    link_selector: str = "h2 a"
+    link_attr: str = "href"
+    filter_pattern: str = None
+    use_random_user_agent: bool = True
+    published_selector: str = "time"
 
 CONFIG = SiteConfig(
 	ALL_URLS={
