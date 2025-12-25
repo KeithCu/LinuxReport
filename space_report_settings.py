@@ -1,7 +1,7 @@
 from models import RssInfo, SiteConfig
 from app_config import RedditFetchConfig
 
-CONFIG: SiteConfig = SiteConfig(
+CONFIG = SiteConfig(
 	ALL_URLS={
 		"https://www.nasa.gov/rss/dyn/breaking_news.rss": RssInfo("nasa.svg", "NASA News", "https://www.nasa.gov"),
 		"http://www.esa.int/rssfeed/Our_Activities/Space_News": RssInfo("esa.svg", "ESA News", "https://www.esa.int"),

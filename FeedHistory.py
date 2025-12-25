@@ -15,7 +15,6 @@ import threading
 import zoneinfo
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Tuple, Set, Optional
 
 # =============================================================================
 # CONFIGURATION CLASSES
@@ -60,7 +59,7 @@ class FeedHistory:
         data (Dict[str, dict]): In-memory feed history data
     """
     
-    def __init__(self, data_file: str):
+    def __init__(self, data_file):
         """
         Initialize the FeedHistory instance.
         
@@ -73,13 +72,13 @@ class FeedHistory:
             self.data_file = self.data_file.with_suffix('.json')
         
         self.lock = threading.RLock()
-        self.data: Dict[str, dict] = self._load_data()
+        self.data = self._load_data()
 
     # =============================================================================
     # DATA LOADING AND VALIDATION METHODS
     # =============================================================================
 
-    def _load_data(self) -> Dict[str, dict]:
+    def _load_data(self):
         """
         Load history from JSON file or pickle file, converting pickle to JSON if necessary.
         
@@ -141,7 +140,7 @@ class FeedHistory:
             print(f"[FeedHistory] Failed to load JSON: {str(e)}")
             return None
 
-    def _load_pickle(self, pickle_file: Path) -> Optional[Dict[str, dict]]:
+    def _load_pickle(self, pickle_file):
         """
         Attempt to load and validate pickle data.
         
@@ -167,7 +166,7 @@ class FeedHistory:
             print(f"[FeedHistory] Failed to load pickle: {str(e)}")
             return None
 
-    def _validate_data(self, data: Dict) -> bool:
+    def _validate_data(self, data):
         """
         Validate the structure of loaded data.
         
@@ -201,7 +200,7 @@ class FeedHistory:
     # DATA PERSISTENCE METHODS
     # =============================================================================
 
-    def _save_data(self) -> None:
+    def _save_data(self):
         """
         Save history to JSON file, converting datetime objects to strings and sets to lists.
         
@@ -221,7 +220,7 @@ class FeedHistory:
         with open(self.data_file, "w") as f:
             json.dump(serializable_data, f, indent=4, sort_keys=True)
 
-    def reset_history(self, url: str) -> None:
+    def reset_history(self, url):
         """
         Reset the history for a given URL.
         
@@ -237,7 +236,7 @@ class FeedHistory:
     # FEED UPDATE AND TRACKING METHODS
     # =============================================================================
 
-    def update_fetch(self, url: str, new_articles: int) -> None:
+    def update_fetch(self, url, new_articles):
         """
         Update the fetch history for a given URL.
         
@@ -282,7 +281,7 @@ class FeedHistory:
     # UTILITY AND ANALYSIS METHODS
     # =============================================================================
 
-    def _get_bucket(self, dt: datetime) -> str:
+    def _get_bucket(self, dt):
         """
         Map datetime to a bucket key for time-based analysis.
         
@@ -299,7 +298,7 @@ class FeedHistory:
         bucket = dt.hour // FeedConfig.BUCKET_SIZE_HOURS
         return f"{'weekday' if is_weekday else 'weekend'}-{bucket}"
 
-    def get_interval(self, url: str) -> timedelta:
+    def get_interval(self, url):
         """
         Get the current refresh interval for a URL based on historical data.
         
@@ -336,7 +335,7 @@ class FeedHistory:
 
         return timedelta(seconds=interval)
 
-    def has_expired(self, url: str, last_fetch: datetime) -> bool:
+    def has_expired(self, url, last_fetch):
         """
         Check if the feed should be refreshed based on current interval and last fetch time.
         

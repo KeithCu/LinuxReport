@@ -1,4 +1,3 @@
-from typing import Optional
 from dataclasses import dataclass
 from models import RssInfo, SiteConfig
 from app_config import FetchConfig
@@ -10,17 +9,17 @@ class SolarMagazineFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Solar Magazine-specific settings.
     """
-    needs_selenium: bool = False
-    needs_tor: bool = False
-    post_container: str = "h3"
-    title_selector: str = "a"
-    link_selector: str = "a"
-    link_attr: str = "href"
-    filter_pattern: Optional[str] = None
-    use_random_user_agent: bool = False
-    published_selector: Optional[str] = ".date"
+    needs_selenium = False
+    needs_tor = False
+    post_container = "h3"
+    title_selector = "a"
+    link_selector = "a"
+    link_attr = "href"
+    filter_pattern = None
+    use_random_user_agent = False
+    published_selector = ".date"
 
-CONFIG: SiteConfig = SiteConfig(
+CONFIG = SiteConfig(
     ALL_URLS={
         "https://www.pv-tech.org/feed": RssInfo("pv-tech-logo.webp", "PV Tech", "https://www.pv-tech.org"),
         "https://www.solarpowerworldonline.com/feed/": RssInfo("solarpowerworld.svg", "Solar power World Online", "https://www.solarpowerworldonline.com"),

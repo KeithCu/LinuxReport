@@ -23,7 +23,6 @@ import os
 import socket
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 
 import yaml
@@ -33,7 +32,7 @@ from Logging import g_logger as logging
 # GLOBAL CONSTANTS AND CONFIGURATION
 # =============================================================================
 
-PATH: Path = Path(__file__).parent
+PATH = Path(__file__).parent
 DEBUG = False
 USE_TOR = True
 
@@ -52,15 +51,15 @@ class FetchConfig:
     This immutable configuration class provides type safety for all fetch-related
     settings used across different sites and services.
     """
-    needs_selenium: bool = False
-    needs_tor: bool = False
-    post_container: str = ""
-    title_selector: str = ""
-    link_selector: str = ""
-    link_attr: str = "href"
-    filter_pattern: Optional[str] = None
-    use_random_user_agent: bool = False
-    published_selector: Optional[str] = None
+    needs_selenium = False
+    needs_tor = False
+    post_container = ""
+    title_selector = ""
+    link_selector = ""
+    link_attr = "href"
+    filter_pattern = None
+    use_random_user_agent = False
+    published_selector = None
 
 @dataclass(frozen=True)
 class RedditFetchConfig(FetchConfig):
@@ -69,14 +68,14 @@ class RedditFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Reddit-specific defaults.
     """
-    needs_selenium: bool = True
-    needs_tor: bool = True
-    post_container: str = "article"
-    title_selector: str = "a[id^='post-title-']"
-    link_selector: str = "a[id^='post-title-']"
-    link_attr: str = "href"
-    filter_pattern: Optional[str] = None
-    use_random_user_agent: bool = True
+    needs_selenium = True
+    needs_tor = True
+    post_container = "article"
+    title_selector = "a[id^='post-title-']"
+    link_selector = "a[id^='post-title-']"
+    link_attr = "href"
+    filter_pattern = None
+    use_random_user_agent = True
 
 REDDIT_FETCH_CONFIG = RedditFetchConfig()
 
@@ -103,14 +102,14 @@ class ConfigManager:
         return cls._instance
     
     @classmethod
-    def get_instance(cls) -> 'ConfigManager':
+    def get_instance(cls):
         """Get the singleton instance of ConfigManager."""
         if cls._instance is None:
             cls._instance = ConfigManager()
         return cls._instance
     
     @lru_cache(maxsize=1)
-    def load_config(self) -> Dict[str, Any]:
+    def load_config(self):
         """
         Load and cache configuration from config.yaml file.
         
@@ -142,7 +141,7 @@ class ConfigManager:
             logging.error(f"Error reading config.yaml: {e}")
             raise
     
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self):
         """
         Get the configuration dictionary, loading it if necessary.
         
@@ -154,7 +153,7 @@ class ConfigManager:
             self._validate_config()
         return self._config
     
-    def _validate_config(self) -> None:
+    def _validate_config(self):
         """
         Validate configuration if present. This is now permissive to avoid exceptions.
         """
@@ -165,7 +164,7 @@ class ConfigManager:
         # Let the calling code handle missing config naturally
         self._validated = True
     
-    def get(self, key_path: str, default: Any = None) -> Any:
+    def get(self, key_path, default=None):
         """
         Get a configuration value using dot notation.
         
@@ -187,7 +186,7 @@ class ConfigManager:
         except (KeyError, TypeError):
             return default
     
-    def require(self, key_path: str) -> Any:
+    def require(self, key_path):
         """
         Get a required configuration value, failing if not found.
         
@@ -205,7 +204,7 @@ class ConfigManager:
             raise ValueError(f"Required configuration key not found: {key_path}")
         return value
 
-    def reload(self) -> None:
+    def reload(self):
         """
         Reload configuration from disk (useful for development).
         
@@ -226,7 +225,7 @@ config_manager = ConfigManager.get_instance()
 # UTILITY FUNCTIONS
 # =============================================================================
 
-def is_tor_running() -> bool:
+def is_tor_running():
     """
     Check if Tor is running by attempting to connect to the SOCKS proxy port.
     
@@ -251,7 +250,7 @@ if USE_TOR and not is_tor_running():
 # CONFIGURATION ACCESS FUNCTIONS
 # =============================================================================
 
-def load_config() -> Dict[str, Any]:
+def load_config():
     """
     Load configuration from config.yaml file.
     
@@ -263,7 +262,7 @@ def load_config() -> Dict[str, Any]:
     """
     return config_manager.get_config()
 
-def get_admin_password() -> Optional[str]:
+def get_admin_password():
     """
     Get the admin password from configuration.
 
@@ -273,7 +272,7 @@ def get_admin_password() -> Optional[str]:
     return config_manager.get('admin.password')
 
 
-def get_dashboard_credentials() -> Dict[str, str]:
+def get_dashboard_credentials():
     """
     Get the dashboard credentials from configuration.
 
@@ -282,7 +281,7 @@ def get_dashboard_credentials() -> Dict[str, str]:
     """
     return config_manager.get('admin.dashboard', {})
 
-def get_secret_key() -> Optional[str]:
+def get_secret_key():
     """
     Get the secret key from configuration.
 
@@ -291,7 +290,7 @@ def get_secret_key() -> Optional[str]:
     """
     return config_manager.get('admin.secret_key')
 
-def get_weather_api_key() -> Optional[str]:
+def get_weather_api_key():
     """
     Get the weather API key from configuration.
     
@@ -300,7 +299,7 @@ def get_weather_api_key() -> Optional[str]:
     """
     return config_manager.get('admin.weather_api_key')
 
-def get_storage_config() -> Dict[str, Any]:
+def get_storage_config():
     """
     Get the storage configuration.
     
@@ -309,7 +308,7 @@ def get_storage_config() -> Dict[str, Any]:
     """
     return config_manager.get('storage', {})
 
-def get_settings_config() -> Dict[str, Any]:
+def get_settings_config():
     """
     Get the settings configuration.
     
@@ -318,7 +317,7 @@ def get_settings_config() -> Dict[str, Any]:
     """
     return config_manager.get('settings', {})
 
-def get_allowed_domains() -> List[str]:
+def get_allowed_domains():
     """
     Get the list of allowed domains for CSP and CORS.
     
@@ -327,7 +326,7 @@ def get_allowed_domains() -> List[str]:
     """
     return config_manager.get('settings.allowed_domains', [])
 
-def get_allowed_requester_domains() -> List[str]:
+def get_allowed_requester_domains():
     """
     Get the list of domains allowed to make API requests.
     
@@ -336,7 +335,7 @@ def get_allowed_requester_domains() -> List[str]:
     """
     return config_manager.get('settings.allowed_requester_domains', [])
 
-def get_cdn_config() -> Dict[str, Any]:
+def get_cdn_config():
     """
     Get the CDN configuration.
     
@@ -345,7 +344,7 @@ def get_cdn_config() -> Dict[str, Any]:
     """
     return config_manager.get('settings.cdn', {})
 
-def get_object_store_config() -> Dict[str, Any]:
+def get_object_store_config():
     """
     Get the object store configuration.
     
@@ -354,7 +353,7 @@ def get_object_store_config() -> Dict[str, Any]:
     """
     return config_manager.get('settings.object_store', {})
 
-def get_welcome_html() -> str:
+def get_welcome_html():
     """
     Get the welcome HTML message.
     
@@ -363,7 +362,7 @@ def get_welcome_html() -> str:
     """
     return config_manager.get('settings.welcome_html', '')
 
-def get_reports_config() -> Dict[str, Any]:
+def get_reports_config():
     """
     Get the reports configuration.
 
@@ -372,7 +371,7 @@ def get_reports_config() -> Dict[str, Any]:
     """
     return config_manager.get('reports', {})
 
-def get_tor_password() -> Optional[str]:
+def get_tor_password():
     """
     Get the Tor control port password from configuration.
 
@@ -381,7 +380,7 @@ def get_tor_password() -> Optional[str]:
     """
     return config_manager.get('tor.password')
 
-def is_storage_enabled() -> bool:
+def is_storage_enabled():
     """
     Check if object storage is enabled.
     
@@ -390,7 +389,7 @@ def is_storage_enabled() -> bool:
     """
     return config_manager.get('storage.enabled', False)
 
-def is_cdn_enabled() -> bool:
+def is_cdn_enabled():
     """
     Check if CDN is enabled.
     
@@ -399,7 +398,7 @@ def is_cdn_enabled() -> bool:
     """
     return config_manager.get('settings.cdn.enabled', False)
 
-def is_object_store_enabled() -> bool:
+def is_object_store_enabled():
     """
     Check if object store feeds are enabled.
     
@@ -408,7 +407,7 @@ def is_object_store_enabled() -> bool:
     """
     return config_manager.get('settings.object_store.enabled', False)
 
-def get_proxy_config() -> Dict[str, Any]:
+def get_proxy_config():
     """
     Get the proxy server configuration.
     
@@ -417,7 +416,7 @@ def get_proxy_config() -> Dict[str, Any]:
     """
     return config_manager.get('proxy', {})
 
-def get_proxy_server() -> Optional[str]:
+def get_proxy_server():
     """
     Get the proxy server address and port.
     
@@ -426,7 +425,7 @@ def get_proxy_server() -> Optional[str]:
     """
     return config_manager.get('proxy.server')
 
-def get_proxy_username() -> Optional[str]:
+def get_proxy_username():
     """
     Get the proxy server username.
     
@@ -435,7 +434,7 @@ def get_proxy_username() -> Optional[str]:
     """
     return config_manager.get('proxy.username')
 
-def get_proxy_password() -> Optional[str]:
+def get_proxy_password():
     """
     Get the proxy server password.
     
@@ -444,7 +443,7 @@ def get_proxy_password() -> Optional[str]:
     """
     return config_manager.get('proxy.password')
 
-def get_reddit_username() -> str:
+def get_reddit_username():
     """
     Get the Reddit username from configuration for user agent construction.
     
@@ -458,7 +457,7 @@ def get_reddit_username() -> str:
 # CONFIGURATION VALIDATION
 # =============================================================================
 
-def validate_configuration() -> None:
+def validate_configuration():
     """
     Validate configuration if present. Now permissive to avoid exceptions.
     """
@@ -473,7 +472,7 @@ def validate_configuration() -> None:
 # CONFIGURATION RELOADING (for development)
 # =============================================================================
 
-def reload_configuration() -> None:
+def reload_configuration():
     """
     Reload configuration from disk (useful for development).
     

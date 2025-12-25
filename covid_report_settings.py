@@ -1,7 +1,7 @@
 from models import RssInfo, SiteConfig
 from app_config import RedditFetchConfig
 
-CONFIG: SiteConfig = SiteConfig(
+CONFIG = SiteConfig(
     ALL_URLS={
         "https://www.reddit.com/r/Coronavirus/rising/.rss": RssInfo("redditlogosmall.webp", "Reddit Corona virus sub", "https://www.reddit.com/r/Coronavirus/"),
         "https://www.reddit.com/r/COVID19/.rss": RssInfo("Coronavirus.jpg", "Reddit Covid-19 sub", "https://www.reddit.com/r/COVID19/"),

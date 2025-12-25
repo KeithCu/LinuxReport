@@ -15,7 +15,6 @@ import threading
 import time
 import uuid
 from abc import ABC, abstractmethod
-from typing import Optional
 
 # =============================================================================
 # THIRD-PARTY IMPORTS
@@ -39,7 +38,7 @@ class DiskcacheSqliteLock(LockBase):
     This lock is designed for multi-process and multi-threaded environments. It uses
     atomic transactions, ownership verification, and lock expiry to ensure safety.
     """
-    def __init__(self, lock_name: str, cache_instance: diskcache.Cache, owner_prefix: Optional[str] = None):
+    def __init__(self, lock_name, cache_instance, owner_prefix=None):
         """
         Initializes the lock instance.
 
@@ -57,7 +56,7 @@ class DiskcacheSqliteLock(LockBase):
         self._locked = False
         self._lock_expiry = 0
 
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+    def acquire(self, timeout_seconds=60, wait=False):
         """
         Tries to acquire the lock, with an option to wait.
 
@@ -84,7 +83,7 @@ class DiskcacheSqliteLock(LockBase):
             sleep_time = min(0.1 * (2 ** (time.monotonic() - start_time)), 1.0) + (uuid.uuid4().int % 100 / 1000)
             time.sleep(sleep_time)
 
-    def _attempt_acquire(self, timeout_seconds: int) -> bool:
+    def _attempt_acquire(self, timeout_seconds):
         """Internal method that makes a single attempt to acquire the lock."""
         try:
             with self.cache.transact():
@@ -161,7 +160,7 @@ class DiskcacheSqliteLock(LockBase):
             return False
 
         return True
-    def renew(self, timeout_seconds: int) -> bool:
+    def renew(self, timeout_seconds):
         """Renews the lock with a new timeout."""
         pass
 

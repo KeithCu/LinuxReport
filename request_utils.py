@@ -6,7 +6,6 @@ including rate limiting logic and web bot detection.
 """
 
 import ipaddress
-from typing import Optional
 import datetime
 
 # =============================================================================
@@ -78,7 +77,7 @@ for bot_pattern in WEB_BOT_USER_AGENTS:
     _BOT_AUTOMATON.add_word(bot_pattern, bot_pattern)
 _BOT_AUTOMATON.make_automaton()
 
-def is_web_bot(user_agent: str) -> bool:
+def is_web_bot(user_agent):
     """
     Check if the user agent string contains any web bot patterns using Aho-Corasick algorithm.
     
@@ -163,7 +162,7 @@ def get_ip_prefix(ip_str):
         return "Invalid IP"
     return None
 
-def format_last_updated(last_fetch: Optional[datetime.datetime]) -> str:
+def format_last_updated(last_fetch):
     """
     Format the last fetch time as UTC ISO format for frontend timezone conversion.
     

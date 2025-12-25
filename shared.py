@@ -28,7 +28,6 @@ import os
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Type
 
 # Third-party imports
 import diskcache
@@ -133,15 +132,15 @@ CONFIG_MODULES = {mode: f"{mode.value}_report_settings" for mode in Mode}
 # =============================================================================
 
 # Path for code and cache
-PATH: Path = Path(__file__).parent
+PATH = Path(__file__).parent
 
 # Shared path for weather, etc.
 storage_config = get_storage_config()
 # Use test-friendly path when running tests
 if 'pytest' in sys.modules or 'test' in sys.argv[0]:
-    SPATH: str = str(PATH / 'test_cache')
+    SPATH = str(PATH / 'test_cache')
 else:
-    SPATH: str = storage_config['shared_path']
+    SPATH = storage_config['shared_path']
 TZ = FeedHistory.FeedConfig.TZ
 
 # =============================================================================
@@ -149,11 +148,11 @@ TZ = FeedHistory.FeedConfig.TZ
 # =============================================================================
 
 # Cache expiration time constants (in seconds)
-EXPIRE_MINUTES: int = 60 * 5      # 5 minutes
-EXPIRE_HOUR: int = 3600           # 1 hour
-EXPIRE_DAY: int = 3600 * 12       # 12 hours
-EXPIRE_WEEK: int = 86400 * 7      # 7 days
-EXPIRE_YEARS: int = 86400 * 365 * 2  # 2 years
+EXPIRE_MINUTES = 60 * 5      # 5 minutes
+EXPIRE_HOUR = 3600           # 1 hour
+EXPIRE_DAY = 3600 * 12       # 12 hours
+EXPIRE_WEEK = 86400 * 7      # 7 days
+EXPIRE_YEARS = 86400 * 365 * 2  # 2 years
 
 # =============================================================================
 # APPLICATION MODE AND VERSION SETTINGS
@@ -333,23 +332,23 @@ g_cm = Cache()                    # In-memory cache with per-item TTL
 GLOBAL_FETCH_MODE_LOCK_KEY = "global_fetch_mode"
 
 # Selectable lock class and factory
-LOCK_CLASS: Type[LockBase] = DiskcacheSqliteLock
+LOCK_CLASS = DiskcacheSqliteLock
 
-def get_lock(lock_name: str, owner_prefix: Optional[str] = None) -> LockBase:
+def get_lock(lock_name, owner_prefix=None):
     """
     Get a DiskcacheSqliteLock instance for distributed locking.
     
     Args:
-        lock_name (str): Name of the lock to acquire
-        owner_prefix (Optional[str]): Prefix for lock owner identification
+        lock_name: Name of the lock to acquire
+        owner_prefix: Prefix for lock owner identification
         
     Returns:
-        LockBase: Lock instance for distributed operations
+        Lock instance for distributed operations
     """
     return DiskcacheSqliteLock(lock_name, g_cs.cache, owner_prefix)
 
 # Original factory implementation (commented out for reference):
-# def get_lock(lock_name: str, owner_prefix: Optional[str] = None) -> LockBase:
+# def get_lock(lock_name, owner_prefix=None):
 #     """Factory to get a lock instance using the selected lock class."""
 #     if issubclass(LOCK_CLASS, FileLockWrapper):
 #         return LOCK_CLASS(lock_name)

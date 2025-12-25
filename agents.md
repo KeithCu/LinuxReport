@@ -179,7 +179,6 @@ This flag only affects how Reddit feeds are fetched; other feeds are unaffected.
 - Follow PEP 8.
 - Indent with 4 spaces.
 - Target max line length: 160 chars.
-- Use type hints for public functions where practical.
 - Use existing patterns:
   - Classes: PascalCase (SiteConfig, RssInfo).
   - Functions/vars: snake_case.
@@ -206,6 +205,8 @@ This flag only affects how Reddit feeds are fetched; other feeds are unaffected.
 - Never:
   - Commit secrets, tokens, passwords, or private keys.
   - Introduce unauthenticated admin-style endpoints.
+  - Use `pickle` for data from untrusted or external sources (risk of arbitrary code execution).
+  - Use MD5 for security-sensitive hashing; prefer SHA-256 or better.
 
 ## JavaScript and CSS Architecture (minimal operational view)
 

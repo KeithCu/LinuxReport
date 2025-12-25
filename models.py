@@ -9,7 +9,6 @@ Defines data models and configuration structures for the LinuxReport project.
 # =============================================================================
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, List, Any, Optional
 from flask_login import UserMixin
 import datetime
 import os
@@ -42,19 +41,19 @@ class SiteConfig:
     """
     Configuration for a site.
     """
-    ALL_URLS: Dict[str, "RssInfo"]
-    USER_AGENT: str
-    SITE_URLS: List[str] #This is the order of the URLs in the display (left to right), most active at top
-    URL_IMAGES: str
-    FAVICON: str
-    LOGO_URL: str
-    WEB_DESCRIPTION: str
-    WEB_TITLE: str
-    REPORT_PROMPT: str
-    PATH: str
-    SCHEDULE: List[int]
-    DEFAULT_THEME: str = "silver" # Default fallback
-    CUSTOM_FETCH_CONFIG: Optional[Dict[str, Any]] = None
+    ALL_URLS = None
+    USER_AGENT = None
+    SITE_URLS = None #This is the order of the URLs in the display (left to right), most active at top
+    URL_IMAGES = None
+    FAVICON = None
+    LOGO_URL = None
+    WEB_DESCRIPTION = None
+    WEB_TITLE = None
+    REPORT_PROMPT = None
+    PATH = None
+    SCHEDULE = None
+    DEFAULT_THEME = "silver" # Default fallback
+    CUSTOM_FETCH_CONFIG = None
 
 class RssInfo:
     """
@@ -73,7 +72,7 @@ class RssFeed:
     managing feed entries and top article tracking.
     """
     
-    def __init__(self, entries: list, top_articles: Optional[list] = None) -> None:
+    def __init__(self, entries, top_articles=None):
         """
         Initialize an RSS feed with entries and optional top articles.
         
@@ -85,12 +84,12 @@ class RssFeed:
         self.top_articles = top_articles if top_articles else []
         self.__post_init__()
 
-    def __post_init__(self) -> None:
+    def __post_init__(self):
         """Ensure top_articles attribute is properly initialized."""
         if not hasattr(self, 'top_articles'):
             object.__setattr__(self, 'top_articles', [])
 
-    def __setstate__(self, state: dict) -> None:
+    def __setstate__(self, state):
         """
         Restore state and reinitialize attributes during unpickling.
         
@@ -108,7 +107,7 @@ class DiskCacheWrapper:
     and adds custom methods for feed management and expiration checking.
     """
     
-    def __init__(self, cache_dir: str) -> None:
+    def __init__(self, cache_dir):
         """
         Initialize the cache wrapper with a directory.
         
@@ -117,7 +116,7 @@ class DiskCacheWrapper:
         """
         self.cache = diskcache.Cache(cache_dir, disk_min_file_size=10000000)
 
-    def get(self, key: str) -> Any:
+    def get(self, key):
         """
         Retrieve a value from the cache.
         
@@ -129,7 +128,7 @@ class DiskCacheWrapper:
         """
         return self.cache.get(key)
 
-    def put(self, key: str, value: Any, timeout: Optional[int] = None) -> None:
+    def put(self, key, value, timeout=None):
         """
         Store a value in the cache with optional expiration.
         
@@ -140,7 +139,7 @@ class DiskCacheWrapper:
         """
         self.cache.set(key, value, expire=timeout)
 
-    def delete(self, key: str) -> None:
+    def delete(self, key):
         """
         Remove a key from the cache.
         
@@ -149,7 +148,7 @@ class DiskCacheWrapper:
         """
         self.cache.delete(key)
 
-    def has(self, key: str) -> bool:
+    def has(self, key):
         """
         Check if a key exists in the cache.
         
@@ -161,7 +160,7 @@ class DiskCacheWrapper:
         """
         return key in self.cache
 
-    def has_feed_expired(self, url: str, last_fetch: Optional[datetime.datetime] = None, history: Optional[FeedHistory.FeedHistory] = None) -> bool:
+    def has_feed_expired(self, url, last_fetch=None, history=None):
         """
         Check if a feed has expired based on the last fetch time.
         
@@ -188,7 +187,7 @@ class DiskCacheWrapper:
         
         return history.has_expired(url, last_fetch)
 
-    def get_all_last_fetches(self, urls: List[str]) -> Dict[str, Optional[datetime.datetime]]:
+    def get_all_last_fetches(self, urls):
         """
         Get last fetch times for multiple URLs in a single operation.
         
@@ -201,7 +200,7 @@ class DiskCacheWrapper:
         all_fetches = self.get('all_last_fetches') or {}
         return {url: all_fetches.get(url) for url in urls}
 
-    def get_last_fetch(self, url: str) -> Optional[datetime.datetime]:
+    def get_last_fetch(self, url):
         """
         Get the last fetch time for a URL from the shared disk cache.
         
@@ -216,7 +215,7 @@ class DiskCacheWrapper:
             return all_fetches[url]
         return None
 
-    def set_last_fetch(self, url: str, timestamp: Any, timeout: Optional[int] = None) -> None:
+    def set_last_fetch(self, url, timestamp, timeout=None):
         """
         Set the last fetch time for a URL in the shared disk cache.
         
@@ -229,7 +228,7 @@ class DiskCacheWrapper:
         all_fetches[url] = timestamp
         self.put('all_last_fetches', all_fetches, timeout)
 
-    def clear_last_fetch(self, url: str) -> None:
+    def clear_last_fetch(self, url):
         """
         Clear the last fetch time for a URL in the shared disk cache.
         
@@ -268,7 +267,7 @@ class LockBase(ABC):
     """An abstract base class defining the interface for a lock."""
 
     @abstractmethod
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+    def acquire(self, timeout_seconds=60, wait=False):
         """Acquires the lock, optionally waiting for it to become available."""
         pass
 
@@ -288,11 +287,11 @@ class LockBase(ABC):
         pass
 
     @abstractmethod
-    def locked(self) -> bool:
+    def locked(self):
         """Checks if the lock is currently held."""
         pass
 
     @abstractmethod
-    def renew(self, timeout_seconds: int) -> bool:
+    def renew(self, timeout_seconds):
         """Renews the lock with a new timeout."""
         pass

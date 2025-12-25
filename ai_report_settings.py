@@ -1,4 +1,3 @@
-from typing import Dict, List, Optional
 from dataclasses import dataclass
 
 from models import RssInfo, SiteConfig
@@ -11,17 +10,17 @@ class VentureBeatFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with VentureBeat-specific settings.
     """
-    needs_selenium: bool = True
-    needs_tor: bool = False
-    post_container: str = "article"
-    title_selector: str = "h2 a"
-    link_selector: str = "h2 a"
-    link_attr: str = "href"
-    filter_pattern: Optional[str] = None
-    use_random_user_agent: bool = True
-    published_selector: Optional[str] = "time"
+    needs_selenium = True
+    needs_tor = False
+    post_container = "article"
+    title_selector = "h2 a"
+    link_selector = "h2 a"
+    link_attr = "href"
+    filter_pattern = None
+    use_random_user_agent = True
+    published_selector = "time"
 
-CONFIG: SiteConfig = SiteConfig(
+CONFIG = SiteConfig(
 	ALL_URLS={
 		"https://www.reddit.com/r/LocalLlama/rising/.rss": RssInfo("LocalLlama.webp", "Machine Learning sub", "https://www.reddit.com/r/LocalLlama/"),
 		"https://www.theregister.com/software/ai_ml/headlines.atom": RssInfo("RegisterLogo.webp", "The Register AI News", "https://www.theregister.com/software/ai_ml/"),

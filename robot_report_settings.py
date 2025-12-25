@@ -1,11 +1,10 @@
-from typing import Dict, List
 
 from models import RssInfo, SiteConfig
 from app_config import RedditFetchConfig, FetchConfig
 
 # No custom fetch config needed initially; add if sites require Selenium.
 
-CONFIG: SiteConfig = SiteConfig(
+CONFIG = SiteConfig(
     ALL_URLS={
         "https://www.therobotreport.com/feed/": RssInfo("therobotreport.webp", "The Robot Report", "https://www.therobotreport.com/"),
         "https://robohub.org/feed/": RssInfo("Robohub.webp", "Robohub", "https://robohub.org/"),

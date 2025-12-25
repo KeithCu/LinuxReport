@@ -1,4 +1,3 @@
-from typing import Optional
 from dataclasses import dataclass
 from models import RssInfo, SiteConfig
 from app_config import FetchConfig
@@ -10,17 +9,17 @@ class BandcampFetchConfig(FetchConfig):
     
     Inherits from FetchConfig with Bandcamp-specific settings.
     """
-    needs_selenium: bool = True
-    needs_tor: bool = False
-    post_container: str = ".music-grid-item"
-    title_selector: str = ".title"
-    link_selector: str = "a"
-    link_attr: str = "href"
-    filter_pattern: Optional[str] = None
-    use_random_user_agent: bool = False
-    published_selector: Optional[str] = ".date"
+    needs_selenium = True
+    needs_tor = False
+    post_container = ".music-grid-item"
+    title_selector = ".title"
+    link_selector = "a"
+    link_attr = "href"
+    filter_pattern = None
+    use_random_user_agent = False
+    published_selector = ".date"
 
-CONFIG: SiteConfig = SiteConfig(
+CONFIG = SiteConfig(
     ALL_URLS = {
         "http://detroiteq.com/feed": RssInfo("deq.webp", "Detroit Electronic Quarterly", "http://detroiteq.com/"),
         "https://www.google.com/alerts/feeds/12151242449143161443/18325972585468687530": RssInfo("Google-NewsTechno.webp", "Google Detroit Techno news", "https://news.google.com/search?q=detroit techno"),

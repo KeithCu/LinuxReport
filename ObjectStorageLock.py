@@ -65,7 +65,6 @@ import os
 import threading
 import time
 import uuid
-from typing import Optional, Dict
 from io import BytesIO
 import hashlib
 import pickle
@@ -105,10 +104,10 @@ class ObjectStorageLock(LockBase):
     """
     def __init__(
         self,
-        lock_name: str,
-        owner_prefix: Optional[str] = None,
-        metadata: Optional[Dict[str, str]] = None,
-        retry_interval: float = DEFAULT_RETRY_INTERVAL
+        lock_name,
+        owner_prefix=None,
+        metadata=None,
+        retry_interval=DEFAULT_RETRY_INTERVAL
     ):
         if not oss_config.LIBCLOUD_AVAILABLE or not oss_config.STORAGE_ENABLED:
             raise oss_config.ConfigurationError("Object storage is not available or not enabled")
@@ -136,10 +135,10 @@ class ObjectStorageLock(LockBase):
         
         self._fencing_token = 0
 
-    def _get_object_name(self, key: str) -> str:
+    def _get_object_name(self, key):
         return oss_config.generate_object_name(key, prefix="lock")
         
-    def acquire(self, timeout_seconds: int = 60, wait: bool = False) -> bool:
+    def acquire(self, timeout_seconds=60, wait=False):
         """
         Try to acquire the lock with exponential backoff.
 
@@ -181,7 +180,7 @@ class ObjectStorageLock(LockBase):
         retry=retry_if_exception_type((oss_config.StorageOperationError, oss_config.LibcloudError)),
         reraise=True
     )
-    def _attempt_acquire(self, timeout_seconds: int) -> bool:
+    def _attempt_acquire(self, timeout_seconds):
         """Attempt to acquire the lock once with fencing token."""
         try:
             now = time.monotonic()
@@ -256,7 +255,7 @@ class ObjectStorageLock(LockBase):
             g_logger.warning(f"Storage error putting lock info for {self.lock_key}: {e}")
             raise
     
-    def release(self) -> bool:
+    def release(self):
         """
         Release the lock if held by this instance.
 
@@ -291,7 +290,7 @@ class ObjectStorageLock(LockBase):
         self._thread_local.lock_count = 0
         return success
         
-    def renew(self, timeout_seconds: int) -> bool:
+    def renew(self, timeout_seconds):
         """
         Renew the lock's expiry time if held by this instance.
 
