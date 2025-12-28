@@ -104,6 +104,83 @@ def get_cached_above_html():
     """
     return get_cached_file_content(Path(PATH) / ABOVE_HTML_FILE)
 
+def _get_all_reports():
+    """
+    Build a list of all available report modes for cross-navigation.
+    
+    Returns:
+        list: List of dictionaries containing report information with keys:
+              'name', 'url', 'description', 'is_current'
+    """
+    all_reports = []
+    for mode in Mode:
+        # Import the config module for each mode to get its settings
+        try:
+            config_module = __import__(f"{mode.value}_report_settings", fromlist=["CONFIG"])
+            config = config_module.CONFIG
+            # Extract base URL from URL_IMAGES (e.g., "https://linuxreport.net/static/images/" -> "https://linuxreport.net")
+            # Remove trailing slash and /static/images/ suffix if present
+            url_images = config.URL_IMAGES.rstrip('/')
+            if url_images.endswith('/static/images'):
+                report_url = url_images[:-len('/static/images')]
+            else:
+                # Fallback: try to extract base URL by removing /static/images/ pattern
+                report_url = url_images.replace('/static/images', '').rstrip('/')
+                # If that didn't work, use default pattern
+                if report_url == url_images:
+                    report_url = f"https://{mode.value}report.keithcu.com"
+            
+            all_reports.append({
+                'name': mode.value.title(),
+                'url': report_url,
+                'description': config.WEB_DESCRIPTION,
+                'is_current': mode == MODE
+            })
+        except ImportError:
+            # Skip modes without config files
+            continue
+    
+    return all_reports
+
+def _render_about_page(description):
+    """
+    Render the about page template with the given description.
+    Uses in-memory caching (g_cm) for the lifetime of the app.
+    
+    Args:
+        description (str): The description text to display on the page
+    
+    Returns:
+        str: Rendered HTML string
+    """
+    # Create a cache key that includes a hash of the description to differentiate
+    # between different routes (e.g., /about vs /reddit/callback)
+    import hashlib
+    description_hash = hashlib.md5(description.encode('utf-8')).hexdigest()[:8]
+    cache_key = f'about_page:{description_hash}'
+    
+    # Check cache first
+    cached_html = g_cm.get(cache_key)
+    if cached_html is not None:
+        return cached_html
+    
+    # Not cached, render the page
+    all_reports = _get_all_reports()
+    html = render_template(
+        'about.html',
+        title=WEB_TITLE,
+        description=description,
+        logo_url=LOGO_URL,
+        favicon=FAVICON,
+        all_reports=all_reports,
+        current_mode=MODE.value
+    )
+    
+    # Cache for the lifetime of the app (using EXPIRE_YEARS)
+    g_cm.set(cache_key, html, ttl=EXPIRE_YEARS)
+    
+    return html
+
 class RateLimitStatsResource(Resource):
     """
     Resource for handling GET requests to /api/rate_limit_stats.
@@ -796,45 +873,7 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         Displays information about the site, its features, and links to other reports.
         Uses existing template structure and styling.
         """
-        # Get all available report modes for cross-navigation
-        all_reports = []
-        for mode in Mode:
-            # Import the config module for each mode to get its settings
-            try:
-                config_module = __import__(f"{mode.value}_report_settings", fromlist=["CONFIG"])
-                config = config_module.CONFIG
-                # Extract base URL from URL_IMAGES (e.g., "https://linuxreport.net/static/images/" -> "https://linuxreport.net")
-                # Remove trailing slash and /static/images/ suffix if present
-                url_images = config.URL_IMAGES.rstrip('/')
-                if url_images.endswith('/static/images'):
-                    report_url = url_images[:-len('/static/images')]
-                else:
-                    # Fallback: try to extract base URL by removing /static/images/ pattern
-                    report_url = url_images.replace('/static/images', '').rstrip('/')
-                    # If that didn't work, use default pattern
-                    if report_url == url_images:
-                        report_url = f"https://{mode.value}report.keithcu.com"
-                
-                all_reports.append({
-                    'name': mode.value.title(),
-                    'url': report_url,
-                    'description': config.WEB_DESCRIPTION,
-                    'is_current': mode == MODE
-                })
-            except ImportError:
-                # Skip modes without config files
-                continue
-
-        # Render the about page template
-        return render_template(
-            'about.html',
-            title=WEB_TITLE,
-            description=WEB_DESCRIPTION,
-            logo_url=LOGO_URL,
-            favicon=FAVICON,
-            all_reports=all_reports,
-            current_mode=MODE.value
-        )
+        return _render_about_page(WEB_DESCRIPTION)
 
     @flask_app.route('/reddit/callback')
     @limiter.limit(dynamic_rate_limit)
@@ -849,48 +888,13 @@ Sitemap: {request.host_url.rstrip('/')}/sitemap.xml
         It does NOT perform any OAuth or token-handling logic for the current
         LinuxReport deployment, which uses script-style credentials via Reddit.py.
         """
-        # Build the same all_reports list used on the /about page for consistency
-        all_reports = []
-        for mode in Mode:
-            try:
-                config_module = __import__(f"{mode.value}_report_settings", fromlist=["CONFIG"])
-                config = config_module.CONFIG
-                # Extract base URL from URL_IMAGES (e.g., "https://linuxreport.net/static/images/" -> "https://linuxreport.net")
-                # Remove trailing slash and /static/images/ suffix if present
-                url_images = config.URL_IMAGES.rstrip('/')
-                if url_images.endswith('/static/images'):
-                    report_url = url_images[:-len('/static/images')]
-                else:
-                    # Fallback: try to extract base URL by removing /static/images/ pattern
-                    report_url = url_images.replace('/static/images', '').rstrip('/')
-                    # If that didn't work, use default pattern
-                    if report_url == url_images:
-                        report_url = f"https://{mode.value}report.keithcu.com"
-                
-                all_reports.append({
-                    'name': mode.value.title(),
-                    'url': report_url,
-                    'description': config.WEB_DESCRIPTION,
-                    'is_current': mode == MODE
-                })
-            except ImportError:
-                continue
-
         callback_description = (
             "Reddit authorization callback endpoint for LinuxReport. "
             "If you reached this page after authorizing an application on Reddit, "
             "the configuration is complete and you can safely close this tab."
         )
 
-        return render_template(
-            'about.html',
-            title=WEB_TITLE,
-            description=callback_description,
-            logo_url=LOGO_URL,
-            favicon=FAVICON,
-            all_reports=all_reports,
-            current_mode=MODE.value
-        )
+        return _render_about_page(callback_description)
 
     # Rate limit error handler
     @flask_app.errorhandler(429)
