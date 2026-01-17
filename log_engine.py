@@ -15,9 +15,14 @@ METRIC_DTYPE = np.dtype([
 from shared import g_c, g_logger
 
 class LogEngine:
-    def __init__(self, log_path, metrics_path="metrics.npy"):
+    def __init__(self, log_path, metrics_path=None):
         self.log_path = Path(log_path)
-        self.metrics_path = Path(metrics_path)
+        # If metrics_path is not absolute, make it relative to the log file's directory
+        if metrics_path:
+            self.metrics_path = Path(metrics_path)
+        else:
+            self.metrics_path = self.log_path.parent / "metrics.npy"
+            
         self.data = self._load_persisted()
 
     def _load_persisted(self):
@@ -44,7 +49,9 @@ class LogEngine:
         Incrementally syncs the log file by tracking the first line and byte offset.
         Handles rotation and extension gracefully.
         """
-        if not self.log_path.exists(): return self.data
+        if not self.log_path.exists(): 
+            g_logger.error(f"CRITICAL: Performance log file not found at {self.log_path.absolute()}")
+            return self.data
 
         # 1. Check for Rotation using the first line's timestamp
         last_offset = g_c.get("log_sync_offset") or 0

@@ -236,8 +236,9 @@ class PerformanceMetricsResource(Resource):
         g_logger.info("DEBUG: PerformanceMetricsResource.get called")
         
         try:
-            g_logger.info("DEBUG: Initializing LogEngine sync")
-            engine = LogEngine("linuxreport.log")
+            from shared import PATH
+            g_logger.info(f"DEBUG: Initializing LogEngine sync with path: {PATH / 'linuxreport.log'}")
+            engine = LogEngine(PATH / "linuxreport.log")
             data = engine.sync()
             g_logger.info(f"DEBUG: LogEngine sync complete, data length: {len(data)}")
             
