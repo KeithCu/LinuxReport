@@ -76,11 +76,19 @@ def get_admin_stats_html():
     # Vectorized analysis with NumPy
     # Filter out zero values (unused buffer) and handle effective size
     actual_data = np.array(times_list)
+    idx = stats.get("index", 0)
+    
     if stats["count"] < len(times_list):
-        # Buffer not full yet, only take first N entries
-        # But wait, index is current write pos. 
-        # Actually it's simpler to just use count - 1 (skipping cold start)
-        actual_data = actual_data[:min(stats["count"]-1, len(times_list))]
+        # Buffer not full yet, take only the entries we've written
+        actual_data = actual_data[:stats["count"]]
+    else:
+        # Buffer is full, roll it so the oldest entry (at index) is at the start
+        actual_data = np.roll(actual_data, -idx)
+    
+    # Filter out initial zeros if count is very low (e.g. first request)
+    actual_data = actual_data[actual_data > 0]
+    if len(actual_data) == 0:
+        return None
     
     # Calculate stats
     min_time = np.min(actual_data)

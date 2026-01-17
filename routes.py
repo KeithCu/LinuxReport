@@ -230,11 +230,28 @@ class PerformanceMetricsResource(Resource):
         """
         Get performance metrics for the dashboard.
         """
+        # Cache key based on current process state
+        cache_key = "admin_metrics_echarts"
+        
         try:
             engine = LogEngine("linuxreport.log")
             data = engine.sync()
+            
+            # Check if logs have changed using a fingerprint (length + last offset)
+            last_offset = g_c.get("log_sync_offset") or 0
+            fingerprint = f"{len(data)}:{last_offset}"
+            
+            cached_result = g_cm.get(cache_key)
+            if cached_result and cached_result.get("fingerprint") == fingerprint:
+                return cached_result["data"], 200
+            
             analytics = PerformanceAnalytics(data)
-            return analytics.get_echarts_data(), 200
+            echarts_data = analytics.get_echarts_data()
+            
+            # Cache the result
+            g_cm.set(cache_key, {"data": echarts_data, "fingerprint": fingerprint}, ttl=300)
+            
+            return echarts_data, 200
         except Exception as e:
             g_logger.error(f"Error fetching performance metrics: {e}")
             return {"error": str(e)}, 500

@@ -27,20 +27,39 @@ class PerformanceAnalytics:
 
     def detect_outliers_zscore(self, threshold=3):
         """
-        Uses Z-Score (standard deviations from mean) to detect performance anomalies.
-        Vectorized O(1) implementation.
+        Uses Z-Score to detect performance anomalies. Fully vectorized across all metric types.
         """
-        outliers = []
-        for m_type in np.unique(self.data['type']):
-            subset = self.data[self.data['type'] == m_type]
-            if len(subset) < 2: continue
-            
-            latencies = subset['latency']
-            z_scores = np.abs((latencies - np.mean(latencies)) / np.std(latencies))
-            
-            anomalies = subset[z_scores > threshold]
-            for a in anomalies:
-                outliers.append(f"OUTLIER: {m_type:8} | {a['timestamp']} | Latency: {a['latency']:.3f}s | Source: {a['source']}")
+        if len(self.data) < 2:
+            return ""
+
+        # Vectorized stats per type
+        types, inverse = np.unique(self.data['type'], return_inverse=True)
+        type_counts = np.bincount(inverse)
+        
+        # Means
+        type_sums = np.bincount(inverse, weights=self.data['latency'])
+        type_means = type_sums / np.maximum(type_counts, 1)
+        
+        # Standard Deviations
+        type_sums_sq = np.bincount(inverse, weights=self.data['latency']**2)
+        type_means_sq = type_sums_sq / np.maximum(type_counts, 1)
+        type_stds = np.sqrt(np.maximum(0, type_means_sq - type_means**2))
+        
+        # Broadcast back to original array
+        b_means = type_means[inverse]
+        b_stds = type_stds[inverse]
+        
+        # Calculate Z-Scores
+        valid_mask = (type_counts[inverse] > 2) & (b_stds > 1e-6)
+        z_scores = np.zeros(len(self.data))
+        z_scores[valid_mask] = np.abs((self.data['latency'][valid_mask] - b_means[valid_mask]) / b_stds[valid_mask])
+        
+        anomalies = self.data[z_scores > threshold]
+        
+        outliers = [
+            f"OUTLIER: {a['type']:8} | {a['timestamp']} | Latency: {a['latency']:.3f}s | Source: {a['source']}"
+            for a in anomalies
+        ]
         
         return "\n".join(outliers)
 
@@ -89,15 +108,23 @@ class PerformanceAnalytics:
             for h in range(24):
                 heatmap_data.append([h, d, int(counts[d * 24 + h])])
 
-        # 3. Anomaly Calendar
-        # Data format: [[date, count], ...]
-        outliers_mask = np.zeros(len(self.data), dtype=bool)
-        for m_type in np.unique(self.data['type']):
-            subset_mask = self.data['type'] == m_type
-            subset_latencies = self.data[subset_mask]['latency']
-            if len(subset_latencies) > 2:
-                z = np.abs((subset_latencies - np.mean(subset_latencies)) / np.std(subset_latencies))
-                outliers_mask[subset_mask] = z > 3
+        # 3. Anomaly Calendar (Fully Vectorized without O(N_types) loops)
+        types, inverse = np.unique(self.data['type'], return_inverse=True)
+        type_counts = np.bincount(inverse)
+        type_sums = np.bincount(inverse, weights=self.data['latency'])
+        type_means = type_sums / np.maximum(type_counts, 1)
+        
+        type_sums_sq = np.bincount(inverse, weights=self.data['latency']**2)
+        type_means_sq = type_sums_sq / np.maximum(type_counts, 1)
+        type_stds = np.sqrt(np.maximum(0, type_means_sq - type_means**2))
+        
+        b_means = type_means[inverse]
+        b_stds = type_stds[inverse]
+        
+        valid_mask = (type_counts[inverse] > 2) & (b_stds > 1e-6)
+        z_scores = np.zeros(len(self.data))
+        z_scores[valid_mask] = np.abs((self.data['latency'][valid_mask] - b_means[valid_mask]) / b_stds[valid_mask])
+        outliers_mask = z_scores > 3
         
         anomaly_dates = self.data[outliers_mask]['timestamp'].astype('datetime64[D]').astype(str)
         unique_dates, anomaly_counts = np.unique(anomaly_dates, return_counts=True)
@@ -127,14 +154,15 @@ class PerformanceAnalytics:
         """
         weather_latencies = self.data[self.data['type'] == 'weather']['latency']
         if len(weather_latencies) < window:
-            return "Insufficient data for rolling analysis."
+            return 0.0
             
         # Magic of stride_tricks: creates a (N, window) view of original memory
         from numpy.lib.stride_tricks import sliding_window_view
         windows = sliding_window_view(weather_latencies, window_shape=window)
         volatilities = np.std(windows, axis=1)
         
-        return f"Average Weather Volatility (Rolling {window}): {np.mean(volatilities):.4f}"
+        # Return only the float value for consistency (Feedback #4)
+        return float(np.mean(volatilities))
 
 if __name__ == "__main__":
     from shared import g_logger
