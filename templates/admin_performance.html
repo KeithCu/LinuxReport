@@ -189,10 +189,10 @@
                     return response.json();
                 })
                 .then(data => {
-                    renderLatencyTrend(data.trends);
-                    renderDensity(data.heatmap);
-                    renderJitter(data.jitter);
-                    renderCalendar(data.calendar);
+                    renderLatencyTrend(data.trends || {});
+                    renderDensity(data.heatmap || []);
+                    renderJitter(data.jitter || []);
+                    renderCalendar(data.calendar || []);
                     btn.textContent = 'Refresh Metrics';
                     btn.disabled = false;
                 })

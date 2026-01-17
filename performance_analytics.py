@@ -68,7 +68,12 @@ class PerformanceAnalytics:
         Processes NumPy data into a JSON-compatible format optimized for Apache ECharts.
         """
         if len(self.data) == 0:
-            return {}
+            return {
+                "trends": {},
+                "heatmap": [],
+                "calendar": [],
+                "jitter": []
+            }
 
         # 1. Latency Trends (P50/P99)
         trends = {}
