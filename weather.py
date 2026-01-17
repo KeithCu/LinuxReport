@@ -28,6 +28,7 @@ from pathlib import Path
 import geoip2.database
 import geoip2.errors
 import requests
+import numpy as np
 from flask import jsonify, request
 from flask_restful import Resource, reqparse
 
@@ -339,10 +340,18 @@ def _process_openweather_response(weather_data, fetch_time):
         if days_added >= 5:
             break
             
-        temp_mins = [e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]]
-        temp_maxs = [e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]]
-        pops = [e.get("pop", 0) for e in entries]
-        rain_total = sum(e.get("rain", {}).get("3h", 0) for e in entries if "rain" in e)
+        # Use NumPy for efficient statistical aggregation
+        # Extract fields into NumPy arrays for vectorized operations
+        temp_mins = np.array([e["main"]["temp_min"] for e in entries if "main" in e and "temp_min" in e["main"]])
+        temp_maxs = np.array([e["main"]["temp_max"] for e in entries if "main" in e and "temp_max" in e["main"]])
+        pops = np.array([e.get("pop", 0) for e in entries])
+        rain_array = np.array([e.get("rain", {}).get("3h", 0) for e in entries])
+        
+        # Aggregate using NumPy
+        day_min = np.min(temp_mins) if temp_mins.size > 0 else None
+        day_max = np.max(temp_maxs) if temp_maxs.size > 0 else None
+        max_pop = np.max(pops) if pops.size > 0 else 0
+        total_rain = np.sum(rain_array)
 
         # Use noon entry if possible, else first
         preferred_entry = next((e for e in entries if "12:00:00" in e.get("dt_txt", "")), entries[0])
@@ -351,10 +360,10 @@ def _process_openweather_response(weather_data, fetch_time):
 
         processed_data["daily"].append({
             "dt": int(datetime.strptime(date, "%Y-%m-%d").replace(hour=12).timestamp()),
-            "temp_min": min(temp_mins) if temp_mins else None,
-            "temp_max": max(temp_maxs) if temp_maxs else None,
-            "precipitation": round(max(pops) * 100) if pops else 0,
-            "rain": round(rain_total, 2),
+            "temp_min": day_min,
+            "temp_max": day_max,
+            "precipitation": round(max_pop * 100),
+            "rain": round(total_rain, 2),
             "weather": weather_main,
             "weather_icon": weather_icon
         })

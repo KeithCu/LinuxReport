@@ -49,6 +49,8 @@ from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
 from shared import g_logger
+from performance_analytics import PerformanceAnalytics
+from log_engine import LogEngine
 
 # =============================================================================
 # GLOBAL CONFIGURATION
@@ -74,7 +76,7 @@ def _build_security_headers():
         f"default-src {default_src}; "
         f"connect-src 'self' {csp_domains}; "
         f"img-src {img_src} *; "
-        f"script-src 'self' 'unsafe-inline'; "
+        f"script-src 'self' 'unsafe-inline' {csp_domains}; "
         f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
         f"font-src 'self' https://fonts.gstatic.com; "
         f"frame-ancestors 'none';"
@@ -217,6 +219,26 @@ class RateLimitStatsResource(Resource):
         
         return result, 200
 
+class PerformanceMetricsResource(Resource):
+    """
+    Resource for handling GET requests to /api/admin/metrics.
+    Provides statistical performance data for the dashboard.
+    """
+    
+    @login_required
+    def get(self):
+        """
+        Get performance metrics for the dashboard.
+        """
+        try:
+            engine = LogEngine("linuxreport.log")
+            data = engine.sync()
+            analytics = PerformanceAnalytics(data)
+            return analytics.get_echarts_data(), 200
+        except Exception as e:
+            g_logger.error(f"Error fetching performance metrics: {e}")
+            return {"error": str(e)}, 500
+
 # =============================================================================
 # ROUTE INITIALIZATION
 # =============================================================================
@@ -268,6 +290,7 @@ def init_app(flask_app):
 
     # Register Flask-RESTful resources
     API.add_resource(RateLimitStatsResource, '/api/rate_limit_stats')
+    API.add_resource(PerformanceMetricsResource, '/api/admin/metrics')
 
 # =============================================================================
 # AUTHENTICATION ROUTES
@@ -325,6 +348,12 @@ def _register_main_routes(flask_app):
     Args:
         flask_app (Flask): The Flask application instance
     """
+    
+    @flask_app.route('/admin/performance')
+    @login_required
+    def admin_performance():
+        """Render the performance dashboard."""
+        return render_template('admin_performance.html')
     
     @flask_app.route('/')
     @limiter.limit(dynamic_rate_limit)

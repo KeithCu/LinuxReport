@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Dashboard | LinuxReport</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --accent-primary: #38bdf8;
+            --accent-secondary: #818cf8;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Outfit', sans-serif;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        .dashboard-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 0 10px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin: 0;
+            background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .refresh-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .refresh-btn:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 20px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-full {
+            grid-column: span 2;
+        }
+
+        .card-header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-title {
+            font-size: 16px;
+            color: var(--text-dim);
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .chart-container {
+            flex-grow: 1;
+            width: 100%;
+        }
+
+        @media (max-width: 1024px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .card-full {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="header">
+            <h1>Backend Performance Analytics</h1>
+            <button class="refresh-btn" onclick="loadData()">Refresh Metrics</button>
+        </header>
+
+        <div class="grid">
+            <div class="card card-full">
+                <div class="card-header">
+                    <span class="card-title">Latency Trends (P50/P99)</span>
+                </div>
+                <div id="latencyTrendChart" class="chart-container"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">Traffic Density (Weekly)</span>
+                </div>
+                <div id="densityChart" class="chart-container"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">System Jitter (Coefficient of Variation)</span>
+                </div>
+                <div id="jitterChart" class="chart-container"></div>
+            </div>
+
+            <div class="card card-full">
+                <div class="card-header">
+                    <span class="card-title">Anomaly Calendar</span>
+                </div>
+                <div id="calendarChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let charts = {};
+
+        function initCharts() {
+            const chartIds = ['latencyTrendChart', 'densityChart', 'jitterChart', 'calendarChart'];
+            chartIds.forEach(id => {
+                charts[id] = echarts.init(document.getElementById(id), 'dark', { backgroundColor: 'transparent' });
+            });
+
+            window.addEventListener('resize', () => {
+                Object.values(charts).forEach(chart => chart.resize());
+            });
+        }
+
+        function loadData() {
+            const btn = document.querySelector('.refresh-btn');
+            btn.textContent = 'Loading...';
+            btn.disabled = true;
+
+            fetch('/api/admin/metrics')
+                .then(response => response.json())
+                .then(data => {
+                    renderLatencyTrend(data.trends);
+                    renderDensity(data.heatmap);
+                    renderJitter(data.jitter);
+                    renderCalendar(data.calendar);
+                    btn.textContent = 'Refresh Metrics';
+                    btn.disabled = false;
+                })
+                .catch(err => {
+                    console.error('Error loading metrics:', err);
+                    btn.textContent = 'Error (Retry)';
+                    btn.disabled = false;
+                });
+        }
+
+        function renderLatencyTrend(trends) {
+            const types = Object.keys(trends);
+            const series = [];
+            
+            types.forEach(type => {
+                series.push({
+                    name: `${type} (P50)`,
+                    type: 'line',
+                    smooth: true,
+                    showSymbol: false,
+                    data: trends[type].timestamps.map((t, i) => [t, trends[type].p50[i]]),
+                    lineStyle: { width: 2 }
+                });
+                series.push({
+                    name: `${type} (P99)`,
+                    type: 'line',
+                    smooth: true,
+                    showSymbol: false,
+                    data: trends[type].timestamps.map((t, i) => [t, trends[type].p99[i]]),
+                    lineStyle: { width: 1, type: 'dashed' }
+                });
+            });
+
+            const option = {
+                tooltip: { trigger: 'axis' },
+                legend: { data: series.map(s => s.name), bottom: 0, textStyle: { color: '#94a3b8' } },
+                grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+                xAxis: { type: 'time', splitLine: { show: false } },
+                yAxis: { type: 'value', name: 'Latency (s)', splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+                series: series
+            };
+            charts.latencyTrendChart.setOption(option);
+        }
+
+        function renderDensity(heatmapData) {
+            const hours = Array.from({length: 24}, (_, i) => i + ':00');
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+            const option = {
+                tooltip: { position: 'top' },
+                grid: { height: '70%', top: '10%' },
+                xAxis: { type: 'category', data: hours, splitArea: { show: true } },
+                yAxis: { type: 'category', data: days, splitArea: { show: true } },
+                visualMap: {
+                    min: 0, max: 100,
+                    calculable: true, orient: 'horizontal', left: 'center', bottom: '0%',
+                    inRange: { color: ['#0f172a', '#38bdf8', '#818cf8'] }
+                },
+                series: [{
+                    name: 'Requests', type: 'heatmap', data: heatmapData,
+                    label: { show: false },
+                    emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+                }]
+            };
+            charts.densityChart.setOption(option);
+        }
+
+        function renderJitter(jitterData) {
+            const option = {
+                tooltip: { trigger: 'axis' },
+                xAxis: { type: 'time', splitLine: { show: false } },
+                yAxis: { type: 'value', name: 'Volatility', splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+                series: [{
+                    name: 'Weather Jitter',
+                    type: 'line',
+                    smooth: true,
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(56, 189, 248, 0.3)' },
+                            { offset: 1, color: 'rgba(56, 189, 248, 0)' }
+                        ])
+                    },
+                    data: jitterData
+                }]
+            };
+            charts.jitterChart.setOption(option);
+        }
+
+        function renderCalendar(calendarData) {
+            const currentYear = new Date().getFullYear();
+            const option = {
+                tooltip: { position: 'top' },
+                visualMap: {
+                    min: 0, max: 10, type: 'piecewise',
+                    orient: 'horizontal', left: 'center', top: 0,
+                    textStyle: { color: '#94a3b8' }
+                },
+                calendar: {
+                    top: 60, left: 30, right: 30, cellSize: ['auto', 13],
+                    range: currentYear,
+                    itemStyle: { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.05)' },
+                    yearLabel: { show: false },
+                    dayLabel: { color: '#94a3b8' },
+                    monthLabel: { color: '#94a3b8' }
+                },
+                series: {
+                    type: 'scatter', coordinateSystem: 'calendar',
+                    symbolSize: function (val) { return val[1] * 2; },
+                    data: calendarData
+                }
+            };
+            charts.calendarChart.setOption(option);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCharts();
+            loadData();
+        });
+    </script>
+</body>
+</html>

@@ -50,6 +50,7 @@ settings:
   allowed_domains:
     - "https://linuxreport.net"
     - "https://www.linuxreport.net"
+    - "https://cdn.jsdelivr.net"
     - "https://covidreport.org"
     - "https://www.covidreport.org"
     - "https://aireport.keithcu.com"
