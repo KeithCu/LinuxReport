@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Performance Dashboard | LinuxReport</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg-dark: #0f172a;
@@ -45,6 +47,7 @@
             margin: 0;
             background: linear-gradient(to right, var(--accent-primary), var(--accent-secondary));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
@@ -111,12 +114,14 @@
             .grid {
                 grid-template-columns: 1fr;
             }
+
             .card-full {
                 grid-column: span 1;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="dashboard-container">
         <header class="header">
@@ -175,7 +180,14 @@
             btn.disabled = true;
 
             fetch('/api/admin/metrics')
-                .then(response => response.json())
+                .then(async response => {
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('Performance API Error:', response.status, errorText);
+                        throw new Error(`Server returned ${response.status}: ${errorText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     renderLatencyTrend(data.trends);
                     renderDensity(data.heatmap);
@@ -188,13 +200,17 @@
                     console.error('Error loading metrics:', err);
                     btn.textContent = 'Error (Retry)';
                     btn.disabled = false;
+                    // Inform the user via alert if they are debugging
+                    if (window.location.search.includes('debug')) {
+                        alert('Performance Dashboard Error: ' + err.message);
+                    }
                 });
         }
 
         function renderLatencyTrend(trends) {
             const types = Object.keys(trends);
             const series = [];
-            
+
             types.forEach(type => {
                 series.push({
                     name: `${type} (P50)`,
@@ -226,7 +242,7 @@
         }
 
         function renderDensity(heatmapData) {
-            const hours = Array.from({length: 24}, (_, i) => i + ':00');
+            const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
             const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
             const option = {
@@ -301,4 +317,5 @@
         });
     </script>
 </body>
+
 </html>

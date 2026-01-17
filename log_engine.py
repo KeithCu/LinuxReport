@@ -26,7 +26,7 @@ class LogEngine:
             try:
                 return np.load(self.metrics_path)
             except Exception as e:
-                print(f"Error loading {self.metrics_path}: {e}")
+                g_logger.error(f"Error loading {self.metrics_path}: {e}")
         return np.array([], dtype=METRIC_DTYPE)
 
     def _save_persisted(self):
