@@ -6,25 +6,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Performance Dashboard | LinuxReport</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&family=JetBrains+Mono&display=swap"
-        rel="stylesheet">
+    <!-- Link external CSS using Flask-Assets -->
+    {% assets "css_all" %}
+    <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+    {% endassets %}
     <style>
-        :root {
-            --bg-dark: #0f172a;
-            --card-bg: rgba(30, 41, 59, 0.7);
-            --border-color: rgba(255, 255, 255, 0.1);
-            --accent-primary: #38bdf8;
-            --accent-secondary: #818cf8;
-            --text-main: #f1f5f9;
-            --text-dim: #94a3b8;
-        }
-
+        /* Dashboard-specific styles using theme CSS variables */
         body {
-            background: var(--bg-dark);
-            color: var(--text-main);
-            font-family: 'Outfit', sans-serif;
             margin: 0;
-            padding: 20px;
+            padding: var(--spacing-lg);
             overflow-x: hidden;
         }
 
@@ -37,8 +27,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 30px;
-            padding: 0 10px;
+            margin-bottom: var(--spacing-xl);
+            padding: 0 var(--spacing-sm);
         }
 
         .header h1 {
@@ -52,35 +42,40 @@
         }
 
         .refresh-btn {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-            padding: 8px 16px;
-            border-radius: 8px;
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            color: var(--btn-text);
+            padding: var(--spacing-sm) var(--spacing-md);
+            border-radius: var(--border-radius-md);
             cursor: pointer;
             font-size: 14px;
-            transition: all 0.3s ease;
-            backdrop-filter: blur(10px);
+            transition: all var(--transition-normal);
         }
 
         .refresh-btn:hover {
+            background: var(--btn-hover-bg);
+            color: var(--btn-hover-text);
             border-color: var(--accent-primary);
-            box-shadow: 0 0 15px rgba(56, 189, 248, 0.2);
+            box-shadow: var(--shadow-btn-hover);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
         }
 
         .grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 20px;
+            gap: var(--spacing-lg);
         }
 
         .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 20px;
-            backdrop-filter: blur(12px);
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+            background: var(--btn-bg);
+            border: 1px solid var(--btn-border);
+            border-radius: var(--border-radius-lg);
+            padding: var(--spacing-lg);
+            box-shadow: var(--shadow-lg);
             height: 400px;
             display: flex;
             flex-direction: column;
@@ -91,7 +86,7 @@
         }
 
         .card-header {
-            margin-bottom: 20px;
+            margin-bottom: var(--spacing-lg);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -99,7 +94,7 @@
 
         .card-title {
             font-size: 16px;
-            color: var(--text-dim);
+            color: var(--text-secondary);
             font-weight: 400;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -160,13 +155,44 @@
         </div>
     </div>
 
+    <!-- Link external JS using Flask-Assets -->
+    {% assets "js_all" %}
+    <script type="text/javascript" src="{{ ASSET_URL }}"></script>
+    {% endassets %}
+
+    <!-- Pass Flask variables to JavaScript -->
+    <script>
+      window.defaultTheme = "{{ default_theme }}";
+    </script>
+
     <script>
         let charts = {};
+
+        // Get theme colors from CSS custom properties
+        function getThemeColors() {
+            const style = getComputedStyle(document.body);
+            return {
+                bg: style.getPropertyValue('--bg').trim(),
+                text: style.getPropertyValue('--text').trim(),
+                textSecondary: style.getPropertyValue('--text-secondary').trim(),
+                accentPrimary: style.getPropertyValue('--accent-primary').trim(),
+                accentSecondary: style.getPropertyValue('--accent-secondary').trim(),
+                btnBorder: style.getPropertyValue('--btn-border').trim()
+            };
+        }
+
+        // Convert hex color to rgba
+        function hexToRgba(hex, alpha) {
+            const r = parseInt(hex.slice(1, 3), 16);
+            const g = parseInt(hex.slice(3, 5), 16);
+            const b = parseInt(hex.slice(5, 7), 16);
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
 
         function initCharts() {
             const chartIds = ['latencyTrendChart', 'densityChart', 'jitterChart', 'calendarChart'];
             chartIds.forEach(id => {
-                charts[id] = echarts.init(document.getElementById(id), 'dark', { backgroundColor: 'transparent' });
+                charts[id] = echarts.init(document.getElementById(id), null, { backgroundColor: 'transparent' });
             });
 
             window.addEventListener('resize', () => {
@@ -208,17 +234,21 @@
         }
 
         function renderLatencyTrend(trends) {
+            const colors = getThemeColors();
             const types = Object.keys(trends);
             const series = [];
 
-            types.forEach(type => {
+            types.forEach((type, typeIndex) => {
+                const colorIndex = typeIndex % 2;
+                const primaryColor = colorIndex === 0 ? colors.accentPrimary : colors.accentSecondary;
                 series.push({
                     name: `${type} (P50)`,
                     type: 'line',
                     smooth: true,
                     showSymbol: false,
                     data: trends[type].timestamps.map((t, i) => [t, trends[type].p50[i]]),
-                    lineStyle: { width: 2 }
+                    lineStyle: { width: 2, color: primaryColor },
+                    itemStyle: { color: primaryColor }
                 });
                 series.push({
                     name: `${type} (P99)`,
@@ -226,57 +256,121 @@
                     smooth: true,
                     showSymbol: false,
                     data: trends[type].timestamps.map((t, i) => [t, trends[type].p99[i]]),
-                    lineStyle: { width: 1, type: 'dashed' }
+                    lineStyle: { width: 1, type: 'dashed', color: primaryColor },
+                    itemStyle: { color: primaryColor }
                 });
             });
 
             const option = {
-                tooltip: { trigger: 'axis' },
-                legend: { data: series.map(s => s.name), bottom: 0, textStyle: { color: '#94a3b8' } },
+                tooltip: { 
+                    trigger: 'axis',
+                    backgroundColor: colors.bg,
+                    borderColor: colors.btnBorder,
+                    textStyle: { color: colors.text }
+                },
+                legend: { 
+                    data: series.map(s => s.name), 
+                    bottom: 0, 
+                    textStyle: { color: colors.textSecondary } 
+                },
                 grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
-                xAxis: { type: 'time', splitLine: { show: false } },
-                yAxis: { type: 'value', name: 'Latency (s)', splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+                xAxis: { 
+                    type: 'time', 
+                    splitLine: { show: false },
+                    axisLabel: { color: colors.textSecondary },
+                    axisLine: { lineStyle: { color: colors.btnBorder } }
+                },
+                yAxis: { 
+                    type: 'value', 
+                    name: 'Latency (s)', 
+                    nameTextStyle: { color: colors.textSecondary },
+                    splitLine: { lineStyle: { color: hexToRgba(colors.btnBorder, 0.1) } },
+                    axisLabel: { color: colors.textSecondary },
+                    axisLine: { lineStyle: { color: colors.btnBorder } }
+                },
                 series: series
             };
             charts.latencyTrendChart.setOption(option);
         }
 
         function renderDensity(heatmapData) {
+            const colors = getThemeColors();
             const hours = Array.from({ length: 24 }, (_, i) => i + ':00');
             const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
             const option = {
-                tooltip: { position: 'top' },
+                tooltip: { 
+                    position: 'top',
+                    backgroundColor: colors.bg,
+                    borderColor: colors.btnBorder,
+                    textStyle: { color: colors.text }
+                },
                 grid: { height: '70%', top: '10%' },
-                xAxis: { type: 'category', data: hours, splitArea: { show: true } },
-                yAxis: { type: 'category', data: days, splitArea: { show: true } },
+                xAxis: { 
+                    type: 'category', 
+                    data: hours, 
+                    splitArea: { show: true },
+                    axisLabel: { color: colors.textSecondary },
+                    axisLine: { lineStyle: { color: colors.btnBorder } }
+                },
+                yAxis: { 
+                    type: 'category', 
+                    data: days, 
+                    splitArea: { show: true },
+                    axisLabel: { color: colors.textSecondary },
+                    axisLine: { lineStyle: { color: colors.btnBorder } }
+                },
                 visualMap: {
                     min: 0, max: 100,
                     calculable: true, orient: 'horizontal', left: 'center', bottom: '0%',
-                    inRange: { color: ['#0f172a', '#38bdf8', '#818cf8'] }
+                    inRange: { color: [colors.bg, colors.accentPrimary, colors.accentSecondary] },
+                    textStyle: { color: colors.textSecondary }
                 },
                 series: [{
                     name: 'Requests', type: 'heatmap', data: heatmapData,
                     label: { show: false },
-                    emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
+                    emphasis: { itemStyle: { shadowBlur: 10, shadowColor: hexToRgba(colors.text, 0.3) } }
                 }]
             };
             charts.densityChart.setOption(option);
         }
 
         function renderJitter(jitterData) {
+            const colors = getThemeColors();
+            const primaryRgba = hexToRgba(colors.accentPrimary, 0.3);
+            const primaryRgbaTransparent = hexToRgba(colors.accentPrimary, 0);
+
             const option = {
-                tooltip: { trigger: 'axis' },
-                xAxis: { type: 'time', splitLine: { show: false } },
-                yAxis: { type: 'value', name: 'Volatility', splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+                tooltip: { 
+                    trigger: 'axis',
+                    backgroundColor: colors.bg,
+                    borderColor: colors.btnBorder,
+                    textStyle: { color: colors.text }
+                },
+                xAxis: { 
+                    type: 'time', 
+                    splitLine: { show: false },
+                    axisLabel: { color: colors.textSecondary },
+                    axisLine: { lineStyle: { color: colors.btnBorder } }
+                },
+                yAxis: { 
+                    type: 'value', 
+                    name: 'Volatility',
+                    nameTextStyle: { color: colors.textSecondary },
+                    splitLine: { lineStyle: { color: hexToRgba(colors.btnBorder, 0.1) } },
+                    axisLabel: { color: colors.textSecondary },
+                    axisLine: { lineStyle: { color: colors.btnBorder } }
+                },
                 series: [{
                     name: 'Weather Jitter',
                     type: 'line',
                     smooth: true,
+                    lineStyle: { color: colors.accentPrimary },
+                    itemStyle: { color: colors.accentPrimary },
                     areaStyle: {
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(56, 189, 248, 0.3)' },
-                            { offset: 1, color: 'rgba(56, 189, 248, 0)' }
+                            { offset: 0, color: primaryRgba },
+                            { offset: 1, color: primaryRgbaTransparent }
                         ])
                     },
                     data: jitterData
@@ -286,25 +380,32 @@
         }
 
         function renderCalendar(calendarData) {
+            const colors = getThemeColors();
             const currentYear = new Date().getFullYear();
             const option = {
-                tooltip: { position: 'top' },
+                tooltip: { 
+                    position: 'top',
+                    backgroundColor: colors.bg,
+                    borderColor: colors.btnBorder,
+                    textStyle: { color: colors.text }
+                },
                 visualMap: {
                     min: 0, max: 10, type: 'piecewise',
                     orient: 'horizontal', left: 'center', top: 0,
-                    textStyle: { color: '#94a3b8' }
+                    textStyle: { color: colors.textSecondary }
                 },
                 calendar: {
                     top: 60, left: 30, right: 30, cellSize: ['auto', 13],
                     range: currentYear,
-                    itemStyle: { borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.05)' },
+                    itemStyle: { borderWidth: 0.5, borderColor: hexToRgba(colors.btnBorder, 0.2) },
                     yearLabel: { show: false },
-                    dayLabel: { color: '#94a3b8' },
-                    monthLabel: { color: '#94a3b8' }
+                    dayLabel: { color: colors.textSecondary },
+                    monthLabel: { color: colors.textSecondary }
                 },
                 series: {
                     type: 'scatter', coordinateSystem: 'calendar',
                     symbolSize: function (val) { return val[1] * 2; },
+                    itemStyle: { color: colors.accentPrimary },
                     data: calendarData
                 }
             };
@@ -312,8 +413,15 @@
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            initCharts();
-            loadData();
+            // Wait for theme to be applied by UIManager
+            if (window.app && window.app.utils && window.app.utils.UIManager) {
+                window.app.utils.UIManager.applySettings();
+            }
+            // Small delay to ensure theme CSS is applied
+            setTimeout(() => {
+                initCharts();
+                loadData();
+            }, 100);
         });
     </script>
 </body>

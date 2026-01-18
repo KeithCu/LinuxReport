@@ -380,7 +380,7 @@ def _register_main_routes(flask_app):
     @login_required
     def admin_performance():
         """Render the performance dashboard."""
-        return render_template('admin_performance.html')
+        return render_template('admin_performance.html', default_theme=DEFAULT_THEME)
     
     @flask_app.route('/')
     @limiter.limit(dynamic_rate_limit)
