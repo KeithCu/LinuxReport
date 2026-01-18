@@ -10,9 +10,10 @@ from Logging import _setup_logging, g_logger
 # List of free models to try
 FREE_MODELS = [
     # "agentica-org/deepcoder-14b-preview:free", # Removed by openrouter.ai on: 2025-11-21
-    "alibaba/tongyi-deepresearch-30b-a3b:free",
-    "allenai/olmo-3-32b-think:free",
-    "allenai/olmo-3.1-32b-think:free",
+    # "alibaba/tongyi-deepresearch-30b-a3b:free", # Removed by openrouter.ai on: 2026-01-17
+    "allenai/molmo-2-8b:free",
+    # "allenai/olmo-3-32b-think:free", # Removed by openrouter.ai on: 2026-01-17
+    # "allenai/olmo-3.1-32b-think:free", # Removed by openrouter.ai on: 2026-01-17
     "arcee-ai/trinity-mini:free",
     # "arliai/qwq-32b-arliai-rpr-v1:free", # Removed by openrouter.ai on: 2025-11-29
     "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
@@ -37,7 +38,7 @@ FREE_MODELS = [
     "google/gemma-3-4b-it:free",
     "google/gemma-3n-e2b-it:free",
     "google/gemma-3n-e4b-it:free",
-    "kwaipilot/kat-coder-pro:free",
+    # "kwaipilot/kat-coder-pro:free", # Removed by openrouter.ai on: 2026-01-17
     # "meituan/longcat-flash-chat:free", # Removed by openrouter.ai on: 2025-12-19
     # "meta-llama/llama-3.1-405b-instruct:free", # Removed by openrouter.ai on: 2025-10-03
     # "meta-llama/llama-3.2-11b-vision-instruct:free", # Removed by openrouter.ai on: 2025-09-07
@@ -53,7 +54,7 @@ FREE_MODELS = [
     "mistralai/devstral-2512:free",
     # "mistralai/devstral-small-2505:free", # Removed by openrouter.ai on: 2025-11-09
     # "mistralai/devstral-small:free", # Removed by openrouter.ai on: 2025-08-01
-    "mistralai/mistral-7b-instruct:free",
+    # "mistralai/mistral-7b-instruct:free", # Removed by openrouter.ai on: 2026-01-17
     # "mistralai/mistral-nemo:free", # Removed by openrouter.ai on: 2025-11-29
     # "mistralai/mistral-small-24b-instruct-2501:free", # Removed by openrouter.ai on: 2025-11-29
     "mistralai/mistral-small-3.1-24b-instruct:free",
@@ -62,7 +63,7 @@ FREE_MODELS = [
     "moonshotai/kimi-k2:free",
     # "moonshotai/kimi-vl-a3b-thinking:free", # Removed by openrouter.ai on: 2025-10-29
     # "moonshotai/moonlight-16b-a3b-instruct:free", # Removed by openrouter.ai on: 2025-08-01
-    "nex-agi/deepseek-v3.1-nex-n1:free",
+    # "nex-agi/deepseek-v3.1-nex-n1:free", # Removed by openrouter.ai on: 2026-01-17
     # "nousresearch/deephermes-3-llama-3-8b-preview:free", # Removed by openrouter.ai on: 2025-11-09
     "nousresearch/hermes-3-llama-3.1-405b:free",
     # "nvidia/llama-3.1-nemotron-ultra-253b-v1:free", # Removed by openrouter.ai on: 2025-09-21
@@ -86,12 +87,13 @@ FREE_MODELS = [
     # "qwen/qwen2.5-vl-32b-instruct:free", # Removed by openrouter.ai on: 2025-11-29
     # "qwen/qwen2.5-vl-72b-instruct:free", # Removed by openrouter.ai on: 2025-10-29
     # "qwen/qwen3-14b:free", # Removed by openrouter.ai on: 2025-11-29
-    "qwen/qwen3-235b-a22b:free",
+    # "qwen/qwen3-235b-a22b:free", # Removed by openrouter.ai on: 2025-12-28
     # "qwen/qwen3-30b-a3b:free", # Removed by openrouter.ai on: 2025-11-29
     # "qwen/qwen3-32b:free", # Removed by openrouter.ai on: 2025-08-01
     "qwen/qwen3-4b:free",
     # "qwen/qwen3-8b:free", # Removed by openrouter.ai on: 2025-11-09
     "qwen/qwen3-coder:free",
+    "qwen/qwen3-next-80b-a3b-instruct:free",
     # "qwen/qwq-32b:free", # Removed by openrouter.ai on: 2025-10-03
     # "rekaai/reka-flash-3:free", # Removed by openrouter.ai on: 2025-09-21
     # "sarvamai/sarvam-m:free", # Removed by openrouter.ai on: 2025-09-07
