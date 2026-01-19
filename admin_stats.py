@@ -117,7 +117,7 @@ def get_admin_stats_html():
     uptime_str = str(datetime.timedelta(seconds=int(uptime_seconds)))
     
     return f'''
-    <div style="position: fixed; top: 10px; right: 10px; background: rgba(50,50,50,0.9); color: #eee; padding: 8px; 
+    <div style="position: absolute; top: 10px; right: 10px; background: rgba(50,50,50,0.9); color: #eee; padding: 8px; 
                 border-radius: 6px; font-size: 11px; z-index: 9999; font-family: 'JetBrains Mono', 'Courier New', monospace;
                 border: 1px solid #444; box-shadow: 0 4px 12px rgba(0,0,0,0.3); line-height: 1.4;">
         <strong style="color: #4CAF50;">ADMIN CORE METRICS</strong>
