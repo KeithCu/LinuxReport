@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="icon" type="image/png" href="{{ favicon }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Visitor map – last 48 hours (with and without bots)">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>{{ title }} – Visitor Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    {% assets "css_all" %}
+    <link rel="stylesheet" type="text/css" href="{{ ASSET_URL }}">
+    {% endassets %}
+    <style>
+      #map { height: 70vh; min-height: 400px; width: 100%; }
+      .map-legend { position: absolute; bottom: 24px; left: 12px; z-index: 1000; background: #fff; padding: 10px 14px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.2); font-size: 14px; }
+      .map-legend label { margin-left: 6px; }
+      .map-legend .counts { margin-top: 6px; color: #555; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img loading="lazy" src="{{ logo_url }}" alt="{{ title }}" class="main-logo">
+      <small><a href="/">Home</a> – Visitor map (last 48 hours)</small>
+    </header>
+    <main style="position: relative;">
+      <div id="map"></div>
+      <div class="map-legend">
+        <label><input type="checkbox" id="show-bots" checked> Show bot visits</label>
+        <div class="counts" id="visit-counts">Human: <span id="count-human">0</span> · Bot: <span id="count-bot">0</span> · All: <span id="count-all">0</span></div>
+      </div>
+    </main>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+(function () {
+  var visits = {{ visits | tojson }};
+  var humanLayer = L.layerGroup();
+  var botLayer = L.layerGroup();
+  var worldBounds = L.latLngBounds([[-85.051129, -180], [85.051129, 180]]);
+  var map = L.map('map', { maxBounds: worldBounds, maxBoundsViscosity: 1 }).setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', noWrap: true }).addTo(map);
+
+  var humanCount = 0, botCount = 0;
+  visits.forEach(function (v) {
+    var lat = v.lat, lon = v.lon, isBot = v.is_bot;
+    var circle = L.circleMarker([lat, lon], {
+      radius: 6,
+      fillColor: isBot ? '#c00' : '#0a0',
+      color: '#333',
+      weight: 1,
+      opacity: 1,
+      fillOpacity: 0.7
+    });
+    if (isBot) {
+      botCount++;
+      circle.addTo(botLayer);
+    } else {
+      humanCount++;
+      circle.addTo(humanLayer);
+    }
+  });
+
+  humanLayer.addTo(map);
+  botLayer.addTo(map);
+
+  document.getElementById('count-human').textContent = humanCount;
+  document.getElementById('count-bot').textContent = botCount;
+  document.getElementById('count-all').textContent = visits.length;
+
+  document.getElementById('show-bots').addEventListener('change', function () {
+    if (this.checked) botLayer.addTo(map); else map.removeLayer(botLayer);
+  });
+})();
+    </script>
+  </body>
+</html>

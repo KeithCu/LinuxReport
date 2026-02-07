@@ -48,6 +48,7 @@ from admin_stats import update_performance_stats, get_admin_stats_html, track_ra
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
+from visitor_map import init_visitor_map_routes
 from shared import g_logger
 from performance_analytics import PerformanceAnalytics
 from log_engine import LogEngine
@@ -233,37 +234,28 @@ class PerformanceMetricsResource(Resource):
         # Cache key based on current process state
         cache_key = "admin_metrics_echarts"
         
-        g_logger.info("DEBUG: PerformanceMetricsResource.get called")
-        
         try:
             from shared import PATH
-            g_logger.info(f"DEBUG: Initializing LogEngine sync with path: {PATH / 'linuxreport.log'}")
             engine = LogEngine(PATH / "linuxreport.log")
             data = engine.sync()
-            g_logger.info(f"DEBUG: LogEngine sync complete, data length: {len(data)}")
             
             # Check if logs have changed using a fingerprint (length + last offset)
             last_offset = g_c.get("log_sync_offset") or 0
             fingerprint = f"{len(data)}:{last_offset}"
-            g_logger.info(f"DEBUG: Performance metrics fingerprint: {fingerprint}")
             
             cached_result = g_cm.get(cache_key)
             if cached_result and cached_result.get("fingerprint") == fingerprint:
-                g_logger.info("DEBUG: Returning cached performance metrics")
                 return cached_result["data"], 200
             
-            g_logger.info("DEBUG: Generating new performance analytics")
             analytics = PerformanceAnalytics(data)
             echarts_data = analytics.get_echarts_data()
-            g_logger.info("DEBUG: ECharts data generation complete")
             
             # Cache the result
             g_cm.set(cache_key, {"data": echarts_data, "fingerprint": fingerprint}, ttl=300)
-            g_logger.info("DEBUG: Performance metrics cached successfully")
             
             return echarts_data, 200
         except Exception as e:
-            g_logger.error(f"CRITICAL: Error fetching performance metrics: {e}", exc_info=True)
+            g_logger.error(f"Error fetching performance metrics: {e}", exc_info=True)
             return {"error": str(e)}, 500
 
 # =============================================================================
@@ -287,7 +279,8 @@ def init_app(flask_app):
     init_old_headlines_routes(flask_app)
     init_chat_routes(flask_app, limiter, dynamic_rate_limit)
     init_config_routes(flask_app)
-    
+    init_visitor_map_routes(flask_app)
+
     # Configure CORS and security headers only if enabled
     if ENABLE_CORS:
         # Configure CORS to allow requests from any domain for weather API

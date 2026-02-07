@@ -48,6 +48,7 @@ reports:
 settings:
   # Domains for CSP and CORS - add your domains here
   allowed_domains:
+    - "https://unpkg.com"
     - "https://linuxreport.net"
     - "https://www.linuxreport.net"
     - "https://cdn.jsdelivr.net"
