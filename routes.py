@@ -78,7 +78,7 @@ def _build_security_headers():
         f"connect-src 'self' {csp_domains}; "
         f"img-src {img_src} *; "
         f"script-src 'self' 'unsafe-inline' {csp_domains}; "
-        f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        f"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com {csp_domains}; "
         f"font-src 'self' https://fonts.gstatic.com; "
         f"frame-ancestors 'none';"
     )

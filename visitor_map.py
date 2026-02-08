@@ -17,7 +17,7 @@ import urllib.request
 
 from flask import request, render_template, send_file, abort, make_response
 
-from shared import g_c, g_logger, EXPIRE_YEARS, FAVICON, LOGO_URL, WEB_TITLE, USER_AGENT
+from shared import g_c, g_logger, limiter, EXPIRE_YEARS, FAVICON, LOGO_URL, WEB_TITLE, USER_AGENT
 from request_utils import is_web_bot
 from weather import get_location_from_ip, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
@@ -117,12 +117,21 @@ def init_visitor_map_routes(flask_app):
         )
 
     @flask_app.route("/tiles/<int:z>/<int:x>/<int:y>.png")
+    @limiter.exempt
     def tile_proxy(z, x, y):
         """
         Caching tile proxy for OpenStreetMap tiles.
         Serves from disk cache when fresh, fetches upstream on cache miss.
         Concurrent requests for the same tile are deduplicated via per-tile locks.
         """
+        # Reject out-of-range coordinates (e.g. negative x from Leaflet edge panning)
+        max_tile = (1 << z) - 1  # 2^z - 1
+        if x < 0 or y < 0 or x > max_tile or y > max_tile:
+            resp = make_response(send_file(
+                io.BytesIO(_GRAY_TILE), mimetype="image/png"))
+            resp.headers["Cache-Control"] = "public, max-age=86400"
+            return resp
+
         cache_path = os.path.join(TILE_CACHE_DIR, str(z), str(x), f"{y}.png")
         tile_key = f"{z}/{x}/{y}"
         lock = _get_tile_lock(tile_key)
