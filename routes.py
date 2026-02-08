@@ -40,7 +40,6 @@ from shared import (
     INFINITE_SCROLL_MOBILE, INFINITE_SCROLL_DEBUG, API, MODE, DISABLE_CLIENT_GEOLOCATION, Mode,
     DEFAULT_THEME
 )
-from request_utils import is_web_bot
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content
@@ -48,7 +47,8 @@ from admin_stats import update_performance_stats, get_admin_stats_html, track_ra
 from old_headlines import init_old_headlines_routes
 from chat import init_chat_routes
 from config import init_config_routes
-from visitor_map import init_visitor_map_routes
+from request_utils import is_web_bot
+from visitor_map import init_visitor_map_routes, record_visit
 from shared import g_logger
 from performance_analytics import PerformanceAnalytics
 from log_engine import LogEngine
@@ -395,6 +395,11 @@ def _register_main_routes(flask_app):
         user_agent = request.headers.get('User-Agent', '')
         is_deploy_bot = 'DeployBot' in user_agent
         is_bot = is_web_bot(user_agent)
+
+        # Record visit for the visitor map (near-zero cost: dict insert only)
+        ip = request.remote_addr
+        if ip:
+            record_visit(ip, is_bot)
 
         # Determine the order of RSS feeds to display.
         page_order = None

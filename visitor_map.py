@@ -5,6 +5,10 @@ Records visitor IPs with GeoIP lookups and exposes a public /map page
 showing visits (with/without bots) on a Leaflet map. Data is stored in g_c
 and pruned to the last 48 hours.
 
+Visits are buffered in memory (deduped by IP) and flushed to g_c every few
+seconds by a daemon thread — one SQLite read + one write per flush cycle.
+record_visit() itself is near-zero cost (dict lookup + insert).
+
 Also provides a caching tile proxy (/tiles/) that fetches OpenStreetMap tiles
 on first request, caches them on disk, and serves cached copies thereafter.
 """
@@ -14,15 +18,34 @@ import os
 import time
 import threading
 import urllib.request
+from functools import lru_cache
 
 from flask import request, render_template, send_file, abort, make_response
 
 from shared import g_c, g_logger, limiter, EXPIRE_YEARS, FAVICON, LOGO_URL, WEB_TITLE, USER_AGENT
-from request_utils import is_web_bot
 from weather import get_location_from_ip, DEFAULT_WEATHER_LAT, DEFAULT_WEATHER_LON
 
-VISITOR_MAP_CACHE_KEY = "visitor_map_visits"
+VISITOR_MAP_CACHE_KEY = "visitor_map_visits_v2"
 VISIT_WINDOW_SEC = 48 * 3600  # 48 hours
+
+# ── Visit buffering ────────────────────────────────────────────────────────
+# Visits accumulate in an in-memory dict keyed by IP (natural dedup) and are
+# flushed to g_c every _FLUSH_INTERVAL seconds.  GeoIP resolution happens in
+# the flusher thread, not on the request path.  record_visit() is near-free.
+_pending_visits = {}                  # ip → (is_bot, timestamp)
+_pending_lock = threading.Lock()
+_FLUSH_INTERVAL = 60                  # seconds between flushes
+_PRUNE_INTERVAL = 300                 # prune stale entries every 5 minutes
+_last_prune = 0.0
+
+
+@lru_cache(maxsize=4096)
+def _cached_geoip(ip):
+    """GeoIP lookup with per-process LRU cache — avoids redundant MMDB reads."""
+    try:
+        return get_location_from_ip(ip)
+    except Exception:
+        return None
 
 # ── Tile caching proxy configuration ──────────────────────────────────────
 TILE_CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tile_cache")
@@ -55,55 +78,69 @@ def _is_fallback_coords(lat, lon):
     return (lat == DEFAULT_WEATHER_LAT and lon == DEFAULT_WEATHER_LON)
 
 
-def record_visit(ip, user_agent):
+def record_visit(ip, is_bot):
     """
-    Geolocate the IP, determine bot status, append visit to g_c, and prune
-    entries older than 48 hours.
+    Buffer a visit in memory — just a dict lookup + insert (~100ns).
+    GeoIP resolution is deferred to the flusher thread.
     """
-    try:
-        lat, lon = get_location_from_ip(ip)
-    except Exception:
-        return
-    if _is_fallback_coords(lat, lon):
-        return
-    is_bot = is_web_bot(user_agent or "")
-    visits = g_c.get(VISITOR_MAP_CACHE_KEY) or []
-    cutoff = time.time() - VISIT_WINDOW_SEC
-    visits = [v for v in visits if v.get("timestamp", 0) > cutoff]
-    visits.append({
-        "lat": lat,
-        "lon": lon,
-        "is_bot": is_bot,
-        "timestamp": time.time(),
-        "country": None,
-    })
-    g_c.put(VISITOR_MAP_CACHE_KEY, visits, timeout=EXPIRE_YEARS)
+    with _pending_lock:
+        if ip not in _pending_visits:
+            _pending_visits[ip] = (is_bot, time.time())
+
+
+def _flush_visits():
+    """Daemon thread: GeoIP-resolve buffered IPs and merge into g_c — one read + one write per cycle."""
+    global _last_prune
+    while True:
+        time.sleep(_FLUSH_INTERVAL)
+        with _pending_lock:
+            if not _pending_visits:
+                continue
+            batch = dict(_pending_visits)   # ip → (is_bot, timestamp)
+            _pending_visits.clear()
+        try:
+            # Resolve GeoIP in this thread, not on the request path
+            resolved = []
+            for ip, (is_bot, ts) in batch.items():
+                coords = _cached_geoip(ip)
+                if coords is not None and not _is_fallback_coords(*coords):
+                    resolved.append((coords[0], coords[1], is_bot, ts))
+            if not resolved:
+                continue
+            visits = g_c.get(VISITOR_MAP_CACHE_KEY) or []
+            now = time.time()
+            # Periodic prune — not every flush, just every _PRUNE_INTERVAL
+            if now - _last_prune > _PRUNE_INTERVAL:
+                cutoff = now - VISIT_WINDOW_SEC
+                visits = [v for v in visits if v[3] > cutoff]
+                _last_prune = now
+            visits.extend(resolved)
+            g_c.put(VISITOR_MAP_CACHE_KEY, visits, timeout=EXPIRE_YEARS)
+        except Exception:
+            g_logger.exception("Failed to flush visitor map visits")
+
+
+threading.Thread(target=_flush_visits, daemon=True, name="visitor-map-flusher").start()
 
 
 def _get_visits_last_48h():
-    """Return list of visit dicts from g_c, filtered to last 48 hours."""
+    """Return visit dicts from g_c + unflushed buffer, filtered to last 48h."""
     visits = g_c.get(VISITOR_MAP_CACHE_KEY) or []
+    with _pending_lock:
+        pending = dict(_pending_visits)    # ip → (is_bot, timestamp)
     cutoff = time.time() - VISIT_WINDOW_SEC
-    return [v for v in visits if v.get("timestamp", 0) > cutoff]
+    result = [{"lat": v[0], "lon": v[1], "is_bot": v[2]} for v in visits if v[3] > cutoff]
+    # Resolve any unflushed visits for the map view
+    for ip, (is_bot, ts) in pending.items():
+        if ts > cutoff:
+            coords = _cached_geoip(ip)
+            if coords is not None and not _is_fallback_coords(*coords):
+                result.append({"lat": coords[0], "lon": coords[1], "is_bot": is_bot})
+    return result
 
 
 def init_visitor_map_routes(flask_app):
-    """Register /map route, tile proxy, and after_request hook to record visits."""
-
-    @flask_app.after_request
-    def _record_visit_after_request(response):
-        path = request.path or ""
-        if (path.startswith("/static/") or path.startswith("/tiles/")
-                or path.rstrip("/") == "/map"):
-            return response
-        ip = request.remote_addr
-        if not ip:
-            return response
-        try:
-            record_visit(ip, request.headers.get("User-Agent", ""))
-        except Exception:
-            pass
-        return response
+    """Register /map route and tile proxy. Visits are recorded by calling record_visit() from routes."""
 
     @flask_app.route("/map")
     def map_page():
