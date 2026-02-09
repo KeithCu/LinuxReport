@@ -68,7 +68,7 @@ CONFIG = SiteConfig(
 	#	"https://bonginoreport.com/index.rss",
 	],
 	URL_IMAGES="https://trumpreport.info/static/images/",
-	FAVICON="TrumpReportChristmasfestivewintertheme.webp",
+	FAVICON="trumpreport192.ico",
 	LOGO_URL="TrumpReportWinter.webp",
 	WEB_DESCRIPTION="Fast Trump 2025 news for MAGA: tariffs, immigration, deregulation. Hourly conservative headlines.",
 	WEB_TITLE="Trump Report | Conservative News",

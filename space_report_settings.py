@@ -32,7 +32,7 @@ CONFIG = SiteConfig(
 		"https://www.spaceelevatorblog.com/?feed=rss2",
 	],
 	URL_IMAGES="https://news.spaceelevatorwiki.com/static/images/",
-	FAVICON="SpaceReport.ico",
+	FAVICON="SpaceReport192.ico",
 	LOGO_URL="SpaceReport.webp",
 	WEB_DESCRIPTION="Space exploration news: Cosmic updates in milliseconds",
 	WEB_TITLE="Space Report",
