@@ -18,7 +18,7 @@ from pathlib import Path
 # =============================================================================
 # THIRD-PARTY IMPORTS
 # =============================================================================
-from flask import g, jsonify, render_template, request, make_response, flash, redirect, url_for
+from flask import g, jsonify, render_template, request, make_response, flash, redirect, url_for, send_from_directory, current_app
 from markupsafe import Markup
 from flask_cors import CORS
 from flask_login import login_user, logout_user, login_required, current_user
@@ -368,7 +368,18 @@ def _register_main_routes(flask_app):
     Args:
         flask_app (Flask): The Flask application instance
     """
-    
+    # Apple Touch Icon: serve existing favicon at root paths to avoid 404s from Safari (iOS/macOS)
+    _favicon_filename = FAVICON.split("/")[-1]
+
+    @flask_app.route("/apple-touch-icon.png")
+    @flask_app.route("/apple-touch-icon-precomposed.png")
+    @flask_app.route("/apple-touch-icon-120x120.png")
+    @flask_app.route("/apple-touch-icon-120x120-precomposed.png")
+    def apple_touch_icon():
+        return send_from_directory(
+            current_app.static_folder, "images/" + _favicon_filename
+        )
+
     @flask_app.route('/admin/performance')
     @login_required
     def admin_performance():
