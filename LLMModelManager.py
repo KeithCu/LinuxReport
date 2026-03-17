@@ -11,9 +11,10 @@ from Logging import _setup_logging, g_logger
 FREE_MODELS = [
     # "agentica-org/deepcoder-14b-preview:free", # Removed by openrouter.ai on: 2025-11-21
     # "alibaba/tongyi-deepresearch-30b-a3b:free", # Removed by openrouter.ai on: 2026-01-17
-    "allenai/molmo-2-8b:free",
+    # "allenai/molmo-2-8b:free", # Removed by openrouter.ai on: 2026-03-17
     # "allenai/olmo-3-32b-think:free", # Removed by openrouter.ai on: 2026-01-17
     # "allenai/olmo-3.1-32b-think:free", # Removed by openrouter.ai on: 2026-01-17
+    "arcee-ai/trinity-large-preview:free",
     "arcee-ai/trinity-mini:free",
     # "arliai/qwq-32b-arliai-rpr-v1:free", # Removed by openrouter.ai on: 2025-11-29
     "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
@@ -30,7 +31,7 @@ FREE_MODELS = [
     # "deepseek/deepseek-r1:free", # Removed by openrouter.ai on: 2025-11-29
     # "deepseek/deepseek-v3-base:free", # Removed by openrouter.ai on: 2025-08-01
     # "featherless/qwerky-72b:free", # Removed by openrouter.ai on: 2025-09-07
-    "google/gemini-2.0-flash-exp:free",
+    # "google/gemini-2.0-flash-exp:free", # Removed by openrouter.ai on: 2026-03-17
     # "google/gemini-2.5-pro-exp-03-25", # Removed by openrouter.ai on: 2025-09-21
     # "google/gemma-2-9b-it:free", # Removed by openrouter.ai on: 2025-11-09
     "google/gemma-3-12b-it:free",
@@ -39,6 +40,8 @@ FREE_MODELS = [
     "google/gemma-3n-e2b-it:free",
     "google/gemma-3n-e4b-it:free",
     # "kwaipilot/kat-coder-pro:free", # Removed by openrouter.ai on: 2026-01-17
+    "liquid/lfm-2.5-1.2b-instruct:free",
+    "liquid/lfm-2.5-1.2b-thinking:free",
     # "meituan/longcat-flash-chat:free", # Removed by openrouter.ai on: 2025-12-19
     # "meta-llama/llama-3.1-405b-instruct:free", # Removed by openrouter.ai on: 2025-10-03
     # "meta-llama/llama-3.2-11b-vision-instruct:free", # Removed by openrouter.ai on: 2025-09-07
@@ -50,8 +53,9 @@ FREE_MODELS = [
     # "microsoft/mai-ds-r1:free", # Removed by openrouter.ai on: 2025-11-29
   #  "microsoft/phi-4-reasoning-plus:free", very long answers, often fails to follow instructions
   #  "microsoft/phi-4-reasoning:free", 
+    "minimax/minimax-m2.5:free",
     # "minimax/minimax-m2:free", # Removed by openrouter.ai on: 2025-11-12
-    "mistralai/devstral-2512:free",
+    # "mistralai/devstral-2512:free", # Removed by openrouter.ai on: 2026-03-17
     # "mistralai/devstral-small-2505:free", # Removed by openrouter.ai on: 2025-11-09
     # "mistralai/devstral-small:free", # Removed by openrouter.ai on: 2025-08-01
     # "mistralai/mistral-7b-instruct:free", # Removed by openrouter.ai on: 2026-01-17
@@ -60,7 +64,7 @@ FREE_MODELS = [
     "mistralai/mistral-small-3.1-24b-instruct:free",
     # "mistralai/mistral-small-3.2-24b-instruct:free", # Removed by openrouter.ai on: 2025-11-29
     # "moonshotai/kimi-dev-72b:free", # Removed by openrouter.ai on: 2025-11-09
-    "moonshotai/kimi-k2:free",
+    # "moonshotai/kimi-k2:free", # Removed by openrouter.ai on: 2026-03-17
     # "moonshotai/kimi-vl-a3b-thinking:free", # Removed by openrouter.ai on: 2025-10-29
     # "moonshotai/moonlight-16b-a3b-instruct:free", # Removed by openrouter.ai on: 2025-08-01
     # "nex-agi/deepseek-v3.1-nex-n1:free", # Removed by openrouter.ai on: 2026-01-17
@@ -69,6 +73,7 @@ FREE_MODELS = [
     # "nvidia/llama-3.1-nemotron-ultra-253b-v1:free", # Removed by openrouter.ai on: 2025-09-21
     # "nvidia/llama-3.3-nemotron-super-49b-v1:free", # Removed by openrouter.ai on: 2025-08-01
     "nvidia/nemotron-3-nano-30b-a3b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free",
     "nvidia/nemotron-nano-12b-v2-vl:free",
     "nvidia/nemotron-nano-9b-v2:free",
    # "open-r1/olympiccoder-32b:free", Generates too many tokens
@@ -77,13 +82,16 @@ FREE_MODELS = [
     # "opengvlab/internvl3-14b:free", # Removed by openrouter.ai on: 2025-08-01
     # "openrouter/bert-nebulon-alpha", # Removed by openrouter.ai on: 2025-12-19
     # "openrouter/cypher-alpha:free", # Removed by openrouter.ai on: 2025-08-01
+    "openrouter/free",
+    "openrouter/healer-alpha",
     # "openrouter/horizon-alpha", # Removed by openrouter.ai on: 2025-08-10
+    "openrouter/hunter-alpha",
     # "openrouter/polaris-alpha", # Removed by openrouter.ai on: 2025-11-21
     # "openrouter/sonoma-dusk-alpha", # Removed by openrouter.ai on: 2025-09-21
     # "openrouter/sonoma-sky-alpha", # Removed by openrouter.ai on: 2025-09-21
     # "qwen/qwen-2.5-72b-instruct:free", # Removed by openrouter.ai on: 2025-11-29
     # "qwen/qwen-2.5-coder-32b-instruct:free", # Removed by openrouter.ai on: 2025-11-29
-    "qwen/qwen-2.5-vl-7b-instruct:free",
+    # "qwen/qwen-2.5-vl-7b-instruct:free", # Removed by openrouter.ai on: 2026-03-17
     # "qwen/qwen2.5-vl-32b-instruct:free", # Removed by openrouter.ai on: 2025-11-29
     # "qwen/qwen2.5-vl-72b-instruct:free", # Removed by openrouter.ai on: 2025-10-29
     # "qwen/qwen3-14b:free", # Removed by openrouter.ai on: 2025-11-29
@@ -98,16 +106,17 @@ FREE_MODELS = [
     # "rekaai/reka-flash-3:free", # Removed by openrouter.ai on: 2025-09-21
     # "sarvamai/sarvam-m:free", # Removed by openrouter.ai on: 2025-09-07
     # "shisa-ai/shisa-v2-llama3.3-70b:free", # Removed by openrouter.ai on: 2025-11-09
+    "stepfun/step-3.5-flash:free",
     # "tencent/hunyuan-a13b-instruct:free", # Removed by openrouter.ai on: 2025-10-29
     # "thudm/glm-4-32b:free", # Removed by openrouter.ai on: 2025-08-10
     # "thudm/glm-z1-32b:free", # Removed by openrouter.ai on: 2025-09-07
-    "tngtech/deepseek-r1t-chimera:free",
-    "tngtech/deepseek-r1t2-chimera:free",
-    "tngtech/tng-r1t-chimera:free",
+    # "tngtech/deepseek-r1t-chimera:free", # Removed by openrouter.ai on: 2026-03-17
+    # "tngtech/deepseek-r1t2-chimera:free", # Removed by openrouter.ai on: 2026-03-17
+    # "tngtech/tng-r1t-chimera:free", # Removed by openrouter.ai on: 2026-03-17
     # "x-ai/grok-4-fast:free", # Removed by openrouter.ai on: 2025-10-03
     # "x-ai/grok-4.1-fast", # Removed by openrouter.ai on: 2025-11-29
     # "x-ai/grok-4.1-fast:free", # Removed by openrouter.ai on: 2025-12-19
-    "xiaomi/mimo-v2-flash:free",
+    # "xiaomi/mimo-v2-flash:free", # Removed by openrouter.ai on: 2026-03-17
     "z-ai/glm-4.5-air:free",
 ]
 
