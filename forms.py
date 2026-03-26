@@ -73,6 +73,22 @@ class ConfigForm(FlaskForm):
         ],
         render_kw={"style": "width: 100%; height: 200px; font-family: monospace;"}
     )
+    extra_headlines_html_above = TextAreaField(
+        label="Extra Headlines HTML (Above)",
+        validators=[
+            validators.Optional(),
+            validators.Length(max=50000, message="Extra above headlines content is too long (max 50,000 characters)")
+        ],
+        render_kw={"style": "width: 100%; height: 150px; font-family: monospace;"}
+    )
+    extra_headlines_html_below = TextAreaField(
+        label="Extra Headlines HTML (Below)",
+        validators=[
+            validators.Optional(),
+            validators.Length(max=50000, message="Extra below headlines content is too long (max 50,000 characters)")
+        ],
+        render_kw={"style": "width: 100%; height: 150px; font-family: monospace;"}
+    )
     urls = FieldList(FormField(UrlForm))
     url_custom = FieldList(FormField(CustomRSSForm))
 

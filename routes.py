@@ -33,6 +33,7 @@ from models import RssInfo, User
 from app_config import DEBUG
 from shared import (
     limiter, dynamic_rate_limit, ABOVE_HTML_FILE, ALL_URLS, EXPIRE_MINUTES,
+    EXTRA_HEADLINES_HTML_ABOVE_FILE, EXTRA_HEADLINES_HTML_BELOW_FILE,
     EXPIRE_DAY, EXPIRE_YEARS, FAVICON, LOGO_URL, STANDARD_ORDER_STR,
     URL_IMAGES, URLS_COOKIE_VERSION, WEB_DESCRIPTION, WEB_TITLE, WELCOME_HTML,
     g_c, g_cm, SITE_URLS, PATH, format_last_updated, ALLOWED_DOMAINS, ENABLE_CORS,
@@ -105,7 +106,10 @@ def get_cached_above_html():
     Returns:
         str: Cached HTML content from the above HTML file
     """
-    return get_cached_file_content(Path(PATH) / ABOVE_HTML_FILE)
+    generated_html = get_cached_file_content(Path(PATH) / ABOVE_HTML_FILE)
+    extra_above_html = get_cached_file_content(Path(PATH) / EXTRA_HEADLINES_HTML_ABOVE_FILE)
+    extra_below_html = get_cached_file_content(Path(PATH) / EXTRA_HEADLINES_HTML_BELOW_FILE)
+    return f"{extra_above_html}{generated_html}{extra_below_html}"
 
 def _get_all_reports():
     """

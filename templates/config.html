@@ -70,6 +70,15 @@
         </div>
 
         <div class="form-group admin-section">
+          <h3>Extra Headlines HTML</h3>
+          <p class="admin-description">
+            Optional HTML snippets that are always rendered along with the AI-generated headlines, without being wiped on LLM runs.
+          </p>
+          {{ render_field(form.extra_headlines_html_above) }}
+          {{ render_field(form.extra_headlines_html_below) }}
+        </div>
+
+        <div class="form-group admin-section">
           <h3>LLM Model Management</h3>
           <p class="admin-description">
             Manage models used for headline generation. Models that fail are automatically blacklisted for 30 days.

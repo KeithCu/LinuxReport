@@ -5,6 +5,7 @@ from flask import request, render_template, make_response, flash, redirect, url_
 from flask_login import current_user
 from shared import (
     limiter, dynamic_rate_limit, PATH, ABOVE_HTML_FILE,
+    EXTRA_HEADLINES_HTML_ABOVE_FILE, EXTRA_HEADLINES_HTML_BELOW_FILE,
     ENABLE_URL_CUSTOMIZATION, SITE_URLS, ALL_URLS, FAVICON,
     EXPIRE_YEARS, URLS_COOKIE_VERSION, clear_page_caches, g_c, history, g_logger, MODE
 )
@@ -56,6 +57,23 @@ def init_config_routes(app):
                 except (FileNotFoundError, IOError) as e:
                     g_logger.warning(f"Error reading headlines file: {e}")
                     form.headlines.data = ""
+
+                # Load persistent admin extras (not wiped by LLM runs)
+                try:
+                    extra_above_path = Path(PATH) / EXTRA_HEADLINES_HTML_ABOVE_FILE
+                    with open(extra_above_path, 'r', encoding='utf-8') as f:
+                        form.extra_headlines_html_above.data = f.read()
+                except (FileNotFoundError, IOError) as e:
+                    g_logger.warning(f"Error reading extra headlines above file: {e}")
+                    form.extra_headlines_html_above.data = ""
+
+                try:
+                    extra_below_path = Path(PATH) / EXTRA_HEADLINES_HTML_BELOW_FILE
+                    with open(extra_below_path, 'r', encoding='utf-8') as f:
+                        form.extra_headlines_html_below.data = f.read()
+                except (FileNotFoundError, IOError) as e:
+                    g_logger.warning(f"Error reading extra headlines below file: {e}")
+                    form.extra_headlines_html_below.data = ""
 
             # Only add URL customization options if enabled
             if ENABLE_URL_CUSTOMIZATION:
@@ -134,6 +152,38 @@ def init_config_routes(app):
                     del _file_cache[above_html_full_path]
                 # Clear all page caches since headlines have changed
                 clear_page_caches()
+
+            # Save persistent extras for admin mode
+            if is_admin:
+                extras_saved = False
+                try:
+                    extra_above_path = Path(PATH) / EXTRA_HEADLINES_HTML_ABOVE_FILE
+                    with open(extra_above_path, 'w', encoding='utf-8') as f:
+                        f.write(form.extra_headlines_html_above.data or "")
+                    extras_saved = True
+                except (FileNotFoundError, IOError) as e:
+                    g_logger.error(f"Error saving extra headlines above file: {e}")
+                    flash('Error saving extra headlines (above). Please try again.', 'error')
+
+                try:
+                    extra_below_path = Path(PATH) / EXTRA_HEADLINES_HTML_BELOW_FILE
+                    with open(extra_below_path, 'w', encoding='utf-8') as f:
+                        f.write(form.extra_headlines_html_below.data or "")
+                    extras_saved = True
+                except (FileNotFoundError, IOError) as e:
+                    g_logger.error(f"Error saving extra headlines below file: {e}")
+                    flash('Error saving extra headlines (below). Please try again.', 'error')
+
+                if extras_saved:
+                    # Clear the file-cache entries so the next request renders fresh extras
+                    extra_above_full_path = Path(PATH) / EXTRA_HEADLINES_HTML_ABOVE_FILE
+                    if extra_above_full_path in _file_cache:
+                        del _file_cache[extra_above_full_path]
+                    extra_below_full_path = Path(PATH) / EXTRA_HEADLINES_HTML_BELOW_FILE
+                    if extra_below_full_path in _file_cache:
+                        del _file_cache[extra_below_full_path]
+
+                    clear_page_caches()
                 
             page_order = []
 
