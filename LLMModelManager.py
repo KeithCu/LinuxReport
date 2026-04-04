@@ -39,6 +39,8 @@ FREE_MODELS = [
     "google/gemma-3-4b-it:free",
     "google/gemma-3n-e2b-it:free",
     "google/gemma-3n-e4b-it:free",
+    "google/lyria-3-clip-preview",
+    "google/lyria-3-pro-preview",
     # "kwaipilot/kat-coder-pro:free", # Removed by openrouter.ai on: 2026-01-17
     "liquid/lfm-2.5-1.2b-instruct:free",
     "liquid/lfm-2.5-1.2b-thinking:free",
@@ -61,7 +63,7 @@ FREE_MODELS = [
     # "mistralai/mistral-7b-instruct:free", # Removed by openrouter.ai on: 2026-01-17
     # "mistralai/mistral-nemo:free", # Removed by openrouter.ai on: 2025-11-29
     # "mistralai/mistral-small-24b-instruct-2501:free", # Removed by openrouter.ai on: 2025-11-29
-    "mistralai/mistral-small-3.1-24b-instruct:free",
+    # "mistralai/mistral-small-3.1-24b-instruct:free", # Removed by openrouter.ai on: 2026-04-03
     # "mistralai/mistral-small-3.2-24b-instruct:free", # Removed by openrouter.ai on: 2025-11-29
     # "moonshotai/kimi-dev-72b:free", # Removed by openrouter.ai on: 2025-11-09
     # "moonshotai/kimi-k2:free", # Removed by openrouter.ai on: 2026-03-17
@@ -83,9 +85,9 @@ FREE_MODELS = [
     # "openrouter/bert-nebulon-alpha", # Removed by openrouter.ai on: 2025-12-19
     # "openrouter/cypher-alpha:free", # Removed by openrouter.ai on: 2025-08-01
     "openrouter/free",
-    "openrouter/healer-alpha",
+    # "openrouter/healer-alpha", # Removed by openrouter.ai on: 2026-04-03
     # "openrouter/horizon-alpha", # Removed by openrouter.ai on: 2025-08-10
-    "openrouter/hunter-alpha",
+    # "openrouter/hunter-alpha", # Removed by openrouter.ai on: 2026-04-03
     # "openrouter/polaris-alpha", # Removed by openrouter.ai on: 2025-11-21
     # "openrouter/sonoma-dusk-alpha", # Removed by openrouter.ai on: 2025-09-21
     # "openrouter/sonoma-sky-alpha", # Removed by openrouter.ai on: 2025-09-21
@@ -98,10 +100,11 @@ FREE_MODELS = [
     # "qwen/qwen3-235b-a22b:free", # Removed by openrouter.ai on: 2025-12-28
     # "qwen/qwen3-30b-a3b:free", # Removed by openrouter.ai on: 2025-11-29
     # "qwen/qwen3-32b:free", # Removed by openrouter.ai on: 2025-08-01
-    "qwen/qwen3-4b:free",
+    # "qwen/qwen3-4b:free", # Removed by openrouter.ai on: 2026-04-03
     # "qwen/qwen3-8b:free", # Removed by openrouter.ai on: 2025-11-09
     "qwen/qwen3-coder:free",
     "qwen/qwen3-next-80b-a3b-instruct:free",
+    "qwen/qwen3.6-plus:free",
     # "qwen/qwq-32b:free", # Removed by openrouter.ai on: 2025-10-03
     # "rekaai/reka-flash-3:free", # Removed by openrouter.ai on: 2025-09-21
     # "sarvamai/sarvam-m:free", # Removed by openrouter.ai on: 2025-09-07
