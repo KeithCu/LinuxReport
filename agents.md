@@ -2,6 +2,51 @@
 
 Concise guide for AI agents and humans working on LinuxReport. Focus: correct mental model, key files, critical toggles, and non-obvious rules.
 
+## Planned Future Features & Implementation Blueprint
+
+These features represent major proposed upgrades to LinuxReport / AI Report, designed to improve community engagement, visual aesthetics, and real-time utility.
+
+### 1. GitHub AI Tools & Backend Release Tracker
+* **Goal**: Track latest releases of critical AI backends and GUIs (e.g., `ggerganov/llama.cpp`, `vllm-project/vllm`, `huggingface/transformers`, `open-webui/open-webui`, `lmstudio-ai`).
+* **Implementation Plan**:
+  * **Config**: Define a `GITHUB_REPOS_TO_TRACK` list in `config.yaml` or `ai_report_settings.py`.
+  * **Fetch Worker**: In `workers.py`, create a periodic job that fetches `https://api.github.com/repos/{owner}/{repo}/releases/latest`.
+  * **Caching**: Store response payloads (tag name, published date, brief body snippet) in the shared SQLite cache (`g_cs` / `g_c`) with a long TTL (e.g., 2–4 hours) to protect GitHub API limits.
+  * **UI**: Render a beautiful, dynamic releases panel inside `aireportabove.html` (or a dedicated widget) with clean badges (e.g., "v1.4.2", "Released 3h ago").
+
+### 2. Top 10 Open Source LLMs & Leaderboard Widget
+* **Goal**: Display a premium, interactive widget ranking the top open-source models based on community adoption and benchmarks.
+* **Implementation Plan**:
+  * **Option A (Scraped)**: Write a periodic scraper/consumer in the worker threads targeting Hugging Face's open leaderboard endpoints, caching ranks daily.
+  * **Option B (Curated)**: Define a list in `config.yaml` structure. Update via a simple admin panel or manual edits.
+  * **UI**: Create a rich, sleek comparison table in `templates/` using a glassmorphic look, displaying parameter size, license, key benchmark metrics, and links to Hugging Face model pages.
+
+### 3. Lemmy Channel Integration
+* **Goal**: Diversify feeds and align with open-source/decentralized values by pulling RSS feeds from Lemmy.
+* **Implementation Plan**:
+  * Lemmy communities natively publish RSS endpoints (e.g., `https://lemmy.ml/c/linux.rss`, `https://lemmy.ml/c/localllama.rss`).
+  * Add these feed URLs directly to `SITE_URLS` in `linux_report_settings.py` or `ai_report_settings.py`. They parse natively via `feedparser` in `workers.py` without requiring custom browser or scrapers.
+
+### 4. Community Chat Upgrade: Simple Registration & Upvote System
+* **Goal**: Turn the passive guest chatbox into a vibrant interactive portal where users can share tips/links and upvote high-quality content.
+* **Implementation Plan**:
+  * **Backend (`chat.py`)**:
+    * Create a simple SQLite table or schema for `users` (email, username, hashed password with salt).
+    * Extend the Flask-Login setup in `app.py` to support simple user authentication.
+    * Modify the `chat_comments` cache model to track `upvotes` (integer) and `upvoted_by` (list of user IDs).
+    * Add a `/api/comments/<id>/upvote` POST endpoint.
+  * **Frontend (`chat.js` / `chat.css`)**:
+    * Create user registration and login modals.
+    * Add custom UI upvote elements (e.g., thumbs-up/arrow icons that toggle color state when active).
+    * Enable automatic link formatting and card styling for URLs shared in comments.
+
+### 5. Real-Time Performance & Ticker Stats Widget
+* **Goal**: Add dynamic, highly visual real-time statistics counters (e.g., estimated global tokens/sec, cumulative LLM downloads, total parameter counts) modeled after real-time trackers like usdebtclock.org.
+* **Implementation Plan**:
+  * **Server Cost Avoidance**: To avoid overloading the server with high-frequency HTTP requests, use JS-driven client-side interpolation.
+  * **Protocol**: The server serves a baseline value and a calculated "rate of increase per millisecond" via `/api/stats`.
+  * **Frontend**: A dedicated ticker script (`static/js/ticker.js` or `weather.js` extension) uses `requestAnimationFrame` to animate the numbers ticking up in real-time, giving the page an incredibly dynamic and active aesthetic.
+
 ## Project Overview
 
 LinuxReport is a Python/Flask-based news aggregation platform that builds multiple reports (Linux, AI, COVID-19, PV/Solar, Space, Trump, Detroit Techno, etc.) from RSS/HTML sources. It uses:
