@@ -42,6 +42,7 @@ from shared import (
     DEFAULT_THEME
 )
 from weather import get_default_weather_html, init_weather_routes, get_cached_geolocation
+from openrouter_models import get_openrouter_models_shell_html, init_openrouter_models_routes
 from workers import fetch_urls_parallel, fetch_urls_thread
 from caching import get_cached_file_content
 from admin_stats import update_performance_stats, get_admin_stats_html, track_rate_limit_event
@@ -280,6 +281,7 @@ def init_app(flask_app):
     _register_main_routes(flask_app)
     _register_authentication_routes(flask_app)
     init_weather_routes(flask_app)
+    init_openrouter_models_routes(flask_app)
     init_old_headlines_routes(flask_app)
     init_chat_routes(flask_app, limiter, dynamic_rate_limit)
     init_config_routes(flask_app)
@@ -584,6 +586,8 @@ def _register_main_routes(flask_app):
             above_html = above_html.replace("<hr/>", "")
 
         weather_html = get_default_weather_html()
+        openrouter_shell = get_openrouter_models_shell_html()
+        openrouter_models_html = Markup(openrouter_shell) if openrouter_shell else None
 
         # Get cached location for this IP for template rendering (only if client geolocation is enabled)
         client_ip = request.remote_addr
@@ -599,6 +603,7 @@ def _register_main_routes(flask_app):
                                welcome_html=Markup(WELCOME_HTML),
                                above_html=Markup(above_html),
                                weather_html=Markup(weather_html),
+                               openrouter_models_html=openrouter_models_html,
                                INFINITE_SCROLL_MOBILE=INFINITE_SCROLL_MOBILE,
                                INFINITE_SCROLL_DEBUG=INFINITE_SCROLL_DEBUG,
                                weather_lat=template_lat, weather_lon=template_lon,

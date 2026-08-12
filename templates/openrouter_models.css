@@ -1,0 +1,247 @@
+/* =============================================================================
+   OPENROUTER MODELS WIDGET
+   ============================================================================= */
+
+.header-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+}
+
+.header-brand-row .main-logo {
+  margin: var(--spacing-sm) 0;
+}
+
+.or-models-panel {
+  text-align: left;
+  max-width: 420px;
+  width: 100%;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  border-radius: var(--border-radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 0.85rem;
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.or-models-columns {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.or-models-columns .or-models-section {
+  flex: 1 1 0;
+  min-width: 0;
+  margin-top: var(--spacing-xs);
+}
+
+.or-models-desktop {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.or-models-mobile {
+  display: none;
+  margin: var(--spacing-md) auto;
+  max-width: 420px;
+}
+
+.or-models-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  margin-bottom: var(--spacing-xs);
+  letter-spacing: 0.02em;
+}
+
+.or-models-section {
+  margin-top: var(--spacing-sm);
+}
+
+.or-models-section-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+
+.or-models-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.or-models-list li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  padding: 2px 0;
+  border-bottom: 1px solid var(--btn-border);
+}
+
+.or-models-list li:last-child {
+  border-bottom: none;
+}
+
+.or-models-link {
+  color: var(--link);
+  text-decoration: none;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  cursor: pointer;
+}
+
+.or-models-link:hover {
+  text-decoration: underline;
+  color: var(--accent-primary);
+}
+
+.or-models-tokens {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.or-models-updated {
+  display: block;
+  margin-top: var(--spacing-sm);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.or-models-attribution {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+}
+
+.or-models-attribution a {
+  color: var(--link);
+}
+
+.or-models-loading,
+.or-models-error {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  padding: var(--spacing-xs) 0;
+}
+
+.or-models-error {
+  color: var(--danger);
+}
+
+/* Detail popup — visual language of .ai-process-popup */
+.or-model-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+}
+
+.or-model-overlay.active {
+  display: block;
+}
+
+.or-model-popup {
+  display: none;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 480px);
+  max-height: 80vh;
+  background: var(--bg);
+  color: var(--text);
+  border: 2px solid var(--btn-border);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  padding: var(--spacing-lg);
+  overflow-y: auto;
+  text-align: left;
+}
+
+.or-model-popup.active {
+  display: block;
+}
+
+.or-model-close {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  font-size: 1.5em;
+  cursor: pointer;
+  color: var(--text-secondary);
+  line-height: 1;
+}
+
+.or-model-popup h3 {
+  margin: 0 1.5rem 0.75rem 0;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.or-model-popup-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  margin-bottom: var(--spacing-md);
+}
+
+.or-model-popup-meta dt {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.or-model-popup-meta dd {
+  margin: 0;
+  color: var(--text);
+}
+
+.or-model-popup-desc {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.or-model-popup-link {
+  display: inline-block;
+  margin-top: var(--spacing-md);
+  font-size: 0.85rem;
+  color: var(--link);
+}
+
+@media (max-width: 768px) {
+  .or-models-desktop {
+    display: none;
+  }
+
+  .or-models-mobile {
+    display: block;
+  }
+
+  .header-brand-row {
+    flex-direction: column;
+  }
+}

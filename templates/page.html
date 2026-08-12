@@ -47,8 +47,15 @@
          <!-- Above Content -->
          <div>{{ above_html }}</div>
    
-      <!-- Logo -->
-      <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
+      <div class="header-brand-row">
+        {% if openrouter_models_html is defined and openrouter_models_html %}
+        <aside id="or-models-desktop" class="or-models-panel or-models-desktop" aria-label="OpenRouter models">
+          {{ openrouter_models_html }}
+        </aside>
+        {% endif %}
+        <!-- Logo -->
+        <img loading="lazy" src="{{logo_url}}" alt="{{ title }}" class="main-logo">
+      </div>
 
       <!-- Welcome Message -->
       <small>{{ welcome_html }}</small>
@@ -144,6 +151,12 @@
         <span class="api-link-title">🔗 JSON</span>
       </a>
     </div>
+
+    {% if openrouter_models_html is defined and openrouter_models_html %}
+    <aside id="or-models-mobile" class="or-models-panel or-models-mobile" aria-label="OpenRouter models">
+      {{ openrouter_models_html }}
+    </aside>
+    {% endif %}
 
     <!-- Chat Sidebar -->
     <aside id="chat-container" class="chat-container">

@@ -52,6 +52,7 @@ JS_MODULES = [
     'infinitescroll.js',
     'core.js',
     'weather.js',
+    'openrouter_models.js',
     'chat.js',
     'ai-process.js',
     'config.js',
@@ -62,6 +63,7 @@ CSS_MODULES = [
     'themes.css',
     'core.css',
     'weather.css',
+    'openrouter_models.css',
     'chat.css',
     'config.css',
 ]
