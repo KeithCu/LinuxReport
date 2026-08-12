@@ -48,6 +48,35 @@ def _detail_key(model_id: str) -> str:
     return f"{DETAIL_CACHE_PREFIX}{model_id}"
 
 
+def _ranking_base(slug: str) -> str:
+    """Strip :variant suffixes (e.g. :free) for ranking/family matching."""
+    return slug.split(":")[0] if slug else ""
+
+
+def _free_dedupe_base(model_id: str) -> str:
+    """Base id for free/paid dedupe; only the trailing :free suffix is removed."""
+    if model_id.endswith(":free"):
+        return model_id[:-5]
+    return model_id
+
+
+def _dedupe_prefer_free(models: List[Dict[str, Any]], limit: int = LIST_LIMIT) -> List[Dict[str, Any]]:
+    """Keep first-seen bases; replace a paid entry with :free if it appears later."""
+    order: List[str] = []
+    chosen: Dict[str, Dict[str, Any]] = {}
+    for model in models:
+        model_id = model.get("id")
+        if not model_id:
+            continue
+        base = _free_dedupe_base(model_id)
+        if base not in chosen:
+            order.append(base)
+            chosen[base] = model
+        elif model_id.endswith(":free"):
+            chosen[base] = model
+    return [chosen[base] for base in order[:limit]]
+
+
 def _normalize_model(model: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     model_id = model.get("id")
     if not model_id:
@@ -124,22 +153,25 @@ def _store_model_details(models: List[Dict[str, Any]]) -> None:
 
 
 def _lookup_weekly_tokens(model: Dict[str, Any], weekly_tokens: Dict[str, int]) -> Optional[int]:
-    """Match rankings permaslug to a models-list entry."""
+    """Sum ranking rows whose base matches this model (covers :free / paid siblings)."""
     if not weekly_tokens:
         return None
-    candidates = [model.get("id"), model.get("canonical_slug")]
-    for key in candidates:
-        if key and key in weekly_tokens:
-            return weekly_tokens[key]
-    # Try base id without :variant (rankings may use either form)
-    model_id = model.get("id") or ""
-    base_id = model_id.split(":")[0] if model_id else ""
-    if base_id and base_id in weekly_tokens:
-        return weekly_tokens[base_id]
-    for slug, total in weekly_tokens.items():
-        if slug == base_id or slug.split(":")[0] == base_id:
-            return total
-    return None
+
+    bases = set()
+    for key in (model.get("id"), model.get("canonical_slug")):
+        if key:
+            bases.add(_ranking_base(key))
+    bases.discard("")
+    if not bases:
+        return None
+
+    total = 0
+    matched = False
+    for slug, count in weekly_tokens.items():
+        if _ranking_base(slug) in bases:
+            total += count
+            matched = True
+    return total if matched else None
 
 
 def _refresh_dashboard() -> Optional[Dict[str, Any]]:
@@ -159,13 +191,16 @@ def _refresh_dashboard() -> Optional[Dict[str, Any]]:
     except requests.RequestException as exc:
         g_logger.warning(f"Failed to fetch OpenRouter rankings-daily: {exc}")
 
-    top_ids = [m["id"] for m in top_models if m.get("id")][:LIST_LIMIT]
-    newest_ids = [m["id"] for m in newest_models if m.get("id")][:LIST_LIMIT]
+    top_deduped = _dedupe_prefer_free(top_models, LIST_LIMIT)
+    newest_deduped = _dedupe_prefer_free(newest_models, LIST_LIMIT)
+    top_ids = [m["id"] for m in top_deduped if m.get("id")]
+    newest_ids = [m["id"] for m in newest_deduped if m.get("id")]
 
-    top_by_id = {m["id"]: m for m in top_models if m.get("id")}
     token_map: Dict[str, int] = {}
-    for model_id in top_ids:
-        model = top_by_id.get(model_id) or {"id": model_id}
+    for model in top_deduped:
+        model_id = model.get("id")
+        if not model_id:
+            continue
         normalized = _normalize_model(model) or {"id": model_id}
         tokens = _lookup_weekly_tokens(normalized, weekly_tokens)
         if tokens is not None:
