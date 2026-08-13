@@ -2,7 +2,8 @@
 openrouter_models.py
 
 OpenRouter top-weekly / newest models dashboard for AI Report.
-Caches dashboard lists daily and per-model details for 100 days in g_c.
+One dashboard blob in g_c: newest refreshes on a 2h/6h Eastern schedule,
+top-weekly on EXPIRE_DAY. Per-model details last 100 days.
 """
 
 from __future__ import annotations
@@ -19,6 +20,8 @@ from flask_restful import Resource
 from request_utils import format_last_updated
 from shared import (
     API,
+    EXPIRE_DAY,
+    EXPIRE_HOUR,
     MODE,
     Mode,
     TZ,
@@ -38,14 +41,52 @@ DASHBOARD_CACHE_KEY = "openrouter:models:dashboard"
 DETAIL_CACHE_PREFIX = "openrouter:model:detail:"
 LOCK_NAME = "openrouter_models_fetch"
 
-DASHBOARD_TTL = 86400  # 1 day
 DETAIL_TTL = 86400 * 100  # 100 days
 LIST_LIMIT = 8
 REQUEST_TIMEOUT = 30
+BUSINESS_HOUR_START = 8
+BUSINESS_HOUR_END = 17
 
 
 def _detail_key(model_id: str) -> str:
     return f"{DETAIL_CACHE_PREFIX}{model_id}"
+
+
+def _newest_cache_ttl(now=None) -> int:
+    """Return newest-list TTL: 2h during Eastern 8-5, else 6h."""
+    local = (now or datetime.now(TZ)).astimezone(TZ)
+    if BUSINESS_HOUR_START <= local.hour < BUSINESS_HOUR_END:
+        return 2 * EXPIRE_HOUR
+    return 6 * EXPIRE_HOUR
+
+
+def _is_stale(last_fetch, ttl_seconds: int, now=None) -> bool:
+    if last_fetch is None:
+        return True
+    now = now or datetime.now(TZ)
+    if getattr(last_fetch, "tzinfo", None) is None:
+        last_fetch = last_fetch.replace(tzinfo=TZ)
+    return (now - last_fetch).total_seconds() >= ttl_seconds
+
+
+def _normalize_dashboard(blob) -> Optional[Dict[str, Any]]:
+    """Ignore old/partial blobs; require the one-key refresh fields."""
+    if not isinstance(blob, dict):
+        return None
+    required = ("newest_ids", "newest_last_fetch", "top_weekly_ids", "top_last_fetch")
+    if any(key not in blob for key in required):
+        return None
+    return blob
+
+
+def _empty_dashboard() -> Dict[str, Any]:
+    return {
+        "newest_ids": [],
+        "newest_last_fetch": None,
+        "top_weekly_ids": [],
+        "weekly_tokens": {},
+        "top_last_fetch": None,
+    }
 
 
 def _ranking_base(slug: str) -> str:
@@ -99,7 +140,7 @@ def _normalize_model(model: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 def _fetch_models_sorted(sort: str) -> List[Dict[str, Any]]:
     response = requests.get(
         OPENROUTER_MODELS_URL,
-        params={"sort": sort},
+        params={"sort": sort, "output_modalities": "text"},
         headers={"User-Agent": USER_AGENT},
         timeout=REQUEST_TIMEOUT,
     )
@@ -174,16 +215,29 @@ def _lookup_weekly_tokens(model: Dict[str, Any], weekly_tokens: Dict[str, int]) 
     return total if matched else None
 
 
-def _refresh_dashboard() -> Optional[Dict[str, Any]]:
-    try:
-        top_models = _fetch_models_sorted("top-weekly")
-        newest_models = _fetch_models_sorted("newest")
-    except requests.RequestException as exc:
-        g_logger.error(f"Failed to fetch OpenRouter models: {exc}")
-        return None
+def _refresh_list(sort: str) -> List[Dict[str, Any]]:
+    models = _fetch_models_sorted(sort)
+    _store_model_details(models)
+    return _dedupe_prefer_free(models, LIST_LIMIT)
 
-    _store_model_details(top_models)
-    _store_model_details(newest_models)
+
+def _apply_newest(dashboard: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        models = _refresh_list("newest")
+    except requests.RequestException as exc:
+        g_logger.error(f"Failed to fetch OpenRouter newest models: {exc}")
+        return dashboard
+    dashboard["newest_ids"] = [m["id"] for m in models if m.get("id")]
+    dashboard["newest_last_fetch"] = datetime.now(TZ)
+    return dashboard
+
+
+def _apply_top_weekly(dashboard: Dict[str, Any]) -> Dict[str, Any]:
+    try:
+        models = _refresh_list("top-weekly")
+    except requests.RequestException as exc:
+        g_logger.error(f"Failed to fetch OpenRouter top-weekly models: {exc}")
+        return dashboard
 
     weekly_tokens: Dict[str, int] = {}
     try:
@@ -191,13 +245,8 @@ def _refresh_dashboard() -> Optional[Dict[str, Any]]:
     except requests.RequestException as exc:
         g_logger.warning(f"Failed to fetch OpenRouter rankings-daily: {exc}")
 
-    top_deduped = _dedupe_prefer_free(top_models, LIST_LIMIT)
-    newest_deduped = _dedupe_prefer_free(newest_models, LIST_LIMIT)
-    top_ids = [m["id"] for m in top_deduped if m.get("id")]
-    newest_ids = [m["id"] for m in newest_deduped if m.get("id")]
-
     token_map: Dict[str, int] = {}
-    for model in top_deduped:
+    for model in models:
         model_id = model.get("id")
         if not model_id:
             continue
@@ -206,27 +255,34 @@ def _refresh_dashboard() -> Optional[Dict[str, Any]]:
         if tokens is not None:
             token_map[model_id] = tokens
 
-    dashboard = {
-        "top_weekly_ids": top_ids,
-        "newest_ids": newest_ids,
-        "weekly_tokens": token_map,
-        "last_fetch": datetime.now(TZ),
-    }
-    g_c.put(DASHBOARD_CACHE_KEY, dashboard, timeout=DASHBOARD_TTL)
+    dashboard["top_weekly_ids"] = [m["id"] for m in models if m.get("id")]
+    dashboard["weekly_tokens"] = token_map
+    dashboard["top_last_fetch"] = datetime.now(TZ)
     return dashboard
 
 
 def get_dashboard() -> Optional[Dict[str, Any]]:
-    """Return cached dashboard, refreshing at most once per day under lock."""
-    cached = g_c.get(DASHBOARD_CACHE_KEY)
-    if cached is not None:
+    """Return dashboard, refreshing only the stale list(s) under one lock."""
+    cached = _normalize_dashboard(g_c.get(DASHBOARD_CACHE_KEY))
+    now = datetime.now(TZ)
+    newest_stale = cached is None or _is_stale(cached.get("newest_last_fetch"), _newest_cache_ttl(now), now)
+    top_stale = cached is None or _is_stale(cached.get("top_last_fetch"), EXPIRE_DAY, now)
+    if cached is not None and not newest_stale and not top_stale:
         return cached
 
     with get_lock(LOCK_NAME):
-        cached = g_c.get(DASHBOARD_CACHE_KEY)
-        if cached is not None:
-            return cached
-        return _refresh_dashboard()
+        cached = _normalize_dashboard(g_c.get(DASHBOARD_CACHE_KEY)) or _empty_dashboard()
+        now = datetime.now(TZ)
+        changed = False
+        if _is_stale(cached.get("newest_last_fetch"), _newest_cache_ttl(now), now):
+            cached = _apply_newest(cached)
+            changed = True
+        if _is_stale(cached.get("top_last_fetch"), EXPIRE_DAY, now):
+            cached = _apply_top_weekly(cached)
+            changed = True
+        if changed:
+            g_c.put(DASHBOARD_CACHE_KEY, cached, timeout=EXPIRE_DAY)
+        return cached
 
 
 def _hydrate_models(model_ids: List[str], weekly_tokens: Dict[str, int]) -> List[Dict[str, Any]]:
@@ -266,7 +322,7 @@ def get_openrouter_models_payload() -> Dict[str, Any]:
     return {
         "top_weekly": _hydrate_models(dashboard.get("top_weekly_ids") or [], weekly_tokens),
         "newest": _hydrate_models(dashboard.get("newest_ids") or [], {}),
-        "last_fetch": format_last_updated(dashboard.get("last_fetch")),
+        "last_fetch": format_last_updated(dashboard.get("newest_last_fetch")),
     }
 
 
