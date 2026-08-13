@@ -345,6 +345,8 @@ def init_openrouter_models_routes(app) -> None:
         @limiter.limit(dynamic_rate_limit)
         def get(self):
             payload = get_openrouter_models_payload()
-            return jsonify(payload)
+            response = jsonify(payload)
+            response.headers['Cache-Control'] = f'public, max-age={EXPIRE_HOUR}'
+            return response
 
     API.add_resource(OpenRouterModelsResource, "/api/openrouter/models")
