@@ -86,7 +86,7 @@
     }
 
     load() {
-      fetch('/api/openrouter/models', { credentials: 'same-origin' })
+      fetch('/api/openrouter/models?v=2', { credentials: 'same-origin' })
         .then((res) => {
           if (!res.ok) throw new Error('HTTP ' + res.status);
           return res.json();
