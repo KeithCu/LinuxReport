@@ -43,6 +43,12 @@
       </div>
     </div>
 
+    {% if openrouter_models_html is defined and openrouter_models_html %}
+    <aside id="or-models-mobile" class="or-models-panel or-models-mobile" aria-label="OpenRouter models">
+      {{ openrouter_models_html }}
+    </aside>
+    {% endif %}
+
     <header>
          <!-- Above Content -->
          <div>{{ above_html }}</div>
@@ -151,12 +157,6 @@
         <span class="api-link-title">🔗 JSON</span>
       </a>
     </div>
-
-    {% if openrouter_models_html is defined and openrouter_models_html %}
-    <aside id="or-models-mobile" class="or-models-panel or-models-mobile" aria-label="OpenRouter models">
-      {{ openrouter_models_html }}
-    </aside>
-    {% endif %}
 
     <!-- Chat Sidebar -->
     <aside id="chat-container" class="chat-container">

@@ -7,6 +7,7 @@ Tests for OpenRouter models dashboard caching and AI-only shell.
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -15,7 +16,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import openrouter_models as orm
-from shared import Mode
+from shared import EXPIRE_DAY, EXPIRE_HOUR, Mode, TZ
 
 
 def _model(model_id, name=None, prompt="0.000001", completion="0.000002"):
@@ -180,3 +181,77 @@ def test_lookup_weekly_tokens_sums_family_variants():
     weekly = {"openai/gpt-x": 100, "openai/gpt-x:free": 50, "other/model": 9}
     assert orm._lookup_weekly_tokens(model, weekly) == 150
     assert orm._lookup_weekly_tokens({"id": "missing/model"}, weekly) is None
+
+
+def test_newest_cache_ttl_business_hours():
+    morning = datetime(2026, 8, 13, 8, 0, tzinfo=TZ)
+    afternoon = datetime(2026, 8, 13, 16, 59, tzinfo=TZ)
+    assert orm._newest_cache_ttl(morning) == 2 * EXPIRE_HOUR
+    assert orm._newest_cache_ttl(afternoon) == 2 * EXPIRE_HOUR
+
+
+def test_newest_cache_ttl_after_hours():
+    evening = datetime(2026, 8, 13, 19, 0, tzinfo=TZ)
+    early = datetime(2026, 8, 13, 7, 59, tzinfo=TZ)
+    assert orm._newest_cache_ttl(evening) == 6 * EXPIRE_HOUR
+    assert orm._newest_cache_ttl(early) == 6 * EXPIRE_HOUR
+
+
+def test_old_dashboard_blob_is_ignored(clean_cache_keys):
+    orm.g_c.put(orm.DASHBOARD_CACHE_KEY, {
+        "top_weekly_ids": ["old/top"],
+        "newest_ids": ["old/new"],
+        "weekly_tokens": {},
+        "last_fetch": datetime.now(TZ),
+    }, timeout=EXPIRE_DAY)
+    top = [_model("a/model-1")]
+    newest = [_model("b/new-1")]
+    with patch.object(orm, "_fetch_models_sorted", side_effect=lambda sort: top if sort == "top-weekly" else newest), \
+         patch.object(orm, "_fetch_weekly_token_totals", return_value={}) as fetch_rank, \
+         patch.object(orm, "get_lock") as get_lock:
+        lock = MagicMock()
+        lock.__enter__ = MagicMock(return_value=lock)
+        lock.__exit__ = MagicMock(return_value=False)
+        get_lock.return_value = lock
+        payload = orm.get_openrouter_models_payload()
+        assert payload["newest"][0]["id"] == "b/new-1"
+        assert payload["top_weekly"][0]["id"] == "a/model-1"
+        assert fetch_rank.call_count == 1
+
+
+def test_newest_only_refresh_skips_rankings(clean_cache_keys):
+    now = datetime.now(TZ)
+    orm.g_c.put(orm.DASHBOARD_CACHE_KEY, {
+        "newest_ids": ["old/new"],
+        "newest_last_fetch": now - timedelta(hours=7),
+        "top_weekly_ids": ["a/model-1"],
+        "weekly_tokens": {"a/model-1": 99},
+        "top_last_fetch": now,
+    }, timeout=EXPIRE_DAY)
+    newest = [_model("b/new-1", "New One")]
+
+    with patch.object(orm, "_fetch_models_sorted", side_effect=lambda sort: newest) as fetch_models, \
+         patch.object(orm, "_fetch_weekly_token_totals") as fetch_rank, \
+         patch.object(orm, "get_lock") as get_lock:
+        lock = MagicMock()
+        lock.__enter__ = MagicMock(return_value=lock)
+        lock.__exit__ = MagicMock(return_value=False)
+        get_lock.return_value = lock
+
+        payload = orm.get_openrouter_models_payload()
+        assert fetch_models.call_count == 1
+        fetch_models.assert_called_with("newest")
+        fetch_rank.assert_not_called()
+        assert payload["newest"][0]["id"] == "b/new-1"
+        assert payload["top_weekly"][0]["id"] == "a/model-1"
+
+
+def test_fetch_models_sorted_requests_text_output():
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"data": []}
+    mock_response.raise_for_status = MagicMock()
+    with patch.object(orm.requests, "get", return_value=mock_response) as get:
+        orm._fetch_models_sorted("newest")
+        args, kwargs = get.call_args
+        assert kwargs["params"]["sort"] == "newest"
+        assert kwargs["params"]["output_modalities"] == "text"
