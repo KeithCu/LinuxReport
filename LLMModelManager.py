@@ -148,6 +148,9 @@ FREE_MODELS = [
 # Fallback model to use if all free models fail
 FALLBACK_MODEL = "mistralai/mistral-small-3.2-24b-instruct"
 
+# Primary model alias to use for auto-updating free models
+OPENROUTER_FREE_MODEL = "openrouter/free"
+
 # Models that don't support system instructions properly and need user-only instructions
 USER_ONLY_INSTRUCTION_MODELS = [
     "google/gemma-2-9b-it:free",  # Google Gemma models don't support system instructions
@@ -237,9 +240,8 @@ class LLMModelManager:
     
     def mark_failed(self, model, reason=None, response_text=None):
         """Mark a model as failed with timestamp, reason, and full response."""
-        if model not in FREE_MODELS:
-            logger.warning(f"Attempted to mark unknown model as failed: {model}")
-            return
+        if model not in FREE_MODELS and model != OPENROUTER_FREE_MODEL:
+            logger.debug(f"Marking model as failed: {model}")
             
         failed_models_data = g_c.get(self.failed_models_cache_key) or {}
         failed_models_data[model] = {
@@ -303,9 +305,8 @@ class LLMModelManager:
 
     def mark_success(self, model, forced_model=None):
         """Mark a model as successful and update cache."""
-        if model not in FREE_MODELS:
-            logger.warning(f"Attempted to mark unknown model as successful: {model}")
-            return
+        if model not in FREE_MODELS and model != OPENROUTER_FREE_MODEL:
+            logger.debug(f"Marking model as successful: {model}")
             
         if model != forced_model:  # Don't cache forced models
             g_c.put(self.working_model_cache_key, model, timeout=self.cache_duration)

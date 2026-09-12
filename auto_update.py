@@ -26,7 +26,7 @@ from html_generation import (
 )
 
 from shared import (EXPIRE_DAY, EXPIRE_WEEK, TZ, Mode, g_c)
-from LLMModelManager import LLMModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS
+from LLMModelManager import LLMModelManager, FALLBACK_MODEL, MISTRAL_EXTRA_PARAMS, OPENROUTER_FREE_MODEL
 from Logging import _setup_logging, DEBUG
 from app import detect_mode
 
@@ -185,8 +185,8 @@ def get_openrouter_client():
 def call_openrouter_model(model, messages, max_tokens, label=""):
     """Call OpenRouter model with retry logic, timeout, and logging."""
     client = get_openrouter_client()
-    response_text = _try_call_model(client, model, messages, max_tokens)
-    return response_text, model
+    response_text, actual_model = _try_call_model(client, model, messages, max_tokens)
+    return response_text, actual_model
 
 
 
@@ -286,15 +286,15 @@ def _try_call_model(client, model, messages, max_tokens):
                 raise RuntimeError(f"Model {model} returned empty choices")
 
             choice = response.choices[0]
-            response_text = choice.message.content
+            response_text = choice.message.content or ""
             finish_reason = choice.finish_reason
             response_time = end - start
+            actual_model = getattr(response, "model", None) or model
 
-            logger.info(f"Model {model} responded in {response_time:.3f}s, finish_reason: {finish_reason}")
+            logger.info(f"Model {model} (actual: {actual_model}) responded in {response_time:.3f}s, finish_reason: {finish_reason}")
             logger.debug(f"Response length: {len(response_text)} characters")
 
-
-            return response_text
+            return response_text, actual_model
         except (APITimeoutError, RateLimitError) as e:
             last_error, last_error_body = _extract_error_details(e)
             logger.warning(f"API Error on attempt {attempt} for model {model}: {last_error}. Retrying...")
@@ -467,20 +467,9 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
             current_model = FALLBACK_MODEL
             logger.info(f"Using fallback model: {current_model}")
         else:
-            # Only use forced_model on the first attempt; let the system pick a new model on retries
+            # Only use forced_model on the first attempt; retry with OPENROUTER_FREE_MODEL on subsequent attempts
             model_to_force = forced_model if attempt_idx == 0 else None
-            current_model = model_manager.get_available_model(current_model=current_model, forced_model=model_to_force)
-            if current_model is None:
-                logger.error("No available models found, skipping this attempt")
-                attempt_record = {
-                    "model": None,
-                    "messages": messages,
-                    "response": None,
-                    "success": False,
-                    "error": "No available models"
-                }
-                attempts.append(attempt_record)
-                continue
+            current_model = model_to_force or OPENROUTER_FREE_MODEL
 
         logger.info(f"Trying model: {current_model}")
 
@@ -495,25 +484,29 @@ def _try_ai_models(messages, filtered_articles, forced_model=None):
 
         try:
             response_text, used_model = call_openrouter_model(current_model, messages, MAX_TOKENS, f"Attempt {attempt_idx+1}")
+            if used_model:
+                attempt_record["model"] = used_model
             attempt_record["response"] = response_text
+
+            effective_model = used_model or current_model
 
             if not response_text:
                 error_msg = "Empty response"
-                logger.warning(f"Model {current_model} returned no response")
-                model_manager.mark_failed(current_model, error_msg, response_text="")
+                logger.warning(f"Model {effective_model} returned no response")
+                model_manager.mark_failed(effective_model, error_msg, response_text="")
                 attempt_record["error"] = error_msg
                 continue
 
-            top_articles = _process_ai_response(response_text, filtered_articles, f"model {current_model}")
+            top_articles = _process_ai_response(response_text, filtered_articles, f"model {effective_model}")
             if top_articles and len(top_articles) >= 3:
-                logger.info(f"Successfully got {len(top_articles)} articles from model {current_model}")
-                model_manager.mark_success(current_model)
+                logger.info(f"Successfully got {len(top_articles)} articles from model {effective_model}")
+                model_manager.mark_success(effective_model)
                 attempt_record["success"] = True
-                return response_text, top_articles, current_model, attempts
+                return response_text, top_articles, effective_model, attempts
             else:
                 error_msg = "Insufficient articles returned"
-                logger.warning(f"Model {current_model} failed to produce enough articles")
-                model_manager.mark_failed(current_model, error_msg, response_text)
+                logger.warning(f"Model {effective_model} failed to produce enough articles")
+                model_manager.mark_failed(effective_model, error_msg, response_text)
                 attempt_record["error"] = error_msg
 
         except (RuntimeError, RateLimitError, APITimeoutError) as e:
@@ -783,7 +776,12 @@ def configure_global_settings(args):
         INCLUDE_ARTICLE_SUMMARY_FOR_LLM = True
 
     # Configure models
-    MODEL_1 = model_manager.get_available_model(use_random=USE_RANDOM_MODELS, forced_model=args.force_model)
+    if args.force_model:
+        MODEL_1 = args.force_model
+    elif args.use_cached_model:
+        MODEL_1 = model_manager.get_available_model(use_random=False) or OPENROUTER_FREE_MODEL
+    else:
+        MODEL_1 = OPENROUTER_FREE_MODEL
 
     # Set prompt mode
     if args.prompt_mode:
