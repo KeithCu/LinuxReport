@@ -216,7 +216,11 @@
         getCachedIcon(iconCode) {
             try {
                 const cacheKey = `weather_icon_${iconCode}`;
-                return localStorage.getItem(cacheKey);
+                const cached = localStorage.getItem(cacheKey);
+                if (cached && (cached.startsWith('data:') || cached.startsWith('http://') || cached.startsWith('https://'))) {
+                    return cached;
+                }
+                return null;
             } catch (error) {
                 app.utils.logger.debug('[Weather] Error reading cached icon:', error);
                 return null;
@@ -279,12 +283,12 @@
         }
 
         /**
-         * Get emoji representation for weather icon code
+         * Get emoji representation for weather icon code as an SVG data URI
          * @param {string} iconCode - Weather icon code
-         * @returns {string} Emoji representation
+         * @returns {string} SVG data URI representing the weather emoji
          */
         getEmojiForWeather(iconCode) {
-            const code = iconCode.charAt(0) + iconCode.charAt(1); // First two characters
+            const code = (iconCode || '').slice(0, 2);
             const emojiMap = {
                 '01': '☀️',  // clear sky
                 '02': '⛅',  // few clouds
@@ -296,7 +300,9 @@
                 '13': '❄️',  // snow
                 '50': '🌫️'   // mist
             };
-            return emojiMap[code] || '🌤️'; // default weather emoji
+            const emoji = emojiMap[code] || '🌤️';
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="28">${emoji}</text></svg>`;
+            return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
         }
 
         /**
@@ -534,11 +540,15 @@
             
             // Load and cache the weather icon
             const iconSrc = await this.loadAndCacheIcon(day.weather_icon);
+            const isImageUrl = iconSrc && (iconSrc.startsWith('http://') || iconSrc.startsWith('https://') || iconSrc.startsWith('data:'));
+            const iconElement = isImageUrl
+                ? `<img class="weather-icon" src="${iconSrc}" alt="${day.weather}" loading="lazy">`
+                : `<span class="weather-icon weather-emoji" role="img" aria-label="${day.weather}">${iconSrc || '🌤️'}</span>`;
             
             return `
                 <div class="weather-day">
                     <div class="weather-day-name">${this.getDayName(day)}</div>
-                    <img class="weather-icon" src="${iconSrc}" alt="${day.weather}" loading="lazy">
+                    ${iconElement}
                     <div class="weather-temp">
                         <span class="temp-max">${tempMax}°${unit}</span> /
                         <span class="temp-min">${tempMin}°${unit}</span>
