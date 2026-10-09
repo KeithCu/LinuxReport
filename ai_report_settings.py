@@ -57,7 +57,7 @@ CONFIG = SiteConfig(
 	WEB_TITLE="AI Report | Latest AI News",
 	REPORT_PROMPT="AI and robotics news for developers, researchers, and curious non-experts, focusing on the most important developments in AI and robots. Avoid generic fearmongering or any security or quantum computing topics",
     PATH="/srv/http/aireport",
-    SCHEDULE=[7, 12, 17, 22],
+    SCHEDULE=[0, 8, 12, 16, 20],
     DEFAULT_THEME="futuristic",
     CUSTOM_FETCH_CONFIG={
         "reddit.com": RedditFetchConfig(),
